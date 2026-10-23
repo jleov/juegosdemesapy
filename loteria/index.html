@@ -190,8 +190,9 @@ const myToken = load('lot_token') || (()=>{ const t=Math.random().toString(36).s
 const PREF = Object.assign({name:'', emoji:'🙂', sound:true, voz:true}, load('lot_pref', {}));
 const savePref = () => store('lot_pref', PREF);
 const EMOJIS = ['🙂','😎','🤠','👵','👴','🧉','🐔','🐶','🐱','🦜','⚽','🌺','👑','🍀','🎩','🦊'];
-const BOTS = [['Doña Chela','👵'],['Don Ramón','👴'],['Tía Nilda','🌺'],['Karai Pedro','🤠'],['Mirna','🦜'],['Toto','⚽'],['Ña Petrona','🧉'],['Cholo','🐔']];
-const DEF_CFG = {precio:500, saldo:10000, max:2, serie:12, modo:'linea', pctLinea:30, aTiempo:true, falso:'nada', gracia:4};
+const BOTS = [['Doña Chela','👵'],['Don Ramón','👴'],['Tía Nilda','🌺'],['Karai Pedro','🤠'],['Mirna','🦜'],['Toto','⚽'],['Ña Petrona','🧉'],['Cholo','🐔'],['Tío Beto','🎩'],['Kuña Lucía','🍀']];
+const MAX_JUG = 10;   // jugadores por sala (cada uno puede tener 2 cartones: 20 cartones de colores distintos)
+const DEF_CFG = {precio:500, saldo:10000, max:2, serie:20, modo:'linea', pctLinea:30, aTiempo:true, falso:'nada', gracia:4};
 
 let S = null;   // estado del juego: el anfitrión es la autoridad, los demás reciben copias
 const NET = {mode:null, peer:null, conns:{}, hostConn:null, code:'', myPid:null, welcomed:false};
@@ -287,14 +288,16 @@ function genCard(usados=new Set()){
   }
   return g;
 }
-// Un cartón trae 3 combinaciones, cada una de una serie y un color distinto, sin números repetidos entre ellas
+// Un cartón es de un solo color y trae 3 combinaciones: Serie 1, Serie 2 y Serie 3, sin números repetidos entre ellas
 // (3 x 15 = 45 números). Como cada columna lleva hasta 3 números por combinación, siempre alcanzan.
-const SERIES = {1:'#1f9d55', 2:'#e8730c', 3:'#7d3c98', 4:'#8b5a2b', 5:'#1597b8', 6:'#1f5fbf', 7:'#2b2b2b', 8:'#d52b1e'};
-const seriesDe = p => [0,1,2].map(i=>((p-1)*3+i)%8+1);
+// 20 colores: alcanza para 10 jugadores con 2 cartones cada uno, todos de distinto color.
+const COLORES = ['#1f9d55','#d52b1e','#1f5fbf','#2b2b2b','#e8730c','#7d3c98','#8b5a2b','#1597b8','#d6337f','#0b6b3a',
+                 '#1b2f7a','#8a1c2b','#b8860b','#0f8f84','#5f6b73','#9b59b6','#6b7a1f','#e0604f','#4b3fb3','#b5532a'];
+const colorDe = p => COLORES[(p-1) % COLORES.length];
 const cardNums = g => g.flat().filter(Boolean);
 const myCards = pid => Object.keys(S.owner||{}).filter(c=>S.owner[c]===pid).map(Number).sort((a,b)=>a-b);
 const myPlanchas = pid => Object.keys(S.planchas||{}).map(Number).filter(p=>S.owner[S.planchas[p][0]]===pid);
-const infoDe = c => (S.info && S.info[c]) || {p:c, serie:((c-1)%8)+1};
+const infoDe = c => (S.info && S.info[c]) || {p:Math.ceil(c/3), serie:(c-1)%3+1};
 
 /* ====================== ESTADO (anfitrión) ====================== */
 function lobbyState(){
@@ -313,7 +316,7 @@ const cleanName = s => String(s||'').replace(/\s+/g,' ').trim().slice(0,18) || '
 function sanitizeCfg(c){
   const n=(v,lo,hi,d)=>{ v=Math.round(+v); return isFinite(v) ? Math.max(lo,Math.min(hi,v)) : d; };
   return {
-    precio:Math.round(n(c.precio,500,20000,500)/500)*500, saldo:+c.saldo===20000?20000:10000, max:n(c.max,1,4,2), serie:n(c.serie,4,40,12),
+    precio:Math.round(n(c.precio,500,20000,500)/500)*500, saldo:+c.saldo===20000?20000:10000, max:n(c.max,1,4,2), serie:n(c.serie,4,40,20),
     modo:c.modo==='bingo'?'bingo':'linea', pctLinea:n(c.pctLinea,5,60,30), aTiempo:!!c.aTiempo,
     falso:['anular','multa','nada'].includes(c.falso)?c.falso:'nada', gracia:n(c.gracia,2,10,4)
   };
@@ -323,8 +326,8 @@ function abrirVenta(){
   S.winners={linea:[],bingo:[]}; S.claim=null; S.result=null; S.resumen=null; S.auto=0; S.pozo={linea:0,bingo:0};
   S.info={}; S.planchas={};
   for(let p=1;p<=S.cfg.serie;p++){
-    const usados=new Set(), series=seriesDe(p);
-    S.planchas[p]=series.map((serie,i)=>{ const id=(p-1)*3+i+1; S.cards[id]=genCard(usados); S.info[id]={p, serie}; return id; });
+    const usados=new Set();
+    S.planchas[p]=[1,2,3].map(serie=>{ const id=(p-1)*3+serie; S.cards[id]=genCard(usados); S.info[id]={p, serie}; return id; });
   }
   sys(`🎟️ Ronda ${S.round}: ¡a elegir cartones! Cada cartón trae 3 combinaciones y cuesta ${gs(S.cfg.precio)}.`);
   botsBuy();
@@ -346,6 +349,7 @@ function act(pid, a){
       break;
     case 'bot': {
       if(!isHost || S.phase==='juego') return;
+      if(S.players.length>=MAX_JUG) return `La sala ya tiene ${MAX_JUG} jugadores.`;
       const used=S.players.map(x=>x.name), b=BOTS.find(b=>!used.includes(b[0]));
       if(!b) return 'Ya están todos los vecinos de la casa.';
       addPlayer(b[0], b[1], null, true); sys(`${b[1]} ${b[0]} se sentó a jugar.`);
@@ -634,7 +638,7 @@ function hostOnData(conn, d){
   if(d.t==='hello'){
     let p=S.players.find(x=>!x.bot && x.token && x.token===d.token);
     if(!p){
-      if(S.players.length>=30) { conn.send({t:'toast', x:'La sala está llena.'}); return; }
+      if(S.players.length>=MAX_JUG) { conn.send({t:'toast', x:`La sala está llena: el máximo es ${MAX_JUG} jugadores.`}); return; }
       p=addPlayer(cleanName(d.name), EMOJIS.includes(d.emoji)?d.emoji:'🙂', d.token);
       sys(`${p.emoji} ${p.name} entró a la sala.${S.phase==='juego'?' Mira esta ronda y juega en la próxima.':''}`);
     } else { p.conn=true; sys(`${p.emoji} ${p.name} volvió.`); }
@@ -723,7 +727,7 @@ function cardHTML(c, o={}){
       <button class="btn red" data-act="cantar" data-card="${c}" data-tipo="bingo">¡BINGO!</button></div>`;
   }
   const inf=infoDe(c);
-  return `<div class="carton ${o.mine?'mine':''} ${S.anulados[c]?'anul':''}" data-card="${c}" style="--c:${SERIES[inf.serie]}">
+  return `<div class="carton ${o.mine?'mine':''} ${S.anulados[c]?'anul':''}" data-card="${c}" style="--c:${colorDe(inf.p)}">
     <div class="hd"><span>Cartón N° ${String(inf.p).padStart(2,'0')}</span><span>${own?esc(own.emoji+' '+own.name):''}</span></div>
     <div class="grid">${rows}</div>
     <div class="ft"><i></i><b>SERIE ${inf.serie}</b><i></i></div>${acts}</div>`;
@@ -733,7 +737,7 @@ function planchaHTML(p){
   const ids=S.planchas[p], own=S.owner[ids[0]], mine=own===NET.myPid, o=P(own);
   return `<div class="mini ${mine?'mine':''} ${own&&!mine?'taken':''}" data-act="${mine?'devolver':own?'':'comprar'}" data-plancha="${p}">
     <div class="hd"><span>Cartón N° ${String(p).padStart(2,'0')}</span><span>${mine?'✅ Tuyo':o?esc(o.emoji+' '+o.name):''}</span></div>
-    ${ids.map(c=>`<div class="g" style="--c:${SERIES[infoDe(c).serie]}">${S.cards[c].flat().map(n=>n?`<div>${n}</div>`:'<div class="e"></div>').join('')}</div>`).join('')}</div>`;
+    ${ids.map(c=>`<div class="g" style="--c:${colorDe(p)}">${S.cards[c].flat().map(n=>n?`<div>${n}</div>`:'<div class="e"></div>').join('')}</div>`).join('')}</div>`;
 }
 // fichas de madera como las de la lotería de casa; se subrayan las que se confunden dadas vuelta (6 y 9, 16 y 91…)
 const GIRA={0:'0',1:'1',6:'9',8:'8',9:'6'};
@@ -824,7 +828,7 @@ function ventaHTML(){
   const total=sold*S.cfg.precio;
   return `${playersHTML()}
   <div class="box"><h3>🎟️ Elegí tus cartones — Ronda ${S.round}</h3>
-    <div class="muted">Cada cartón trae <b>3 combinaciones</b> de distinto color, sin números repetidos entre ellas, y cuesta ${gs(S.cfg.precio)}.
+    <div class="muted">Cada cartón es de un color y trae <b>3 combinaciones</b> (Serie 1, 2 y 3) sin números repetidos entre ellas. Cuesta ${gs(S.cfg.precio)}.
       Tocá un cartón para comprarlo y uno tuyo para devolverlo. Máximo ${S.cfg.max} por jugador.
       Tenés <b>${mine.length}</b> · Saldo <b>${gs(m?m.saldo:0)}</b></div>
     <div class="flex" style="margin-top:10px"><button class="btn gold" data-act="azar">🎲 Uno al azar</button>
@@ -884,7 +888,7 @@ function finHTML(){
 }
 const REGLAS = `<h3>📜 Cómo se juega la Lotería</h3><ul class="rules">
   <li><b>Bolillero de 90.</b> Las bolillas van del 1 al 90. El <b>cantor</b> 🎤 las saca de a una y las canta en voz alta.</li>
-  <li><b>El cartón</b> trae <b>3 combinaciones</b>, cada una de un color y una serie distinta, y entre ellas no se repite ningún número. Cada combinación tiene 3 filas y 9 columnas, con 15 números: 5 por fila. La 1ª columna lleva del 1 al 9, la 2ª del 10 al 19… y la última del 80 al 90. Cada jugador puede comprar hasta 2 cartones (el anfitrión puede cambiarlo).</li>
+  <li><b>El cartón</b> es de un solo color y trae <b>3 combinaciones</b>: Serie 1, Serie 2 y Serie 3. Entre ellas no se repite ningún número, y cada cartón de la sala es de un color distinto. Cada combinación tiene 3 filas y 9 columnas, con 15 números: 5 por fila. La 1ª columna lleva del 1 al 9, la 2ª del 10 al 19… y la última del 80 al 90. Pueden jugar hasta 10 jugadores con 2 cartones cada uno (el anfitrión puede cambiar cuántos cartones).</li>
   <li>La línea y el bingo se cantan <b>por combinación</b>: cada una tiene sus botones.</li>
   <li><b>Elegí tus cartones</b> antes de que empiece la ronda. Todo lo que se paga por los cartones forma el <b>pozo</b>.</li>
   <li><b>Poné tu maíz 🌽:</b> cuando sale un número que está en tu cartón, tocalo para ponerle un grano de maíz. Nadie lo pone por vos: si no estás atento, el juego no te avisa.</li>
