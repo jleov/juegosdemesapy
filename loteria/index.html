@@ -30,9 +30,9 @@ input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1p
 .logo{text-align:center;color:#fff;margin:10px 0 18px}
 .logo h1{margin:0;font-size:46px;letter-spacing:2px;font-weight:900;text-shadow:0 3px 0 #000}
 .logo h1 span{color:var(--gold)}
-.logo .sub{display:inline-flex;margin-top:6px;border-radius:6px;overflow:hidden;font-weight:800;letter-spacing:4px;font-size:14px}
-.logo .sub b{padding:4px 10px}
-.flag-r{background:var(--red);color:#fff}.flag-w{background:#fff;color:#222}.flag-b{background:var(--blue);color:#fff}
+.bandera{display:inline-block;margin-top:8px;border-radius:5px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.45);line-height:1;vertical-align:top}
+.bandera i{display:block;height:7px}.bandera i.rojo{background:#d52b1e}.bandera i.azul{background:#0038a8}
+.bandera b{display:block;background:#fff;color:#1b2a5a;font-weight:900;letter-spacing:5px;font-size:14px;padding:5px 11px 5px 16px}
 .box{background:var(--cream);border-radius:14px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:12px}
 .box h3{margin:0 0 10px;font-size:17px}
 .box label{display:block;font-size:13px;font-weight:700;margin:8px 0 4px}
@@ -792,7 +792,7 @@ function menuHTML(){
   const fresh = x => x && Date.now()-x.at < 12*3600e3;
   const url = new URLSearchParams(location.search).get('sala') || UI.menuCode;
   return `<div class="menu">
-    <div class="logo"><h1>LOTE<span>RÍA</span></h1><div class="sub"><b class="flag-r">PA</b><b class="flag-w">RA</b><b class="flag-b">GUAY</b></div>
+    <div class="logo"><h1>LOTE<span>RÍA</span></h1><div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
     <div class="muted" style="color:#ddd;margin-top:8px">Elegí tus cartones, anotá lo que sale y ¡cantá bingo!</div></div>
     <div class="box"><h3>¿Quién sos?</h3>
       <label>Tu nombre</label><input type="text" id="myName" maxlength="18" value="${esc(PREF.name)}" placeholder="Ej: Juana">

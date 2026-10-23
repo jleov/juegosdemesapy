@@ -21,9 +21,9 @@ body{background:radial-gradient(circle at 30% 10%,#33236e,#120b2b 75%) fixed;fon
 header{text-align:center;margin-bottom:26px}
 h1{margin:0;font-size:clamp(30px,7vw,48px);font-weight:900;letter-spacing:1px;text-shadow:0 3px 0 #000;line-height:1.1}
 h1 span{color:var(--gold)}
-.flag{display:inline-flex;margin-top:10px;border-radius:6px;overflow:hidden;font-weight:800;letter-spacing:4px;font-size:14px}
-.flag b{padding:4px 12px}
-.r{background:var(--red)}.w{background:#fff;color:#222}.b{background:var(--blue)}
+.bandera{display:inline-block;margin-top:8px;border-radius:5px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.45);line-height:1;vertical-align:top}
+.bandera i{display:block;height:7px}.bandera i.rojo{background:#d52b1e}.bandera i.azul{background:#0038a8}
+.bandera b{display:block;background:#fff;color:#1b2a5a;font-weight:900;letter-spacing:5px;font-size:14px;padding:5px 11px 5px 16px}
 .sub{color:#cfc8ea;margin-top:12px}
 .games{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 a.game{display:block;text-decoration:none;color:#1d1d1d;background:var(--cream);border-radius:18px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.45);transition:transform .15s}
@@ -58,7 +58,7 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
 <div class="wrap">
   <header>
     <h1>Juegos de Mesa<br><span>Digital PY</span></h1>
-    <div class="flag"><b class="r">PARA</b><b class="w">GUA</b><b class="b">Y</b></div>
+    <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
     <div class="sub">Los juegos de siempre, para jugar en línea con la familia y los amigos.</div>
   </header>
   <div class="install" id="installBox">
