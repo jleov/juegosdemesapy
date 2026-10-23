@@ -1,6 +1,6 @@
 // Service worker mínimo: permite instalar la Lotería como app en Android.
-const CACHE = 'loteria-v1';
-const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js'];
+const CACHE = 'loteria-v2';
+const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './voces.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Grabador de Cantos · Lotería</title>
+<meta name="theme-color" content="#2b0f4a">
+<link rel="icon" href="../loteria/icon-192.png">
+<script src="../loteria/voces.js"></script>
+<style>
+:root{--cream:#fff8e6;--ink:#1d1d1d;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f;--muted:#6b6b6b}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(circle at 30% 10%,#4a1a7a,#1c0a33 75%) fixed;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-tap-highlight-color:transparent}
+input,button,select{font:inherit}
+input[type=text],select{width:100%;padding:10px 12px;border:1px solid #c9c2a8;border-radius:10px;background:#fff;color:var(--ink)}
+.wrap{max-width:760px;margin:0 auto;padding:16px 14px 50px}
+h1{color:#fff;text-align:center;margin:6px 0 4px;font-size:30px;text-shadow:0 3px 0 #000}
+.sub{color:#ddd;text-align:center;margin-bottom:16px;font-size:14px}
+.box{background:var(--cream);border-radius:14px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:12px}
+.box h3{margin:0 0 10px;font-size:17px}
+label{display:block;font-size:13px;font-weight:700;margin:8px 0 4px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--blue);color:#fff;touch-action:manipulation;text-decoration:none;display:inline-block;text-align:center}
+.btn.red{background:var(--red)}.btn.gray{background:#7a7a7a}.btn.gold{background:var(--gold);color:#222}.btn.green{background:var(--green)}.btn.purple{background:#7a2fbf}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px}
+.btn.big{font-size:20px;padding:14px 18px}
+.flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.muted{color:var(--muted);font-size:13px}
+.cantor{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:2px solid #e3d7b8;border-radius:12px;padding:10px;margin-bottom:8px;background:#fff}
+.cantor b{font-size:17px}
+.prog{height:10px;background:#e9dfc6;border-radius:6px;overflow:hidden;margin-top:4px}
+.prog div{height:100%;background:var(--green)}
+.ball{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:34px;box-shadow:inset -8px -10px 16px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.35);position:relative;flex:none}
+.ball::before{content:"";position:absolute;width:64%;height:64%;border-radius:50%;background:#fff}
+.ball span{position:relative}
+.decir{font-size:22px;font-weight:800;color:#5a1a1a;margin:4px 0}
+.decir small{display:block;font-size:13px;font-weight:600;color:var(--muted)}
+.estado{font-weight:700;margin:6px 0}
+.ok{color:var(--green)}.no{color:#a06a00}
+.tiempo{height:14px;background:#e9dfc6;border-radius:8px;overflow:hidden;margin:10px 0 4px;display:none}
+.tiempo div{height:100%;background:linear-gradient(90deg,var(--green),var(--gold) 60%,var(--red));width:0}
+.grabando .tiempo{display:block}
+.recbtn{min-width:170px}
+.grabando .recbtn{animation:late .8s infinite alternate}
+@keyframes late{to{box-shadow:0 0 0 8px rgba(213,43,30,.25)}}
+.acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.acciones .btn{flex:1;min-width:130px}
+.grilla{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
+.grilla button{border:2px solid transparent;border-radius:8px;background:#efe6cf;font-weight:800;padding:7px 0;cursor:pointer;color:#555}
+.grilla button.hecho{background:#bdf0c4;color:#155c22}
+.grilla button.sel{border-color:var(--blue);background:#dfe8ff;color:#002a7a}
+.grilla button.hecho.sel{background:#9fe3aa}
+.leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.leyenda i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;z-index:60;display:none;max-width:90%;text-align:center}
+.links{text-align:center;margin-top:16px}
+.links a{color:#f2c14e;font-weight:700}
+@media (max-width:520px){.grilla{grid-template-columns:repeat(9,1fr)}.ball{width:70px;height:70px;font-size:28px}.decir{font-size:19px}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(x){ const t=$('#toast'); t.textContent=x; t.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display='none', 3500); }
+const BALLC = ['#ef5350','#ffa726','#ffee58','#66bb6a','#26c6da','#42a5f5','#ab47bc','#ec407a','#8d6e63'];
+const ballColor = n => BALLC[Math.min(8, Math.floor(n/10))];
+const baseSelect = (id, sel) => `<select id="${id}">${CANTORES.map(c=>`<option value="${c.id}" ${c.id===sel?'selected':''}>${c.nombre} — ${c.desc}</option>`).join('')}</select>`;
+
+let VISTA='lista', LISTA=[], ED=null, REC=null, STREAM=null;
+const AUTO_SIG_KEY='cantos_autosig';
+let autoSig=false; try{ autoSig=localStorage.getItem(AUTO_SIG_KEY)==='1'; }catch(e){}
+
+async function cargarLista(){
+  const ls=await CantosDB.lista();
+  LISTA=await Promise.all(ls.sort((a,b)=>(b.cambiado||b.creado)-(a.cambiado||a.creado)).map(async c=>({...c, cuantos:(await CantosDB.numeros(c.id)).length})));
+}
+async function abrir(id){
+  const c=await CantosDB.cantor(id); if(!c) return;
+  ED={...c, hechos:new Set(await CantosDB.numeros(id)), durs:{}, sel:1};
+  (await CantosDB.clips(id)).forEach(x=>ED.durs[x.n]=x.dur);
+  ED.sel = [...Array(90).keys()].map(i=>i+1).find(n=>!ED.hechos.has(n)) || 1;
+  VISTA='editar'; render(); window.scrollTo(0,0);
+}
+async function volver(){
+  pararGrabacion(true);
+  if(STREAM){ STREAM.getTracks().forEach(t=>t.stop()); STREAM=null; }
+  ED=null; VISTA='lista'; await cargarLista(); render();
+}
+
+/* ---------- pantallas ---------- */
+function listaHTML(){
+  return `<h1>🎙️ Grabador de Cantos</h1>
+  <div class="sub">Grabá con tu voz cómo se canta cada bolilla de la Lotería.</div>
+  <div class="box"><h3>➕ Nuevo cantor</h3>
+    <label>Nombre del cantor</label><input type="text" id="nuevoNombre" maxlength="30" placeholder="Ej: Tío Leo, Doña Chela, La Abuela">
+    <label>Para los números que no grabes, canta la voz automática:</label>${baseSelect('nuevoBase','don')}
+    <button class="btn green big" style="width:100%;margin-top:12px" data-act="crear">🎙️ Crear y empezar a grabar</button>
+  </div>
+  <div class="box"><h3>📼 Mis cantores</h3>
+    ${LISTA.length?LISTA.map(c=>`<div class="cantor"><div class="grow" style="min-width:180px"><b>🎙️ ${esc(c.nombre)}</b>
+        <div class="muted">${c.cuantos} de 90 números grabados${c.cuantos<90?` · el resto: ${esc(cantorTTS(c.base).nombre)}`:' · ¡completo!'}</div>
+        <div class="prog"><div style="width:${c.cuantos/90*100}%"></div></div></div>
+        <div class="flex"><button class="btn" data-act="editar" data-id="${c.id}">✏️ Grabar / editar</button>
+        <button class="btn sm gray" data-act="bajar" data-id="${c.id}" title="Bajar como archivo para pasarlo a otro celular">⬇️ Archivo</button>
+        <button class="btn sm red" data-act="borrar" data-id="${c.id}">🗑</button></div></div>`).join('')
+      :'<div class="muted">Todavía no grabaste ningún cantor.</div>'}
+    <label style="margin-top:14px">📂 ¿Tenés un archivo de cantos de otro celular?</label>
+    <input type="file" id="archivo" accept=".json,application/json">
+  </div>
+  <div class="box"><h3>ℹ️ Cómo funciona</h3><ul class="muted" style="font-size:14px;line-height:1.5;padding-left:18px;margin:0">
+    <li>Cada número se graba como máximo <b>${MAX_SEG} segundos</b>; al llegar al límite se corta solo.</li>
+    <li>Si una grabación salió mal, la escuchás y la volvés a grabar las veces que quieras.</li>
+    <li>No hace falta grabar los 90: los que falten los canta la voz automática que elegiste.</li>
+    <li>Los cantos quedan guardados <b>en este celular o PC</b>. Para usarlos en otro, bajalos con “⬇️ Archivo” y cargalos allá.</li>
+    <li>En la Lotería, tocá 🗣️ y elegí tu cantor grabado. Si sos el cantor de la sala, tocá “📢 Que todos escuchen mi voz grabada” y todos los jugadores escuchan tu voz.</li></ul></div>
+  <div class="links"><a href="../loteria/">🎱 Ir a la Lotería</a> · <a href="../">🏠 Todos los juegos</a></div>`;
+}
+function editarHTML(){
+  const n=ED.sel, hecho=ED.hechos.has(n), grabando=REC && REC.n===n;
+  return `<div class="flex" style="margin-bottom:10px"><button class="btn gray sm" data-act="volver">← Mis cantores</button><span class="grow"></span>
+    <a class="btn sm gold" href="../loteria/">🎱 Ir a la Lotería</a></div>
+  <div class="box">
+    <label style="margin-top:0">Nombre del cantor</label><input type="text" id="edNombre" maxlength="30" value="${esc(ED.nombre)}">
+    <label>Para los números que no grabes, canta:</label><div class="flex">${baseSelect('edBase', ED.base)}</div>
+    <div class="flex" style="margin-top:10px"><span class="grow"><b>${ED.hechos.size} de 90</b> números grabados</span></div>
+    <div class="prog"><div style="width:${ED.hechos.size/90*100}%"></div></div>
+  </div>
+  <div class="box ${grabando?'grabando':''}" id="panel">
+    <div class="flex" style="align-items:center;gap:14px">
+      <div class="ball" style="background:${ballColor(n)}"><span>${n}</span></div>
+      <div class="grow" style="min-width:200px"><div class="muted">Número ${n} (${enLetras(n)}) · decí algo así:</div>
+        <div class="decir">“${esc(dicho(n))}”… ¡El ${n}!<small>Podés decirlo a tu manera, como lo canta tu familia.</small></div>
+        <div class="estado ${hecho?'ok':'no'}">${hecho?`✅ Grabado${ED.durs[n]?` (${ED.durs[n].toFixed(1).replace('.',',')} s)`:''}`:'⏺️ Sin grabar: lo canta la voz automática'}</div></div>
+    </div>
+    <div class="tiempo"><div id="barra"></div></div>
+    <div class="muted" id="quedan">${grabando?'':'Máximo '+MAX_SEG+' segundos por número.'}</div>
+    <div class="acciones">
+      ${grabando?`<button class="btn red big recbtn" data-act="parar">■ Parar</button>`
+        :`<button class="btn red big recbtn" data-act="grabar" ${REC?'disabled':''}>● ${hecho?'Volver a grabar':'Grabar'}</button>`}
+      <button class="btn green" data-act="escuchar" ${!hecho||REC?'disabled':''}>▶ Escuchar</button>
+      <button class="btn gray" data-act="auto" ${REC?'disabled':''}>🤖 Voz automática</button>
+      <button class="btn gray" data-act="quitar" ${!hecho||REC?'disabled':''}>🗑 Borrar</button>
+    </div>
+    <div class="acciones">
+      <button class="btn" data-act="ant" ${REC?'disabled':''}>⬅ Anterior</button>
+      <button class="btn" data-act="sig" ${REC?'disabled':''}>Siguiente ➡</button>
+      <button class="btn purple" data-act="falta" ${REC||ED.hechos.size>=90?'disabled':''}>⏭ Próximo sin grabar</button>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="autoSig" ${autoSig?'checked':''}> Al terminar de grabar, pasar solo al siguiente número</label>
+    <div class="muted" style="margin-top:4px">En la PC también podés usar la barra espaciadora para grabar y parar.</div>
+  </div>
+  <div class="box"><h3>🔢 Elegí un número</h3>
+    <div class="grilla">${Array.from({length:90},(_,i)=>i+1).map(k=>`<button class="${ED.hechos.has(k)?'hecho':''} ${k===n?'sel':''}" data-act="ir" data-n="${k}" ${REC?'disabled':''}>${k}</button>`).join('')}</div>
+    <div class="leyenda"><span><i style="background:#bdf0c4"></i>Grabado</span><span><i style="background:#efe6cf"></i>Sin grabar (voz automática)</span><span><i style="background:#dfe8ff;border:2px solid var(--blue)"></i>El que estás grabando</span></div>
+  </div>`;
+}
+function render(){ $('#app').innerHTML = VISTA==='editar' && ED ? editarHTML() : listaHTML(); }
+
+/* ---------- grabar ---------- */
+const TIPOS=['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/ogg;codecs=opus'];
+async function grabar(){
+  if(REC || !ED) return;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) return toast('Este navegador no deja grabar. Probá con Chrome (o Safari en iPhone).');
+  try{ STREAM = STREAM || await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}}); }
+  catch(e){ return toast('No se pudo usar el micrófono. Tocá el candado de la barra de direcciones y permití el micrófono.'); }
+  if(audioActual) try{ audioActual.pause(); }catch(e){}
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  const tipo=TIPOS.find(t=>MediaRecorder.isTypeSupported(t)) || '';
+  const mr=new MediaRecorder(STREAM, tipo ? {mimeType:tipo, audioBitsPerSecond:32000} : {});
+  const partes=[], n=ED.sel, id=ED.id, t0=Date.now();
+  mr.ondataavailable = e => { if(e.data && e.data.size) partes.push(e.data); };
+  mr.onstop = async () => {
+    const r=REC; REC=null; clearInterval(r.iv); clearTimeout(r.tope);
+    if(r.cancelado || !ED || ED.id!==id){ render(); return; }
+    const dur=Math.min(MAX_SEG, (Date.now()-t0)/1000);
+    if(dur<0.5 || !partes.length){ toast('Muy corto: grabá de nuevo.'); render(); return; }
+    const blob=new Blob(partes, {type:mr.mimeType || tipo || 'audio/webm'});
+    await CantosDB.guardarClip(id, n, blob, dur);
+    await CantosDB.guardarCantor({...(await CantosDB.cantor(id)), cambiado:Date.now()});
+    ED.hechos.add(n); ED.durs[n]=dur;
+    if(r.porTope) toast(`⏱️ Se cortó a los ${MAX_SEG} segundos.`);
+    if(autoSig && n<90){ ED.sel=n+1; render(); }
+    else { render(); tocarBlob(blob).catch(()=>{}); }
+  };
+  mr.start(250);
+  REC={mr, n, t0, iv:setInterval(tic, 100), tope:setTimeout(()=>{ if(REC){ REC.porTope=true; REC.mr.stop(); } }, MAX_SEG*1000)};
+  render(); tic();
+}
+function tic(){
+  if(!REC) return;
+  const s=(Date.now()-REC.t0)/1000, b=$('#barra'), q=$('#quedan');
+  if(b) b.style.width=Math.min(100, s/MAX_SEG*100)+'%';
+  if(q) q.innerHTML=`🔴 Grabando… quedan <b>${Math.max(0, Math.ceil(MAX_SEG-s))}</b> segundos`;
+}
+function pararGrabacion(cancelar){ if(REC){ REC.cancelado=!!cancelar; try{ REC.mr.stop(); }catch(e){} } }
+
+/* ---------- eventos ---------- */
+document.addEventListener('click', async e=>{
+  const el=e.target.closest('[data-act]'); if(!el) return;
+  const a=el.dataset.act;
+  switch(a){
+    case 'crear': {
+      const nombre=($('#nuevoNombre').value||'').trim().slice(0,30);
+      if(!nombre){ toast('Ponele un nombre al cantor.'); $('#nuevoNombre').focus(); return; }
+      const id=nuevoId(); await CantosDB.guardarCantor({id, nombre, base:$('#nuevoBase').value, creado:Date.now()});
+      abrir(id); break; }
+    case 'editar': abrir(el.dataset.id); break;
+    case 'volver': volver(); break;
+    case 'borrar': {
+      const c=LISTA.find(x=>x.id===el.dataset.id); if(!c) return;
+      if(!confirm(`¿Borrar el cantor «${c.nombre}» y sus ${c.cuantos} grabaciones? No se puede deshacer.`)) return;
+      await CantosDB.borrarCantor(c.id); await cargarLista(); render(); toast('Cantor borrado.'); break; }
+    case 'bajar': {
+      const c=LISTA.find(x=>x.id===el.dataset.id); if(!c) return;
+      const blob=await exportarCantor(c.id), u=URL.createObjectURL(blob), link=document.createElement('a');
+      link.href=u; link.download=`Cantos - ${c.nombre.replace(/[\\/:*?"<>|]/g,'')}.json`; document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(()=>URL.revokeObjectURL(u), 5000); toast('⬇️ Archivo listo. Pasalo al otro celular y cargalo en esta misma página.'); break; }
+    case 'grabar': grabar(); break;
+    case 'parar': pararGrabacion(false); break;
+    case 'escuchar': { const c=await CantosDB.clip(ED.id, ED.sel); if(c) tocarBlob(c.blob).catch(()=>toast('No se pudo reproducir.')); break; }
+    case 'auto': hablarTTS(textoCanto(ED.sel), ED.base); break;
+    case 'quitar':
+      if(!confirm(`¿Borrar la grabación del ${ED.sel}? Ese número lo va a cantar la voz automática.`)) return;
+      await CantosDB.borrarClip(ED.id, ED.sel); ED.hechos.delete(ED.sel); delete ED.durs[ED.sel]; render(); break;
+    case 'ant': ED.sel = ED.sel>1 ? ED.sel-1 : 90; render(); break;
+    case 'sig': ED.sel = ED.sel<90 ? ED.sel+1 : 1; render(); break;
+    case 'falta': { for(let k=1;k<=90;k++){ const m=(ED.sel+k-1)%90+1; if(!ED.hechos.has(m)){ ED.sel=m; break; } } render(); break; }
+    case 'ir': ED.sel=+el.dataset.n; render(); $('#panel').scrollIntoView({behavior:'smooth', block:'start'}); break;
+  }
+});
+document.addEventListener('change', async e=>{
+  const t=e.target;
+  if(t.id==='edNombre' && ED){ const v=t.value.trim().slice(0,30); if(!v){ t.value=ED.nombre; return; } ED.nombre=v; await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), nombre:v, cambiado:Date.now()}); toast('Nombre guardado.'); }
+  else if(t.id==='edBase' && ED){ ED.base=t.value; await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), base:t.value, cambiado:Date.now()}); hablarTTS(textoCanto(ED.sel), ED.base); }
+  else if(t.id==='autoSig'){ autoSig=t.checked; try{ localStorage.setItem(AUTO_SIG_KEY, autoSig?'1':'0'); }catch(e){} }
+  else if(t.id==='archivo' && t.files[0]){
+    try{ const id=await importarCantor(await t.files[0].text()); await cargarLista(); render(); toast('📂 Cantor cargado.'); abrir(id); }
+    catch(err){ toast(err.message || 'No se pudo leer el archivo.'); t.value=''; }
+  }
+});
+document.addEventListener('keydown', e=>{
+  if(VISTA!=='editar' || e.code!=='Space' || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  e.preventDefault(); REC ? pararGrabacion(false) : grabar();
+});
+window.addEventListener('beforeunload', e=>{ if(REC){ e.preventDefault(); e.returnValue=''; } });
+if(window.speechSynthesis) speechSynthesis.getVoices();
+(async()=>{
+  if(!window.indexedDB){ $('#app').innerHTML='<div class="box">Este navegador no permite guardar grabaciones. Probá con Chrome.</div>'; return; }
+  try{ await cargarLista(); }catch(e){ LISTA=[]; toast('No se pudo abrir el lugar donde se guardan los cantos.'); }
+  render();
+})();
+</script>
+</body>
+</html>

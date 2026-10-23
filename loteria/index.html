@@ -10,6 +10,7 @@
 <link rel="icon" href="icon-192.png">
 <!-- librería de conexión entre jugadores (PeerJS 1.5.4), guardada junto al juego -->
 <script src="peerjs.min.js"></script>
+<script src="voces.js"></script>
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
 <style>
 :root{--bg1:#4a1a7a;--bg2:#1c0a33;--cream:#fff8e6;--ink:#1d1d1d;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f;--muted:#6b6b6b}
@@ -117,6 +118,7 @@ input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1p
 .voz{background:#fff;border:2px solid #ddd2b5;border-radius:12px;padding:10px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px}
 .voz span{font-size:12px;color:var(--muted)}
 .voz.on{border-color:var(--green);background:#e4f7e7}
+.voz.grab{border-color:#b98ce0}
 .cantadas{background:rgba(255,255,255,.08);border-radius:14px;padding:4px 12px 12px;margin-top:14px}
 .orden{display:flex;flex-wrap:wrap;gap:5px}
 .orden>div{display:flex;flex-direction:column;align-items:center;color:rgba(255,255,255,.55);font-size:9px;line-height:11px}
@@ -179,55 +181,12 @@ const EMOJIS = ['🙂','😎','🤠','👵','👴','🧉','🐔','🐶','🐱','
 const BOTS = [['Doña Chela','👵'],['Don Ramón','👴'],['Tía Nilda','🌺'],['Karai Pedro','🤠'],['Mirna','🦜'],['Toto','⚽'],['Ña Petrona','🧉'],['Cholo','🐔']];
 const BALLC = ['#ef5350','#ffa726','#ffee58','#66bb6a','#26c6da','#42a5f5','#ab47bc','#ec407a','#8d6e63'];
 const ballColor = n => BALLC[Math.min(8, Math.floor(n/10))];
-// Dichos que dice el cantor antes de cada número, al estilo de la lotería familiar paraguaya.
-// Para cambiar uno, editá el texto al lado de su número.
-const DICHOS = {
-  1:'Ary pyahu, año nuevo', 2:'El patito', 3:'Mbohapy, los tres reyes', 4:'La silla de la abuela', 5:'Po, la mano abierta',
-  6:'La chipa calentita', 7:'El Luisón, séptimo hijo', 8:'La Virgen de Caacupé', 9:'El kambuchi', 10:'Mokõi po, las dos manos',
-  11:'Kamba canilla', 12:'La docena de chipa', 13:'El Pombero', 14:'Fiesta patria', 15:'La niña bonita, mitãkuña porã',
-  16:'El mbeju de la abuela', 17:'La sopa paraguaya', 18:'Ya es mayor de edad', 19:'El vori vori', 20:'Mitã rusu, los veinte años',
-  21:'El tereré con yuyo', 22:'Los dos patitos', 23:'La guampa', 24:'Nochebuena', 25:'Navidad, el pesebre',
-  26:'El so\'o yosopy', 27:'La bombilla', 28:'El kiveve', 29:'El chipa guasu', 30:'Fin de mes, ndaipóri pirapire',
-  31:'El Jasy Jatere', 32:'El arpa paraguaya', 33:'Ñandejára ary', 34:'El pastel mandi\'o', 35:'La guarania',
-  36:'La polca paraguaya', 37:'El Kurupi', 38:'El ñandutí', 39:'El mbokaja', 40:'Cuarenta grados a la siesta',
-  41:'El karai guasu', 42:'El tatakua', 43:'La mandi\'o chyryry', 44:'Las dos sillitas', 45:'El sombrero piri',
-  46:'El lapacho florido', 47:'El Mboi Tu\'i', 48:'El Moñai', 49:'El Teju Jagua', 50:'Medio siglo',
-  51:'El Ao Ao', 52:'La Ka\'a Jarýi', 53:'Cerro Corá', 54:'La carreta', 55:'Los dos cincos, po ha po',
-  56:'El burrito de la chacra', 57:'Mbarakaja, el gato', 58:'Ryguasu, la gallina', 59:'Jagua\'i, el perrito', 60:'El karumbé',
-  61:'El cocido negro', 62:'El tren de Sapucai', 63:'La playa de Encarnación', 64:'El lago Ypacaraí', 65:'La jubilación',
-  66:'Las dos guampas', 67:'El mburukuja', 68:'La naranja hái', 69:'Tereré jere, la ronda del tereré', 70:'Karai tuja, setenta pirulos',
-  71:'El caburé', 72:'El yacaré del Chaco', 73:'El Chaco boreal', 74:'El río Paraná', 75:'El río Paraguay',
-  76:'Kurusu, la cruz', 77:'Las dos banderitas', 78:'Pykasu, la paloma', 79:'El tatu carreta', 80:'Jarýi, la abuela',
-  81:'El yerbal', 82:'El ka\'a he\'ẽ', 83:'El mate dulce', 84:'El burro de la chacra', 85:'Ka\'aguy, el monte',
-  86:'Kokue, la chacra', 87:'Ñu, el campo', 88:'Las dos gorditas', 89:'El que cierra la puerta', 90:'Taita guasu, el abuelo'
-};
-const dicho = n => DICHOS[n] || '';
-// Cómo tiene que leer el cantor las palabras en guaraní. La voz del celular habla castellano,
-// así que se escribe "a la castellana": j → y, h → j, la ' (puso) se junta, y el acento va donde lo pone el guaraní
-// (casi siempre en la última sílaba). La "y" guaraní (la sexta vocal) no existe en castellano: se acerca con "i".
-const HABLA = {
-  1:'Arí piajú, año nuevo', 3:'Mbojapí, los tres reyes', 9:'El cambuchí', 10:'Mocói po, las dos manos',
-  11:'Cambá canilla', 15:'La niña bonita, mitancuñá porán', 16:'El mbeyú de la abuela', 19:'El vorí vorí',
-  20:'Mitán rusú, los veinte años', 26:'El so-ó yosopí', 28:'El quivevé', 29:'El chipá guasú',
-  30:'Fin de mes, ndaipóri pirapiré', 31:'El Yasí Yateré', 33:'Ñandeyára arí', 34:'El pastel mandió',
-  37:'El Curupí', 39:'El mbocayá', 41:'El carái guasú', 42:'El tatacuá', 43:'La mandió chirirí',
-  45:'El sombrero pirí', 47:'El Mbói Tu-í', 48:'El Moñái', 49:'El Teyú Yaguá', 51:'El Aó Aó',
-  52:'La Caá Yarií', 55:'Los dos cincos, po já po', 57:'Mbaracayá, el gato', 58:'Riguasú, la gallina',
-  59:'Yagua-í, el perrito', 60:'El carumbé', 62:'El tren de Sapucái', 64:'El lago Ipacaraí',
-  67:'El mburucuyá', 68:'La naranja jái', 69:'Tereré yeré, la ronda del tereré', 70:'Carái tuyá, setenta pirulos',
-  76:'Curusú, la cruz', 79:'El tatú carreta', 80:'Yarií, la abuela', 82:'El caá jeén', 85:'Caaguí, el monte',
-  86:'Cocué, la chacra', 90:'Táita guasú, el abuelo'
-};
-const habla = n => HABLA[n] || dicho(n);
-const UNID = ['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
-const DEC = {3:'treinta',4:'cuarenta',5:'cincuenta',6:'sesenta',7:'setenta',8:'ochenta',9:'noventa'};
-const enLetras = n => n<30 ? UNID[n] : DEC[Math.floor(n/10)] + (n%10 ? ' y '+UNID[n%10] : '');
 const DEF_CFG = {precio:500, saldo:10000, max:4, serie:36, modo:'linea', pctLinea:30, aTiempo:true, falso:'nada', gracia:4};
 
 let S = null;   // estado del juego: el anfitrión es la autoridad, los demás reciben copias
 const NET = {mode:null, peer:null, conns:{}, hostConn:null, code:'', myPid:null, welcomed:false};
 const T = {auto:null, autoKey:'', claim:null};
-const UI = {seenDrawn:0, seenRound:0, seenClaim:null, seenResult:null, closedResult:null, unread:0, chatSeen:0, menuCode:''};
+const UI = {seenDrawn:0, seenRound:0, seenClaim:null, seenResult:null, closedResult:null, unread:0, chatSeen:0, menuCode:'', grabados:[]};
 
 function toast(x){ const t=$('#toast'); t.textContent=x; t.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display='none', 3200); }
 function netBar(x){ const b=$('#netbar'); if(x){ b.textContent=x; b.style.display='block'; } else b.style.display='none'; }
@@ -245,31 +204,53 @@ function beep(f=660, d=.12, type='sine', vol=.15, delay=0){
 }
 const fanfare = () => [523,659,784,1046].forEach((f,i)=>beep(f,.25,'triangle',.18,i*.13));
 const buzz = () => { beep(140,.5,'sawtooth',.12); };
-// Cantores: cada uno usa una voz de hombre o de mujer del dispositivo con su propio tono y velocidad.
-// Las voces dependen del celular o la PC; si solo hay una voz en español, se cambia el tono.
-const CANTORES = [
-  {id:'don',     nombre:'🎩 Don Cantor',          desc:'El de siempre',            sexo:'h', pitch:1,    rate:.95},
-  {id:'dona',    nombre:'🌺 Doña Rosa',           desc:'Voz de mujer',             sexo:'m', pitch:1.05, rate:.95},
-  {id:'chica',   nombre:'💃 Mitãkuña alegre',     desc:'Mujer joven, rapidita',    sexo:'m', pitch:1.45, rate:1.1},
-  {id:'abuela',  nombre:'👵 Jarýi, la abuela',     desc:'Mujer, despacito',         sexo:'m', pitch:.8,   rate:.78},
-  {id:'abuelo',  nombre:'👴 Taita, el abuelo',     desc:'Voz gruesa y lenta',       sexo:'h', pitch:.6,   rate:.8},
-  {id:'locutor', nombre:'📻 Locutor de radio',    desc:'Hombre, con energía',      sexo:'h', pitch:.85,  rate:1.15}
-];
-const VOZ_M = /sabina|helena|laura|elvira|paulina|m[oó]nica|dalia|luc[ií]a|paloma|marisol|elena|catalina|ximena|isabel|camila|valentina|francisca|female|mujer|femen/i;
-const VOZ_H = /ra[uú]l|pablo|jorge|diego|[aá]lvaro|juan|carlos|enrique|tom[aá]s|gonzalo|jos[eé]|male|hombre|mascul/i;
-function vozPara(sexo){
-  const es=speechSynthesis.getVoices().filter(v=>/^es/i.test(v.lang));
-  const pref = sexo==='m' ? es.find(v=>VOZ_M.test(v.name) && !/\bmale\b/i.test(v.name)) : es.find(v=>VOZ_H.test(v.name) && !/female/i.test(v.name));
-  return pref || es[0] || null;
+// El cantor elegido puede ser una voz automática (PREF.cantor = 'don', 'dona'…) o uno grabado en este dispositivo ('rec:<id>').
+const esGrabado = () => String(PREF.cantor||'').startsWith('rec:');
+const recId = () => esGrabado() ? PREF.cantor.slice(4) : null;
+const recInfo = id => (UI.grabados||[]).find(g=>g.id===(id||recId()));
+const baseTTS = () => esGrabado() ? (recInfo()||{}).base : PREF.cantor;
+function say(txt, forzar){ if(PREF.voz || forzar) hablarTTS(txt, baseTTS()); }
+async function cargarGrabados(){
+  try{ const ls=await CantosDB.lista(); UI.grabados=await Promise.all(ls.map(async c=>({...c, cuantos:(await CantosDB.numeros(c.id)).length}))); }
+  catch(e){ UI.grabados=[]; }
 }
-const cantorActual = () => CANTORES.find(c=>c.id===PREF.cantor) || CANTORES[0];
-function say(txt, forzar){
-  if((!PREF.voz && !forzar) || !window.speechSynthesis) return;
-  try{ speechSynthesis.cancel(); const c=cantorActual(), u=new SpeechSynthesisUtterance(txt); u.lang='es-ES';
-    u.rate=c.rate; u.pitch=c.pitch; const v=vozPara(c.sexo); if(v){ u.voice=v; u.lang=v.lang; } speechSynthesis.speak(u); }catch(e){}
+// canta con el cantor que elegí en este dispositivo (si es grabado y falta el número, usa su voz automática)
+async function cantarLocal(n){
+  if(!PREF.voz) return;
+  if(esGrabado()){ try{ const c=await CantosDB.clip(recId(), n); if(c){ await tocarBlob(c.blob); return; } }catch(e){} }
+  hablarTTS(textoCanto(n), baseTTS());
 }
-// como el cantor de la lotería de casa: primero el dicho y después el número
-function cantarBolilla(n){ say(`${habla(n)}... ¡El ${n}!`); }
+/* ---------- voz de la sala: el cantor comparte su voz grabada y todos la escuchan ---------- */
+function anunciarBolilla(n, idx){
+  const vs=S.vozSala;
+  if(vs && P(vs.pid)){
+    if(vs.pid===NET.myPid){ compartirCanto(n, idx); return; }
+    if(!PREF.voz) return;
+    // espero el audio del cantor; si no llega a tiempo, canta la voz automática que él eligió
+    clearTimeout(UI.esperaT); UI.espera={idx};
+    UI.esperaT=setTimeout(()=>{ if(UI.espera && UI.espera.idx===idx){ UI.espera=null; hablarTTS(textoCanto(n), vs.base); } }, 2500);
+    return;
+  }
+  cantarLocal(n);
+}
+async function compartirCanto(n, idx){
+  const vs=S.vozSala; let msg={t:'canto', round:S.round, idx, n, none:true}, blob=null;
+  try{ const c=PREF.vozSalaId && await CantosDB.clip(PREF.vozSalaId, n);
+    if(c){ blob=c.blob; msg={t:'canto', round:S.round, idx, n, type:c.type, data:await c.blob.arrayBuffer()}; } }catch(e){}
+  enviarCanto(msg);
+  if(PREF.voz){ if(blob) tocarBlob(blob).catch(()=>hablarTTS(textoCanto(n), vs.base)); else hablarTTS(textoCanto(n), vs.base); }
+}
+function enviarCanto(msg, excepto){
+  if(NET.mode==='host'){ for(const pid in NET.conns){ if(pid===excepto) continue; const c=NET.conns[pid]; if(c && c.open) try{ c.send(msg); }catch(e){} } }
+  else if(NET.hostConn && NET.hostConn.open) try{ NET.hostConn.send(msg); }catch(e){}
+}
+function recibirCanto(d){
+  if(!S || !S.vozSala || d.round!==S.round || d.idx!==S.drawn.length || !PREF.voz) return;
+  if(!UI.espera || UI.espera.idx!==d.idx) return;   // ya cantó la voz automática
+  clearTimeout(UI.esperaT); UI.espera=null;
+  if(d.none || !d.data){ hablarTTS(textoCanto(d.n), S.vozSala.base); return; }
+  tocarBlob(new Blob([d.data], {type:d.type||'audio/webm'})).catch(()=>hablarTTS(textoCanto(d.n), S.vozSala.base));
+}
 
 /* ====================== CARTONES ====================== */
 // Cartón de 90 bolillas como en la lotería real: 3 filas x 9 columnas, 5 números por fila (15 en total).
@@ -296,7 +277,7 @@ const myCards = pid => Object.keys(S.owner||{}).filter(c=>S.owner[c]===pid).map(
 function lobbyState(){
   return {phase:'lobby', round:0, players:[], hostPid:null, cantorPid:null, cfg:{...DEF_CFG}, cards:{}, owner:{}, anulados:{},
     drawn:[], stage:'linea', pozo:{linea:0,bingo:0}, acum:0, winners:{linea:[],bingo:[]}, claim:null, result:null, auto:0,
-    lastBallAt:0, resumen:null, chat:[], deudas:[], pedidos:[], nextId:1};
+    lastBallAt:0, resumen:null, chat:[], deudas:[], pedidos:[], vozSala:null, nextId:1};
 }
 const P = id => S && S.players.find(p=>p.id===id);
 function addPlayer(name, emoji, token, bot){
@@ -348,13 +329,21 @@ function act(pid, a){
       const q=P(a.pid); if(!isHost || !q || q.id===S.hostPid || S.phase==='juego') return;
       myCards(q.id).forEach(c=>{ delete S.owner[c]; });
       S.players=S.players.filter(x=>x!==q); if(S.cantorPid===q.id) S.cantorPid=S.hostPid;
+      if(S.vozSala && S.vozSala.pid===q.id) S.vozSala=null;
       S.deudas=(S.deudas||[]).filter(d=>d.de!==q.id && d.a!==q.id); S.pedidos=(S.pedidos||[]).filter(x=>x.pid!==q.id);
       if(NET.conns[q.id]){ try{ NET.conns[q.id].send({t:'kicked'}); NET.conns[q.id].close(); }catch(e){} delete NET.conns[q.id]; }
       sys(`${q.emoji} ${q.name} salió de la sala.`);
       break; }
     case 'cantor': {
       const q=P(a.pid); if(!isHost || !q || q.bot) return;
+      if(S.cantorPid!==q.id) S.vozSala=null;
       S.cantorPid=q.id; sys(`🎤 ${q.emoji} ${q.name} es el cantor: saca las bolillas.`);
+      break; }
+    case 'vozSala': {
+      if(pid!==S.cantorPid) return 'Solo el cantor puede poner su voz grabada para toda la sala.';
+      if(!a.on){ if(S.vozSala) sys(`🎙️ ${p.name} dejó de compartir su voz grabada.`); S.vozSala=null; break; }
+      S.vozSala={pid, nombre:String(a.nombre||'Cantor').slice(0,30), base:cantorTTS(a.base).id};
+      sys(`🎙️ Ahora canta «${S.vozSala.nombre}», la voz grabada de ${p.emoji} ${p.name}. ¡Todos la escuchan!`);
       break; }
     case 'recargar': {
       const q=P(a.pid); if(!isHost || !q || S.phase==='juego') return;
@@ -626,6 +615,8 @@ function hostOnData(conn, d){
   }
   if(!conn.pid || NET.conns[conn.pid]!==conn) return;
   if(d.t==='act'){ const r=act(conn.pid, d.a); if(typeof r==='string') try{ conn.send({t:'toast', x:r}); }catch(e){} }
+  // el cantor de la sala manda el audio de la bolilla: se reenvía a todos y se escucha acá
+  else if(d.t==='canto' && S.vozSala && conn.pid===S.vozSala.pid){ enviarCanto(d, conn.pid); recibirCanto(d); }
 }
 function hostOnClose(conn){
   if(!S || !conn.pid || NET.conns[conn.pid]!==conn) return;
@@ -659,6 +650,7 @@ function connectHost(){
     if(NET.hostConn!==c || !d) return;
     if(d.t==='state'){ NET.welcomed=true; S=d.s; NET.myPid=d.you; store('lot_client', {code:NET.code, at:Date.now()}); render(); }
     else if(d.t==='toast') toast(d.x);
+    else if(d.t==='canto') recibirCanto(d);
     else if(d.t==='kicked'){ toast('El anfitrión te sacó de la sala.'); leave(true); }
   });
   c.on('close', ()=>{ if(NET.mode!=='client' || NET.hostConn!==c) return; netBar('Se perdió la conexión con el anfitrión. Reconectando…'); setTimeout(connectHost, 3000); });
@@ -752,7 +744,7 @@ function menuHTML(){
     </div>
     <div class="box"><button class="btn gray wide" data-act="reglas">📜 Cómo se juega (reglas)</button>
       <button class="btn gold wide" style="margin-top:8px" data-act="sonido">🗣️ Elegir quién canta las bolillas</button>
-      <div class="muted" style="margin-top:8px"><a href="../">🏠 Todos los juegos</a> · <a href="../banquero/">🎩 Jugá al Banquero Paraguayo</a></div></div>
+      <div class="muted" style="margin-top:8px"><a href="../">🏠 Todos los juegos</a> · <a href="../banquero/">🎩 Banquero</a> · <a href="../cantos/">🎙️ Grabar cantos</a></div></div>
     <div class="foot">Lotería Paraguaya · jleovgames</div></div>`;
 }
 function cfgHTML(){
@@ -803,6 +795,7 @@ function ventaHTML(){
     <span class="grow muted">Vendidos: <b>${sold}</b> · Pozo: <b>${gs(total+S.acum)}</b>${S.acum?` (incluye acumulado ${gs(S.acum)})`:''}</span>
     ${canStart?`<button class="btn green big" data-act="empezar" ${sold?'':'disabled'}>▶️ Empezar a cantar</button>`:''}</div>
   </div>
+  ${NET.myPid===S.cantorPid?`<div class="cantor"><b>🎤 Sos el cantor</b>${vozSalaHTML()}</div>`:""}
   <div class="shop">${Object.keys(S.cards).map(Number).map(miniHTML).join('')}</div>`;
 }
 function juegoHTML(){
@@ -811,7 +804,7 @@ function juegoHTML(){
   const lw=S.winners.linea.map(w=>P(w.pid)).filter(Boolean).map(p=>p.emoji+' '+esc(p.name)).join(', ');
   return `<div class="stage">
     ${last?ball(last,'spin" id="bigBall'):`<div class="ball" style="background:#777"><span>?</span></div>`}
-    <div class="info"><div style="font-size:14px;opacity:.8">${last?`Bolilla ${S.drawn.length} de 90`:'Todavía no salió ninguna bolilla'}</div>
+    <div class="info"><div style="font-size:14px;opacity:.8">${last?`Bolilla ${S.drawn.length} de 90`:'Todavía no salió ninguna bolilla'}${S.vozSala?` · 🎙️ Canta ${esc(S.vozSala.nombre)}`:''}</div>
       ${last?`<div class="nick">“${esc(dicho(last))}”</div>`:''}
       <div style="font-size:26px;font-weight:900" id="bigNum" class="late">${last?`¡El ${last}! <span style="font-size:16px;opacity:.8">(${enLetras(last)})</span>`:`🎤 ${cantor?esc(cantor.name):''} va a cantar`}</div>
     </div>
@@ -828,6 +821,7 @@ function juegoHTML(){
       <span class="muted" style="color:#ddd">Sorteo automático: <select id="selAuto" style="width:auto;display:inline-block;padding:4px">${[0,5,8,12,20].map(s=>`<option value="${s}" ${S.auto===s?'selected':''}>${s?'cada '+s+' s':'apagado'}</option>`).join('')}</select></span></div>
       <button class="btn gold wide big" style="margin-top:10px" data-act="sacar" ${S.claim||S.drawn.length>=90?'disabled':''}>🎱 Sacar bolilla</button>
       ${S.drawn.length>=90 && NET.myPid===S.hostPid?`<button class="btn red wide" style="margin-top:8px" data-act="cerrar" ${S.claim?'disabled':''}>Cerrar ronda (el pozo se acumula)</button>`:''}
+      ${vozSalaHTML()}
     </div>`:''}
   <div class="sec">${mine.length?'Tus cartones — tocá un número para ponerle tu maíz 🌽 (tocalo otra vez para sacarlo)':'Esta ronda estás mirando: no tenés cartones.'}</div>
   <div class="cards">${mine.map(c=>cardHTML(c,{mine:true})).join('')}</div>
@@ -857,7 +851,7 @@ const REGLAS = `<h3>📜 Cómo se juega la Lotería</h3><ul class="rules">
   <li><b>El cartón</b> tiene 3 filas y 9 columnas, con 15 números: 5 por fila. La 1ª columna lleva del 1 al 9, la 2ª del 10 al 19… y la última del 80 al 90.</li>
   <li><b>Elegí tus cartones</b> antes de que empiece la ronda. Todo lo que se paga por los cartones forma el <b>pozo</b>.</li>
   <li><b>Poné tu maíz 🌽:</b> cuando sale un número que está en tu cartón, tocalo para ponerle un grano de maíz. Nadie lo pone por vos: si no estás atento, el juego no te avisa.</li>
-  <li><b>Bolillas cantadas:</b> abajo de tus cartones están todas las bolillas que salieron, en orden y en el tablero del 1 al 90, para revisar si se te pasó alguna.</li>
+  <li><b>Bolillas cantadas:</b> arriba se ven todas las bolillas que salieron, en orden, y abajo de tus cartones está el tablero del 1 al 90, para revisar si se te pasó alguna.</li>
   <li><b>¡LÍNEA!</b> Cuando completás una fila entera (5 números) cantás línea y cobrás la parte del pozo de la línea. Hay una sola línea por ronda.</li>
   <li><b>¡BINGO!</b> Cuando completás los 15 números del cartón (cartón lleno) cantás bingo, ganás el pozo grande y termina la ronda.</li>
   <li><b>Se comprueba:</b> al cantar se frena el juego y se revisan los números de tu cartón contra las bolillas que salieron.</li>
@@ -890,13 +884,26 @@ function prestamosHTML(){
     <div class="muted" style="margin-top:8px">Los préstamos son de palabra entre jugadores: el que debe paga cuando puede. Desde ${gs(500)}, de a 500.</div>
     <button class="btn wide" style="margin-top:12px" data-act="prestClose">Cerrar</button></div>`;
 }
+// para el cantor: compartir (o dejar de compartir) su voz grabada con toda la sala
+function vozSalaHTML(){
+  if(!S || NET.myPid!==S.cantorPid) return '';
+  const vs=S.vozSala, g=recInfo();
+  if(vs && vs.pid===NET.myPid) return `<div class="flex" style="margin-top:10px"><span class="grow">📢 Toda la sala escucha a <b>«${esc(vs.nombre)}»</b></span><button class="btn sm gray" data-act="vozSalaOff">Dejar de compartir</button></div>`;
+  if(g) return `<button class="btn wide" style="margin-top:10px;background:#7a2fbf" data-act="vozSalaOn">📢 Que todos escuchen mi voz grabada «${esc(g.nombre)}»</button>`;
+  return `<div class="muted" style="margin-top:10px;color:#ddd">🎙️ ¿Querés cantar con tu propia voz? Tocá 🗣️ arriba para elegir o grabar un cantor.</div>`;
+}
 function sonidoHTML(){
-  const act=cantorActual(), hay=window.speechSynthesis && speechSynthesis.getVoices().some(v=>/^es/i.test(v.lang));
+  const sel=PREF.cantor||'don', hay=window.speechSynthesis && speechSynthesis.getVoices().some(v=>/^es/i.test(v.lang));
+  const vs=S && S.vozSala;
   return `<div class="box"><h3>🗣️ ¿Quién canta las bolillas?</h3>
     <div class="muted" style="margin-bottom:8px">Tocá un cantor para elegirlo y escucharlo. Cada jugador elige el suyo en su celular.</div>
-    <div class="voces">${CANTORES.map(c=>`<button class="voz ${PREF.voz&&c.id===act.id?'on':''}" data-act="cantorSel" data-id="${c.id}"><b>${c.nombre}</b><span>${c.desc}</span></button>`).join('')}
+    ${vs && vs.pid!==NET.myPid?`<div class="res ok" style="margin-bottom:8px">🎙️ En esta sala canta <b>«${esc(vs.nombre)}»</b> (voz grabada de ${esc((P(vs.pid)||{}).name||'')}). Tu cantor se usa cuando no haya voz de sala.</div>`:''}
+    <div class="voces">${CANTORES.map(c=>`<button class="voz ${PREF.voz&&c.id===sel?'on':''}" data-act="cantorSel" data-id="${c.id}"><b>${c.nombre}</b><span>${c.desc}</span></button>`).join('')}
+      ${UI.grabados.map(g=>`<button class="voz grab ${PREF.voz&&sel==='rec:'+g.id?'on':''}" data-act="cantorSel" data-id="rec:${g.id}"><b>🎙️ ${esc(g.nombre)}</b><span>Voz grabada · ${g.cuantos} de 90</span></button>`).join('')}
       <button class="voz ${!PREF.voz?'on':''}" data-act="sinVoz"><b>🤐 Sin voz</b><span>Solo se ve el número</span></button></div>
-    ${hay?'':'<div class="res tarde" style="margin-top:8px">Este dispositivo no tiene voces en español instaladas, así que el cantor no se va a escuchar.</div>'}
+    <a class="btn gold wide" href="../cantos/" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-top:10px">🎙️ Grabar cantos con mi voz</a>
+    ${S && NET.myPid===S.cantorPid ? `<div style="margin-top:8px">${vozSalaHTML().replace(/color:#ddd/g,'')}</div>`:''}
+    ${hay?'':'<div class="res tarde" style="margin-top:8px">Este dispositivo no tiene voces en español instaladas, así que las voces automáticas no se van a escuchar.</div>'}
     <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:700"><input type="checkbox" data-act="efectos" ${PREF.sound?'checked':''}> 🔔 Efectos de sonido (bolilla, maíz, aplausos)</label>
     <button class="btn wide" style="margin-top:12px" data-act="sonidoClose">Listo</button></div>`;
 }
@@ -961,7 +968,7 @@ function effects(){
   if(S.drawn.length<UI.seenDrawn) UI.seenDrawn=S.drawn.length;
   if(S.phase==='juego' && S.drawn.length>UI.seenDrawn){
     const n=S.drawn[S.drawn.length-1]; beep(880,.08); beep(660,.12,'sine',.15,.09);
-    if(S.drawn.length-UI.seenDrawn===1) cantarBolilla(n);
+    if(S.drawn.length-UI.seenDrawn===1) anunciarBolilla(n, S.drawn.length);
     if(navigator.vibrate) navigator.vibrate(40);
     UI.ballAt=Date.now();
   } else {
@@ -1033,9 +1040,18 @@ document.addEventListener('click', e=>{
     case 'pagar': case 'perdonar': doAct({t:a, id:el.dataset.id}); break;
     case 'ovClose': UI.reglas=false; renderOv(); break;
     case 'ovRes': UI.closedResult=S.result&&S.result.at; renderOv(); break;
-    case 'sonido': UI.sonido=true; renderOv(); break;
+    case 'sonido': UI.sonido=true; renderOv(); cargarGrabados().then(()=>{ if(UI.sonido) renderOv(); }); break;
+    case 'vozSalaOn': { const g=recInfo(); if(!g) break; PREF.vozSalaId=g.id; savePref(); doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base}); break; }
+    case 'vozSalaOff': doAct({t:'vozSala', on:false}); break;
     case 'sonidoClose': UI.sonido=false; renderOv(); break;
-    case 'cantorSel': PREF.cantor=el.dataset.id; PREF.voz=true; savePref(); say(`${habla(33)}... ¡El 33!`, true); renderOv(); $('#top').innerHTML=S?topHTML():''; break;
+    case 'cantorSel': {
+      PREF.cantor=el.dataset.id; PREF.voz=true; savePref();
+      if(esGrabado()){ // muestra: el 33 grabado, o el primero que tenga
+        const id=recId(); CantosDB.clip(id,33).then(c=>c||CantosDB.clips(id).then(cs=>cs[0])).then(c=>c?tocarBlob(c.blob):hablarTTS(textoCanto(33), baseTTS())).catch(()=>{});
+        // si estoy compartiendo mi voz con la sala, paso a compartir este cantor
+        const g=recInfo(); if(g && S && S.vozSala && S.vozSala.pid===NET.myPid){ PREF.vozSalaId=g.id; savePref(); doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base}); }
+      } else hablarTTS(textoCanto(33), PREF.cantor);
+      renderOv(); $('#top').innerHTML=S?topHTML():''; break; }
     case 'sinVoz': PREF.voz=false; savePref(); if(window.speechSynthesis) speechSynthesis.cancel(); renderOv(); if(S) $('#top').innerHTML=topHTML(); break;
     case 'efectos': PREF.sound=!PREF.sound; savePref(); beep(880,.1); renderOv(); if(S) $('#top').innerHTML=topHTML(); break;
     case 'chat': $('#chat').classList.toggle('on'); renderChat(); $('#top').innerHTML=topHTML(); if($('#chat').classList.contains('on')) $('#chatIn').focus(); break;
@@ -1062,6 +1078,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.id==='j
 $('#chatForm').addEventListener('submit', e=>{ e.preventDefault(); const i=$('#chatIn'); if(i.value.trim()) doAct({t:'chat', x:i.value}); i.value=''; });
 if(window.speechSynthesis) speechSynthesis.getVoices();
 render();
+cargarGrabados();
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
