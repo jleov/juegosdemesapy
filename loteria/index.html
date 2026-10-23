@@ -744,7 +744,7 @@ function menuHTML(){
     </div>
     <div class="box"><button class="btn gray wide" data-act="reglas">📜 Cómo se juega (reglas)</button>
       <button class="btn gold wide" style="margin-top:8px" data-act="sonido">🗣️ Elegir quién canta las bolillas</button>
-      <div class="muted" style="margin-top:8px"><a href="../">🏠 Todos los juegos</a> · <a href="../banquero/">🎩 Banquero</a> · <a href="../cantos/">🎙️ Grabar cantos</a></div></div>
+      <div class="muted" style="margin-top:8px"><a href="../">🏠 Todos los juegos</a> · <a href="../banquero/">🎩 Banquero</a></div></div>
     <div class="foot">Lotería Paraguaya · jleovgames</div></div>`;
 }
 function cfgHTML(){
@@ -890,7 +890,7 @@ function vozSalaHTML(){
   const vs=S.vozSala, g=recInfo();
   if(vs && vs.pid===NET.myPid) return `<div class="flex" style="margin-top:10px"><span class="grow">📢 Toda la sala escucha a <b>«${esc(vs.nombre)}»</b></span><button class="btn sm gray" data-act="vozSalaOff">Dejar de compartir</button></div>`;
   if(g) return `<button class="btn wide" style="margin-top:10px;background:#7a2fbf" data-act="vozSalaOn">📢 Que todos escuchen mi voz grabada «${esc(g.nombre)}»</button>`;
-  return `<div class="muted" style="margin-top:10px;color:#ddd">🎙️ ¿Querés cantar con tu propia voz? Tocá 🗣️ arriba para elegir o grabar un cantor.</div>`;
+  return '';
 }
 function sonidoHTML(){
   const sel=PREF.cantor||'don', hay=window.speechSynthesis && speechSynthesis.getVoices().some(v=>/^es/i.test(v.lang));
@@ -901,7 +901,6 @@ function sonidoHTML(){
     <div class="voces">${CANTORES.map(c=>`<button class="voz ${PREF.voz&&c.id===sel?'on':''}" data-act="cantorSel" data-id="${c.id}"><b>${c.nombre}</b><span>${c.desc}</span></button>`).join('')}
       ${UI.grabados.map(g=>`<button class="voz grab ${PREF.voz&&sel==='rec:'+g.id?'on':''}" data-act="cantorSel" data-id="rec:${g.id}"><b>🎙️ ${esc(g.nombre)}</b><span>Voz grabada · ${g.cuantos} de 90</span></button>`).join('')}
       <button class="voz ${!PREF.voz?'on':''}" data-act="sinVoz"><b>🤐 Sin voz</b><span>Solo se ve el número</span></button></div>
-    <a class="btn gold wide" href="../cantos/" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-top:10px">🎙️ Grabar cantos con mi voz</a>
     ${S && NET.myPid===S.cantorPid ? `<div style="margin-top:8px">${vozSalaHTML().replace(/color:#ddd/g,'')}</div>`:''}
     ${hay?'':'<div class="res tarde" style="margin-top:8px">Este dispositivo no tiene voces en español instaladas, así que las voces automáticas no se van a escuchar.</div>'}
     <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:700"><input type="checkbox" data-act="efectos" ${PREF.sound?'checked':''}> 🔔 Efectos de sonido (bolilla, maíz, aplausos)</label>

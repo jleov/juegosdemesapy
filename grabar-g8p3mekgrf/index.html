@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Grabador de Cantos · Lotería</title>
 <meta name="theme-color" content="#2b0f4a">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="../loteria/icon-192.png">
 <script src="../loteria/voces.js"></script>
 <style>
@@ -116,6 +117,8 @@ function listaHTML(){
   <div class="box"><h3>ℹ️ Cómo funciona</h3><ul class="muted" style="font-size:14px;line-height:1.5;padding-left:18px;margin:0">
     <li>Cada número se graba como máximo <b>${MAX_SEG} segundos</b>; al llegar al límite se corta solo.</li>
     <li>Si una grabación salió mal, la escuchás y la volvés a grabar las veces que quieras.</li>
+    <li>También podés <b>subir audios que ya tengas grabados</b> (de WhatsApp o del grabador del celular), uno por número o varios juntos.</li>
+    <li>Esta página no aparece en el juego: solo entra quien tenga este link.</li>
     <li>No hace falta grabar los 90: los que falten los canta la voz automática que elegiste.</li>
     <li>Los cantos quedan guardados <b>en este celular o PC</b>. Para usarlos en otro, bajalos con “⬇️ Archivo” y cargalos allá.</li>
     <li>En la Lotería, tocá 🗣️ y elegí tu cantor grabado. Si sos el cantor de la sala, tocá “📢 Que todos escuchen mi voz grabada” y todos los jugadores escuchan tu voz.</li></ul></div>
@@ -130,6 +133,9 @@ function editarHTML(){
     <label>Para los números que no grabes, canta:</label><div class="flex">${baseSelect('edBase', ED.base)}</div>
     <div class="flex" style="margin-top:10px"><span class="grow"><b>${ED.hechos.size} de 90</b> números grabados</span></div>
     <div class="prog"><div style="width:${ED.hechos.size/90*100}%"></div></div>
+    <label style="margin-top:14px">📤 ¿Ya tenés cantos grabados? (audios de WhatsApp, del grabador del celular…)</label>
+    <input type="file" id="upVarios" accept="audio/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.amr,.webm" multiple>
+    <div class="muted">Podés subir varios a la vez: el nombre de cada archivo tiene que tener el número (por ejemplo <b>11.mp3</b>, <b>33 Ñandejara.m4a</b>). Para uno solo, usá “📤 Subir audio” en el número. Si dura más de ${MAX_SEG} segundos, se usan los primeros ${MAX_SEG}.</div>
   </div>
   <div class="box ${grabando?'grabando':''}" id="panel">
     <div class="flex" style="align-items:center;gap:14px">
@@ -143,6 +149,7 @@ function editarHTML(){
     <div class="acciones">
       ${grabando?`<button class="btn red big recbtn" data-act="parar">■ Parar</button>`
         :`<button class="btn red big recbtn" data-act="grabar" ${REC?'disabled':''}>● ${hecho?'Volver a grabar':'Grabar'}</button>`}
+      <button class="btn purple" data-act="subir" ${REC?'disabled':''}>📤 Subir audio</button>
       <button class="btn green" data-act="escuchar" ${!hecho||REC?'disabled':''}>▶ Escuchar</button>
       <button class="btn gray" data-act="auto" ${REC?'disabled':''}>🤖 Voz automática</button>
       <button class="btn gray" data-act="quitar" ${!hecho||REC?'disabled':''}>🗑 Borrar</button>
@@ -154,6 +161,7 @@ function editarHTML(){
     </div>
     <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="autoSig" ${autoSig?'checked':''}> Al terminar de grabar, pasar solo al siguiente número</label>
     <div class="muted" style="margin-top:4px">En la PC también podés usar la barra espaciadora para grabar y parar.</div>
+    <input type="file" id="upUno" accept="audio/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.amr,.webm" style="display:none">
   </div>
   <div class="box"><h3>🔢 Elegí un número</h3>
     <div class="grilla">${Array.from({length:90},(_,i)=>i+1).map(k=>`<button class="${ED.hechos.has(k)?'hecho':''} ${k===n?'sel':''}" data-act="ir" data-n="${k}" ${REC?'disabled':''}>${k}</button>`).join('')}</div>
@@ -198,6 +206,52 @@ function tic(){
   if(b) b.style.width=Math.min(100, s/MAX_SEG*100)+'%';
   if(q) q.innerHTML=`🔴 Grabando… quedan <b>${Math.max(0, Math.ceil(MAX_SEG-s))}</b> segundos`;
 }
+/* ---------- subir audios ya grabados ----------
+   Se pasan a WAV de una sola voz (16 kHz) y se recortan a MAX_SEG segundos: así se escuchan igual en Android, iPhone y PC. */
+async function prepararAudio(file){
+  const AC=window.AudioContext||window.webkitAudioContext, ac=new AC();
+  let audio;
+  try{ audio=await ac.decodeAudioData(await file.arrayBuffer()); }
+  catch(e){ throw new Error(`No se pudo leer «${file.name}». Probá con un audio MP3, M4A, WAV u OGG.`); }
+  finally{ try{ ac.close(); }catch(e){} }
+  const original=audio.duration, dur=Math.min(MAX_SEG, original), rate=16000;
+  if(dur<0.3) throw new Error(`«${file.name}» es demasiado corto.`);
+  const off=new OfflineAudioContext(1, Math.ceil(dur*rate), rate), src=off.createBufferSource();
+  src.buffer=audio; src.connect(off.destination); src.start(0);
+  const salida=await off.startRendering();
+  return {blob:aWav(salida.getChannelData(0), rate), dur, recortado: original>MAX_SEG+0.05, original};
+}
+function aWav(m, rate){
+  const b=new ArrayBuffer(44+m.length*2), v=new DataView(b), txt=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  txt(0,'RIFF'); v.setUint32(4, 36+m.length*2, true); txt(8,'WAVE'); txt(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); txt(36,'data'); v.setUint32(40, m.length*2, true);
+  for(let i=0;i<m.length;i++){ const s=Math.max(-1, Math.min(1, m[i])); v.setInt16(44+i*2, s<0 ? s*0x8000 : s*0x7fff, true); }
+  return new Blob([b], {type:'audio/wav'});
+}
+async function guardarSubido(file, n){
+  const r=await prepararAudio(file);
+  await CantosDB.guardarClip(ED.id, n, r.blob, r.dur);
+  ED.hechos.add(n); ED.durs[n]=r.dur;
+  return r;
+}
+// el número sale del nombre del archivo: "11.mp3", "33 Ñandejara.m4a", "canto_07.ogg"
+const numeroDelNombre = nombre => { const m=String(nombre).replace(/\.[^.]+$/,'').match(/(?:^|\D)(\d{1,2})(?!\d)/); const n=m?+m[1]:0; return n>=1 && n<=90 ? n : 0; };
+async function subirVarios(files){
+  let ok=0, recortados=0; const sinNumero=[], fallaron=[];
+  for(const f of files){
+    const n=numeroDelNombre(f.name);
+    if(!n){ sinNumero.push(f.name); continue; }
+    try{ const r=await guardarSubido(f, n); ok++; if(r.recortado) recortados++; }
+    catch(e){ fallaron.push(f.name); }
+  }
+  await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), cambiado:Date.now()});
+  render();
+  let msg=`📤 Se cargaron ${ok} audio${ok===1?'':'s'}.`;
+  if(recortados) msg+= recortados===1 ? ` 1 se recortó a ${MAX_SEG} s.` : ` ${recortados} se recortaron a ${MAX_SEG} s.`;
+  if(sinNumero.length) msg+=` Sin número en el nombre: ${sinNumero.join(', ')}.`;
+  if(fallaron.length) msg+=` No se pudieron leer: ${fallaron.join(', ')}.`;
+  toast(msg); return {ok, recortados, sinNumero, fallaron};
+}
 function pararGrabacion(cancelar){ if(REC){ REC.cancelado=!!cancelar; try{ REC.mr.stop(); }catch(e){} } }
 
 /* ---------- eventos ---------- */
@@ -223,6 +277,7 @@ document.addEventListener('click', async e=>{
       setTimeout(()=>URL.revokeObjectURL(u), 5000); toast('⬇️ Archivo listo. Pasalo al otro celular y cargalo en esta misma página.'); break; }
     case 'grabar': grabar(); break;
     case 'parar': pararGrabacion(false); break;
+    case 'subir': $('#upUno').click(); break;
     case 'escuchar': { const c=await CantosDB.clip(ED.id, ED.sel); if(c) tocarBlob(c.blob).catch(()=>toast('No se pudo reproducir.')); break; }
     case 'auto': hablarTTS(textoCanto(ED.sel), ED.base); break;
     case 'quitar':
@@ -238,6 +293,15 @@ document.addEventListener('change', async e=>{
   const t=e.target;
   if(t.id==='edNombre' && ED){ const v=t.value.trim().slice(0,30); if(!v){ t.value=ED.nombre; return; } ED.nombre=v; await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), nombre:v, cambiado:Date.now()}); toast('Nombre guardado.'); }
   else if(t.id==='edBase' && ED){ ED.base=t.value; await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), base:t.value, cambiado:Date.now()}); hablarTTS(textoCanto(ED.sel), ED.base); }
+  else if(t.id==='upUno' && ED && t.files[0]){
+    const n=ED.sel;
+    try{ const r=await guardarSubido(t.files[0], n); await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), cambiado:Date.now()});
+      render(); toast(r.recortado ? `📤 Listo. El audio duraba ${r.original.toFixed(0)} s: se usan los primeros ${MAX_SEG}.` : '📤 Audio cargado.');
+      const c=await CantosDB.clip(ED.id, n); if(c) tocarBlob(c.blob).catch(()=>{}); }
+    catch(err){ toast(err.message); }
+    t.value='';
+  }
+  else if(t.id==='upVarios' && ED && t.files.length){ await subirVarios([...t.files]); }
   else if(t.id==='autoSig'){ autoSig=t.checked; try{ localStorage.setItem(AUTO_SIG_KEY, autoSig?'1':'0'); }catch(e){} }
   else if(t.id==='archivo' && t.files[0]){
     try{ const id=await importarCantor(await t.files[0].text()); await cargarLista(); render(); toast('📂 Cantor cargado.'); abrir(id); }
