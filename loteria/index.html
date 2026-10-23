@@ -54,6 +54,7 @@ input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1p
 .pl{background:rgba(255,255,255,.1);color:#fff;border-radius:10px;padding:5px 9px;font-size:13px;display:flex;gap:6px;align-items:center}
 .pl.me{outline:2px solid var(--gold)}
 .pl.off{opacity:.45}
+.espbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(242,193,78,.18);border:1px solid rgba(242,193,78,.5);color:#fff;border-radius:10px;padding:8px 10px;margin:-2px 0 10px;font-size:14px}
 .pl b{font-weight:800}
 .pl .x{background:none;border:0;color:#fbb;cursor:pointer;padding:0 0 0 4px}
 /* cartón */
@@ -192,6 +193,8 @@ const savePref = () => store('lot_pref', PREF);
 const EMOJIS = ['🙂','😎','🤠','👵','👴','🧉','🐔','🐶','🐱','🦜','⚽','🌺','👑','🍀','🎩','🦊'];
 const BOTS = [['Doña Chela','👵'],['Don Ramón','👴'],['Tía Nilda','🌺'],['Karai Pedro','🤠'],['Mirna','🦜'],['Toto','⚽'],['Ña Petrona','🧉'],['Cholo','🐔'],['Tío Beto','🎩'],['Kuña Lucía','🍀']];
 const MAX_JUG = 10;   // jugadores por sala (cada uno puede tener 2 cartones: 20 cartones de colores distintos)
+const MAX_SALA = 25;  // con espectadores incluidos
+const jugadores = () => S.players.filter(p=>!p.esp);
 const DEF_CFG = {precio:500, saldo:10000, max:2, serie:20, modo:'linea', pctLinea:30, aTiempo:true, falso:'nada', gracia:4};
 
 let S = null;   // estado del juego: el anfitrión es la autoridad, los demás reciben copias
@@ -349,7 +352,7 @@ function act(pid, a){
       break;
     case 'bot': {
       if(!isHost || S.phase==='juego') return;
-      if(S.players.length>=MAX_JUG) return `La sala ya tiene ${MAX_JUG} jugadores.`;
+      if(jugadores().length>=MAX_JUG) return `La sala ya tiene ${MAX_JUG} jugadores.`;
       const used=S.players.map(x=>x.name), b=BOTS.find(b=>!used.includes(b[0]));
       if(!b) return 'Ya están todos los vecinos de la casa.';
       addPlayer(b[0], b[1], null, true); sys(`${b[1]} ${b[0]} se sentó a jugar.`);
@@ -421,9 +424,21 @@ function act(pid, a){
     case 'lobby':
       if(!isHost || S.phase!=='fin') return;
       S.phase='lobby'; break;
+    // espectador que pasa a jugar (si hay lugar en la mesa) o jugador que deja su lugar para mirar
+    case 'jugar':
+      if(!p.esp) return;
+      if(S.phase==='juego') return 'Esperá a que termine la ronda para sumarte a la mesa.';
+      if(jugadores().length>=MAX_JUG) return `La mesa sigue completa (${MAX_JUG} jugadores).`;
+      p.esp=false; sys(`🎟️ ${p.emoji} ${p.name} se sumó a la mesa como jugador.`); break;
+    case 'mirar':
+      if(p.esp || p.bot) return;
+      if(S.phase==='juego' && myCards(pid).length) return 'Tenés cartones en juego: podés pasar a mirar cuando termine la ronda.';
+      if(S.phase==='venta') myPlanchas(pid).forEach(q=>{ S.planchas[q].forEach(c=>delete S.owner[c]); p.saldo+=S.cfg.precio; });
+      p.esp=true; sys(`👀 ${p.emoji} ${p.name} dejó su lugar en la mesa y ahora mira como espectador.`); break;
     // se compra el cartón entero: sus 3 combinaciones
     case 'comprar': {
       if(S.phase!=='venta') return 'La venta de cartones está cerrada.';
+      if(p.esp) return `Estás como espectador: la mesa ya tiene ${MAX_JUG} jugadores.`;
       const ids=(S.planchas||{})[+a.plancha]; if(!ids) return;
       if(S.owner[ids[0]]) return S.owner[ids[0]]===pid ? undefined : 'Ese cartón ya lo eligió otro jugador.';
       if(myPlanchas(pid).length>=S.cfg.max) return `Máximo ${S.cfg.max} ${S.cfg.max>1?'cartones':'cartón'} por jugador.`;
@@ -638,9 +653,11 @@ function hostOnData(conn, d){
   if(d.t==='hello'){
     let p=S.players.find(x=>!x.bot && x.token && x.token===d.token);
     if(!p){
-      if(S.players.length>=MAX_JUG) { conn.send({t:'toast', x:`La sala está llena: el máximo es ${MAX_JUG} jugadores.`}); return; }
+      if(S.players.length>=MAX_SALA) { conn.send({t:'toast', x:'La sala está llena.'}); return; }
       p=addPlayer(cleanName(d.name), EMOJIS.includes(d.emoji)?d.emoji:'🙂', d.token);
-      sys(`${p.emoji} ${p.name} entró a la sala.${S.phase==='juego'?' Mira esta ronda y juega en la próxima.':''}`);
+      // con la mesa completa entra como espectador: mira, chatea y puede ser el cantor
+      if(jugadores().length>MAX_JUG){ p.esp=true; sys(`👀 ${p.emoji} ${p.name} entró como espectador (ya hay ${MAX_JUG} jugadores). Puede mirar, chatear y ser el cantor.`); }
+      else sys(`${p.emoji} ${p.name} entró a la sala.${S.phase==='juego'?' Mira esta ronda y juega en la próxima.':''}`);
     } else { p.conn=true; sys(`${p.emoji} ${p.name} volvió.`); }
     const old=NET.conns[p.id]; if(old && old!==conn) try{ old.close(); }catch(e){}
     conn.pid=p.id; NET.conns[p.id]=conn;
@@ -744,14 +761,21 @@ const GIRA={0:'0',1:'1',6:'9',8:'8',9:'6'};
 const subraya = n => { const s=String(n); if(![...s].every(d=>GIRA[d]!==undefined)) return false; const r=[...s].reverse().map(d=>GIRA[d]).join(''); return r[0]!=='0' && +r!==n && +r>=1 && +r<=90; };
 function ball(n, cls=''){ return `<div class="ball ${cls}"><span class="${subraya(n)?'u':''}">${n}</span></div>`; }
 function playersHTML(){
-  const host = NET.myPid===S.hostPid;
-  return `<div class="players">${S.players.map(p=>{
+  const host = NET.myPid===S.hostPid, m=me(), mesa=jugadores().length, esps=S.players.filter(p=>p.esp);
+  const ficha = p => {
     const n=myPlanchas(p.id).length;
     return `<div class="pl ${p.id===NET.myPid?'me':''} ${!p.conn&&!p.bot?'off':''}">${p.emoji} <b>${esc(p.name)}</b>
       ${p.id===S.hostPid?'👑':''}${p.id===S.cantorPid?'🎤':''}${p.bot?'🤖':''}
-      <span>${gs(p.saldo)}</span>${n?`<span>· 🎟️${n}</span>`:''}
+      ${p.esp?'':`<span>${gs(p.saldo)}</span>`}${n?`<span>· 🎟️${n}</span>`:''}
       ${host && p.id!==S.hostPid && S.phase!=='juego' ? `<button class="x" title="Sacar de la sala" data-act="quitar" data-pid="${p.id}">✕</button>`:''}</div>`;
-  }).join('')}</div>`;
+  };
+  // espectador: puede pasar a la mesa si hay lugar; jugador sin cartones en juego: puede dejar su lugar
+  let aviso='';
+  if(m && m.esp) aviso=`<div class="espbar">👀 Estás como <b>espectador</b>: mirás, chateás${S.cantorPid===m.id?' y sos el cantor 🎤':' y podés ser el cantor'}.
+      ${mesa<MAX_JUG && S.phase!=='juego'?`<button class="btn sm green" data-act="jugar">🎟️ Quiero jugar (hay lugar)</button>`:`<span class="muted" style="color:#ddd">Si se libera un lugar en la mesa, vas a poder jugar.</span>`}</div>`;
+  else if(m && !m.bot && S.phase!=='juego' && esps.length) aviso=`<div class="espbar" style="background:none;padding:0 2px"><button class="btn sm gray" data-act="mirar">👀 Dejar mi lugar y mirar</button></div>`;
+  return `<div class="players"><span class="pl" style="background:none">🎟️ Mesa ${mesa}/${MAX_JUG}</span>${S.players.filter(p=>!p.esp).map(ficha).join('')}</div>
+    ${esps.length?`<div class="players"><span class="pl" style="background:none">👀 Espectadores</span>${esps.map(ficha).join('')}</div>`:''}${aviso}`;
 }
 function topHTML(){
   const m=me(); const unread = UI.unread ? `<span class="dot">${UI.unread}</span>` : '';
@@ -829,9 +853,9 @@ function ventaHTML(){
   return `${playersHTML()}
   <div class="box"><h3>🎟️ Elegí tus cartones — Ronda ${S.round}</h3>
     <div class="muted">Cada cartón es de un color y trae <b>3 combinaciones</b> (Serie 1, 2 y 3) sin números repetidos entre ellas. Cuesta ${gs(S.cfg.precio)}.
-      Tocá un cartón para comprarlo y uno tuyo para devolverlo. Máximo ${S.cfg.max} por jugador.
-      Tenés <b>${mine.length}</b> · Saldo <b>${gs(m?m.saldo:0)}</b></div>
-    <div class="flex" style="margin-top:10px"><button class="btn gold" data-act="azar">🎲 Uno al azar</button>
+      ${m && m.esp ? '<b>Estás como espectador:</b> mirás cómo eligen los demás.' : `Tocá un cartón para comprarlo y uno tuyo para devolverlo. Máximo ${S.cfg.max} por jugador.
+      Tenés <b>${mine.length}</b> · Saldo <b>${gs(m?m.saldo:0)}</b>`}</div>
+    <div class="flex" style="margin-top:10px">${m && m.esp ? '' : '<button class="btn gold" data-act="azar">🎲 Uno al azar</button>'}
     <span class="grow muted">Vendidos: <b>${sold}</b> · Pozo: <b>${gs(total+S.acum)}</b>${S.acum?` (incluye acumulado ${gs(S.acum)})`:''}</span>
     ${canStart?`<button class="btn green big" data-act="empezar" ${sold?'':'disabled'}>▶️ Empezar a cantar</button>`:''}</div>
   </div>
@@ -888,7 +912,7 @@ function finHTML(){
 }
 const REGLAS = `<h3>📜 Cómo se juega la Lotería</h3><ul class="rules">
   <li><b>Bolillero de 90.</b> Las bolillas van del 1 al 90. El <b>cantor</b> 🎤 las saca de a una y las canta en voz alta.</li>
-  <li><b>El cartón</b> es de un solo color y trae <b>3 combinaciones</b>: Serie 1, Serie 2 y Serie 3. Entre ellas no se repite ningún número, y cada cartón de la sala es de un color distinto. Cada combinación tiene 3 filas y 9 columnas, con 15 números: 5 por fila. La 1ª columna lleva del 1 al 9, la 2ª del 10 al 19… y la última del 80 al 90. Pueden jugar hasta 10 jugadores con 2 cartones cada uno (el anfitrión puede cambiar cuántos cartones).</li>
+  <li><b>El cartón</b> es de un solo color y trae <b>3 combinaciones</b>: Serie 1, Serie 2 y Serie 3. Entre ellas no se repite ningún número, y cada cartón de la sala es de un color distinto. Cada combinación tiene 3 filas y 9 columnas, con 15 números: 5 por fila. La 1ª columna lleva del 1 al 9, la 2ª del 10 al 19… y la última del 80 al 90. Pueden jugar hasta 10 jugadores con 2 cartones cada uno (el anfitrión puede cambiar cuántos cartones). Si la mesa está completa, los que llegan entran como <b>espectadores</b> 👀: miran, chatean y pueden ser el cantor; si se libera un lugar, pasan a jugar.</li>
   <li>La línea y el bingo se cantan <b>por combinación</b>: cada una tiene sus botones.</li>
   <li><b>Elegí tus cartones</b> antes de que empiece la ronda. Todo lo que se paga por los cartones forma el <b>pozo</b>.</li>
   <li><b>Poné tu maíz 🌽:</b> cuando sale un número que está en tu cartón, tocalo para ponerle un grano de maíz. Nadie lo pone por vos: si no estás atento, el juego no te avisa.</li>
