@@ -86,6 +86,9 @@ input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1p
 .carton.anul::before{content:"ANULADO";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:34px;color:rgba(200,0,0,.85);transform:rotate(-12deg);z-index:2;pointer-events:none}
 .carton.anul .grid{opacity:.4}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:12px}
+/* mis cartones: cada uno en su columna (el primero a la izquierda, el segundo a la derecha) con sus 3 series una debajo de otra */
+.planchas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;align-items:start}
+.plancha{display:flex;flex-direction:column;gap:10px}
 /* venta: cartones chicos */
 .shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .mini{background:var(--cream);border-radius:9px;padding:6px;cursor:pointer;border:3px solid transparent;position:relative}
@@ -866,6 +869,11 @@ function ventaHTML(){
   ${NET.myPid===S.cantorPid?`<div class="cantor"><b>🎤 Sos el cantor</b>${vozSalaHTML()}</div>`:""}
   <div class="shop">${Object.keys(S.planchas||{}).map(Number).map(planchaHTML).join('')}</div>`;
 }
+// mis combinaciones agrupadas por cartón: en la PC un cartón a la izquierda y el otro a la derecha; en el celular uno debajo del otro
+function misCartonesHTML(mine){
+  const grupos={}; mine.forEach(c=>{ const p=infoDe(c).p; (grupos[p]=grupos[p]||[]).push(c); });
+  return `<div class="planchas">${Object.keys(grupos).map(Number).sort((a,b)=>a-b).map(p=>`<div class="plancha">${grupos[p].sort((a,b)=>infoDe(a).serie-infoDe(b).serie).map(c=>cardHTML(c,{mine:true})).join('')}</div>`).join('')}</div>`;
+}
 function juegoHTML(){
   const last=S.drawn[S.drawn.length-1], canDraw=NET.myPid===S.cantorPid||NET.myPid===S.hostPid, mine=myCards(NET.myPid);
   const cantor=P(S.cantorPid), d=new Set(S.drawn);
@@ -892,7 +900,7 @@ function juegoHTML(){
       ${vozSalaHTML()}
     </div>`:''}
   <div class="sec">${mine.length?'Tus cartones — tocá un número para ponerle tu maíz 🌽 (tocalo otra vez para sacarlo)':(me()&&me().esp?'👀 Estás como espectador: mirás la cantada. Cuando termine la ronda podés sumarte a la mesa si hay lugar.':'Esta ronda estás mirando: no tenés cartones.')}</div>
-  <div class="cards">${mine.map(c=>cardHTML(c,{mine:true})).join('')}</div>
+  ${misCartonesHTML(mine)}
   <div class="cantadas">
     <div class="sec">🔢 Tablero del 1 al 90 — revisá si se te pasó alguna</div>
     <div class="board">${Array.from({length:90},(_,i)=>i+1).map(n=>`<div class="${d.has(n)?'on':''} ${n===last?'last late':''}">${n}</div>`).join('')}</div>
@@ -994,7 +1002,7 @@ function renderOv(){
     ov.innerHTML=`<div class="box"><div class="claimbig">📣 ¡CANTARON!</div>
       ${S.claim.list.map(c=>{ const p=P(c.pid); return `<div style="text-align:center;font-size:18px;margin:6px 0">${p?esc(p.emoji+' '+p.name):''} cantó <b>${c.tipo==='bingo'?'BINGO':'LÍNEA'}</b> con el cartón N° ${c.card}</div>`; }).join('')}
       <div class="muted" style="text-align:center">Se frena el juego. Comprobando en <b id="claimLeft">${left}</b> s… Si vos también tenés, ¡cantá ahora!</div>
-      ${myCards(NET.myPid).filter(c=>!S.anulados[c]).length?`<div class="cards" style="margin-top:10px">${myCards(NET.myPid).filter(c=>!S.anulados[c]).map(c=>cardHTML(c,{mine:true})).join('')}</div>`:''}
+      ${myCards(NET.myPid).filter(c=>!S.anulados[c]).length?`<div style="margin-top:10px">${misCartonesHTML(myCards(NET.myPid).filter(c=>!S.anulados[c]))}</div>`:''}
     </div>`;
     ov.classList.add('on'); return;
   }
