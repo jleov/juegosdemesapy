@@ -193,7 +193,7 @@ const savePref = () => store('lot_pref', PREF);
 const EMOJIS = ['🙂','😎','🤠','👵','👴','🧉','🐔','🐶','🐱','🦜','⚽','🌺','👑','🍀','🎩','🦊'];
 const BOTS = [['Doña Chela','👵'],['Don Ramón','👴'],['Tía Nilda','🌺'],['Karai Pedro','🤠'],['Mirna','🦜'],['Toto','⚽'],['Ña Petrona','🧉'],['Cholo','🐔'],['Tío Beto','🎩'],['Kuña Lucía','🍀']];
 const MAX_JUG = 10;   // jugadores por sala (cada uno puede tener 2 cartones: 20 cartones de colores distintos)
-const MAX_SALA = 25;  // con espectadores incluidos
+const MAX_SALA = 50;  // con espectadores incluidos
 const jugadores = () => S.players.filter(p=>!p.esp);
 const DEF_CFG = {precio:500, saldo:10000, max:2, serie:20, modo:'linea', pctLinea:30, aTiempo:true, falso:'nada', gracia:4};
 
@@ -655,9 +655,10 @@ function hostOnData(conn, d){
     if(!p){
       if(S.players.length>=MAX_SALA) { conn.send({t:'toast', x:'La sala está llena.'}); return; }
       p=addPlayer(cleanName(d.name), EMOJIS.includes(d.emoji)?d.emoji:'🙂', d.token);
-      // con la mesa completa entra como espectador: mira, chatea y puede ser el cantor
-      if(jugadores().length>MAX_JUG){ p.esp=true; sys(`👀 ${p.emoji} ${p.name} entró como espectador (ya hay ${MAX_JUG} jugadores). Puede mirar, chatear y ser el cantor.`); }
-      else sys(`${p.emoji} ${p.name} entró a la sala.${S.phase==='juego'?' Mira esta ronda y juega en la próxima.':''}`);
+      // entra como espectador (mira, chatea y puede ser el cantor) si lo pidió, si la mesa está completa o si la cantada ya empezó
+      const porque = d.mirar ? 'solo quiere mirar' : jugadores().length>MAX_JUG ? `ya hay ${MAX_JUG} jugadores` : S.phase==='juego' ? 'la cantada ya empezó; puede sumarse a la mesa en la próxima ronda' : '';
+      if(porque){ p.esp=true; sys(`👀 ${p.emoji} ${p.name} entró como espectador (${porque}).`); }
+      else sys(`${p.emoji} ${p.name} entró a la sala.`);
     } else { p.conn=true; sys(`${p.emoji} ${p.name} volvió.`); }
     const old=NET.conns[p.id]; if(old && old!==conn) try{ old.close(); }catch(e){}
     conn.pid=p.id; NET.conns[p.id]=conn;
@@ -675,8 +676,8 @@ function hostOnClose(conn){
   commit();
 }
 // ---------- cliente ----------
-function clientJoin(code){
-  NET.mode='client'; NET.code=code; NET.welcomed=false; S=null;
+function clientJoin(code, mirar){
+  NET.mode='client'; NET.code=code; NET.welcomed=false; NET.mirar=!!mirar; S=null;
   const peer = NET.peer = newPeer();
   peer.on('open', ()=>connectHost());
   peer.on('disconnected', ()=>{ if(!peer.destroyed) setTimeout(()=>{ try{ peer.reconnect(); }catch(e){} }, 1500); });
@@ -695,7 +696,7 @@ function connectHost(){
   if(NET.hostConn && NET.hostConn.open) return;
   const c = NET.peer.connect(PREFIX+NET.code, {reliable:true});
   NET.hostConn=c;
-  c.on('open', ()=>{ netBar(false); c.send({t:'hello', name:cleanName(PREF.name), emoji:PREF.emoji, token:myToken}); });
+  c.on('open', ()=>{ netBar(false); c.send({t:'hello', name:cleanName(PREF.name), emoji:PREF.emoji, token:myToken, mirar:NET.mirar}); });
   c.on('data', d=>{
     if(NET.hostConn!==c || !d) return;
     if(d.t==='state'){ NET.welcomed=true; S=d.s; NET.myPid=d.you; store('lot_client', {code:NET.code, at:Date.now()}); render(); }
@@ -772,8 +773,10 @@ function playersHTML(){
   // espectador: puede pasar a la mesa si hay lugar; jugador sin cartones en juego: puede dejar su lugar
   let aviso='';
   if(m && m.esp) aviso=`<div class="espbar">👀 Estás como <b>espectador</b>: mirás, chateás${S.cantorPid===m.id?' y sos el cantor 🎤':' y podés ser el cantor'}.
-      ${mesa<MAX_JUG && S.phase!=='juego'?`<button class="btn sm green" data-act="jugar">🎟️ Quiero jugar (hay lugar)</button>`:`<span class="muted" style="color:#ddd">Si se libera un lugar en la mesa, vas a poder jugar.</span>`}</div>`;
-  else if(m && !m.bot && S.phase!=='juego' && esps.length) aviso=`<div class="espbar" style="background:none;padding:0 2px"><button class="btn sm gray" data-act="mirar">👀 Dejar mi lugar y mirar</button></div>`;
+      ${mesa>=MAX_JUG ? `<span class="muted" style="color:#ddd">La mesa está completa: si se libera un lugar, vas a poder jugar.</span>`
+        : S.phase==='juego' ? `<span class="muted" style="color:#ddd">Cuando termine esta ronda vas a poder sumarte a la mesa.</span>`
+        : `<button class="btn sm green" data-act="jugar">🎟️ Quiero jugar (hay lugar)</button>`}</div>`;
+  else if(m && !m.bot && S.phase!=='juego') aviso=`<div class="espbar" style="background:none;padding:0 2px;margin-top:-4px"><button class="btn sm gray" data-act="mirar">👀 Prefiero solo mirar (dejar mi lugar)</button></div>`;
   return `<div class="players"><span class="pl" style="background:none">🎟️ Mesa ${mesa}/${MAX_JUG}</span>${S.players.filter(p=>!p.esp).map(ficha).join('')}</div>
     ${esps.length?`<div class="players"><span class="pl" style="background:none">👀 Espectadores</span>${esps.map(ficha).join('')}</div>`:''}${aviso}`;
 }
@@ -804,6 +807,7 @@ function menuHTML(){
       <label style="margin-top:14px">…o entrá con el código que te pasaron</label>
       <div class="flex"><input type="text" id="joinCode" class="grow" maxlength="5" style="text-transform:uppercase;letter-spacing:3px;font-weight:800;flex:1" value="${esc(url||'')}" placeholder="CÓDIGO">
       <button class="btn green" data-act="unirse">Entrar</button></div>
+      <button class="btn gray wide" style="margin-top:8px" data-act="soloMirar">👀 Entrar solo a mirar (sin jugar)</button>
     </div>
     <div class="box"><button class="btn gray wide" data-act="reglas">📜 Cómo se juega (reglas)</button>
       <button class="btn gold wide" style="margin-top:8px" data-act="sonido">🗣️ Elegir quién canta las bolillas</button>
@@ -887,7 +891,7 @@ function juegoHTML(){
       ${S.drawn.length>=90 && NET.myPid===S.hostPid?`<button class="btn red wide" style="margin-top:8px" data-act="cerrar" ${S.claim?'disabled':''}>Cerrar ronda (el pozo se acumula)</button>`:''}
       ${vozSalaHTML()}
     </div>`:''}
-  <div class="sec">${mine.length?'Tus cartones — tocá un número para ponerle tu maíz 🌽 (tocalo otra vez para sacarlo)':'Esta ronda estás mirando: no tenés cartones.'}</div>
+  <div class="sec">${mine.length?'Tus cartones — tocá un número para ponerle tu maíz 🌽 (tocalo otra vez para sacarlo)':(me()&&me().esp?'👀 Estás como espectador: mirás la cantada. Cuando termine la ronda podés sumarte a la mesa si hay lugar.':'Esta ronda estás mirando: no tenés cartones.')}</div>
   <div class="cards">${mine.map(c=>cardHTML(c,{mine:true})).join('')}</div>
   <div class="cantadas">
     <div class="sec">🔢 Tablero del 1 al 90 — revisá si se te pasó alguna</div>
@@ -912,7 +916,7 @@ function finHTML(){
 }
 const REGLAS = `<h3>📜 Cómo se juega la Lotería</h3><ul class="rules">
   <li><b>Bolillero de 90.</b> Las bolillas van del 1 al 90. El <b>cantor</b> 🎤 las saca de a una y las canta en voz alta.</li>
-  <li><b>El cartón</b> es de un solo color y trae <b>3 combinaciones</b>: Serie 1, Serie 2 y Serie 3. Entre ellas no se repite ningún número, y cada cartón de la sala es de un color distinto. Cada combinación tiene 3 filas y 9 columnas, con 15 números: 5 por fila. La 1ª columna lleva del 1 al 9, la 2ª del 10 al 19… y la última del 80 al 90. Pueden jugar hasta 10 jugadores con 2 cartones cada uno (el anfitrión puede cambiar cuántos cartones). Si la mesa está completa, los que llegan entran como <b>espectadores</b> 👀: miran, chatean y pueden ser el cantor; si se libera un lugar, pasan a jugar.</li>
+  <li><b>El cartón</b> es de un solo color y trae <b>3 combinaciones</b>: Serie 1, Serie 2 y Serie 3. Entre ellas no se repite ningún número, y cada cartón de la sala es de un color distinto. Cada combinación tiene 3 filas y 9 columnas, con 15 números: 5 por fila. La 1ª columna lleva del 1 al 9, la 2ª del 10 al 19… y la última del 80 al 90. Pueden jugar hasta 10 jugadores con 2 cartones cada uno (el anfitrión puede cambiar cuántos cartones). <b>Espectadores</b> 👀: cualquiera puede entrar solo a mirar (botón “Entrar solo a mirar”), y también entran como espectadores los que llegan con la mesa completa o con la cantada ya empezada. Miran, chatean y pueden ser el cantor; cuando hay lugar y no se está cantando, tocan “Quiero jugar” y pasan a la mesa.</li>
   <li>La línea y el bingo se cantan <b>por combinación</b>: cada una tiene sus botones.</li>
   <li><b>Elegí tus cartones</b> antes de que empiece la ronda. Todo lo que se paga por los cartones forma el <b>pozo</b>.</li>
   <li><b>Poné tu maíz 🌽:</b> cuando sale un número que está en tu cartón, tocalo para ponerle un grano de maíz. Nadie lo pone por vos: si no estás atento, el juego no te avisa.</li>
@@ -1086,7 +1090,7 @@ document.addEventListener('click', e=>{
   switch(a){
     case 'emoji': PREF.emoji=el.dataset.e; savePref(); saveName(); render(); break;
     case 'crear': if(needName()) hostStart(false); break;
-    case 'unirse': { if(!needName()) break; const c=($('#joinCode').value||'').trim().toUpperCase(); if(c.length<5) return toast('Escribí el código de 5 letras.'); clientJoin(c); break; }
+    case 'unirse': case 'soloMirar': { if(!needName()) break; const c=($('#joinCode').value||'').trim().toUpperCase(); if(c.length<5) return toast('Escribí el código de 5 letras.'); clientJoin(c, a==='soloMirar'); break; }
     case 'volver': { saveName(); const h=load('lot_host'); if(h && Date.now()-h.at<12*3600e3) hostStart(true); else { const c=load('lot_client'); if(c) clientJoin(c.code); } break; }
     case 'cancelar': leave(false); break;
     case 'salir':
