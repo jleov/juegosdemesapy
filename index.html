@@ -6,7 +6,12 @@
 <title>Juegos de Mesa Digital PY</title>
 <meta name="description" content="Juegos de mesa paraguayos para jugar en línea con amigos: Banquero y Lotería.">
 <meta name="theme-color" content="#1c1240">
-<link rel="icon" href="banquero/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Juegos PY">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--cream:#fff8e6}
 *{box-sizing:border-box}
@@ -32,6 +37,20 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
 .body p{margin:0 0 12px;color:#555;font-size:14px;line-height:1.4}
 .btn{display:block;text-align:center;border-radius:10px;padding:12px;font-weight:800;color:#fff;background:var(--blue)}
 .lotbtn{background:#7a2fbf}
+.install{display:flex;gap:14px;align-items:center;background:linear-gradient(135deg,#2a9d3f,#1f7a30);border-radius:16px;padding:14px 16px;margin-bottom:18px;box-shadow:0 8px 22px rgba(0,0,0,.4)}
+.install img{width:58px;height:58px;border-radius:14px;flex:none}
+.install .t{flex:1}
+.install b{display:block;font-size:17px}
+.install small{opacity:.9}
+.install button{border:0;border-radius:10px;padding:12px 16px;font:inherit;font-weight:800;background:#fff;color:#1f7a30;cursor:pointer;white-space:nowrap}
+@media (max-width:480px){.install{flex-wrap:wrap}.install button{width:100%}}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+#ov.on{display:flex}
+#ov .box{background:#fff8e6;color:#1d1d1d;border-radius:16px;padding:18px;max-width:440px;width:100%}
+#ov h3{margin:0 0 8px}
+#ov li{margin:6px 0}
+#ov button{width:100%;border:0;border-radius:10px;padding:12px;font:inherit;font-weight:800;background:#0038a8;color:#fff;margin-top:8px;cursor:pointer}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:10;text-align:center;max-width:90%}
 .foot{text-align:center;color:rgba(255,255,255,.55);font-size:13px;margin-top:30px;line-height:1.6}
 </style>
 </head>
@@ -42,6 +61,11 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
     <div class="flag"><b class="r">PARA</b><b class="w">GUA</b><b class="b">Y</b></div>
     <div class="sub">Los juegos de siempre, para jugar en línea con la familia y los amigos.</div>
   </header>
+  <div class="install" id="installBox">
+    <img src="icon-192.png" alt="">
+    <div class="t"><b>📲 Instalá los juegos en tu celular</b><small>Queda un ícono en tu pantalla que abre directo el sitio nuevo, con el Banquero y la Lotería.</small></div>
+    <button id="btnInstall">Instalar</button>
+  </div>
   <div class="games">
     <a class="game" href="banquero/">
       <div class="cover bnq"><img src="banquero/icon-192.png" alt=""></div>
@@ -59,5 +83,39 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
   <div class="foot">Juegos de Mesa Digital PY · un proyecto de <b>jleovgames</b><br>
     jleov.github.io/juegosdemesapy · juegosdemesapy.pages.dev</div>
 </div>
+<div id="ov"><div class="box" id="ovBox"></div></div>
+<div id="toast"></div>
+<script>
+/* ====================== INSTALAR COMO APP ====================== */
+const $ = s => document.querySelector(s);
+function toast(x){ const t=$('#toast'); t.textContent=x; t.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display='none',3500); }
+let installPrompt=null;
+const isInstalled = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone===true;
+function refreshInstall(){ $('#installBox').style.display = isInstalled() ? 'none' : 'flex'; }
+// Chrome y Edge (Android y PC) avisan que se puede instalar: guardamos ese aviso para usarlo con nuestro botón
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; refreshInstall(); });
+window.addEventListener('appinstalled', ()=>{ installPrompt=null; refreshInstall(); toast('✅ ¡Listo! Juegos de Mesa quedó instalado. Buscalo con su ícono 🎲.'); });
+$('#btnInstall').onclick=async()=>{
+  if(installPrompt){
+    installPrompt.prompt();
+    const r=await installPrompt.userChoice.catch(()=>({outcome:'dismissed'}));
+    if(r.outcome==='accepted') toast('📲 Instalando Juegos de Mesa…');
+    installPrompt=null; return;
+  }
+  // el navegador no ofrece el botón automático: explicamos cómo hacerlo a mano según el dispositivo
+  const ua=navigator.userAgent, ios=/iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document), android=/Android/i.test(ua);
+  const safari=/Safari/i.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS/i.test(ua);
+  let pasos;
+  if(ios) pasos = safari
+    ? `<ol><li>Tocá el botón <b>Compartir</b> ⬆️ (abajo en el iPhone, arriba en el iPad).</li><li>Deslizá y elegí <b>“Agregar a pantalla de inicio”</b>.</li><li>Tocá <b>“Agregar”</b>.</li></ol>`
+    : `<p>En iPhone y iPad solo se puede instalar desde <b>Safari</b>. Copiá el enlace, abrilo en Safari y seguí estos pasos:</p><ol><li>Botón <b>Compartir</b> ⬆️</li><li><b>“Agregar a pantalla de inicio”</b></li></ol>`;
+  else if(android) pasos = `<ol><li>Abrí esta página en <b>Chrome</b>.</li><li>Tocá el menú <b>⋮</b> (arriba a la derecha).</li><li>Elegí <b>“Instalar app”</b> o <b>“Agregar a pantalla principal”</b>.</li></ol><p style="font-size:13px;color:#666">Si no aparece, recargá la página y esperá unos segundos.</p>`;
+  else pasos = `<ol><li>Abrí esta página en <b>Chrome</b> o <b>Edge</b>.</li><li>En la barra de direcciones, a la derecha, tocá el ícono de <b>instalar</b> (una pantallita con una flecha).</li><li>O en el menú <b>⋮</b> → <b>“Instalar Juegos de Mesa Digital PY”</b>.</li></ol>`;
+  $('#ovBox').innerHTML=`<h3>📲 Cómo instalar Juegos de Mesa</h3>${pasos}<p style="font-size:13px;color:#666">Queda con el ícono 🎲 y se abre como una app, con el Banquero y la Lotería adentro.</p><button onclick="document.getElementById('ov').classList.remove('on')">Entendido</button>`;
+  $('#ov').classList.add('on');
+};
+refreshInstall();
+if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
 </body>
 </html>
