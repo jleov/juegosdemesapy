@@ -213,12 +213,18 @@ function say(txt, forzar){ if(PREF.voz || forzar) hablarTTS(txt, baseTTS()); }
 async function cargarGrabados(){
   try{ const ls=await CantosDB.lista(); UI.grabados=await Promise.all(ls.map(async c=>({...c, cuantos:(await CantosDB.numeros(c.id)).length}))); }
   catch(e){ UI.grabados=[]; }
+  // si comparto mi voz con la sala y cambié textos en el grabador, se actualizan para todos
+  const g=S && S.vozSala && S.vozSala.pid===NET.myPid && recInfo(PREF.vozSalaId);
+  if(g && (g.nombre!==S.vozSala.nombre || JSON.stringify(limpiarTextos(g.textos))!==JSON.stringify(S.vozSala.textos||{})))
+    doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base, textos:g.textos});
 }
+// el dicho que se ve en pantalla: el texto propio del cantor grabado si tiene, si no el dicho de siempre
+const dichoMostrado = n => S && S.vozSala && P(S.vozSala.pid) ? dichoDe(n, S.vozSala.textos) : esGrabado() ? dichoDe(n, (recInfo()||{}).textos) : dicho(n);
 // canta con el cantor que elegí en este dispositivo (si es grabado y falta el número, usa su voz automática)
 async function cantarLocal(n){
   if(!PREF.voz) return;
   if(esGrabado()){ try{ const c=await CantosDB.clip(recId(), n); if(c){ await tocarBlob(c.blob); return; } }catch(e){} }
-  hablarTTS(textoCanto(n), baseTTS());
+  hablarTTS(textoCanto(n, (recInfo()||{}).textos), baseTTS());
 }
 /* ---------- voz de la sala: el cantor comparte su voz grabada y todos la escuchan ---------- */
 function anunciarBolilla(n, idx){
@@ -228,7 +234,7 @@ function anunciarBolilla(n, idx){
     if(!PREF.voz) return;
     // espero el audio del cantor; si no llega a tiempo, canta la voz automática que él eligió
     clearTimeout(UI.esperaT); UI.espera={idx};
-    UI.esperaT=setTimeout(()=>{ if(UI.espera && UI.espera.idx===idx){ UI.espera=null; hablarTTS(textoCanto(n), vs.base); } }, 2500);
+    UI.esperaT=setTimeout(()=>{ if(UI.espera && UI.espera.idx===idx){ UI.espera=null; hablarTTS(textoCanto(n, vs.textos), vs.base); } }, 2500);
     return;
   }
   cantarLocal(n);
@@ -238,7 +244,7 @@ async function compartirCanto(n, idx){
   try{ const c=PREF.vozSalaId && await CantosDB.clip(PREF.vozSalaId, n);
     if(c){ blob=c.blob; msg={t:'canto', round:S.round, idx, n, type:c.type, data:await c.blob.arrayBuffer()}; } }catch(e){}
   enviarCanto(msg);
-  if(PREF.voz){ if(blob) tocarBlob(blob).catch(()=>hablarTTS(textoCanto(n), vs.base)); else hablarTTS(textoCanto(n), vs.base); }
+  if(PREF.voz){ if(blob) tocarBlob(blob).catch(()=>hablarTTS(textoCanto(n, vs.textos), vs.base)); else hablarTTS(textoCanto(n, vs.textos), vs.base); }
 }
 function enviarCanto(msg, excepto){
   if(NET.mode==='host'){ for(const pid in NET.conns){ if(pid===excepto) continue; const c=NET.conns[pid]; if(c && c.open) try{ c.send(msg); }catch(e){} } }
@@ -248,8 +254,8 @@ function recibirCanto(d){
   if(!S || !S.vozSala || d.round!==S.round || d.idx!==S.drawn.length || !PREF.voz) return;
   if(!UI.espera || UI.espera.idx!==d.idx) return;   // ya cantó la voz automática
   clearTimeout(UI.esperaT); UI.espera=null;
-  if(d.none || !d.data){ hablarTTS(textoCanto(d.n), S.vozSala.base); return; }
-  tocarBlob(new Blob([d.data], {type:d.type||'audio/webm'})).catch(()=>hablarTTS(textoCanto(d.n), S.vozSala.base));
+  if(d.none || !d.data){ hablarTTS(textoCanto(d.n, S.vozSala.textos), S.vozSala.base); return; }
+  tocarBlob(new Blob([d.data], {type:d.type||'audio/webm'})).catch(()=>hablarTTS(textoCanto(d.n, S.vozSala.textos), S.vozSala.base));
 }
 
 /* ====================== CARTONES ====================== */
@@ -342,8 +348,9 @@ function act(pid, a){
     case 'vozSala': {
       if(pid!==S.cantorPid) return 'Solo el cantor puede poner su voz grabada para toda la sala.';
       if(!a.on){ if(S.vozSala) sys(`🎙️ ${p.name} dejó de compartir su voz grabada.`); S.vozSala=null; break; }
-      S.vozSala={pid, nombre:String(a.nombre||'Cantor').slice(0,30), base:cantorTTS(a.base).id};
-      sys(`🎙️ Ahora canta «${S.vozSala.nombre}», la voz grabada de ${p.emoji} ${p.name}. ¡Todos la escuchan!`);
+      const yaEra=S.vozSala && S.vozSala.pid===pid;
+      S.vozSala={pid, nombre:String(a.nombre||'Cantor').slice(0,30), base:cantorTTS(a.base).id, textos:limpiarTextos(a.textos)};
+      if(!yaEra) sys(`🎙️ Ahora canta «${S.vozSala.nombre}», la voz grabada de ${p.emoji} ${p.name}. ¡Todos la escuchan!`);
       break; }
     case 'recargar': {
       const q=P(a.pid); if(!isHost || !q || S.phase==='juego') return;
@@ -805,7 +812,7 @@ function juegoHTML(){
   return `<div class="stage">
     ${last?ball(last,'spin" id="bigBall'):`<div class="ball" style="background:#777"><span>?</span></div>`}
     <div class="info"><div style="font-size:14px;opacity:.8">${last?`Bolilla ${S.drawn.length} de 90`:'Todavía no salió ninguna bolilla'}${S.vozSala?` · 🎙️ Canta ${esc(S.vozSala.nombre)}`:''}</div>
-      ${last?`<div class="nick">“${esc(dicho(last))}”</div>`:''}
+      ${last?`<div class="nick">“${esc(dichoMostrado(last))}”</div>`:''}
       <div style="font-size:26px;font-weight:900" id="bigNum" class="late">${last?`¡El ${last}! <span style="font-size:16px;opacity:.8">(${enLetras(last)})</span>`:`🎤 ${cantor?esc(cantor.name):''} va a cantar`}</div>
     </div>
     <div class="todas">
@@ -1040,15 +1047,15 @@ document.addEventListener('click', e=>{
     case 'ovClose': UI.reglas=false; renderOv(); break;
     case 'ovRes': UI.closedResult=S.result&&S.result.at; renderOv(); break;
     case 'sonido': UI.sonido=true; renderOv(); cargarGrabados().then(()=>{ if(UI.sonido) renderOv(); }); break;
-    case 'vozSalaOn': { const g=recInfo(); if(!g) break; PREF.vozSalaId=g.id; savePref(); doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base}); break; }
+    case 'vozSalaOn': { const g=recInfo(); if(!g) break; PREF.vozSalaId=g.id; savePref(); doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base, textos:g.textos}); break; }
     case 'vozSalaOff': doAct({t:'vozSala', on:false}); break;
     case 'sonidoClose': UI.sonido=false; renderOv(); break;
     case 'cantorSel': {
       PREF.cantor=el.dataset.id; PREF.voz=true; savePref();
       if(esGrabado()){ // muestra: el 33 grabado, o el primero que tenga
-        const id=recId(); CantosDB.clip(id,33).then(c=>c||CantosDB.clips(id).then(cs=>cs[0])).then(c=>c?tocarBlob(c.blob):hablarTTS(textoCanto(33), baseTTS())).catch(()=>{});
+        const id=recId(); CantosDB.clip(id,33).then(c=>c||CantosDB.clips(id).then(cs=>cs[0])).then(c=>c?tocarBlob(c.blob):hablarTTS(textoCanto(33, (recInfo()||{}).textos), baseTTS())).catch(()=>{});
         // si estoy compartiendo mi voz con la sala, paso a compartir este cantor
-        const g=recInfo(); if(g && S && S.vozSala && S.vozSala.pid===NET.myPid){ PREF.vozSalaId=g.id; savePref(); doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base}); }
+        const g=recInfo(); if(g && S && S.vozSala && S.vozSala.pid===NET.myPid){ PREF.vozSalaId=g.id; savePref(); doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base, textos:g.textos}); }
       } else hablarTTS(textoCanto(33), PREF.cantor);
       renderOv(); $('#top').innerHTML=S?topHTML():''; break; }
     case 'sinVoz': PREF.voz=false; savePref(); if(window.speechSynthesis) speechSynthesis.cancel(); renderOv(); if(S) $('#top').innerHTML=topHTML(); break;
@@ -1078,6 +1085,8 @@ $('#chatForm').addEventListener('submit', e=>{ e.preventDefault(); const i=$('#c
 if(window.speechSynthesis) speechSynthesis.getVoices();
 render();
 cargarGrabados();
+// al volver de grabar (otra pestaña), se cargan los cambios del grabador
+window.addEventListener('focus', ()=>cargarGrabados().then(()=>{ if(UI.sonido) renderOv(); else if(S) render(); }));
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>

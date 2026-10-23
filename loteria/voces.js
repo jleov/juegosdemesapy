@@ -62,8 +62,11 @@ function vozPara(sexo){
   return pref || es[0] || null;
 }
 const cantorTTS = id => CANTORES.find(c=>c.id===id) || CANTORES[0];
-// lo que dice el cantor por cada bolilla: primero el dicho y después el número
-const textoCanto = n => `${habla(n)}... ¡El ${n}!`;
+// texto propio por número que puede tener un cantor grabado (lo que dice en su audio), hasta 80 letras
+const limpiarTextos = t => { const o={}; if(t && typeof t==='object') for(const k in t){ const n=+k, v=String(t[k]||'').replace(/\s+/g,' ').trim().slice(0,80); if(n>=1 && n<=90 && v) o[n]=v; } return o; };
+const dichoDe = (n, textos) => (textos && textos[n]) || dicho(n);
+// lo que dice el cantor por cada bolilla: primero el dicho (o el texto propio) y después el número
+const textoCanto = (n, textos) => `${(textos && textos[n]) || habla(n)}... ¡El ${n}!`;
 function hablarTTS(txt, cantorId){
   if(!window.speechSynthesis) return;
   try{ speechSynthesis.cancel(); const c=cantorTTS(cantorId), u=new SpeechSynthesisUtterance(txt); u.lang='es-ES';
@@ -104,7 +107,7 @@ const base64ABlob = (s,type) => { const bin=atob(s), a=new Uint8Array(bin.length
 // archivo para llevar un cantor a otro dispositivo
 async function exportarCantor(id){
   const c=await CantosDB.cantor(id), clips=await CantosDB.clips(id);
-  const datos={formato:'juegospy-cantos', version:1, nombre:c.nombre, base:c.base,
+  const datos={formato:'juegospy-cantos', version:1, nombre:c.nombre, base:c.base, textos:limpiarTextos(c.textos),
     clips: await Promise.all(clips.map(async x=>({n:x.n, type:x.type, dur:x.dur, data:await blobABase64(x.blob)})))};
   return new Blob([JSON.stringify(datos)], {type:'application/json'});
 }
@@ -112,7 +115,7 @@ async function importarCantor(texto){
   const d=JSON.parse(texto);
   if(d.formato!=='juegospy-cantos' || !Array.isArray(d.clips)) throw new Error('Ese archivo no es de cantos de la Lotería.');
   const id=nuevoId();
-  await CantosDB.guardarCantor({id, nombre:String(d.nombre||'Cantor').slice(0,30), base:cantorTTS(d.base).id, creado:Date.now()});
+  await CantosDB.guardarCantor({id, nombre:String(d.nombre||'Cantor').slice(0,30), base:cantorTTS(d.base).id, textos:limpiarTextos(d.textos), creado:Date.now()});
   for(const x of d.clips){ const n=+x.n; if(n>=1 && n<=90 && x.data) await CantosDB.guardarClip(id, n, base64ABlob(x.data, x.type||'audio/webm'), Math.min(MAX_SEG, +x.dur||0)); }
   return id;
 }

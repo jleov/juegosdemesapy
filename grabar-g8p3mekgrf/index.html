@@ -53,6 +53,8 @@ label{display:block;font-size:13px;font-weight:700;margin:8px 0 4px}
 .grilla button.hecho{background:#bdf0c4;color:#155c22}
 .grilla button.sel{border-color:var(--blue);background:#dfe8ff;color:#002a7a}
 .grilla button.hecho.sel{background:#9fe3aa}
+.grilla button{position:relative}
+.grilla button.txt::after{content:"✏";position:absolute;top:0;right:2px;font-size:9px}
 .leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
 .leyenda i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;z-index:60;display:none;max-width:90%;text-align:center}
@@ -83,7 +85,7 @@ async function cargarLista(){
 }
 async function abrir(id){
   const c=await CantosDB.cantor(id); if(!c) return;
-  ED={...c, hechos:new Set(await CantosDB.numeros(id)), durs:{}, sel:1};
+  ED={...c, textos:limpiarTextos(c.textos), hechos:new Set(await CantosDB.numeros(id)), durs:{}, sel:1};
   (await CantosDB.clips(id)).forEach(x=>ED.durs[x.n]=x.dur);
   ED.sel = [...Array(90).keys()].map(i=>i+1).find(n=>!ED.hechos.has(n)) || 1;
   VISTA='editar'; render(); window.scrollTo(0,0);
@@ -125,7 +127,7 @@ function listaHTML(){
   <div class="links"><a href="../loteria/">🎱 Ir a la Lotería</a> · <a href="../">🏠 Todos los juegos</a></div>`;
 }
 function editarHTML(){
-  const n=ED.sel, hecho=ED.hechos.has(n), grabando=REC && REC.n===n;
+  const n=ED.sel, hecho=ED.hechos.has(n), grabando=REC && REC.n===n, propio=!!ED.textos[n];
   return `<div class="flex" style="margin-bottom:10px"><button class="btn gray sm" data-act="volver">← Mis cantores</button><span class="grow"></span>
     <a class="btn sm gold" href="../loteria/">🎱 Ir a la Lotería</a></div>
   <div class="box">
@@ -140,10 +142,13 @@ function editarHTML(){
   <div class="box ${grabando?'grabando':''}" id="panel">
     <div class="flex" style="align-items:center;gap:14px">
       <div class="ball" style="background:${ballColor(n)}"><span>${n}</span></div>
-      <div class="grow" style="min-width:200px"><div class="muted">Número ${n} (${enLetras(n)}) · decí algo así:</div>
-        <div class="decir">“${esc(dicho(n))}”… ¡El ${n}!<small>Podés decirlo a tu manera, como lo canta tu familia.</small></div>
+      <div class="grow" style="min-width:200px"><div class="muted">Número ${n} (${enLetras(n)}) · ${propio?'lo que decís en tu audio:':'decí algo así:'}</div>
+        <div class="decir">“${esc(dichoDe(n, ED.textos))}”… ¡El ${n}!</div>
         <div class="estado ${hecho?'ok':'no'}">${hecho?`✅ Grabado${ED.durs[n]?` (${ED.durs[n].toFixed(1).replace('.',',')} s)`:''}`:'⏺️ Sin grabar: lo canta la voz automática'}</div></div>
     </div>
+    <label style="margin-top:10px">✏️ ¿En tu audio decís otra cosa? Escribí lo que decís (es lo que se ve en el juego)</label>
+    <div class="flex"><input type="text" id="edTexto" class="grow" maxlength="80" value="${esc(ED.textos[n]||'')}" placeholder="${esc(dicho(n))}" ${REC?'disabled':''}>
+      ${propio?`<button class="btn sm gray" data-act="textoOriginal" title="Volver al dicho de siempre" ${REC?'disabled':''}>↺ Original</button>`:''}</div>
     <div class="tiempo"><div id="barra"></div></div>
     <div class="muted" id="quedan">${grabando?'':'Máximo '+MAX_SEG+' segundos por número.'}</div>
     <div class="acciones">
@@ -164,8 +169,8 @@ function editarHTML(){
     <input type="file" id="upUno" accept="audio/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.amr,.webm" style="display:none">
   </div>
   <div class="box"><h3>🔢 Elegí un número</h3>
-    <div class="grilla">${Array.from({length:90},(_,i)=>i+1).map(k=>`<button class="${ED.hechos.has(k)?'hecho':''} ${k===n?'sel':''}" data-act="ir" data-n="${k}" ${REC?'disabled':''}>${k}</button>`).join('')}</div>
-    <div class="leyenda"><span><i style="background:#bdf0c4"></i>Grabado</span><span><i style="background:#efe6cf"></i>Sin grabar (voz automática)</span><span><i style="background:#dfe8ff;border:2px solid var(--blue)"></i>El que estás grabando</span></div>
+    <div class="grilla">${Array.from({length:90},(_,i)=>i+1).map(k=>`<button class="${ED.hechos.has(k)?'hecho':''} ${k===n?'sel':''} ${ED.textos[k]?'txt':''}" data-act="ir" data-n="${k}" ${REC?'disabled':''}>${k}</button>`).join('')}</div>
+    <div class="leyenda"><span><i style="background:#bdf0c4"></i>Grabado</span><span><i style="background:#efe6cf"></i>Sin grabar (voz automática)</span><span><i style="background:#dfe8ff;border:2px solid var(--blue)"></i>El que estás grabando</span><span>✏ Con texto propio</span></div>
   </div>`;
 }
 function render(){ $('#app').innerHTML = VISTA==='editar' && ED ? editarHTML() : listaHTML(); }
@@ -252,6 +257,12 @@ async function subirVarios(files){
   if(fallaron.length) msg+=` No se pudieron leer: ${fallaron.join(', ')}.`;
   toast(msg); return {ok, recortados, sinNumero, fallaron};
 }
+// texto propio de un número (vacío o igual al dicho de siempre = se usa el dicho de siempre)
+async function guardarTexto(n, v){
+  v=String(v||'').replace(/\s+/g,' ').trim().slice(0,80);
+  if(v && v!==dicho(n)) ED.textos[n]=v; else delete ED.textos[n];
+  await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), textos:{...ED.textos}, cambiado:Date.now()});
+}
 function pararGrabacion(cancelar){ if(REC){ REC.cancelado=!!cancelar; try{ REC.mr.stop(); }catch(e){} } }
 
 /* ---------- eventos ---------- */
@@ -278,8 +289,9 @@ document.addEventListener('click', async e=>{
     case 'grabar': grabar(); break;
     case 'parar': pararGrabacion(false); break;
     case 'subir': $('#upUno').click(); break;
+    case 'textoOriginal': await guardarTexto(ED.sel, ''); toast('Vuelve el dicho de siempre.'); render(); break;
     case 'escuchar': { const c=await CantosDB.clip(ED.id, ED.sel); if(c) tocarBlob(c.blob).catch(()=>toast('No se pudo reproducir.')); break; }
-    case 'auto': hablarTTS(textoCanto(ED.sel), ED.base); break;
+    case 'auto': hablarTTS(textoCanto(ED.sel, ED.textos), ED.base); break;
     case 'quitar':
       if(!confirm(`¿Borrar la grabación del ${ED.sel}? Ese número lo va a cantar la voz automática.`)) return;
       await CantosDB.borrarClip(ED.id, ED.sel); ED.hechos.delete(ED.sel); delete ED.durs[ED.sel]; render(); break;
@@ -292,7 +304,7 @@ document.addEventListener('click', async e=>{
 document.addEventListener('change', async e=>{
   const t=e.target;
   if(t.id==='edNombre' && ED){ const v=t.value.trim().slice(0,30); if(!v){ t.value=ED.nombre; return; } ED.nombre=v; await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), nombre:v, cambiado:Date.now()}); toast('Nombre guardado.'); }
-  else if(t.id==='edBase' && ED){ ED.base=t.value; await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), base:t.value, cambiado:Date.now()}); hablarTTS(textoCanto(ED.sel), ED.base); }
+  else if(t.id==='edBase' && ED){ ED.base=t.value; await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), base:t.value, cambiado:Date.now()}); hablarTTS(textoCanto(ED.sel, ED.textos), ED.base); }
   else if(t.id==='upUno' && ED && t.files[0]){
     const n=ED.sel;
     try{ const r=await guardarSubido(t.files[0], n); await CantosDB.guardarCantor({...(await CantosDB.cantor(ED.id)), cambiado:Date.now()});
@@ -302,6 +314,7 @@ document.addEventListener('change', async e=>{
     t.value='';
   }
   else if(t.id==='upVarios' && ED && t.files.length){ await subirVarios([...t.files]); }
+  else if(t.id==='edTexto' && ED){ await guardarTexto(ED.sel, t.value); toast(ED.textos[ED.sel] ? '✏️ Texto guardado.' : 'Vuelve el dicho de siempre.'); render(); }
   else if(t.id==='autoSig'){ autoSig=t.checked; try{ localStorage.setItem(AUTO_SIG_KEY, autoSig?'1':'0'); }catch(e){} }
   else if(t.id==='archivo' && t.files[0]){
     try{ const id=await importarCantor(await t.files[0].text()); await cargarLista(); render(); toast('📂 Cantor cargado.'); abrir(id); }
@@ -309,6 +322,7 @@ document.addEventListener('change', async e=>{
   }
 });
 document.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && e.target.id==='edTexto'){ e.target.blur(); return; }
   if(VISTA!=='editar' || e.code!=='Space' || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
   e.preventDefault(); REC ? pararGrabacion(false) : grabar();
 });
