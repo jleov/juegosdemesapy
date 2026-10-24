@@ -2628,8 +2628,9 @@ function openTour() {
 function setTourMode(m) {
   TOUR.mode = m;
   if (m === 'bots') TOUR.slots.forEach(s => s.ctl = 'bot');
-  else if (!TOUR.slots.some(s => s.ctl === 'me')) TOUR.slots[0].ctl = 'me';
-  if (m !== 'online' && roomHost() && NET.room === 'tour') { netCast({ t: 'bye' }); netClose(); }
+  else if (m === 'solo' && !TOUR.slots.some(s => s.ctl === 'me')) TOUR.slots[0].ctl = 'me';
+  // la sala sigue abierta: fuera de "en línea" los que entraron solo miran (dejan su lugar a la máquina)
+  if (m !== 'online') { TOUR.slots.forEach(s => { if (s.ctl === 'net') s.ctl = 'bot'; }); for (const c of NET.specs) c._slot = -1; }
   saveTour(); renderTour();
 }
 function faceStyle(url, yaw) { return url ? `style="background-image:url(${url})"` : ''; }
@@ -2641,10 +2642,13 @@ function renderTour() {
       <button class="sm ${T.need === 1 ? 'on' : ''}" data-need="1">⚡ A 1 ronda</button><button class="sm ${T.need === 2 ? 'on' : ''}" data-need="2">🥊 Al mejor de 3</button>
       <span style="width:12px"></span><span style="font-weight:800;font-size:13px">Bots:</span>${LVLS.map(([k, t]) => `<button class="sm ${T.lvl === k ? "on" : ""}" data-tl="${k}">${t}</button>`).join("")}
       <span style="width:12px"></span><button class="sm" id="tRandCh">🎲 Personajes al azar</button><button class="sm" id="tRandFace">🙂 Repartir caras guardadas</button><button class="sm" id="tReset">↺ Nombres originales</button></div>` +
-    (T.mode === 'online' ? `<div class="secT">📡 Sala del torneo</div>` + (roomOpen
-      ? `<div class="row" style="align-items:center"><span>Sala <b style="color:var(--gold);letter-spacing:3px;font-size:20px">${esc(NET.code)}</b> · 🌐 ${friends} amigo${friends === 1 ? '' : 's'} · 👀 ${NET.specs.size} conectado${NET.specs.size === 1 ? '' : 's'}</span><button class="sm" id="tShare">📤 Compartir link</button><button class="sm" id="tCopy">📋 Copiar</button></div>
-         <div class="hint" style="text-align:left">Cada amigo que entra con el código toma un lugar del torneo con su cara y su peleador. Los lugares que sobran los pelea la máquina.</div>`
-      : roomHost() ? `<div class="hint" style="text-align:left">Abriendo sala…</div>` : `<button class="sm" id="tRoom">📡 Abrir sala para mis amigos</button>`) : '');
+    `<div class="secT">📡 Sala del torneo</div>` + (roomOpen
+      ? `<div class="row" style="align-items:center"><span>Sala <b style="color:var(--gold);letter-spacing:3px;font-size:20px">${esc(NET.code)}</b>${T.mode === 'online' ? ` · 🌐 ${friends} peleando` : ''} · 👀 ${NET.specs.size} conectado${NET.specs.size === 1 ? '' : 's'}</span><button class="sm" id="tShare">📤 Compartir link</button><button class="sm" id="tCopy">📋 Copiar</button></div>
+         <div class="hint" style="text-align:left">${T.mode === 'online'
+        ? 'Cada amigo que entra con el código toma un lugar del torneo con su cara y su peleador. Los lugares que sobran los pelea la máquina. Si vos no querés pelear, tocá de nuevo tu “🙋 Yo”.'
+        : 'Los que entren con el código miran todas las peleas en vivo y alientan a su favorito con emojis y confeti. No toman lugares: pelean los de la lista.'}</div>`
+      : roomHost() ? `<div class="hint" style="text-align:left">Abriendo sala…</div>`
+        : `<button class="sm" id="tRoom">📡 ${T.mode === 'online' ? 'Abrir sala para mis amigos' : 'Abrir sala para que miren'}</button>`);
   $('#tOpts').querySelectorAll('[data-need]').forEach(b => b.onclick = () => { T.need = +b.dataset.need; saveTour(); renderTour(); });
   $('#tOpts').querySelectorAll('[data-tl]').forEach(b => b.onclick = () => { T.lvl = b.dataset.tl; saveTour(); renderTour(); });
   $('#tRandCh').onclick = () => { const ks = [...CH_KEYS].sort(() => Math.random() - .5); T.slots.forEach((s, i) => { if (s.ctl !== 'net') s.ch = ks[i]; }); saveTour(); renderTour(); };
@@ -2663,7 +2667,13 @@ function renderTour() {
   box.querySelectorAll('[data-face]').forEach(b => b.onclick = () => { const s = T.slots[+b.dataset.face]; if (s.ctl !== 'net') pickFaceFor(s); });
   box.querySelectorAll('[data-name]').forEach(n => n.oninput = () => { T.slots[+n.dataset.name].name = n.value; saveTour(); });
   box.querySelectorAll('[data-ch]').forEach(n => n.onchange = () => { T.slots[+n.dataset.ch].ch = n.value; saveTour(); });
-  box.querySelectorAll('[data-me]').forEach(b => b.onclick = () => { T.slots.forEach(s => { if (s.ctl === 'me') s.ctl = 'bot'; }); T.slots[+b.dataset.me].ctl = 'me'; saveTour(); renderTour(); });
+  box.querySelectorAll('[data-me]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.me, was = T.slots[i].ctl === 'me';
+    T.slots.forEach(s => { if (s.ctl === 'me') s.ctl = 'bot'; });
+    // en línea podés sacarte y quedarte solo de anfitrión; jugando solo siempre hay uno que sos vos
+    if (!was || T.mode === 'solo') T.slots[i].ctl = 'me';
+    saveTour(); renderTour();
+  });
   const going = T.status !== 'setup' && T.R;
   $('#tCont').style.display = going ? '' : 'none';
   $('#tGo').textContent = going ? '🔀 Empezar otro torneo' : '🔀 Sortear llaves y empezar';
@@ -2708,7 +2718,7 @@ function renderBracket() {
   const mine = !host && TT && TT.you >= 0 ? SEL[0] : null;
   $('#bMine').innerHTML = mine && T.status === 'setup' ? `<div class="slot me" style="max-width:360px"><button class="fb" id="myFace" ${faceStyle(mine.face)}>${mine.face ? '' : '🙂'}</button>
       <input id="myName" value="${esc(mine.name)}" maxlength="12"><select id="myCh">${CH_KEYS.map(k => `<option value="${k}" ${mine.ch === k ? 'selected' : ''}>${CHARS[k].name}</option>`).join('')}</select>
-      <div class="ctl">🙋 Tu lugar en el torneo</div></div>` : !host && TT && TT.you < 0 ? `<div class="hint" style="text-align:left">👀 Estás mirando el torneo (ya no quedaban lugares).</div>` : '';
+      <div class="ctl">🙋 Tu lugar en el torneo</div></div>` : !host && TT && TT.you < 0 ? `<div class="hint" style="text-align:left">${TT.mode === "online" ? "👀 Estás mirando el torneo (ya no quedaban lugares)." : "👀 Estás mirando el torneo: pelean los bots. En cada pelea elegí a quién apoyás y alentalo con emojis y confeti 🎊."}</div>` : '';
   if ($('#myFace')) {
     $('#myFace').onclick = () => pickFaceFor(SEL[0]);
     $('#myName').oninput = e => { SEL[0].name = e.target.value; saveSel(); helloSoon(); };
@@ -2843,7 +2853,7 @@ function tourJoined(c) {
 }
 function tourHello(c, sel) {
   if (NET.room !== 'tour' || !sel) return;
-  if (TOUR.status === 'setup') {
+  if (TOUR.status === 'setup' && TOUR.mode === 'online') { // fuera de "en línea" los que entran solo miran
     if (c._slot < 0) { const i = TOUR.slots.findIndex(s => s.ctl === 'bot'); if (i >= 0) c._slot = i; }
     if (c._slot >= 0) Object.assign(TOUR.slots[c._slot], { name: (sel.name || 'Amigo').slice(0, 12), ch: CHARS[sel.ch] ? sel.ch : 'toro', face: sel.face || null, yaw: sel.yaw || 0, ctl: 'net' });
   }
