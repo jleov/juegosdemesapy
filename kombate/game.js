@@ -71,6 +71,8 @@ const SFX = {
   slam() { sTone(90, 30, .6, .9); sNoise(.6, 500, .9, 'lowpass', 80); },
   ko() { sTone(160, 30, 1.2, .9, 'sawtooth'); sNoise(1, 800, .7, 'lowpass', 60); },
   zap() { sNoise(.18, 5000, .5, 'highpass'); sTone(1800, 300, .15, .15, 'square'); },
+  pop() { sTone(700 + Math.random() * 500, 1300, .07, .06, 'triangle'); },
+  confetti() { sNoise(.35, 2500, .25, 'bandpass', 6000); sTone(500, 900, .12, .08, 'triangle'); },
   twinkle() { sTone(1600, 2400, .12, .12, 'triangle'); setTimeout(() => sTone(2400, 3200, .15, .1, 'triangle'), 110); },
   power() { sTone(400, 1200, .25, .15, 'triangle'); },
   beep() { sTone(660, 660, .08, .12, 'square'); }
@@ -763,15 +765,18 @@ function setSt(f, st) { if (f.st !== st) { f.st = st; f.sf = 0; } }
 
 function startMatch(setup) {
   G.paused = false; G.setup = setup; G.mode = setup.mode; G.stage = setup.stage; G.lvl = setup.lvl || 'normal'; G.lvls = setup.lvls || null;
-  const seeds = setup.seeds || newSeeds();
+  const seeds = G.seeds = setup.seeds || newSeeds();
   G.f = [mkFighter(0, setup.sel[0], seeds[0]), mkFighter(1, setup.sel[1], seeds[1])];
   const mine = [S_KB1, S_T[0], S_PAD[0], S_PAD[1]];
   G.src = {
     demo: [[S_CPU[0]], [S_CPU[1]]], bots: [[S_CPU[0]], [S_CPU[1]]], cpu: [mine, [S_CPU[1]]],
-    host: [mine, [S_NET]], guest: [[], []]
+    host: [mine, [S_NET]], guest: [[], []], spect: [[S_CPU[0]], [S_CPU[1]]]
   }[G.mode];
   for (const S of [S_KB1, ...S_T, ...S_PAD, ...S_CPU, S_NET]) for (const k in S.t) S.t[k] = 0;
-  G.maxD = Math.min(W, G.mode === 'host' ? NET.rW || W : W) - 110;
+  // los que miran pueden tener pantallas más angostas: en la sala de bots los peleadores no se separan tanto
+  G.maxD = Math.min(W, G.mode === 'host' ? NET.rW || W : G.mode === 'bots' && botsRoom() ? 760 : W) - 110;
+  G.emo = []; G.conf = []; G.hype = [0, 0];
+  if (G.mode === 'bots' && botsRoom()) { G.ev = []; netCast(startMsg()); }
   G.round = 1; G.parts = []; startRound();
   if (G.mode !== 'demo') beginPlay();
 }
@@ -1161,7 +1166,7 @@ function poseStep(f) {
 }
 
 /* ------------------------- efectos ------------------------- */
-function fx(type, a, b, c) { runFx(type, a, b, c); if (G.mode === 'host') G.ev.push([type, a, b, c]); }
+function fx(type, a, b, c) { runFx(type, a, b, c); if (G.mode === 'host' || (G.mode === 'bots' && botsRoom())) G.ev.push([type, a, b, c]); }
 function runFx(type, a, b, c) {
   switch (type) {
     case 'hit': sparks(a, b, c ? 22 : 12, c ? '#fff3a0' : '#ffffff', c ? 9 : 6); G.parts.push({ ring: 1, x: a, y: b, l: 12, L: 12, c: c ? '#ffd23f' : '#fff', r: c ? 50 : 30 }); SFX.hit(c); break;
@@ -1183,6 +1188,7 @@ function sparks(x, y, n, col, spd) {
   for (let i = 0; i < n; i++) { const an = Math.random() * Math.PI * 2, v = rnd(.3, 1) * spd; G.parts.push({ x, y, vx: Math.cos(an) * v, vy: Math.sin(an) * v, l: rnd(10, 20), L: 20, c: col, r: rnd(2, 4.5), g: .25, spark: 1 }); }
 }
 function partsStep() {
+  cheerStep();
   for (const b of G.bolts) b.l--;
   G.bolts = G.bolts.filter(b => b.l > 0);
   if (G.scrFlash > 0) G.scrFlash--;
@@ -1198,14 +1204,14 @@ function step() {
   if (G.ann) G.ann.t++;
   if (G.combo && --G.combo.t <= 0) G.combo = null;
   partsStep();
-  if (G.mode === 'guest') { guestStep(); return; }
+  if (G.mode === 'guest' || G.mode === 'spect') { guestStep(); return; }
   if (G.paused) return;
   if (G.hitstop > 0) { G.hitstop--; return; }
   if (G.slow > 0) { G.slow--; if (G.slow % 2) return; }
   phaseStep();
-  if (G.phase === 'over' && G.mode !== 'demo') { G.f.forEach(poseStep); return; }
+  if (G.phase === 'over' && G.mode !== 'demo') { G.f.forEach(poseStep); netTick(); return; } // sigue mandando: así llega el aviso del final
   const live = G.phase === 'fight', fin = G.phase === 'finish' && G.fin;
-  if (G.phase === 'fatal') { fatalStep(); G.f.forEach(poseStep); if (G.mode === 'host' && G.time % 2 === 0) netSend(snapshot()); return; }
+  if (G.phase === 'fatal') { fatalStep(); G.f.forEach(poseStep); netTick(); return; }
   G.f.forEach((f, i) => { if (G.src[i][0] === S_CPU[i] && live) cpuThink(f, G.f[1 - i], S_CPU[i], G.mode === 'demo' ? 'normal' : G.lvls ? G.lvls[i] : G.lvl); });
   const ins = G.f.map((f, i) => { const r = readSources(G.src[i]); return live || (fin && i === fin.w) ? r : EMPTY; });
   G.f.forEach((f, i) => fighterStep(f, G.f[1 - i], ins[i]));
@@ -1217,7 +1223,7 @@ function step() {
   }
   combat(); separate(); bounds();
   G.f.forEach(poseStep);
-  if (G.mode === 'host' && G.time % 2 === 0) netSend(snapshot());
+  netTick();
   touchReady();
 }
 let lastReady = '';
@@ -1361,6 +1367,7 @@ function render() {
   if (G.scrFlash > 0) { c.fillStyle = `rgba(230,245,255,${G.scrFlash * .12})`; c.fillRect(0, 0, W, H); }
   drawHUD(c);
   if (G.phase === 'finish' && G.fin) drawFinish(c); else if (G.phase !== 'fatal') drawKeys(c);
+  drawCheer(c);
   if (G.ann && G.ann.t < 85) drawAnn(c);
   if (G.paused) { c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 0, W, H); }
 }
@@ -1475,7 +1482,9 @@ function drawAnn(c) {
 
 /* =========================== EN LÍNEA =========================== */
 const PFX = 'kdcpy26-';
-const NET = { peer: null, conn: null, role: null, code: '', rsel: null, rW: 0, cnt: { p: 0, k: 0, s: 0, u: 0 }, last: { p: 0, k: 0, s: 0, u: 0 }, mask: -1, hello: 0 };
+// role: host / guest (pelea entre dos) o spect (mira una sala de bots); room: duel o bots
+const NET = { peer: null, conn: null, role: null, room: 'duel', specs: new Set(), code: '', rsel: null, rW: 0, cnt: { p: 0, k: 0, s: 0, u: 0 }, last: { p: 0, k: 0, s: 0, u: 0 }, mask: -1, hello: 0 };
+const botsRoom = () => NET.role === 'host' && NET.room === 'bots';
 function mkPeer(id) {
   const o = {
     debug: 1, config: {
@@ -1490,21 +1499,29 @@ function mkPeer(id) {
 function genCode() { const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += A[Math.random() * A.length | 0]; return s; }
 const oMsg = t => $('#oMsg').textContent = t;
 function netSend(m) { try { if (NET.conn && NET.conn.open) NET.conn.send(m); } catch (e) { } }
+// a todos los que miran la sala de bots (menos a uno, si se indica)
+function netCast(m, except) { for (const c of NET.specs) if (c !== except && c.open) try { c.send(m); } catch (e) { } }
 function netClose() {
-  const c = NET.conn, p = NET.peer;
-  Object.assign(NET, { peer: null, conn: null, role: null, rsel: null, mask: -1 });
+  const c = NET.conn, p = NET.peer, specs = [...NET.specs];
+  Object.assign(NET, { peer: null, conn: null, role: null, room: 'duel', rsel: null, mask: -1 }); NET.specs.clear();
+  for (const s of specs) try { s.close(); } catch (e) { }
   try { c && c.close(); } catch (e) { } try { p && p.destroy(); } catch (e) { }
 }
-function netHost() {
-  if (typeof Peer === 'undefined') { oMsg('No se pudo cargar la conexión en línea.'); return; }
-  netClose(); NET.role = 'host'; NET.code = genCode();
+function netHost(room = 'duel') {
+  if (typeof Peer === 'undefined') { oMsg('No se pudo cargar la conexión en línea.'); toast('No se pudo cargar la conexión en línea.'); return; }
+  netClose(); NET.role = 'host'; NET.room = room; NET.code = genCode();
   const p = NET.peer = mkPeer(PFX + NET.code); oMsg('Creando sala…');
-  p.on('open', () => { if (NET.peer !== p) return; $('#onA').style.display = 'none'; $('#onB').style.display = 'block'; $('#oShow').textContent = NET.code; oMsg('Esperando que tu amigo entre…'); });
+  p.on('open', () => {
+    if (NET.peer !== p) return;
+    if (room === 'bots') { audienceChanged(); toast('📡 Sala abierta: ' + NET.code); return; }
+    $('#onA').style.display = 'none'; $('#onB').style.display = 'block'; $('#oShow').textContent = NET.code; oMsg('Esperando que tu amigo entre…');
+  });
   p.on('connection', c => {
+    if (NET.room === 'bots') { if (NET.specs.size >= 40) c.on('open', () => { c.send({ t: 'full' }); setTimeout(() => c.close(), 500); }); else bindSpec(c); return; }
     if (NET.conn && NET.conn.open) { c.on('open', () => { c.send({ t: 'full' }); setTimeout(() => c.close(), 500); }); return; }
     bindConn(c);
   });
-  p.on('error', e => { if (NET.peer !== p) return; if (e.type === 'unavailable-id') { netHost(); return; } oMsg('Error de conexión (' + e.type + '). Probá de nuevo.'); });
+  p.on('error', e => { if (NET.peer !== p) return; if (e.type === 'unavailable-id') { netHost(room); return; } oMsg('Error de conexión (' + e.type + '). Probá de nuevo.'); if (room === 'bots') toast('Error de conexión (' + e.type + ').'); });
   p.on('disconnected', () => { try { if (NET.peer === p) p.reconnect(); } catch (e) { } });
 }
 function netJoin(code) {
@@ -1520,7 +1537,12 @@ function netJoin(code) {
   p.on('error', e => { if (NET.peer !== p) return; oMsg(e.type === 'peer-unavailable' ? 'No existe la sala ' + code + '. Revisá el código.' : 'Error de conexión (' + e.type + ').'); });
 }
 function bindConn(c) {
-  c.on('open', () => { NET.conn = c; NET.rx = performance.now(); NET.last = { p: 0, k: 0, s: 0, u: 0 }; NET.cnt = { p: 0, k: 0, s: 0, u: 0 }; sendHello(); $('#scrOnline').classList.remove('on'); openSelect(NET.role); toast('✅ ¡Conectados! Elijan sus peleadores.'); });
+  c.on('open', () => {
+    NET.conn = c; NET.rx = performance.now(); NET.last = { p: 0, k: 0, s: 0, u: 0 }; NET.cnt = { p: 0, k: 0, s: 0, u: 0 };
+    // el anfitrión avisa qué tipo de sala es; el que entra espera ese aviso
+    if (NET.role === 'host') { c.send({ t: 'room', kind: 'duel' }); sendHello(); $('#scrOnline').classList.remove('on'); openSelect('host'); toast('✅ ¡Conectados! Elijan sus peleadores.'); }
+    else oMsg('Conectado. Entrando a la sala…');
+  });
   c.on('data', onNet);
   c.on('close', () => { if (NET.conn === c) netLost(); });
   c.on('error', () => { });
@@ -1529,24 +1551,60 @@ function sendHello() { const d = SEL[0]; netSend({ t: 'hello', sel: { name: d.na
 function helloSoon() { clearTimeout(NET.hello); NET.hello = setTimeout(sendHello, 250); }
 function netLost() {
   if (!NET.role) return;
-  toast('🔌 Se cortó la conexión con tu amigo.', 4500); netClose(); goMenu();
+  toast(NET.role === 'spect' ? '🔌 Se cortó la conexión con la sala.' : '🔌 Se cortó la conexión con tu amigo.', 4500); netClose(); goMenu();
+}
+/* ---- sala de bots: el anfitrión simula la pelea y la manda a los que miran ---- */
+function bindSpec(c) {
+  c._side = -1;
+  c.on('open', () => { NET.specs.add(c); c.send({ t: 'room', kind: 'bots' }); if (G.mode === 'bots' && G.phase !== 'over') c.send(startMsg()); audienceChanged(); });
+  c.on('data', m => onSpecMsg(c, m));
+  c.on('close', () => { if (NET.specs.delete(c)) audienceChanged(); });
+  c.on('error', () => { });
+}
+function startMsg() { return { t: 'start', kind: 'bots', stage: G.stage, seeds: G.seeds, sel: G.setup.sel.map(b => ({ name: b.name, ch: b.ch, face: b.face, yaw: b.yaw ?? yawOf(b.face) })) }; }
+function onSpecMsg(c, m) {
+  if (!m || !m.t) return;
+  if (m.t === 'side') { c._side = m.s === 0 || m.s === 1 ? m.s : -1; audienceChanged(); }
+  else if (m.t === 'cheer') {
+    const now = performance.now(); if (now - (c._ct || 0) < 150 || !CHEERS.includes(m.e) || (m.s !== 0 && m.s !== 1)) return;
+    c._ct = now; cheerFx(m.s, m.e); netCast({ t: 'cheer', s: m.s, e: m.e }, c);
+  } else if (m.t === 'bye') { NET.specs.delete(c); try { c.close(); } catch (e) { } audienceChanged(); }
+}
+// cuántos miran y cuántos apoyan a cada lado (el anfitrión también cuenta)
+function audienceChanged() {
+  const n = [0, 0]; for (const c of NET.specs) if (c._side >= 0) n[c._side]++;
+  if (CHEER_SIDE >= 0) n[CHEER_SIDE]++;
+  G.aud = { n, v: NET.specs.size }; netCast({ t: 'aud', n, v: NET.specs.size });
+  if ($('#scrSelect').classList.contains('on') && selMode === 'bots') renderSelect();
 }
 // si el otro cierra la pestaña WebRTC a veces no avisa: nos mandamos un ping cada 2 s y cortamos a los 10 s de silencio
 setInterval(() => {
+  if (botsRoom()) { netCast({ t: 'ping' }); return; }
   if (!NET.role || !(NET.conn && NET.conn.open)) return;
   netSend({ t: 'ping' });
   if (performance.now() - NET.rx > 12000) netLost();
 }, 2000);
-addEventListener('pagehide', () => netSend({ t: 'bye' }));
+addEventListener('pagehide', () => { netSend({ t: 'bye' }); netCast({ t: 'bye' }); });
 function onNet(m) {
   NET.rx = performance.now();
   if (!m || !m.t) return;
   switch (m.t) {
+    case 'room':
+      $('#scrOnline').classList.remove('on');
+      if (m.kind === 'bots') { NET.role = 'spect'; CHEER_SIDE = -1; showScreen('scrSpect'); $('#spCode').textContent = NET.code; toast('📺 ¡Entraste a mirar la pelea de bots!'); }
+      else { sendHello(); openSelect('guest'); toast('✅ ¡Conectados! Elijan sus peleadores.'); }
+      break;
     case 'hello': NET.rsel = m.sel; NET.rW = m.W || 960; if ($('#scrSelect').classList.contains('on')) renderSelect(); break;
-    case 'full': oMsg('Esa sala ya tiene dos jugadores.'); netClose(); break;
-    case 'start': if (NET.role === 'guest' && NET.rsel) { hideScreens(); startMatch({ mode: 'guest', sel: [NET.rsel, SEL[0]], stage: m.stage, seeds: m.seeds }); } break;
+    case 'full': oMsg('Esa sala ya está llena.'); netClose(); break;
+    case 'start':
+      if (NET.role === 'guest' && NET.rsel) { hideScreens(); startMatch({ mode: 'guest', sel: [NET.rsel, SEL[0]], stage: m.stage, seeds: m.seeds }); }
+      else if (NET.role === 'spect' && m.sel) { hideScreens(); startMatch({ mode: 'spect', sel: m.sel, stage: m.stage, seeds: m.seeds }); }
+      break;
+    case 'wait': if (NET.role === 'spect') { endPlay(); if (G.mode !== 'demo') startDemo(); showScreen('scrSpect'); } break;
+    case 'cheer': if (m.s === 0 || m.s === 1) cheerFx(m.s, m.e); break;
+    case 'aud': G.aud = { n: m.n, v: m.v }; break;
     case 'sel': if (NET.role === 'guest') openSelect('guest'); break;
-    case 's': if (G.mode === 'guest') applySnap(m); break;
+    case 's': if (G.mode === 'guest' || G.mode === 'spect') applySnap(m); break;
     case 'in':
       if (NET.role === 'host') {
         const b = m.m; S_NET.h.l = b & 1; S_NET.h.r = b >> 1 & 1; S_NET.h.u = b >> 2 & 1; S_NET.h.d = b >> 3 & 1;
@@ -1555,6 +1613,12 @@ function onNet(m) {
       break;
     case 'bye': netLost(); break;
   }
+}
+// cada 2 cuadros: al invitado (pelea en línea) o a todos los que miran la sala de bots
+function netTick() {
+  if (G.time % 2) return;
+  if (G.mode === 'host') netSend(snapshot());
+  else if (G.mode === 'bots' && botsRoom()) { if (NET.specs.size) netCast(snapshot()); else G.ev.length = 0; }
 }
 function snapshot() {
   return {
@@ -1578,12 +1642,14 @@ function applySnap(m) {
   for (const e of m.ev) runFx(...e);
 }
 function guestStep() {
-  // manda mis controles al anfitrión
-  const r = readSources([S_KB1, S_T[0], S_PAD[0], S_PAD[1]]);
-  let tapped = false;
-  for (const k of ['p', 'k', 's', 'u']) if (r.t[k]) { NET.cnt[k] += r.t[k]; tapped = true; }
-  const mask = r.h.l | r.h.r << 1 | r.h.u << 2 | r.h.d << 3;
-  if (mask !== NET.mask || tapped || G.time % 8 === 0) { NET.mask = mask; netSend({ t: 'in', m: mask, c: [NET.cnt.p, NET.cnt.k, NET.cnt.s, NET.cnt.u] }); }
+  // manda mis controles al anfitrión (el que solo mira no manda nada)
+  if (G.mode === 'guest') {
+    const r = readSources([S_KB1, S_T[0], S_PAD[0], S_PAD[1]]);
+    let tapped = false;
+    for (const k of ['p', 'k', 's', 'u']) if (r.t[k]) { NET.cnt[k] += r.t[k]; tapped = true; }
+    const mask = r.h.l | r.h.r << 1 | r.h.u << 2 | r.h.d << 3;
+    if (mask !== NET.mask || tapped || G.time % 8 === 0) { NET.mask = mask; netSend({ t: 'in', m: mask, c: [NET.cnt.p, NET.cnt.k, NET.cnt.s, NET.cnt.u] }); }
+  }
   for (const f of G.f) {
     f.x = lerp(f.x, f.tx, .45); f.y = Math.abs(f.ty - f.y) > 80 ? f.ty : lerp(f.y, f.ty, .6); f.sf++;
     poseStep(f);
@@ -1612,18 +1678,81 @@ function beginPlay() {
   hideScreens();
   document.body.classList.add('playing');
   $('#hudBtns').classList.add('on');
-  $('#btnPause').textContent = G.mode === 'host' || G.mode === 'guest' ? '✕' : '⏸';
+  $('#btnPause').textContent = ['host', 'guest', 'spect'].includes(G.mode) ? '✕' : '⏸';
   if (!isTouch()) $('#touch').className = '';
-  else { if (G.mode === 'bots') $('#touch').className = ''; else { buildTouch(1); lastReady = ''; } goFull(); }
+  else { if (G.mode === 'bots' || G.mode === 'spect') $('#touch').className = ''; else { buildTouch(1); lastReady = ''; } goFull(); }
+  if (G.mode === 'bots' || G.mode === 'spect') buildCheer(); else $('#cheer').classList.remove('on');
   audio();
 }
-function endPlay() { document.body.classList.remove('playing'); $('#hudBtns').classList.remove('on'); $('#touch').className = ''; TOUCH.clear(); G.paused = false; }
+function endPlay() { document.body.classList.remove('playing'); $('#hudBtns').classList.remove('on'); $('#touch').className = ''; $('#cheer').classList.remove('on'); TOUCH.clear(); G.paused = false; }
+
+/* ---------- hinchada: elegís a quién apoyás y tirás emojis o confeti desde su lado ---------- */
+const CHEERS = ['👏', '🔥', '💪', '😂', '😱', '❤️', '🎊'];
+let CHEER_SIDE = -1, cheerLast = 0;
+function buildCheer() {
+  const el = $('#cheer'), [a, b] = G.f;
+  el.innerHTML = `<button class="side s0" data-side="0">⬅️ ${esc(a.name)}</button>${CHEERS.map(e => `<button class="emo" data-e="${e}">${e}</button>`).join('')}<button class="side s1" data-side="1">${esc(b.name)} ➡️</button>`;
+  el.classList.add('on'); paintCheer();
+  el.querySelectorAll('[data-side]').forEach(n => n.onclick = () => {
+    CHEER_SIDE = +n.dataset.side; paintCheer();
+    if (NET.role === 'spect') netSend({ t: 'side', s: CHEER_SIDE }); else if (botsRoom()) audienceChanged(); else G.aud = { n: [+(CHEER_SIDE === 0), +(CHEER_SIDE === 1)], v: 0 };
+  });
+  el.querySelectorAll('[data-e]').forEach(n => n.onclick = () => {
+    if (CHEER_SIDE < 0) { toast('Primero elegí a quién apoyás: ⬅️ o ➡️'); return; }
+    const now = performance.now(); if (now - cheerLast < 160) return; cheerLast = now;
+    const e = n.dataset.e; audio(); cheerFx(CHEER_SIDE, e);
+    if (NET.role === 'spect') netSend({ t: 'cheer', s: CHEER_SIDE, e }); else if (botsRoom()) netCast({ t: 'cheer', s: CHEER_SIDE, e });
+  });
+}
+function paintCheer() {
+  document.querySelectorAll('#cheer [data-side]').forEach(n => n.classList.toggle('on', +n.dataset.side === CHEER_SIDE));
+  $('#cheer').classList.toggle('pick', CHEER_SIDE < 0);
+}
+const CONF_COL = ['#ffc83d', '#e8312a', '#2f7bff', '#1d9e49', '#ff5fa8', '#ffffff', '#b85cff'];
+function cheerFx(s, e) {
+  if (!G.emo) return;
+  G.hype[s] = Math.min(100, G.hype[s] + (e === '🎊' ? 9 : 4));
+  if (e === '🎊') {
+    for (let i = 0; i < 55; i++) G.conf.push({ x: s ? W + 10 : -10, y: H * .62 + rnd(-50, 50), vx: (s ? -1 : 1) * rnd(5, 15), vy: rnd(-12, -3), r: rnd(0, 6.3), vr: rnd(-.3, .3), c: CONF_COL[i % CONF_COL.length], w: rnd(6, 11), h: rnd(3, 6), l: rnd(90, 150) });
+    if (G.conf.length > 600) G.conf.splice(0, G.conf.length - 600);
+    SFX.confetti();
+  } else {
+    G.emo.push({ e, x: s ? W - rnd(40, 230) : rnd(40, 230), y: H - 70, vy: rnd(-2.8, -1.6), ph: rnd(0, 6), l: 120, L: 120, sz: rnd(30, 44) });
+    if (G.emo.length > 70) G.emo.shift();
+    SFX.pop();
+  }
+}
+function cheerStep() {
+  if (!G.emo) return;
+  for (const p of G.emo) { p.y += p.vy; p.l--; p.x += Math.sin(p.l * .08 + p.ph) * .7; }
+  G.emo = G.emo.filter(p => p.l > 0);
+  for (const p of G.conf) { p.x += p.vx; p.y += p.vy; p.vy += .25; p.vx *= .985; p.r += p.vr; p.l--; }
+  G.conf = G.conf.filter(p => p.l > 0 && p.y < H + 20);
+  G.hype[0] *= .996; G.hype[1] *= .996;
+}
+function drawCheer(c) {
+  if (G.mode !== 'bots' && G.mode !== 'spect') return;
+  for (const p of G.conf) { c.save(); c.translate(p.x, p.y); c.rotate(p.r); c.globalAlpha = Math.min(1, p.l / 30); c.fillStyle = p.c; c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); c.restore(); }
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const p of G.emo) { c.globalAlpha = Math.min(1, p.l / 30); c.font = `${p.sz}px system-ui`; c.fillText(p.e, p.x, p.y); }
+  c.globalAlpha = 1;
+  // hinchada de cada lado y cuántos miran
+  const a = G.aud || { n: [0, 0], v: 0 }, bw = 150, y = 104;
+  for (let s = 0; s < 2; s++) {
+    const x = s ? W - 20 - bw : 20;
+    rr(c, x, y, bw, 10, 5); c.fillStyle = '#000000a0'; c.fill();
+    rr(c, s ? x + bw - bw * G.hype[s] / 100 : x, y, bw * G.hype[s] / 100, 10, 5); c.fillStyle = s ? '#ff5a4a' : '#4a8dff'; c.fill();
+    c.font = '800 13px system-ui,sans-serif'; c.textAlign = s ? 'right' : 'left'; c.lineWidth = 3; c.strokeStyle = '#000';
+    const t = `📣 Hinchada${a.n[s] ? ' · 🙋 ' + a.n[s] : ''}`; c.strokeText(t, s ? x + bw : x, y + 24); c.fillStyle = '#fff'; c.fillText(t, s ? x + bw : x, y + 24);
+  }
+  if (a.v) { c.font = '800 14px system-ui,sans-serif'; c.textAlign = 'center'; c.lineWidth = 3; c.strokeText('👀 ' + a.v + ' mirando', W / 2, 74); c.fillStyle = '#fff'; c.fillText('👀 ' + a.v + ' mirando', W / 2, 74); }
+}
 function startDemo() {
   const pick = () => CH_KEYS[Math.random() * CH_KEYS.length | 0];
   startMatch({ mode: 'demo', sel: [{ ch: pick(), face: FACES[0] || null }, { ch: pick(), face: FACES[1] || FACES[0] || null }], stage: Math.random() * STAGES.length | 0 });
 }
 function goMenu() {
-  if (NET.role) { netSend({ t: 'bye' }); netClose(); }
+  if (NET.role) { netSend({ t: 'bye' }); netCast({ t: 'bye' }); netClose(); }
   endPlay(); selMode = null; startDemo(); showScreen('scrMenu');
 }
 function goFull() {
@@ -1632,7 +1761,7 @@ function goFull() {
 }
 function togglePause() {
   if (G.mode === 'demo' || G.phase === 'over') return;
-  const online = G.mode === 'host' || G.mode === 'guest';
+  const online = ['host', 'guest', 'spect'].includes(G.mode);
   const on = !$('#scrPause').classList.contains('on');
   if (!online) G.paused = on;
   $('#pRestart').style.display = $('#pSelect').style.display = online ? 'none' : '';
@@ -1675,9 +1804,9 @@ function showEnd() {
     if (w) SCORE[w.i]++;
     $('#eSub').textContent += ` (rondas) · Peleas ganadas: ${a.name} ${SCORE[0]} – ${SCORE[1]} ${b.name}`;
   }
-  const guest = G.mode === 'guest';
+  const guest = G.mode === 'guest' || G.mode === 'spect';
   $('#eAgain').style.display = $('#eSelect').style.display = guest ? 'none' : '';
-  if (guest) $('#eSub').textContent += ' · Esperando que el anfitrión elija la revancha…';
+  if (guest) $('#eSub').textContent += G.mode === 'spect' ? ' · Esperando la próxima pelea…' : ' · Esperando que el anfitrión elija la revancha…';
   endPlay(); showScreen('scrEnd');
 }
 
@@ -1686,6 +1815,7 @@ function panelData() { return selMode === 'host' ? [SEL[0], NET.rsel] : selMode 
 const editable = i => selMode === 'host' ? i === 0 : selMode === 'guest' ? i === 1 : true;
 function openSelect(mode) {
   selMode = mode; endPlay(); SCORE = [0, 0];
+  if (mode === 'bots' && botsRoom()) netCast({ t: 'wait' }); // los que miran esperan la próxima pelea
   if (G.mode !== 'demo') startDemo();
   showScreen('scrSelect'); renderSelect();
 }
@@ -1730,6 +1860,19 @@ function renderSelect() {
     el.querySelectorAll('[data-bl]').forEach(b => b.onclick = () => { d.lvl = b.dataset.bl; changed(); renderSelect(); });
   });
   $('#extra').innerHTML = selMode === 'cpu' ? `<div class="secT">Dificultad de la máquina</div><div class="row">${LVLS.map(([k, t]) => `<button class="sm ${LVL === k ? 'on' : ''}" data-l="${k}">${t}</button>`).join('')}</div>` : '';
+  if (selMode === 'bots') {
+    const open = botsRoom() && NET.peer && NET.peer.open, a = G.aud || { n: [0, 0], v: 0 };
+    $('#extra').innerHTML = `<div class="secT">📡 Sala para que miren y alienten</div>` + (open
+      ? `<div class="row" style="align-items:center"><span style="font-size:15px">Sala <b style="color:var(--gold);letter-spacing:3px;font-size:20px">${esc(NET.code)}</b> · 👀 ${a.v} mirando</span>
+         <button class="sm" id="rShare">📤 Compartir link</button><button class="sm" id="rCopy">📋 Copiar</button><button class="sm" id="rClose">✕ Cerrar sala</button></div>
+         <div class="hint" style="text-align:left">Los que entren con el código ven la pelea en vivo y alientan con emojis y confeti.</div>`
+      : botsRoom() ? `<div class="hint" style="text-align:left">Abriendo sala…</div>`
+        : `<button class="sm" id="rOpen">📡 Abrir sala: otros miran desde su celu y alientan</button>`);
+    if ($('#rOpen')) $('#rOpen').onclick = () => { netHost('bots'); renderSelect(); };
+    if ($('#rShare')) $('#rShare').onclick = () => $('#oShare').onclick();
+    if ($('#rCopy')) $('#rCopy').onclick = () => $('#oCopy').onclick();
+    if ($('#rClose')) $('#rClose').onclick = () => { netCast({ t: 'bye' }); netClose(); G.aud = null; renderSelect(); };
+  }
   $('#extra').querySelectorAll('[data-l]').forEach(b => b.onclick = () => { LVL = b.dataset.l; store.set('kdc_lvl', LVL); renderSelect(); });
   const guest = selMode === 'guest';
   $('#stgT').style.display = $('#stages').style.display = guest ? 'none' : '';
@@ -1987,7 +2130,8 @@ $('#oCode').onkeydown = e => { if (e.key === 'Enter') netJoin($('#oCode').value)
 $('#oClose').onclick = () => { netClose(); $('#scrOnline').classList.remove('on'); };
 const roomLink = () => location.origin + location.pathname + '?sala=' + NET.code;
 $('#oShare').onclick = () => {
-  const data = { title: 'Kombate de Caras', text: '¡Peleemos! Entrá a mi sala de Kombate de Caras con el código ' + NET.code, url: roomLink() };
+  const text = NET.room === 'bots' ? '🍿 ¡Vení a mirar la pelea de bots en Kombate de Caras y alentá a tu favorito! Código ' + NET.code : '¡Peleemos! Entrá a mi sala de Kombate de Caras con el código ' + NET.code;
+  const data = { title: 'Kombate de Caras', text, url: roomLink() };
   if (navigator.share) navigator.share(data).catch(() => { }); else $('#oCopy').onclick();
 };
 $('#oCopy').onclick = () => { navigator.clipboard.writeText(roomLink()).then(() => toast('📋 Link copiado. Pasáselo a tu amigo.')).catch(() => toast(roomLink(), 6000)); };
@@ -2004,7 +2148,8 @@ $('#eAgain').onclick = () => {
 };
 $('#eSelect').onclick = () => { if (G.setup.mode === 'host') netSend({ t: 'sel' }); openSelect(G.setup.mode); };
 $('#eQuit').onclick = goMenu;
-document.addEventListener('visibilitychange', () => { if (document.hidden && (G.mode === 'cpu' || G.mode === 'bots') && G.phase !== 'over' && !G.paused) togglePause(); });
+$('#spQuit').onclick = goMenu;
+document.addEventListener('visibilitychange', () => { if (document.hidden && (G.mode === 'cpu' || (G.mode === 'bots' && !botsRoom())) && G.phase !== 'over' && !G.paused) togglePause(); });
 
 /* instalar como app */
 let installPrompt = null;

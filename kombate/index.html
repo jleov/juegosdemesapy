@@ -112,6 +112,17 @@ h1.logo small{display:block;color:#fff;font-size:.45em;letter-spacing:6px;text-s
 #touch{--dp:min(36vmin,150px);--bt:min(17vmin,72px);--jw:min(44vw,460px);--jh:70vh}
 #touch.two{--dp:min(30vmin,120px);--bt:min(13.5vmin,56px);--jw:min(24vw,230px);--jh:60vh}
 #touch.two .pad{gap:8px}
+#cheer{position:fixed;left:50%;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;display:none;gap:5px;align-items:center;background:#000000a0;border:1px solid #ffffff30;border-radius:30px;padding:5px 8px;max-width:calc(100vw - 16px)}
+#cheer.on{display:flex}
+#cheer button{border:0;background:#ffffff1a;color:#fff;border-radius:22px;cursor:pointer;touch-action:manipulation}
+#cheer .emo{width:min(42px,8.5vw);height:min(42px,8.5vw);font-size:min(22px,4.6vw);padding:0;flex:none}
+#cheer .emo:active{transform:scale(.85)}
+#cheer.pick .emo{opacity:.35}
+#cheer .side{font-weight:900;font-size:13px;padding:8px 10px;max-width:22vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#cheer .side.s0.on{background:#2f7bff}
+#cheer .side.s1.on{background:#e8312a}
+#cheer.pick .side{animation:blink 1s infinite}
+@keyframes blink{50%{background:#ffc83d55}}
 #rotate{position:fixed;inset:0;z-index:20;background:#120814;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:20px;font-weight:800}
 #rotate .ph{font-size:70px;animation:rot 1.6s ease-in-out infinite}
 @keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
@@ -129,6 +140,7 @@ kbd{background:#ffffff22;border-radius:5px;padding:1px 6px;font-family:inherit;f
 <div id="hudBtns"><button id="btnPause" title="Pausa">⏸</button><button id="btnMute" title="Sonido">🔊</button></div>
 
 <div id="touch"></div>
+<div id="cheer"></div>
 
 <!-- MENÚ PRINCIPAL -->
 <section class="scr on" id="scrMenu">
@@ -183,6 +195,16 @@ kbd{background:#ffffff22;border-radius:5px;padding:1px 6px;font-family:inherit;f
   </div>
 </section>
 
+<!-- MIRANDO UNA SALA DE BOTS -->
+<section class="scr modal" id="scrSpect">
+  <div class="box" style="text-align:center">
+    <h2 style="margin:0 0 6px">📺 Sala <span id="spCode" style="color:var(--gold);letter-spacing:3px"></span></h2>
+    <p class="hint">Estás mirando una pelea de bots. En cuanto empiece la vas a ver acá, y vas a poder alentar a tu favorito con emojis 👏🔥 y confeti 🎊.</p>
+    <div class="msg">⏳ Esperando que empiece la pelea…</div>
+    <button class="big" id="spQuit">Salir</button>
+  </div>
+</section>
+
 <!-- AYUDA -->
 <section class="scr modal" id="scrHelp">
   <div class="box help" style="max-height:92vh;overflow:auto">
@@ -194,6 +216,7 @@ kbd{background:#ffffff22;border-radius:5px;padding:1px 6px;font-family:inherit;f
       <tr><td>💀 Remate</td><td>Cuando ganás la pelea, el otro queda mareado: tenés 5 segundos para hacer la combinación de tu peleador (➡️ = hacia el rival, ⬅️ = alejándote).<br>
         <b>Toro</b> ⬇️ ➡️ 👊 Cornada voladora · <b>Rayo</b> ⬇️ ⬇️ 👊 Electrocución · <b>Sombra</b> ⬅️ ⬅️ 🦶 Mil patadas · <b>Tanque</b> ⬇️ ⬇️ 🦶 Aplastada.<br>
         En la PC: <kbd>S</kbd> abajo, <kbd>D</kbd>/<kbd>A</kbd> adelante o atrás, <kbd>V</kbd> puño, <kbd>B</kbd> patada.</td></tr>
+      <tr><td>📡 Sala de bots</td><td>En <b>Bots peleando</b> tocá <b>📡 Abrir sala</b> y pasá el link. Los que entren miran la pelea en vivo, eligen a qué bot apoyan (⬅️ o ➡️) y tiran emojis 👏🔥💪😂😱❤️ o confeti 🎊 desde ese lado.</td></tr>
       <tr><td>Contra un amigo</td><td>Usen <b>En línea</b>: cada uno en su celular o PC. O pongan sus caras en <b>Bots peleando</b> y miren quién gana.</td></tr>
       <tr><td>Joystick</td><td>Cruz o palanca · <kbd>X/□</kbd> puño · <kbd>A/✕</kbd> patada · <kbd>B/○</kbd> o <kbd>Y/△</kbd> habilidad</td></tr>
       <tr><td>⚡ Habilidad</td><td>Gasta media barra de energía (la barra violeta). Se llena pegando, recibiendo golpes y con el tiempo.</td></tr>
