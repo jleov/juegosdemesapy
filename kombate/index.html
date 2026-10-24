@@ -121,7 +121,6 @@ h1.logo small{display:block;color:#fff;font-size:.45em;letter-spacing:6px;text-s
 .help td{padding:5px 6px;border-bottom:1px solid #ffffff18;vertical-align:top}
 .help td:first-child{font-weight:800;color:var(--gold);white-space:nowrap}
 kbd{background:#ffffff22;border-radius:5px;padding:1px 6px;font-family:inherit;font-weight:800;font-size:13px;white-space:nowrap}
-.endFace{width:110px;height:110px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:54px;background:#333 center/cover;border:5px solid var(--gold);box-shadow:0 0 30px #ffc83d88}
 </style>
 </head>
 <body>
@@ -218,7 +217,7 @@ kbd{background:#ffffff22;border-radius:5px;padding:1px 6px;font-family:inherit;f
 <!-- FIN -->
 <section class="scr modal" id="scrEnd">
   <div class="box" style="text-align:center">
-    <div class="endFace" id="eFace"></div>
+    <canvas id="eCv" width="640" height="340" style="width:min(360px,100%);height:auto;display:block;margin:0 auto 8px"></canvas>
     <h2 style="margin:0 0 4px;color:var(--gold);font-size:28px;text-transform:uppercase" id="eTitle">¡Ganó!</h2>
     <div class="hint" id="eSub"></div>
     <div class="menu">

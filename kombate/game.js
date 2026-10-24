@@ -166,12 +166,124 @@ function faceArt(img, yaw) {
   }
   ART.set(key, c); return c;
 }
-// dir = 1 mira a la derecha, -1 a la izquierda
-function drawFace(c, img, R, ring, flash, dir = 1, yaw = 0) {
+/* ---------- heridas ----------
+   Cada peleador tiene una lista de heridas con un umbral: aparecen cuando el daño acumulado en
+   toda la pelea (hurt, de 0 a 1) lo pasa. Posiciones en radios de la cara (x a la derecha, y abajo). */
+const WOUND_PLAN = [
+  [.05, 'bruise', 'cheek'], [.11, 'scratch', 'cheek2'], [.17, 'bandaid', 'any'], [.24, 'bump', 'forehead'], [.31, 'blackeye', 'eye'],
+  [.37, 'nosebleed', 'nose'], [.44, 'bruise', 'cheek2'], [.51, 'stitches', 'brow'], [.58, 'xband', 'cheek'], [.65, 'lip', 'mouth'],
+  [.72, 'blackeye', 'eye2'], [.79, 'scratch', 'any'], [.86, 'bruise', 'chin'], [.92, 'bandage', 'head'], [.97, 'bandaid', 'chin']
+];
+function mkWounds(seed) {
+  const R = rng(seed), side = R() < .5 ? -1 : 1, j = () => (R() - .5) * .1;
+  const spot = {
+    cheek: [.46 * side, .28], cheek2: [-.46 * side, .28], eye: [.33 * side, -.12], eye2: [-.33 * side, -.12], forehead: [(R() - .5) * .5, -.58],
+    brow: [.3 * (R() < .5 ? side : -side), -.36], nose: [.03, .14], mouth: [.14 * side, .46], chin: [(R() - .5) * .35, .7], head: [0, -.62]
+  };
+  return WOUND_PLAN.map(([t, type, where]) => {
+    const [x, y] = where === 'any' ? [(R() - .5) * 1.1, (R() - .3) * .9] : spot[where];
+    const fixed = type === 'blackeye' || type === 'nosebleed' || type === 'bandage';
+    return { t: t + (R() - .5) * .04, type, x: x + (fixed ? 0 : j()), y: y + (fixed ? 0 : j()), rot: (R() - .5) * 1.6, s: .85 + R() * .35 };
+  });
+}
+function drawWounds(c, R, hf, th) {
+  const T = G.time;
+  hf.wounds.forEach((w, i) => {
+    if (hf.hurt < w.t) return;
+    let k = 1;
+    if (hf.wt) { if (hf.wt[i] == null) hf.wt[i] = T; k = Math.min(1, (T - hf.wt[i]) / 10); }
+    // la cara girada corre los rasgos: las heridas se corren igual
+    const x = th ? Math.sin(Math.asin(clamp(w.x, -1, 1)) + th) : w.x;
+    c.save(); c.translate(x * R, w.y * R); c.globalAlpha *= k * .9; c.scale(R, R);
+    const s = w.s * (1 + (1 - k) * .8); c.scale(s, s);
+    WOUND[w.type](c, w);
+    c.restore();
+  });
+  if (hf.cry) { // lágrimas del que perdió
+    for (const ex of [-.33, .33]) {
+      const x = th ? Math.sin(Math.asin(ex) + th) : ex;
+      c.save(); c.translate(x * R, 0); c.scale(R, R);
+      const g = c.createLinearGradient(0, -.02, 0, .5); g.addColorStop(0, 'rgba(140,210,255,.9)'); g.addColorStop(1, 'rgba(140,210,255,.2)');
+      c.fillStyle = g; c.beginPath(); c.moveTo(-.04, 0); c.quadraticCurveTo(-.06, .3, 0, .5); c.quadraticCurveTo(.06, .3, .04, 0); c.fill();
+      c.fillStyle = 'rgba(170,225,255,.95)'; c.beginPath(); c.arc(0, .52, .06, 0, 7); c.fill();
+      c.restore();
+    }
+  }
+}
+function radial(c, r, stops) { const g = c.createRadialGradient(0, 0, 0, 0, 0, r); stops.forEach(([o, col]) => g.addColorStop(o, col)); return g; }
+const WOUND = {
+  bruise(c, w) {
+    c.rotate(w.rot); c.scale(1.35, 1);
+    c.fillStyle = radial(c, .27, [[0, 'rgba(95,25,120,.62)'], [.5, 'rgba(70,40,120,.42)'], [.8, 'rgba(90,120,60,.2)'], [1, 'rgba(90,120,60,0)']]);
+    c.beginPath(); c.arc(0, 0, .27, 0, 7); c.fill();
+  },
+  blackeye(c) {
+    c.scale(1.25, 1);
+    c.fillStyle = radial(c, .27, [[0, 'rgba(60,10,80,.15)'], [.45, 'rgba(60,10,80,.25)'], [.7, 'rgba(55,10,75,.75)'], [.85, 'rgba(90,30,110,.45)'], [1, 'rgba(90,30,110,0)']]);
+    c.beginPath(); c.arc(0, 0, .27, 0, 7); c.fill();
+  },
+  bandaid(c, w) {
+    c.rotate(w.rot);
+    c.fillStyle = '#e9c49c'; c.strokeStyle = '#b5845a'; c.lineWidth = .025;
+    c.beginPath(); c.roundRect(-.29, -.085, .58, .17, .085); c.fill(); c.stroke();
+    c.fillStyle = '#f6e3cc'; c.fillRect(-.09, -.07, .18, .14);
+    c.fillStyle = '#b5845a'; for (const dx of [-.21, -.15, .15, .21]) for (const dy of [-.03, .03]) { c.beginPath(); c.arc(dx, dy, .01, 0, 7); c.fill(); }
+  },
+  xband(c, w) { c.save(); c.rotate(.75 - w.rot); WOUND.bandaid(c, { rot: 0 }); c.restore(); c.rotate(-.75 - w.rot); WOUND.bandaid(c, { rot: 0 }); },
+  scratch(c, w) {
+    c.rotate(w.rot - .6); c.lineCap = 'round';
+    for (let k = -1; k <= 1; k++) {
+      const L = .2 - Math.abs(k) * .05, y = k * .075;
+      c.strokeStyle = 'rgba(160,20,35,.7)'; c.lineWidth = .028; c.beginPath(); c.moveTo(-L, y); c.quadraticCurveTo(0, y - .04, L, y + .03); c.stroke();
+      c.strokeStyle = 'rgba(255,140,140,.55)'; c.lineWidth = .01; c.beginPath(); c.moveTo(-L * .9, y - .004); c.quadraticCurveTo(0, y - .044, L * .9, y + .026); c.stroke();
+    }
+    c.fillStyle = 'rgba(165,0,26,.8)'; c.beginPath(); c.arc(.06, .11, .016, 0, 7); c.arc(-.09, -.1, .012, 0, 7); c.fill();
+  },
+  bump(c) {
+    c.fillStyle = radial(c, .2, [[0, 'rgba(255,150,140,.95)'], [.6, 'rgba(225,90,90,.8)'], [1, 'rgba(200,60,60,0)']]);
+    c.beginPath(); c.arc(0, 0, .2, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(140,30,30,.5)'; c.lineWidth = .02; c.beginPath(); c.arc(0, .01, .13, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.75)'; c.beginPath(); c.ellipse(-.05, -.06, .05, .03, -.5, 0, 7); c.fill();
+  },
+  nosebleed(c) {
+    c.fillStyle = '#b3001b';
+    for (const dx of [-.07, .07]) {
+      c.beginPath(); c.moveTo(dx - .035, 0); c.quadraticCurveTo(dx - .045, .2, dx, .3); c.quadraticCurveTo(dx + .045, .2, dx + .035, 0); c.fill();
+      c.beginPath(); c.arc(dx, .3, .035, 0, 7); c.fill();
+    }
+    c.fillStyle = 'rgba(255,120,120,.6)'; c.beginPath(); c.arc(-.08, .08, .012, 0, 7); c.fill();
+  },
+  stitches(c, w) {
+    c.rotate(w.rot * .5); c.lineCap = 'round';
+    c.strokeStyle = 'rgba(200,60,70,.35)'; c.lineWidth = .08; c.beginPath(); c.moveTo(-.22, 0); c.quadraticCurveTo(0, -.03, .22, 0); c.stroke();
+    c.strokeStyle = 'rgba(150,15,30,.9)'; c.lineWidth = .025; c.beginPath(); c.moveTo(-.22, 0); c.quadraticCurveTo(0, -.03, .22, 0); c.stroke();
+    c.strokeStyle = 'rgba(30,15,15,.85)'; c.lineWidth = .013;
+    for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(k * .085 - .02, -.06); c.lineTo(k * .085 + .02, .05); c.stroke(); }
+  },
+  lip(c) {
+    c.fillStyle = radial(c, .18, [[0, 'rgba(200,40,60,.8)'], [1, 'rgba(200,40,60,0)']]);
+    c.beginPath(); c.ellipse(0, 0, .2, .12, 0, 0, 7); c.fill();
+    c.fillStyle = '#a5001a'; c.beginPath(); c.moveTo(-.025, 0); c.quadraticCurveTo(-.03, .14, 0, .2); c.quadraticCurveTo(.03, .14, .025, 0); c.fill();
+    c.beginPath(); c.arc(0, .2, .028, 0, 7); c.fill();
+  },
+  bandage(c) {
+    c.rotate(-.12);
+    c.fillStyle = '#f3f1ea'; c.strokeStyle = '#c9c4b5'; c.lineWidth = .02;
+    c.translate(0, -.1);
+    c.beginPath(); c.roundRect(-1.2, -.12, 2.4, .24, .04); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(160,150,130,.5)'; c.lineWidth = .012;
+    for (let x = -1.1; x < 1.1; x += .14) { c.beginPath(); c.moveTo(x, -.11); c.lineTo(x + .07, .11); c.stroke(); }
+    c.fillStyle = radial(c, .14, [[0, 'rgba(200,10,20,.75)'], [1, 'rgba(200,10,20,0)']]);
+    c.save(); c.translate(.25, 0); c.beginPath(); c.arc(0, 0, .14, 0, 7); c.fill(); c.restore();
+  }
+};
+// dir = 1 mira a la derecha, -1 a la izquierda; hf = { wounds, hurt, wt } para dibujar las heridas
+function drawFace(c, img, R, ring, flash, dir = 1, yaw = 0, hf = null) {
   c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2);
   c.fillStyle = '#d9a27c'; c.fill();
   c.save(); if (dir < 0) c.scale(-1, 1);
-  if (img && img.complete && img.naturalWidth) {
+  const photo = img && img.complete && img.naturalWidth;
+  if (photo) {
     c.clip(); c.drawImage(faceArt(img, yaw), -R, -R, R * 2, R * 2);
   } else {
     // cara de muñeco cuando no hay foto
@@ -182,6 +294,10 @@ function drawFace(c, img, R, ring, flash, dir = 1, yaw = 0) {
     c.strokeStyle = '#3a2210'; c.lineWidth = R * .1; c.lineCap = 'round';
     c.beginPath(); c.moveTo(-R * .6, -R * .5); c.lineTo(-R * .15, -R * .36); c.moveTo(R * .6, -R * .5); c.lineTo(R * .15, -R * .36);
     c.moveTo(-R * .3, R * .45); c.quadraticCurveTo(0, R * .3, R * .3, R * .45); c.stroke();
+  }
+  if (hf && hf.wounds && (hf.hurt > 0 || hf.cry)) {
+    c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.clip();
+    drawWounds(c, R, hf, photo ? .4 * (1 - clamp((yaw || 0) / .45, 0, 1)) : 0);
   }
   c.restore();
   if (flash > 0) { c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.fillStyle = `rgba(255,40,30,${Math.min(1, flash / 10) * .5})`; c.fill(); }
@@ -595,9 +711,10 @@ const P_IDLE = { t: .08, a1: .75, a2: 2.55, b1: .35, b2: 2.25, l1: .42, l2: .05,
 const P_CROUCH = { t: .7, a1: 1.05, a2: 2.55, b1: .75, b2: 2.35, l1: 1.35, l2: .1, m1: .55, m2: -1.25 };
 const P_TUCK = { t: .1, a1: 1.0, a2: 2.4, b1: .3, b2: 1.9, l1: 1.45, l2: -.1, m1: .55, m2: -.9 };
 
-function mkFighter(i, sel) {
+const newSeeds = () => [Math.random() * 1e9 | 0, Math.random() * 1e9 | 0];
+function mkFighter(i, sel, seed) {
   const ch = CHARS[sel.ch] || CHARS.toro;
-  const f = { i, ch, key: sel.ch, name: (sel.name || '').trim() || ('Jugador ' + (i + 1)), faceUrl: sel.face || null, img: faceImg(sel.face), yaw: sel.yaw ?? yawOf(sel.face), wins: 0, maxHp: ch.hp, en: 0 };
+  const f = { i, ch, key: sel.ch, name: (sel.name || '').trim() || ('Jugador ' + (i + 1)), faceUrl: sel.face || null, img: faceImg(sel.face), yaw: sel.yaw ?? yawOf(sel.face), wins: 0, maxHp: ch.hp, en: 0, hurt: 0, wt: {}, wounds: mkWounds(seed) };
   placeFighter(f); return f;
 }
 function placeFighter(f) {
@@ -612,7 +729,8 @@ function setSt(f, st) { if (f.st !== st) { f.st = st; f.sf = 0; } }
 
 function startMatch(setup) {
   G.setup = setup; G.mode = setup.mode; G.stage = setup.stage; G.lvl = setup.lvl || 'normal'; G.lvls = setup.lvls || null;
-  G.f = [mkFighter(0, setup.sel[0]), mkFighter(1, setup.sel[1])];
+  const seeds = setup.seeds || newSeeds();
+  G.f = [mkFighter(0, setup.sel[0], seeds[0]), mkFighter(1, setup.sel[1], seeds[1])];
   const mine = [S_KB1, S_KB2, S_T[0], S_PAD[0], S_PAD[1]];
   G.src = {
     demo: [[S_CPU[0]], [S_CPU[1]]], bots: [[S_CPU[0]], [S_CPU[1]]], cpu: [mine, [S_CPU[1]]], local: [[S_KB1, S_T[0], S_PAD[0]], [S_KB2, S_T[1], S_PAD[1]]],
@@ -771,12 +889,14 @@ function applyHit(att, def, a, px, py) {
   const dir = Math.sign(def.x - att.x) || att.face;
   if (canBlock(def, a)) {
     def.st = 'block'; def.sf = 0; def.crouchBlock = !!def.holdDown; def.stun = a.bs || 12; def.vx = dir * a.push * .9;
-    if (a.chip) def.hp = Math.max(1, def.hp - a.chip);
+    if (a.chip) { def.hp = Math.max(1, def.hp - a.chip); def.hurt = Math.min(1, def.hurt + a.chip / (def.maxHp * 2)); }
     def.en = Math.min(100, def.en + 3); att.en = Math.min(100, att.en + 2);
     fx('block', px, py); G.hitstop = 4; return;
   }
   let dmg = a.dmg * att.ch.power; if (def.combo > 0) dmg *= Math.max(.45, 1 - .15 * def.combo);
   dmg = Math.max(1, Math.round(dmg));
+  // hurt: daño de toda la pelea; perder dos barras enteras = cara destrozada
+  def.hurt = Math.min(1, def.hurt + Math.min(dmg, def.hp) / (def.maxHp * 2));
   def.hp = Math.max(0, def.hp - dmg); def.combo++; def.flash = 12; def.atk = null; def.alpha = 1; def.slamLand = 0;
   att.en = Math.min(100, att.en + 7); def.en = Math.min(100, def.en + 5);
   if (def.combo >= 2) G.combo = { i: att.i, n: def.combo, t: 80 };
@@ -996,7 +1116,15 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   limb(nx, ny + 4, lerp(nx, hcx, .5), lerp(ny, hcy, .5), lw * .9, C.neck);
   c.save(); c.translate(hcx, hcy); c.scale(f.face, 1); c.rotate(f.face * P.t * .45);
   if (f.flash > 0) { const q = Math.sin(f.flash * 1.3) * .12; c.scale(1 + q, 1 - q); }
-  drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, f.face, f.yaw);
+  drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, f.face, f.yaw, f);
+  if ((f.st === 'ko' || f.st === 'down') && f.y <= 2) { // estrellitas mareado
+    for (let k = 0; k < 3; k++) {
+      const a = T * .12 + k * 2.09, sx = Math.cos(a) * R * 1.1, sy = -R * .9 + Math.sin(a) * R * .3;
+      c.save(); c.translate(sx, sy); c.rotate(a); c.fillStyle = k % 2 ? '#fff3a0' : '#ffc83d'; c.beginPath();
+      for (let p = 0; p < 10; p++) { const rr2 = p % 2 ? 4 : 10, aa = p * Math.PI / 5; c.lineTo(Math.cos(aa) * rr2, Math.sin(aa) * rr2); }
+      c.fill(); c.restore();
+    }
+  }
   c.restore();
   // brazo de adelante
   limb(shx, shy, fex, fey, lw, C.arm); limb(fex, fey, fhx, fhy, lw * .92, C.arm); ball(fhx, fhy, glove, C.glove);
@@ -1083,7 +1211,7 @@ function drawHUD(c) {
       c.beginPath(); c.arc(sx, sy, 7, 0, 7); c.fillStyle = k < f.wins ? '#ffc83d' : '#00000080'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#fff8'; c.stroke();
     }
     // carita
-    c.save(); c.translate(right ? x + bw + 36 : x - 36, y + 14); drawFace(c, f.img, 27, RING[i], f.flash, i ? -1 : 1, f.yaw); c.restore();
+    c.save(); c.translate(right ? x + bw + 36 : x - 36, y + 14); drawFace(c, f.img, 27, RING[i], f.flash, i ? -1 : 1, f.yaw, f); c.restore();
   });
   // reloj
   c.save(); c.translate(W / 2, y + 12);
@@ -1180,7 +1308,7 @@ function onNet(m) {
   switch (m.t) {
     case 'hello': NET.rsel = m.sel; NET.rW = m.W || 960; if ($('#scrSelect').classList.contains('on')) renderSelect(); break;
     case 'full': oMsg('Esa sala ya tiene dos jugadores.'); netClose(); break;
-    case 'start': if (NET.role === 'guest' && NET.rsel) { hideScreens(); startMatch({ mode: 'guest', sel: [NET.rsel, SEL[0]], stage: m.stage }); } break;
+    case 'start': if (NET.role === 'guest' && NET.rsel) { hideScreens(); startMatch({ mode: 'guest', sel: [NET.rsel, SEL[0]], stage: m.stage, seeds: m.seeds }); } break;
     case 'sel': if (NET.role === 'guest') openSelect('guest'); break;
     case 's': if (G.mode === 'guest') applySnap(m); break;
     case 'in':
@@ -1195,7 +1323,7 @@ function onNet(m) {
 function snapshot() {
   return {
     t: 's',
-    f: G.f.map(f => ({ x: Math.round(f.x), y: Math.round(f.y), fc: f.face, hp: f.hp, en: Math.round(f.en), st: f.st, sf: f.sf, an: f.an, vx: Math.round(f.vx * 10) / 10, vy: Math.round(f.vy * 10) / 10, w: f.wins, fl: f.flash, al: Math.round(f.alpha * 100) / 100, cb: f.crouchBlock ? 1 : 0, sp: f.spec, sl: f.slamLand ? 1 : 0 })),
+    f: G.f.map(f => ({ x: Math.round(f.x), y: Math.round(f.y), fc: f.face, hp: f.hp, en: Math.round(f.en), st: f.st, sf: f.sf, an: f.an, vx: Math.round(f.vx * 10) / 10, vy: Math.round(f.vy * 10) / 10, w: f.wins, fl: f.flash, al: Math.round(f.alpha * 100) / 100, cb: f.crouchBlock ? 1 : 0, sp: f.spec, sl: f.slamLand ? 1 : 0, hu: Math.round(f.hurt * 1000) / 1000 })),
     pr: G.proj.map(p => [Math.round(p.x), Math.round(p.y), Math.sign(p.vx), p.o.i]),
     wv: G.waves.map(w => [Math.round(w.x), w.o.i, w.life]),
     ph: G.phase, tm: G.timer, rd: G.round, cb: G.combo, ev: G.ev.splice(0)
@@ -1205,7 +1333,7 @@ function applySnap(m) {
   m.f.forEach((d, i) => {
     const f = G.f[i]; if (!f) return;
     if (d.st !== f.st || d.sf < f.sf) f.sf = d.sf;
-    Object.assign(f, { tx: d.x, ty: d.y, face: d.fc, hp: d.hp, en: d.en, st: d.st, an: d.an, atk: ATK[d.an] || null, vx: d.vx, vy: d.vy, wins: d.w, flash: d.fl, alpha: d.al, crouchBlock: !!d.cb, spec: d.sp, slamLand: d.sl ? (f.slamLand || f.sf) : 0 });
+    Object.assign(f, { tx: d.x, ty: d.y, face: d.fc, hp: d.hp, en: d.en, st: d.st, an: d.an, atk: ATK[d.an] || null, vx: d.vx, vy: d.vy, wins: d.w, flash: d.fl, alpha: d.al, crouchBlock: !!d.cb, spec: d.sp, slamLand: d.sl ? (f.slamLand || f.sf) : 0, hurt: d.hu || 0 });
     if (Math.abs(f.sf - d.sf) > 3) f.sf = d.sf;
   });
   G.proj = m.pr.map(a => ({ x: a[0], y: a[1], vx: a[2] * 8.5, o: G.f[a[3]] }));
@@ -1273,11 +1401,37 @@ function togglePause() {
   $('#pRestart').style.display = $('#pSelect').style.display = online ? 'none' : '';
   $('#scrPause').classList.toggle('on', on);
 }
+// las dos caras como quedaron: el perdedor siempre más golpeado que el ganador
+function drawEnd(w) {
+  const cv2 = $('#eCv'), c = cv2.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv2.width, cv2.height);
+  const hurts = G.f.map(f => f.hurt);
+  if (w) hurts[1 - w.i] = Math.max(hurts[1 - w.i], Math.min(1, hurts[w.i] + .25));
+  G.f.forEach((f, i) => {
+    const win = w === f, lose = w && !win, cx = i ? 470 : 170, cy = 150, R = win ? 108 : 98;
+    c.save(); c.translate(cx, cy + (lose ? 10 : 0)); if (lose) c.rotate(i ? .2 : -.2);
+    if (win) { c.save(); c.globalAlpha = .55; glow(c, 0, 0, R * 1.5, 'rgba(255,200,61,.8)'); c.restore(); }
+    drawFace(c, f.img, R, win ? '#ffc83d' : RING[i], 0, i ? -1 : 1, f.yaw, { wounds: f.wounds, hurt: hurts[i], wt: null, cry: lose });
+    c.restore();
+    if (win) { // corona
+      c.save(); c.translate(cx, cy - R - 8); c.rotate(i ? .15 : -.15);
+      c.beginPath(); c.moveTo(-48, 18); c.lineTo(-56, -26); c.lineTo(-26, -4); c.lineTo(0, -38); c.lineTo(26, -4); c.lineTo(56, -26); c.lineTo(48, 18); c.closePath();
+      c.fillStyle = '#ffc83d'; c.fill(); c.lineWidth = 5; c.strokeStyle = '#8a5a00'; c.stroke();
+      for (const [x, col] of [[-30, '#e8312a'], [0, '#2f7bff'], [30, '#1d9e49']]) { c.beginPath(); c.arc(x, 6, 7, 0, 7); c.fillStyle = col; c.fill(); }
+      c.restore();
+    }
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 6; c.strokeStyle = '#000';
+    c.font = '900 30px system-ui,sans-serif'; c.fillStyle = win ? '#ffc83d' : '#fff';
+    const label = (win ? '👑 ' : lose ? '💥 ' : '') + f.name; c.strokeText(label, cx, 290); c.fillText(label, cx, 290);
+    c.font = '800 21px system-ui,sans-serif'; c.fillStyle = '#ffd9b0';
+    const t = 'Daño recibido: ' + Math.round(f.hurt * 100) + '%'; c.strokeText(t, cx, 324); c.fillText(t, cx, 324);
+  });
+  if (!w) { c.font = '900 54px system-ui'; c.textAlign = 'center'; c.fillText('🤝', 320, 150); }
+}
 function showEnd() {
   if (G.mode === 'demo') return;
   const [a, b] = G.f, w = a.wins > b.wins ? a : b.wins > a.wins ? b : null;
-  $('#eFace').style.backgroundImage = w && w.faceUrl ? `url(${w.faceUrl})` : 'none';
-  $('#eFace').textContent = w && w.faceUrl ? '' : w ? '🏆' : '🤝';
+  drawEnd(w);
   $('#eTitle').textContent = w ? '¡' + w.name + ' ganó!' : '¡Empate!';
   $('#eSub').textContent = `${a.name} ${a.wins} – ${b.wins} ${b.name}`;
   if (G.mode === 'bots') {
@@ -1368,7 +1522,7 @@ $('#sGo').onclick = () => {
   const st = STAGE_SEL < 0 || STAGE_SEL >= STAGES.length ? Math.random() * STAGES.length | 0 : STAGE_SEL;
   if (selMode === 'host') {
     if (!NET.rsel) return;
-    netSend({ t: 'start', stage: st }); startMatch({ mode: 'host', sel: [SEL[0], NET.rsel], stage: st });
+    const seeds = newSeeds(); netSend({ t: 'start', stage: st, seeds }); startMatch({ mode: 'host', sel: [SEL[0], NET.rsel], stage: st, seeds });
   } else if (selMode === 'bots') startMatch({ mode: 'bots', sel: BOTS, stage: st, lvls: BOTS.map(b => b.lvl || 'normal') });
   else startMatch({ mode: selMode, sel: [SEL[0], SEL[1]], stage: st, lvl: LVL });
 };
@@ -1559,7 +1713,7 @@ $('#pRestart').onclick = () => { $('#scrPause').classList.remove('on'); startMat
 $('#pSelect').onclick = () => { $('#scrPause').classList.remove('on'); openSelect(G.setup.mode); };
 $('#pQuit').onclick = () => { $('#scrPause').classList.remove('on'); goMenu(); };
 $('#eAgain').onclick = () => {
-  if (G.setup.mode === 'host') { if (!NET.rsel) return goMenu(); netSend({ t: 'start', stage: G.setup.stage }); startMatch({ ...G.setup, sel: [SEL[0], NET.rsel] }); }
+  if (G.setup.mode === 'host') { if (!NET.rsel) return goMenu(); const seeds = newSeeds(); netSend({ t: 'start', stage: G.setup.stage, seeds }); startMatch({ ...G.setup, sel: [SEL[0], NET.rsel], seeds }); }
   else startMatch(G.setup);
 };
 $('#eSelect').onclick = () => { if (G.setup.mode === 'host') netSend({ t: 'sel' }); openSelect(G.setup.mode); };
