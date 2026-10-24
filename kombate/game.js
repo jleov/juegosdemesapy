@@ -70,6 +70,8 @@ const SFX = {
   tele() { sTone(1500, 200, .3, .18); },
   slam() { sTone(90, 30, .6, .9); sNoise(.6, 500, .9, 'lowpass', 80); },
   ko() { sTone(160, 30, 1.2, .9, 'sawtooth'); sNoise(1, 800, .7, 'lowpass', 60); },
+  zap() { sNoise(.18, 5000, .5, 'highpass'); sTone(1800, 300, .15, .15, 'square'); },
+  twinkle() { sTone(1600, 2400, .12, .12, 'triangle'); setTimeout(() => sTone(2400, 3200, .15, .1, 'triangle'), 110); },
   power() { sTone(400, 1200, .25, .15, 'triangle'); },
   beep() { sTone(660, 660, .08, .12, 'square'); }
 };
@@ -736,7 +738,7 @@ function cpuThink(f, o, S, lv) {
 
 /* ========================== JUEGO ========================== */
 const G = {
-  mode: 'demo', phase: 'intro', pf: 0, round: 1, timer: 60, tf: 0, time: 0, f: [], proj: [], waves: [], parts: [],
+  mode: 'demo', phase: 'intro', pf: 0, round: 1, timer: 60, tf: 0, time: 0, f: [], proj: [], waves: [], parts: [], bolts: [], scrFlash: 0, fin: null, fatal: null,
   stage: 0, hitstop: 0, shake: 0, slow: 0, ann: null, combo: null, paused: false, cam: { x: 0 }, winner: -1, ev: [], src: [], lvl: 'normal', setup: null, maxD: 850
 };
 const P_IDLE = { t: .08, a1: .75, a2: 2.55, b1: .35, b2: 2.25, l1: .42, l2: .05, m1: -.38, m2: -.2 };
@@ -753,14 +755,14 @@ function placeFighter(f) {
   Object.assign(f, {
     x: STAGE_W / 2 + (f.i ? 170 : -170), y: 0, vx: 0, vy: 0, face: f.i ? -1 : 1, tx: 0, ty: 0,
     hp: f.maxHp, hpLag: f.maxHp, st: 'idle', sf: 0, atk: null, an: '', hitDone: false, stun: 0, combo: 0, flash: 0, alpha: 1, rot: 0, inv: 0,
-    buf: { p: 0, k: 0, s: 0 }, pose: { ...P_IDLE }, ai: null, spec: null, slamLand: 0, crouchBlock: false, holdBack: 0, holdDown: 0, airAtk: false, en: 0
+    buf: { p: 0, k: 0, s: 0 }, pose: { ...P_IDLE }, ai: null, spec: null, slamLand: 0, crouchBlock: false, pal: 0, squash: 0, seq: [], holdBack: 0, holdDown: 0, airAtk: false, en: 0
   });
   f.tx = f.x; f.ty = 0;
 }
 function setSt(f, st) { if (f.st !== st) { f.st = st; f.sf = 0; } }
 
 function startMatch(setup) {
-  G.setup = setup; G.mode = setup.mode; G.stage = setup.stage; G.lvl = setup.lvl || 'normal'; G.lvls = setup.lvls || null;
+  G.paused = false; G.setup = setup; G.mode = setup.mode; G.stage = setup.stage; G.lvl = setup.lvl || 'normal'; G.lvls = setup.lvls || null;
   const seeds = setup.seeds || newSeeds();
   G.f = [mkFighter(0, setup.sel[0], seeds[0]), mkFighter(1, setup.sel[1], seeds[1])];
   const mine = [S_KB1, S_T[0], S_PAD[0], S_PAD[1]];
@@ -775,7 +777,7 @@ function startMatch(setup) {
 }
 function startRound() {
   G.f.forEach(placeFighter);
-  Object.assign(G, { proj: [], waves: [], phase: 'intro', pf: 0, timer: 60, tf: 0, winner: -1, combo: null, hitstop: 0, slow: 0, ann: null });
+  Object.assign(G, { proj: [], waves: [], bolts: [], phase: 'intro', pf: 0, timer: 60, tf: 0, winner: -1, combo: null, hitstop: 0, slow: 0, ann: null, fin: null, fatal: null });
 }
 function ann(text) { fx('ann', text); }
 function phaseStep() {
@@ -787,7 +789,19 @@ function phaseStep() {
     if (G.pf >= 95) { G.phase = 'fight'; G.pf = 0; }
   } else if (G.phase === 'fight') {
     if (++G.tf >= 60) { G.tf = 0; G.timer--; if (G.timer <= 5 && G.timer > 0) fx('sfx', 'beep'); if (G.timer <= 0) { G.phase = 'time'; G.pf = 0; } }
+  } else if (G.phase === 'finish') {
+    // ¡ACABALO!: el ganador tiene 5 segundos para hacer su combinación
+    if (G.pf >= FINISH_T) {
+      const o = G.f[1 - G.fin.w]; o.st = 'ko'; o.sf = 0; o.vy = 4; o.y = .1; o.vx = 0;
+      G.fin = null; G.phase = 'ko'; G.pf = 80;
+    }
+  } else if (G.phase === 'fatal') {
+    const F = G.fatal, w = G.f[F.w];
+    if (G.pf === 150) { ann('¡REMATE FATAL!'); fx('say', 'Remate fatal'); }
+    if (G.pf === 240) { ann('¡GANA ' + w.name.toUpperCase() + '!'); fx('say', 'Gana ' + w.name); }
+    if (G.pf >= 350) { G.phase = 'over'; G.pf = 0; fx('end'); }
   } else if (G.phase === 'ko' || G.phase === 'time') {
+    if (G.phase === 'ko' && G.fin && G.pf === 70) { startFinish(); return; }
     if (G.phase === 'time' && G.pf === 1) {
       ann('¡TIEMPO!'); fx('say', 'Tiempo');
       const ra = a.hp / a.maxHp, rb = b.hp / b.maxHp;
@@ -896,7 +910,7 @@ function slamLand(f) {
 }
 function activeAtk(f) {
   if (f.hitDone) return null;
-  if (f.st === 'attack') { const a = f.atk; if (f.sf >= a.su && f.sf < a.su + a.ac) return a; }
+  if (f.st === 'attack' && f.atk) { const a = f.atk; if (f.sf >= a.su && f.sf < a.su + a.ac) return a; }
   if (f.st === 'special' && f.spec === 'charge' && f.sf >= 8 && f.sf < 26) return ATK.charge;
   return null;
 }
@@ -936,6 +950,8 @@ function applyHit(att, def, a, px, py) {
   if (def.hp <= 0) {
     def.st = 'ko'; def.sf = 0; def.vy = 9; def.y = Math.max(def.y, .1); def.vx = dir * 5; def.inv = 9999;
     att.wins++; G.winner = att.i; G.phase = 'ko'; G.pf = 0; G.slow = 70;
+    // si con esto ganó la pelea, viene el remate
+    G.fin = att.wins >= 2 ? { w: att.i, cpuAt: 45 + (Math.random() * 70 | 0) } : null;
     fx('hit', px, py, 1); fx('sfx', 'ko'); fx('shake', 18); ann('K.O.'); fx('say', 'K O'); G.hitstop = 22; return;
   }
   if (a.knock || def.y > 0) { def.st = 'fall'; def.sf = 0; def.vy = a.launch || 6; def.y = Math.max(def.y, .1); def.vx = dir * (a.push * .8 + 1.5); }
@@ -983,6 +999,106 @@ function bounds() {
 }
 function camFollow() { const [a, b] = G.f; G.cam.x = clamp((a.x + b.x) / 2 - W / 2, 0, STAGE_W - W); }
 
+/* ------------------------- remates (¡ACABALO!) -------------------------
+   Al ganar la pelea, el perdedor queda mareado y el ganador puede hacer la combinación de su
+   personaje. D = abajo, F = adelante, B = atrás, P = puño, K = patada. */
+const FINISH_T = 300;
+const FATAL = {
+  charge: { name: 'Cornada voladora', seq: ['D', 'F', 'P'] },
+  fire: { name: 'Electrocución', seq: ['D', 'D', 'P'] },
+  tele: { name: 'Mil patadas', seq: ['B', 'B', 'K'] },
+  slam: { name: 'Aplastada', seq: ['D', 'D', 'K'] }
+};
+function trackSeq(f, inp) {
+  const fw = f.face > 0 ? inp.h.r : inp.h.l, bk = f.face > 0 ? inp.h.l : inp.h.r, p = f.pv || (f.pv = {});
+  f.seq = f.seq || [];
+  const push = t => { f.seq.push([t, G.time]); if (f.seq.length > 8) f.seq.shift(); };
+  if (inp.h.d && !p.d) push('D'); if (fw && !p.f) push('F'); if (bk && !p.b) push('B');
+  for (const [k, t] of [['p', 'P'], ['k', 'K'], ['s', 'S']]) for (let n = 0; n < inp.t[k]; n++) push(t);
+  p.d = inp.h.d; p.f = fw; p.b = bk;
+}
+function seqMatch(f, seq) {
+  const s = (f.seq || []).filter(e => G.time - e[1] < 100).map(e => e[0]);
+  return s.length >= seq.length && seq.every((t, i) => s[s.length - seq.length + i] === t);
+}
+function startFinish() {
+  const o = G.f[1 - G.fin.w], w = G.f[G.fin.w];
+  Object.assign(o, { st: 'dizzy', sf: 0, y: 0, vy: 0, vx: 0, inv: 9999, alpha: 1 });
+  setSt(w, 'idle'); w.seq = []; w.buf = { p: 0, k: 0, s: 0 };
+  G.phase = 'finish'; G.pf = 0;
+  ann('¡ACABALO!'); fx('say', '¡Acabalo!');
+}
+function startFatal() {
+  G.fatal = { w: G.fin.w, type: G.f[G.fin.w].ch.special, hit: 0 };
+  G.fin = null; G.phase = 'fatal'; G.pf = 0;
+  const w = G.f[G.fatal.w]; w.vx = 0; setSt(w, 'idle'); w.hitDone = true;
+  fx('sfx', 'power'); fx('aura', w.x, 110, w.i);
+}
+// paletas para el electrocutado: radiografía (esqueleto) y carbonizado
+const PAL = new Map();
+function palette(ch, kind) {
+  const key = ch.name + kind; let p = PAL.get(key); if (p) return p;
+  const col = kind === 1 ? { shirt: '#0d1a24', pants: '#0d1a24', arm: '#0d1a24', neck: '#0d1a24', glove: '#e8f6ff', shoe: '#0d1a24', belt: '#e8f6ff', line: '#e8f6ff' }
+    : { shirt: '#2a2522', pants: '#1f1b19', arm: '#2a2522', neck: '#2a2522', glove: '#1a1716', shoe: '#111', belt: '#3a3330', line: '#000' };
+  const c = { ...ch.c, ...col, camo: null, scarf: ch.c.scarf ? col.shirt : null }; c.dark = {}; for (const n of ['shirt', 'pants', 'arm', 'glove', 'shoe']) c.dark[n] = shade(c[n], -.2);
+  p = { ...ch, c }; PAL.set(key, p); return p;
+}
+function phys(f) {
+  f.x += f.vx;
+  if (f.y > 0 || f.vy > 0) { f.y += f.vy; f.vy -= f.st === 'fly' ? .12 : GRAV; if (f.y <= 0 && f.st !== 'fly') { f.y = 0; f.vy = 0; return true; } }
+  return false;
+}
+function fatalStep() {
+  const F = G.fatal, t = G.pf, w = G.f[F.w], o = G.f[1 - F.w], dir = o.x >= w.x ? 1 : -1;
+  w.sf++; o.sf++; if (w.flash > 0) w.flash--; if (o.flash > 0) o.flash--;
+  const lw = phys(w), lo = phys(o);
+  if (lo && o.st === 'ko') { G.shake = Math.max(G.shake, 7); fx('dust', o.x, 18); }
+  switch (F.type) {
+    case 'charge': // cornada: lo embiste y lo manda a volar hasta el cielo
+      if (t === 1) { w.st = 'special'; w.spec = 'charge'; w.sf = 0; w.face = dir; }
+      if (!F.hit && t > 1) {
+        w.sf = Math.min(w.sf, 20);
+        if (t < 14) w.vx = 0; else { w.vx = 16 * w.face; if (t % 3 === 0) fx('dust', w.x - w.face * 20, 4); if (t === 14) fx('sfx', 'charge'); }
+        if (Math.abs(o.x - w.x) < 70) {
+          F.hit = t; Object.assign(o, { st: 'fly', sf: 0, vx: w.face * 11, vy: 19, y: .1, hurt: 1, flash: 12 });
+          fx('hit', o.x, 120, 1); fx('sfx', 'ko'); fx('shake', 18);
+        }
+      } else if (F.hit) { w.vx *= .8; if (t === F.hit + 18) setSt(w, 'win'); if (t === F.hit + 55) fx('twinkle', o.x, 430); }
+      break;
+    case 'fire': // electrocución: rayos, esqueleto y queda carbonizado
+      if (t === 1) setSt(w, 'win');
+      if (t >= 15 && t < 100) {
+        o.st = 'zapped'; o.pal = (t >> 2) % 2 ? 1 : 0; o.x += t % 2 ? 3 : -3;
+        if (t % 6 === 0) { fx('bolt', o.x + rnd(-25, 25)); o.flash = 8; fx('shake', 6); }
+      }
+      if (t === 100) { o.pal = 2; Object.assign(o, { st: 'ko', sf: 0, vy: 5, y: .1, vx: 0, hurt: 1 }); fx('sfx', 'ko'); }
+      if (t > 100 && t < 260 && t % 7 === 0) fx('soot', o.x + rnd(-30, 30), 20);
+      break;
+    case 'tele': // mil patadas: aparece de un lado y del otro pateándolo, y lo manda al cielo
+      if (t === 1) { fx('sfx', 'tele'); fx('smoke', w.x, 90); }
+      if (t < 12) w.alpha = 1 - t / 12;
+      else if (t < 112) {
+        const k = (t - 12) % 10, n = (t - 12) / 10 | 0;
+        if (k === 0) { const side = n % 2 ? 1 : -1; w.x = o.x + side * 78; w.face = -side; w.alpha = 1; w.y = n % 3 === 2 ? 60 : 0; w.vy = 0; w.st = 'attack'; w.an = n % 2 ? 'tk' : 'k'; w.atk = ATK[w.an]; w.sf = 0; fx('smoke', w.x, 90); }
+        if (k === 4) { fx('hit', o.x, 100 + rnd(-30, 40), 1); o.flash = 10; o.face = -o.face; o.st = 'hit'; o.sf = 0; G.shake = Math.max(G.shake, 5); }
+      } else if (t === 112) { w.y = 0; w.x = o.x - dir * 82; w.face = dir; w.st = 'attack'; w.an = 'tk'; w.atk = ATK.tk; w.sf = 0; }
+      else if (t === 116) { Object.assign(o, { st: 'fly', sf: 0, vx: dir * 2, vy: 24, y: .1, hurt: 1 }); fx('hit', o.x, 130, 1); fx('sfx', 'ko'); fx('shake', 16); }
+      else if (t === 135) setSt(w, 'win');
+      else if (t === 170) fx('twinkle', o.x, 430);
+      break;
+    case 'slam': // aplastada: salta altísimo y cae encima, lo deja chato
+      if (t === 1) { w.st = 'special'; w.spec = 'slam'; w.slamLand = 0; w.sf = 0; w.vy = 23; w.y = .1; w.vx = (o.x - w.x) / (2 * 23 / GRAV); fx('sfx', 'jump'); }
+      if (lw && !F.hit) {
+        F.hit = t; w.vx = 0; w.slamLand = w.sf || 1; w.x = o.x;
+        Object.assign(o, { st: 'flat', sf: 0, hurt: 1, flash: 12 });
+        fx('sfx', 'slam'); fx('shake', 22); fx('dust', o.x, 34); fx('hit', o.x, 30, 1);
+      }
+      if (F.hit && t === F.hit + 30) { w.st = 'jump'; w.sf = 0; w.vy = 9; w.y = .1; w.vx = -dir * 3.5; } // se baja de arriba del panqueque
+      else if (F.hit && lw && w.st === 'jump') { setSt(w, 'win'); w.vx = 0; fx('dust', w.x, 6); }
+      break;
+  }
+}
+
 /* ------------------------- poses ------------------------- */
 function attackPose(f) {
   const a = f.atk, t = f.sf, n = f.an, ph = t < a.su ? 0 : t < a.su + a.ac ? 1 : 2;
@@ -1028,14 +1144,19 @@ function targetPose(f) {
     case 'fall': case 'ko': case 'down':
       return f.y > 2 ? { t: -.5, a1: 2.4, a2: 2.8, b1: -2.2, b2: -1.6, l1: 1.1, l2: .6, m1: .6, m2: .1 } : { t: 0, a1: .6, a2: .9, b1: -.6, b2: -.4, l1: .15, l2: .05, m1: -.1, m2: -.05 };
     case 'win': { const w = Math.sin(T * .15); return { t: -.05, a1: 2.9 + w * .15, a2: 3.1, b1: 2.7 - w * .15, b2: 3.0, l1: .25, l2: .05, m1: -.25, m2: -.05 }; }
+    case 'dizzy': { const s = Math.sin(T * .09 + f.i); return { t: .2 + s * .22, a1: .15 + s * .2, a2: .35, b1: -.15 - s * .2, b2: .05, l1: .25 + s * .1, l2: .05, m1: -.25 + s * .1, m2: -.1 }; }
+    case 'zapped': { const j = () => rnd(-.25, .25); return { t: j() * .5, a1: 2.3 + j(), a2: 2.5 + j(), b1: -2.1 + j(), b2: -2.3 + j(), l1: .65 + j(), l2: .6, m1: -.65 + j(), m2: -.6 }; }
+    case 'fly': return { t: -.5, a1: 2.4, a2: 2.8, b1: -2.2, b2: -1.6, l1: 1.1, l2: .6, m1: .6, m2: .1 };
+    case 'flat': return { t: 0, a1: 1.57, a2: 1.57, b1: -1.57, b2: -1.57, l1: .35, l2: .35, m1: -.35, m2: -.35 };
   }
   return P_IDLE;
 }
 function poseStep(f) {
-  const tp = targetPose(f), k = f.st === 'attack' || f.st === 'special' || f.st === 'hit' ? .5 : .28;
+  const tp = targetPose(f), k = f.st === 'attack' || f.st === 'special' || f.st === 'hit' || f.st === 'zapped' ? .5 : .28;
   for (const key in tp) f.pose[key] = lerp(f.pose[key] ?? tp[key], tp[key], k);
-  const rt = (f.st === 'down' || f.st === 'ko') && f.y <= 2 ? -1.57 : (f.st === 'fall' || f.st === 'ko') ? -.8 : 0;
-  f.rot = lerp(f.rot, rt, .2);
+  if (f.st === 'fly') f.rot += .28 * (f.vx >= 0 ? 1 : -1) * f.face; // da vueltas por el aire
+  else { const rt = (f.st === 'down' || f.st === 'ko') && f.y <= 2 ? -1.57 : (f.st === 'fall' || f.st === 'ko') ? -.8 : 0; f.rot = lerp(f.rot, rt, .2); }
+  f.squash = lerp(f.squash || 0, f.st === 'flat' ? 1 : 0, .45);
   f.hpLag = f.hpLag > f.hp ? Math.max(f.hp, f.hpLag - .4) : f.hp;
 }
 
@@ -1053,13 +1174,19 @@ function runFx(type, a, b, c) {
     case 'smoke': for (let i = 0; i < 18; i++) G.parts.push({ x: a + rnd(-30, 30), y: b + rnd(-70, 70), vx: rnd(-1.5, 1.5), vy: rnd(-.5, 1.5), l: 28, L: 28, c: 'rgba(140,90,220,.7)', r: rnd(8, 18), g: 0, dust: 1 }); break;
     case 'aura': sparks(G.f[b] ? G.f[b].x : a, 110, 16, '#d07bff', 6); G.parts.push({ ring: 1, x: G.f[b] ? G.f[b].x : a, y: 100, l: 16, L: 16, c: '#d07bff', r: 90 }); break;
     case 'end': if (G.mode !== 'demo') setTimeout(showEnd, 300); break;
+    case 'bolt': G.bolts.push({ x: a, l: 7, seed: Math.random() * 1e6 | 0 }); G.scrFlash = 4; SFX.zap(); sparks(a, 120, 10, '#bff3ff', 7); break;
+    case 'twinkle': G.parts.push({ twinkle: 1, x: a, y: b, l: 50, L: 50 }); SFX.twinkle(); break;
+    case 'soot': G.parts.push({ x: a, y: b + 100, vx: rnd(-.4, .4), vy: rnd(1, 1.8), l: 45, L: 45, c: 'rgba(60,55,55,.55)', r: rnd(7, 14), g: -.01, dust: 1 }); break;
   }
 }
 function sparks(x, y, n, col, spd) {
   for (let i = 0; i < n; i++) { const an = Math.random() * Math.PI * 2, v = rnd(.3, 1) * spd; G.parts.push({ x, y, vx: Math.cos(an) * v, vy: Math.sin(an) * v, l: rnd(10, 20), L: 20, c: col, r: rnd(2, 4.5), g: .25, spark: 1 }); }
 }
 function partsStep() {
-  for (const p of G.parts) { p.l--; if (!p.ring) { p.x += p.vx; p.y += p.vy; p.vy -= p.g; if (p.spark) { p.vx *= .92; } } }
+  for (const b of G.bolts) b.l--;
+  G.bolts = G.bolts.filter(b => b.l > 0);
+  if (G.scrFlash > 0) G.scrFlash--;
+  for (const p of G.parts) { p.l--; if (!p.ring && !p.twinkle) { p.x += p.vx; p.y += p.vy; p.vy -= p.g; if (p.spark) { p.vx *= .92; } } }
   G.parts = G.parts.filter(p => p.l > 0);
   if (G.parts.length > 400) G.parts.splice(0, G.parts.length - 400);
 }
@@ -1077,10 +1204,17 @@ function step() {
   if (G.slow > 0) { G.slow--; if (G.slow % 2) return; }
   phaseStep();
   if (G.phase === 'over' && G.mode !== 'demo') { G.f.forEach(poseStep); return; }
-  const live = G.phase === 'fight';
+  const live = G.phase === 'fight', fin = G.phase === 'finish' && G.fin;
+  if (G.phase === 'fatal') { fatalStep(); G.f.forEach(poseStep); if (G.mode === 'host' && G.time % 2 === 0) netSend(snapshot()); return; }
   G.f.forEach((f, i) => { if (G.src[i][0] === S_CPU[i] && live) cpuThink(f, G.f[1 - i], S_CPU[i], G.mode === 'demo' ? 'normal' : G.lvls ? G.lvls[i] : G.lvl); });
-  const ins = G.f.map((f, i) => { const r = readSources(G.src[i]); return live ? r : EMPTY; });
+  const ins = G.f.map((f, i) => { const r = readSources(G.src[i]); return live || (fin && i === fin.w) ? r : EMPTY; });
   G.f.forEach((f, i) => fighterStep(f, G.f[1 - i], ins[i]));
+  if (fin) {
+    const w = G.f[fin.w];
+    trackSeq(w, ins[fin.w]);
+    const cpu = G.src[fin.w][0] === S_CPU[fin.w];
+    if (seqMatch(w, FATAL[w.ch.special].seq) || (cpu && G.pf === fin.cpuAt && Math.random() < .85)) startFatal();
+  }
   combat(); separate(); bounds();
   G.f.forEach(poseStep);
   if (G.mode === 'host' && G.time % 2 === 0) netSend(snapshot());
@@ -1098,10 +1232,12 @@ function touchReady() {
 /* =========================== DIBUJO =========================== */
 const SEG = { T: 38, S: 38, U: 30, F: 28 };
 function drawFighter(c, f, sx, sy, sc = 1) {
-  const ch = f.ch, B = ch.b, C = ch.c, P = f.pose, s = B.s * sc, OL = C.line, lw = B.limb, D = C.dark, T = G.time;
+  const ch = f.pal ? palette(f.ch, f.pal) : f.ch, B = ch.b, C = ch.c, P = f.pose, s = B.s * sc, OL = C.line, lw = B.limb, D = C.dark, T = G.time;
   c.save(); c.translate(sx, sy); c.globalAlpha = f.alpha;
   if (f.rot) c.translate(0, -16 * Math.min(1, Math.abs(f.rot) / 1.57) * s);
-  c.scale(f.face * s, s); c.rotate(f.rot);
+  c.scale(f.face * s, s);
+  if (f.squash > .01) c.scale(1 + f.squash * .9, 1 - f.squash * .8); // aplastado como panqueque
+  c.rotate(f.rot);
   const hipH = Math.max(Math.cos(P.l1) * SEG.T + Math.cos(P.l2) * SEG.S, Math.cos(P.m1) * SEG.T + Math.cos(P.m2) * SEG.S);
   const hx = 0, hy = -hipH, L = B.torso;
   const ux = Math.sin(P.t), uy = -Math.cos(P.t), px = Math.cos(P.t), py = Math.sin(P.t);
@@ -1149,7 +1285,7 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   c.save(); c.translate(hcx, hcy); c.scale(f.face, 1); c.rotate(f.face * P.t * .45);
   if (f.flash > 0) { const q = Math.sin(f.flash * 1.3) * .12; c.scale(1 + q, 1 - q); }
   drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, f.face, f.yaw, f);
-  if ((f.st === 'ko' || f.st === 'down') && f.y <= 2) { // estrellitas mareado
+  if (((f.st === 'ko' || f.st === 'down') && f.y <= 2) || f.st === 'dizzy') { // estrellitas mareado
     for (let k = 0; k < 3; k++) {
       const a = T * .12 + k * 2.09, sx = Math.cos(a) * R * 1.1, sy = -R * .9 + Math.sin(a) * R * .3;
       c.save(); c.translate(sx, sy); c.rotate(a); c.fillStyle = k % 2 ? '#fff3a0' : '#ffc83d'; c.beginPath();
@@ -1193,6 +1329,14 @@ function render() {
     }
     drawFighter(c, f, f.x - cx, GROUND - f.y);
   }
+  for (const b of G.bolts) { // rayos del cielo
+    const R = rng(b.seed + (G.time >> 1)), x0 = b.x - cx, yEnd = GROUND - 150;
+    for (const [w, col] of [[14, 'rgba(120,200,255,.35)'], [6, '#bff3ff'], [2.5, '#fff']]) {
+      c.strokeStyle = col; c.lineWidth = w; c.lineJoin = 'round'; c.beginPath(); c.moveTo(x0 + (R() - .5) * 60, 0);
+      const R2 = rng(b.seed); for (let y = 40; y < yEnd; y += 40) c.lineTo(x0 + (R2() - .5) * 70, y);
+      c.lineTo(x0, yEnd); c.stroke();
+    }
+  }
   for (const p of G.proj) {
     const x = p.x - cx, y = GROUND - p.y, d = Math.sign(p.vx);
     for (let k = 4; k >= 1; k--) { c.globalAlpha = .15 * (5 - k); glow(c, x - d * k * 14, y, 22 - k * 2, 'rgba(80,190,255,.9)'); }
@@ -1204,14 +1348,19 @@ function render() {
   }
   for (const p of G.parts) {
     const x = p.x - cx, y = GROUND - p.y, k = p.l / p.L;
-    if (p.ring) { c.globalAlpha = k; c.strokeStyle = p.c; c.lineWidth = 4 * k + 1; c.beginPath(); c.arc(x, y, p.r * (1.2 - k), 0, 7); c.stroke(); }
+    if (p.twinkle) { // estrellita donde desapareció volando
+      const s = Math.sin((1 - k) * Math.PI) * 26; c.globalAlpha = 1; c.save(); c.translate(clamp(x, 30, W - 30), Math.max(30, y)); c.rotate(p.l * .15);
+      c.fillStyle = '#fff6c0'; c.beginPath(); for (let q = 0; q < 8; q++) { const rr2 = q % 2 ? s * .25 : s, aa = q * Math.PI / 4; c.lineTo(Math.cos(aa) * rr2, Math.sin(aa) * rr2); } c.fill();
+      glow(c, 0, 0, s * 1.4, 'rgba(255,240,170,.6)'); c.restore();
+    } else if (p.ring) { c.globalAlpha = k; c.strokeStyle = p.c; c.lineWidth = 4 * k + 1; c.beginPath(); c.arc(x, y, p.r * (1.2 - k), 0, 7); c.stroke(); }
     else { c.globalAlpha = p.dust ? k * .8 : Math.min(1, k * 1.5); c.fillStyle = p.c; c.beginPath(); c.arc(x, y, p.dust ? p.r * (1.6 - k) : p.r, 0, 7); c.fill(); }
   }
   c.globalAlpha = 1;
   c.restore();
   if (G.mode === 'demo') { c.fillStyle = 'rgba(10,4,14,.45)'; c.fillRect(0, 0, W, H); return; }
+  if (G.scrFlash > 0) { c.fillStyle = `rgba(230,245,255,${G.scrFlash * .12})`; c.fillRect(0, 0, W, H); }
   drawHUD(c);
-  drawKeys(c);
+  if (G.phase === 'finish' && G.fin) drawFinish(c); else if (G.phase !== 'fatal') drawKeys(c);
   if (G.ann && G.ann.t < 85) drawAnn(c);
   if (G.paused) { c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 0, W, H); }
 }
@@ -1287,6 +1436,30 @@ function drawKeys(c) {
     c.textAlign = 'left'; c.fillStyle = glowIt ? '#f1d4ff' : '#ffffffd0'; c.fillText(label, x + gap - 3, y + 1);
     x += gap + c.measureText(label).width + sp;
   });
+  c.restore();
+}
+// cartel del remate: la combinación del ganador y el tiempo que le queda
+function drawFinish(c) {
+  const w = G.f[G.fin.w]; if (!w) return;
+  const F = FATAL[w.ch.special], pc = !isTouch(), fr = w.face > 0;
+  const icon = { D: '⬇️', F: fr ? '➡️' : '⬅️', B: fr ? '⬅️' : '➡️', P: '👊', K: '🦶' };
+  const key = { D: 'S', F: fr ? 'D' : 'A', B: fr ? 'A' : 'D', P: 'V', K: 'B' };
+  const human = G.src[G.fin.w] && G.src[G.fin.w][0] !== S_CPU[G.fin.w];
+  const left = Math.max(0, 1 - G.pf / FINISH_T), y = H - 92, bw = 460, x = (W - bw) / 2;
+  c.save(); rr(c, x, y, bw, 78, 16); c.fillStyle = 'rgba(40,0,0,.75)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ff4d3a'; c.stroke();
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = '900 16px system-ui,sans-serif'; c.fillStyle = '#ffd9b0';
+  c.fillText((human ? (G.mode === 'host' || G.mode === 'guest' ? w.name + ': ' : '') + 'Rematalo con ' : w.name + ' va a rematar con ') + F.name.toUpperCase(), W / 2, y + 18);
+  const toks = F.seq, n = toks.length, sz = 34, gap = 16, tw = n * sz + (n - 1) * gap; let tx = W / 2 - tw / 2;
+  const s = (w.seq || []).filter(e => G.time - e[1] < 100).map(e => e[0]);
+  let done = 0; for (let k = n; k > 0; k--) if (toks.slice(0, k).every((t, i) => s[s.length - k + i] === t)) { done = k; break; }
+  toks.forEach((t, i) => {
+    rr(c, tx, y + 30, sz, sz, 9); c.fillStyle = i < done ? '#ffc83d' : '#ffffff22'; c.fill();
+    c.font = '22px system-ui'; c.fillStyle = '#fff'; c.fillText(icon[t], tx + sz / 2, y + 48);
+    if (pc) { c.font = '900 11px system-ui'; c.fillStyle = i < done ? '#1a0d00' : '#ffd9b0'; c.fillText(key[t], tx + sz - 6, y + 58); }
+    tx += sz + gap;
+  });
+  rr(c, x + 14, y + 70, (bw - 28) * left, 4, 2); c.fillStyle = '#ff4d3a'; c.fill();
   c.restore();
 }
 function drawAnn(c) {
@@ -1386,22 +1559,22 @@ function onNet(m) {
 function snapshot() {
   return {
     t: 's',
-    f: G.f.map(f => ({ x: Math.round(f.x), y: Math.round(f.y), fc: f.face, hp: f.hp, en: Math.round(f.en), st: f.st, sf: f.sf, an: f.an, vx: Math.round(f.vx * 10) / 10, vy: Math.round(f.vy * 10) / 10, w: f.wins, fl: f.flash, al: Math.round(f.alpha * 100) / 100, cb: f.crouchBlock ? 1 : 0, sp: f.spec, sl: f.slamLand ? 1 : 0, hu: Math.round(f.hurt * 1000) / 1000 })),
+    f: G.f.map(f => ({ x: Math.round(f.x), y: Math.round(f.y), fc: f.face, hp: f.hp, en: Math.round(f.en), st: f.st, sf: f.sf, an: f.an, vx: Math.round(f.vx * 10) / 10, vy: Math.round(f.vy * 10) / 10, w: f.wins, fl: f.flash, al: Math.round(f.alpha * 100) / 100, cb: f.crouchBlock ? 1 : 0, sp: f.spec, sl: f.slamLand ? 1 : 0, hu: Math.round(f.hurt * 1000) / 1000, pl: f.pal || 0 })),
     pr: G.proj.map(p => [Math.round(p.x), Math.round(p.y), Math.sign(p.vx), p.o.i]),
     wv: G.waves.map(w => [Math.round(w.x), w.o.i, w.life]),
-    ph: G.phase, tm: G.timer, rd: G.round, cb: G.combo, ev: G.ev.splice(0)
+    ph: G.phase, pf: G.pf, fw: G.fin ? G.fin.w : -1, tm: G.timer, rd: G.round, cb: G.combo, ev: G.ev.splice(0)
   };
 }
 function applySnap(m) {
   m.f.forEach((d, i) => {
     const f = G.f[i]; if (!f) return;
     if (d.st !== f.st || d.sf < f.sf) f.sf = d.sf;
-    Object.assign(f, { tx: d.x, ty: d.y, face: d.fc, hp: d.hp, en: d.en, st: d.st, an: d.an, atk: ATK[d.an] || null, vx: d.vx, vy: d.vy, wins: d.w, flash: d.fl, alpha: d.al, crouchBlock: !!d.cb, spec: d.sp, slamLand: d.sl ? (f.slamLand || f.sf) : 0, hurt: d.hu || 0 });
+    Object.assign(f, { tx: d.x, ty: d.y, face: d.fc, hp: d.hp, en: d.en, st: d.st, an: d.an, atk: ATK[d.an] || null, vx: d.vx, vy: d.vy, wins: d.w, flash: d.fl, alpha: d.al, crouchBlock: !!d.cb, spec: d.sp, slamLand: d.sl ? (f.slamLand || f.sf) : 0, hurt: d.hu || 0, pal: d.pl || 0 });
     if (Math.abs(f.sf - d.sf) > 3) f.sf = d.sf;
   });
   G.proj = m.pr.map(a => ({ x: a[0], y: a[1], vx: a[2] * 8.5, o: G.f[a[3]] }));
   G.waves = m.wv.map(a => ({ x: a[0], o: G.f[a[1]], life: a[2], vx: 0 }));
-  G.phase = m.ph; G.timer = m.tm; G.round = m.rd; G.combo = m.cb;
+  G.phase = m.ph; G.timer = m.tm; G.round = m.rd; G.combo = m.cb; G.pf = m.pf || 0; G.fin = m.fw >= 0 ? { w: m.fw } : null;
   for (const e of m.ev) runFx(...e);
 }
 function guestStep() {
@@ -1417,7 +1590,8 @@ function guestStep() {
   }
   for (const p of G.proj) p.x += p.vx;
   for (const w of G.waves) w.x += Math.sign(w.x - G.f[w.o.i].x) * 7.5;
-  camFollow(); touchReady();
+  if (G.phase !== 'fatal') camFollow(); // en el remate la cámara se queda quieta (el perdedor sale volando)
+  touchReady();
 }
 
 /* =========================== PANTALLAS =========================== */
@@ -1535,7 +1709,7 @@ function renderSelect() {
       ${ed ? '<div class="row camBtns"><button class="sm" data-a="cam">📷 Foto</button><button class="sm" data-a="gal">🖼️ Galería</button></div>' : ''}</div></div>
       ${ed ? `<div class="faces">${[`<button class="fc none ${d.face ? '' : 'on'}" data-f="-1" title="Sin foto">🙂</button>`, ...FACES.map((u, k) => `<button class="fc ${u === d.face ? 'on' : ''}" data-f="${k}" style="background-image:url(${u})"><i data-del="${k}">✕</i></button>`)].join('')}</div>` : ''}
       <div class="chars">${CH_KEYS.map(k => `<button class="chr ${d.ch === k ? 'on' : ''}" data-ch="${k}"><canvas width="180" height="220"></canvas><b>${CHARS[k].name}</b></button>`).join('')}</div>
-      <div class="chDesc">${esc(CHARS[d.ch] ? CHARS[d.ch].desc : '')}</div>
+      <div class="chDesc">${esc(CHARS[d.ch] ? CHARS[d.ch].desc : '')}${CHARS[d.ch] ? `<br>💀 Remate (${esc(FATAL[CHARS[d.ch].special].name)}): <b>${FATAL[CHARS[d.ch].special].seq.map(t => ({ D: '⬇️', F: '➡️', B: '⬅️', P: '👊', K: '🦶' })[t]).join(' ')}</b>` : ''}</div>
       ${selMode === 'bots' ? `<div class="row" style="align-items:center;margin-top:6px"><span style="font-size:13px;font-weight:800">Nivel:</span>${LVLS.map(([k, t]) => `<button class="sm ${(d.lvl || 'normal') === k ? 'on' : ''}" data-bl="${k}">${t}</button>`).join('')}</div>` : ''}`;
     el.querySelectorAll('.chr').forEach(b => drawPreview(b.querySelector('canvas'), b.dataset.ch, d.face, i, d.yaw ?? yawOf(d.face)));
     if (!ed) return;
@@ -1842,9 +2016,11 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.se
 let last = performance.now(), acc = 0;
 function frame(now) {
   acc += Math.min(100, now - last); last = now;
-  while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
-  render();
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); // primero, así un error en un cuadro no congela el juego
+  try {
+    while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
+    render();
+  } catch (e) { acc = 0; console.error(e); }
 }
 startDemo();
 {
