@@ -54,6 +54,8 @@ input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1p
 .pl{background:rgba(255,255,255,.1);color:#fff;border-radius:10px;padding:5px 9px;font-size:13px;display:flex;gap:6px;align-items:center}
 .pl.me{outline:2px solid var(--gold)}
 .pl.off{opacity:.45}
+.vozsala{display:flex;flex-direction:column;gap:8px;background:rgba(122,47,191,.35);border:1px solid rgba(190,140,240,.6);color:#fff;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+#ov .vozsala{background:#f3e9ff;color:#1d1d1d;border-color:#c9a8ef}
 .espbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(242,193,78,.18);border:1px solid rgba(242,193,78,.5);color:#fff;border-radius:10px;padding:8px 10px;margin:-2px 0 10px;font-size:14px}
 .pl b{font-weight:800}
 .pl .x{background:none;border:0;color:#fbb;cursor:pointer;padding:0 0 0 4px}
@@ -231,7 +233,7 @@ async function cargarGrabados(){
   try{ const ls=await CantosDB.lista(); UI.grabados=await Promise.all(ls.map(async c=>({...c, cuantos:(await CantosDB.numeros(c.id)).length}))); }
   catch(e){ UI.grabados=[]; }
   // si comparto mi voz con la sala y cambié textos en el grabador, se actualizan para todos
-  const g=S && S.vozSala && S.vozSala.pid===NET.myPid && recInfo(PREF.vozSalaId);
+  const g=S && S.vozSala && S.vozSala.pid===NET.myPid && recInfo(PREF.vozSalaId);   // (también si la ofrecí y todavía no la aceptaron)
   if(g && (g.nombre!==S.vozSala.nombre || JSON.stringify(limpiarTextos(g.textos))!==JSON.stringify(S.vozSala.textos||{})))
     doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base, textos:g.textos});
 }
@@ -366,22 +368,42 @@ function act(pid, a){
       myCards(q.id).forEach(c=>{ delete S.owner[c]; });
       S.players=S.players.filter(x=>x!==q); if(S.cantorPid===q.id) S.cantorPid=S.hostPid;
       if(S.vozSala && S.vozSala.pid===q.id) S.vozSala=null;
+      if(S.vozOferta && S.vozOferta.pid===q.id) S.vozOferta=null;
       S.deudas=(S.deudas||[]).filter(d=>d.de!==q.id && d.a!==q.id); S.pedidos=(S.pedidos||[]).filter(x=>x.pid!==q.id);
       if(NET.conns[q.id]){ try{ NET.conns[q.id].send({t:'kicked'}); NET.conns[q.id].close(); }catch(e){} delete NET.conns[q.id]; }
       sys(`${q.emoji} ${q.name} salió de la sala.`);
       break; }
     case 'cantor': {
       const q=P(a.pid); if(!isHost || !q || q.bot) return;
-      if(S.cantorPid!==q.id) S.vozSala=null;
+      if(S.cantorPid===q.id) return;
       S.cantorPid=q.id; sys(`🎤 ${q.emoji} ${q.name} es el cantor: saca las bolillas.`);
       break; }
+    /* ---------- voz grabada de la sala ----------
+       El que saca las bolillas (cantor) y la voz que se escucha pueden ser personas distintas: cualquier jugador ofrece
+       su voz grabada y el cantor o el anfitrión la acepta. El audio sale del dispositivo del dueño de la voz. */
     case 'vozSala': {
-      if(pid!==S.cantorPid) return 'Solo el cantor puede poner su voz grabada para toda la sala.';
-      if(!a.on){ if(S.vozSala) sys(`🎙️ ${p.name} dejó de compartir su voz grabada.`); S.vozSala=null; break; }
-      const yaEra=S.vozSala && S.vozSala.pid===pid;
+      const vs=S.vozSala, esDuenio = vs && vs.pid===pid;
+      if(!a.on){ if(!(esDuenio || isHost || isCantor)) return; if(vs) sys(`🎙️ Se dejó de usar la voz grabada «${vs.nombre}».`); S.vozSala=null; break; }
+      // el cantor pone su propia voz, o el dueño de la voz que ya suena actualiza nombre y textos
+      if(!(isCantor || esDuenio)) return act(pid, {...a, t:'ofrecerVoz'});
       S.vozSala={pid, nombre:String(a.nombre||'Cantor').slice(0,30), base:cantorTTS(a.base).id, textos:limpiarTextos(a.textos)};
-      if(!yaEra) sys(`🎙️ Ahora canta «${S.vozSala.nombre}», la voz grabada de ${p.emoji} ${p.name}. ¡Todos la escuchan!`);
+      if(S.vozOferta && S.vozOferta.pid===pid) S.vozOferta=null;
+      if(!esDuenio) sys(`🎙️ Ahora canta «${S.vozSala.nombre}», la voz grabada de ${p.emoji} ${p.name}. ¡Todos la escuchan!`);
       break; }
+    case 'ofrecerVoz':
+      if(p.bot) return;
+      if(isCantor) return act(pid, {...a, t:'vozSala', on:true});
+      S.vozOferta={pid, nombre:String(a.nombre||'Cantor').slice(0,30), base:cantorTTS(a.base).id, textos:limpiarTextos(a.textos)};
+      sys(`🎙️ ${p.emoji} ${p.name} ofrece su voz grabada «${S.vozOferta.nombre}» para cantar las bolillas. El cantor o el anfitrión la puede aceptar.`);
+      break;
+    case 'aceptarVoz': {
+      const of=S.vozOferta; if(!(isHost || isCantor) || !of || !P(of.pid)) return;
+      S.vozSala={...of}; S.vozOferta=null;
+      sys(`🎙️ Ahora canta «${of.nombre}», la voz grabada de ${P(of.pid).emoji} ${P(of.pid).name}. ¡Todos la escuchan!`);
+      break; }
+    case 'rechazarVoz':
+      if(!(isHost || isCantor) && !(S.vozOferta && S.vozOferta.pid===pid)) return;
+      S.vozOferta=null; break;
     case 'recargar': {
       const q=P(a.pid); if(!isHost || !q || S.phase==='juego') return;
       q.saldo += S.cfg.saldo; sys(`💵 ${q.emoji} ${q.name} recibió ${gs(S.cfg.saldo)} de saldo.`);
@@ -841,7 +863,7 @@ function cfgHTML(){
 function lobbyHTML(){
   const host=NET.myPid===S.hostPid;
   const humans=S.players.filter(p=>!p.bot);
-  return `${playersHTML()}
+  return `${playersHTML()}${vozSalaHTML()}
   ${host?`<div class="box"><h3>👑 Sos el anfitrión</h3>
     <div class="muted">Pasá el código <b>${NET.code}</b> (tocalo arriba para copiar el enlace). Cuando estén todos, abrí la venta de cartones.</div>
     <div class="flex" style="margin-top:10px">
@@ -866,7 +888,7 @@ function ventaHTML(){
     <span class="grow muted">Vendidos: <b>${sold}</b> · Pozo: <b>${gs(total+S.acum)}</b>${S.acum?` (incluye acumulado ${gs(S.acum)})`:''}</span>
     ${canStart?`<button class="btn green big" data-act="empezar" ${sold?'':'disabled'}>▶️ Empezar a cantar</button>`:''}</div>
   </div>
-  ${NET.myPid===S.cantorPid?`<div class="cantor"><b>🎤 Sos el cantor</b>${vozSalaHTML()}</div>`:""}
+  ${vozSalaHTML()}
   <div class="shop">${Object.keys(S.planchas||{}).map(Number).map(planchaHTML).join('')}</div>`;
 }
 // mis combinaciones agrupadas por cartón: en la PC un cartón a la izquierda y el otro a la derecha; en el celular uno debajo del otro
@@ -893,11 +915,13 @@ function juegoHTML(){
     ${S.cfg.modo==='linea'?`<div class="${S.stage!=='linea'?'won':''}">Línea<b>${gs(S.pozo.linea)}</b>${lw?`Ganó ${lw}`:'En juego'}</div>`:''}
     <div>Bingo (cartón lleno)<b>${gs(S.pozo.bingo)}</b>${S.stage==='linea'&&S.cfg.modo==='linea'?'Después de la línea':'En juego'}</div>
   </div>
+  ${vozSalaHTML()}
   ${canDraw?`<div class="cantor"><div class="flex"><b>🎤 ${NET.myPid===S.cantorPid?'Sos el cantor':'Anfitrión'}</b>
+      ${NET.myPid===S.hostPid?`<span class="muted" style="color:#ddd">Cantor: <select id="selCantor" style="width:auto;display:inline-block;padding:4px">${S.players.filter(p=>!p.bot).map(p=>`<option value="${p.id}" ${p.id===S.cantorPid?'selected':''}>${esc(p.emoji+' '+p.name)}</option>`).join('')}</select></span>`:''}
       <span class="muted" style="color:#ddd">Sorteo automático: <select id="selAuto" style="width:auto;display:inline-block;padding:4px">${[0,5,8,12,20].map(s=>`<option value="${s}" ${S.auto===s?'selected':''}>${s?'cada '+s+' s':'apagado'}</option>`).join('')}</select></span></div>
       <button class="btn gold wide big" style="margin-top:10px" data-act="sacar" ${S.claim||S.drawn.length>=90?'disabled':''}>🎱 Sacar bolilla</button>
       ${S.drawn.length>=90 && NET.myPid===S.hostPid?`<button class="btn red wide" style="margin-top:8px" data-act="cerrar" ${S.claim?'disabled':''}>Cerrar ronda (el pozo se acumula)</button>`:''}
-      ${vozSalaHTML()}
+
     </div>`:''}
   <div class="sec">${mine.length?'Tus cartones — tocá un número para ponerle tu maíz 🌽 (tocalo otra vez para sacarlo)':(me()&&me().esp?'👀 Estás como espectador: mirás la cantada. Cuando termine la ronda podés sumarte a la mesa si hay lugar.':'Esta ronda estás mirando: no tenés cartones.')}</div>
   ${misCartonesHTML(mine)}
@@ -961,13 +985,23 @@ function prestamosHTML(){
     <div class="muted" style="margin-top:8px">Los préstamos son de palabra entre jugadores: el que debe paga cuando puede. Desde ${gs(500)}, de a 500.</div>
     <button class="btn wide" style="margin-top:12px" data-act="prestClose">Cerrar</button></div>`;
 }
-// para el cantor: compartir (o dejar de compartir) su voz grabada con toda la sala
+// la voz grabada de la sala: qué voz suena, quién ofrece la suya y los botones de cada uno
 function vozSalaHTML(){
-  if(!S || NET.myPid!==S.cantorPid) return '';
-  const vs=S.vozSala, g=recInfo();
-  if(vs && vs.pid===NET.myPid) return `<div class="flex" style="margin-top:10px"><span class="grow">📢 Toda la sala escucha a <b>«${esc(vs.nombre)}»</b></span><button class="btn sm gray" data-act="vozSalaOff">Dejar de compartir</button></div>`;
-  if(g) return `<button class="btn wide" style="margin-top:10px;background:#7a2fbf" data-act="vozSalaOn">📢 Que todos escuchen mi voz grabada «${esc(g.nombre)}»</button>`;
-  return '';
+  if(!S) return '';
+  const yo=NET.myPid, vs=S.vozSala && P(S.vozSala.pid) ? S.vozSala : null, of=S.vozOferta && P(S.vozOferta.pid) ? S.vozOferta : null;
+  const mando = yo===S.cantorPid || yo===S.hostPid, g=recInfo(), filas=[];
+  if(vs) filas.push(`<div class="flex"><span class="grow">📢 Toda la sala escucha a <b>«${esc(vs.nombre)}»</b>${vs.pid===yo?' (tu voz)':` (voz de ${esc(P(vs.pid).name)})`}</span>
+    ${vs.pid===yo || mando ? '<button class="btn sm gray" data-act="vozSalaOff">Dejar de usarla</button>':''}</div>`);
+  if(of && !(vs && vs.pid===of.pid)){
+    if(mando) filas.push(`<div class="flex"><span class="grow">🎙️ <b>${esc(P(of.pid).name)}</b> ofrece su voz grabada <b>«${esc(of.nombre)}»</b></span>
+      <button class="btn sm green" data-act="aceptarVoz">✅ Usar su voz</button><button class="btn sm gray" data-act="rechazarVoz">No</button></div>`);
+    else if(of.pid===yo) filas.push(`<div class="flex"><span class="grow">🎙️ Ofreciste tu voz «${esc(of.nombre)}». Esperá que el cantor o el anfitrión la acepte.</span><button class="btn sm gray" data-act="rechazarVoz">Cancelar</button></div>`);
+  }
+  if(g && !(vs && vs.pid===yo) && !(of && of.pid===yo))
+    filas.push(yo===S.cantorPid
+      ? `<button class="btn wide" style="background:#7a2fbf" data-act="vozSalaOn">📢 Que todos escuchen mi voz grabada «${esc(g.nombre)}»</button>`
+      : `<button class="btn wide" style="background:#7a2fbf" data-act="ofrecerVoz">📢 Ofrecer mi voz grabada «${esc(g.nombre)}» para que cante en la sala</button>`);
+  return filas.length ? `<div class="vozsala">${filas.join('')}</div>` : '';
 }
 function sonidoHTML(){
   const sel=PREF.cantor||'don', hay=window.speechSynthesis && speechSynthesis.getVoices().some(v=>/^es/i.test(v.lang));
@@ -978,7 +1012,7 @@ function sonidoHTML(){
     <div class="voces">${CANTORES.map(c=>`<button class="voz ${PREF.voz&&c.id===sel?'on':''}" data-act="cantorSel" data-id="${c.id}"><b>${c.nombre}</b><span>${c.desc}</span></button>`).join('')}
       ${UI.grabados.map(g=>`<button class="voz grab ${PREF.voz&&sel==='rec:'+g.id?'on':''}" data-act="cantorSel" data-id="rec:${g.id}"><b>🎙️ ${esc(g.nombre)}</b><span>Voz grabada · ${g.cuantos} de 90</span></button>`).join('')}
       <button class="voz ${!PREF.voz?'on':''}" data-act="sinVoz"><b>🤐 Sin voz</b><span>Solo se ve el número</span></button></div>
-    ${S && NET.myPid===S.cantorPid ? `<div style="margin-top:8px">${vozSalaHTML().replace(/color:#ddd/g,'')}</div>`:''}
+    ${S ? `<div style="margin-top:8px">${vozSalaHTML()}</div>`:''}
     ${hay?'':'<div class="res tarde" style="margin-top:8px">Este dispositivo no tiene voces en español instaladas, así que las voces automáticas no se van a escuchar.</div>'}
     <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:700"><input type="checkbox" data-act="efectos" ${PREF.sound?'checked':''}> 🔔 Efectos de sonido (bolilla, maíz, aplausos)</label>
     <button class="btn wide" style="margin-top:12px" data-act="sonidoClose">Listo</button></div>`;
@@ -1117,7 +1151,8 @@ document.addEventListener('click', e=>{
     case 'ovClose': UI.reglas=false; renderOv(); break;
     case 'ovRes': UI.closedResult=S.result&&S.result.at; renderOv(); break;
     case 'sonido': UI.sonido=true; renderOv(); cargarGrabados().then(()=>{ if(UI.sonido) renderOv(); }); break;
-    case 'vozSalaOn': { const g=recInfo(); if(!g) break; PREF.vozSalaId=g.id; savePref(); doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base, textos:g.textos}); break; }
+    case 'vozSalaOn': case 'ofrecerVoz': { const g=recInfo(); if(!g) break; PREF.vozSalaId=g.id; savePref(); doAct({t:a==='vozSalaOn'?'vozSala':'ofrecerVoz', on:true, nombre:g.nombre, base:g.base, textos:g.textos}); break; }
+    case 'aceptarVoz': case 'rechazarVoz': doAct({t:a}); break;
     case 'vozSalaOff': doAct({t:'vozSala', on:false}); break;
     case 'sonidoClose': UI.sonido=false; renderOv(); break;
     case 'cantorSel': {
