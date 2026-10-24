@@ -556,23 +556,22 @@ function drawStage(c, i, camx, T) {
 /* =========================== ENTRADAS =========================== */
 // cada fuente tiene teclas apretadas (h) y toques nuevos (t) que se consumen al leer
 const mkSrc = () => ({ h: { l: 0, r: 0, u: 0, d: 0, p: 0, k: 0, s: 0 }, t: { p: 0, k: 0, s: 0, u: 0 } });
-const S_KB1 = mkSrc(), S_KB2 = mkSrc(), S_T = [mkSrc(), mkSrc()], S_PAD = [mkSrc(), mkSrc()], S_CPU = [mkSrc(), mkSrc()], S_NET = mkSrc();
-const KEYS1 = { KeyA: 'l', KeyD: 'r', KeyW: 'u', KeyS: 'd', KeyF: 'p', KeyG: 'k', KeyH: 's', KeyJ: 'p', KeyK: 'k', KeyL: 's', Space: 'u' };
-const KEYS2 = { ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd', Comma: 'p', Period: 'k', Slash: 's', Minus: 's', Numpad1: 'p', Numpad2: 'k', Numpad3: 's', Numpad0: 's', NumpadDecimal: 's' };
+const S_KB1 = mkSrc(), S_T = [mkSrc(), mkSrc()], S_PAD = [mkSrc(), mkSrc()], S_CPU = [mkSrc(), mkSrc()], S_NET = mkSrc();
+// PC: W A S D para moverse; V puño, B patada, G salto, H habilidad (como los botones del celular)
+const KEYS1 = { KeyA: 'l', KeyD: 'r', KeyW: 'u', KeyS: 'd', KeyV: 'p', KeyB: 'k', KeyG: 'u', KeyH: 's' };
 function keyEv(e, down) {
   if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
-  const b1 = KEYS1[e.code], b2 = KEYS2[e.code]; const S = b1 ? S_KB1 : b2 ? S_KB2 : null; if (!S) {
+  const b = KEYS1[e.code], S = S_KB1; if (!b) {
     if (down && (e.code === 'Escape' || e.code === 'KeyP') && G.mode !== 'demo') togglePause();
     return;
   }
-  const b = b1 || b2;
   if (playing()) e.preventDefault();
   if (down && !S.h[b] && b in S.t) S.t[b]++;
   S.h[b] = down ? 1 : 0;
 }
 addEventListener('keydown', e => keyEv(e, true));
 addEventListener('keyup', e => keyEv(e, false));
-addEventListener('blur', () => { for (const S of [S_KB1, S_KB2, ...S_T, ...S_PAD]) for (const k in S.h) S.h[k] = 0; });
+addEventListener('blur', () => { for (const S of [S_KB1, ...S_T, ...S_PAD]) for (const k in S.h) S.h[k] = 0; });
 
 function pollPads() {
   const ps = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
@@ -731,12 +730,12 @@ function startMatch(setup) {
   G.setup = setup; G.mode = setup.mode; G.stage = setup.stage; G.lvl = setup.lvl || 'normal'; G.lvls = setup.lvls || null;
   const seeds = setup.seeds || newSeeds();
   G.f = [mkFighter(0, setup.sel[0], seeds[0]), mkFighter(1, setup.sel[1], seeds[1])];
-  const mine = [S_KB1, S_KB2, S_T[0], S_PAD[0], S_PAD[1]];
+  const mine = [S_KB1, S_T[0], S_PAD[0], S_PAD[1]];
   G.src = {
-    demo: [[S_CPU[0]], [S_CPU[1]]], bots: [[S_CPU[0]], [S_CPU[1]]], cpu: [mine, [S_CPU[1]]], local: [[S_KB1, S_T[0], S_PAD[0]], [S_KB2, S_T[1], S_PAD[1]]],
+    demo: [[S_CPU[0]], [S_CPU[1]]], bots: [[S_CPU[0]], [S_CPU[1]]], cpu: [mine, [S_CPU[1]]],
     host: [mine, [S_NET]], guest: [[], []]
   }[G.mode];
-  for (const S of [S_KB1, S_KB2, ...S_T, ...S_PAD, ...S_CPU, S_NET]) for (const k in S.t) S.t[k] = 0;
+  for (const S of [S_KB1, ...S_T, ...S_PAD, ...S_CPU, S_NET]) for (const k in S.t) S.t[k] = 0;
   G.maxD = Math.min(W, G.mode === 'host' ? NET.rW || W : W) - 110;
   G.round = 1; G.parts = []; startRound();
   if (G.mode !== 'demo') beginPlay();
@@ -1057,7 +1056,7 @@ function step() {
 let lastReady = '';
 function touchReady() {
   if (!$('#touch').classList.contains('on')) return;
-  const me = G.mode === 'guest' ? [G.f[1]] : G.mode === 'local' ? G.f : [G.f[0]];
+  const me = G.mode === 'guest' ? [G.f[1]] : [G.f[0]];
   const key = me.map(f => f && f.en >= SPEC_COST ? 1 : 0).join('');
   if (key === lastReady) return; lastReady = key;
   document.querySelectorAll('#touch .btns').forEach(b => { const pi = +b.dataset.pi; b.querySelector('.bs').classList.toggle('ready', key[pi] === '1'); });
@@ -1343,7 +1342,7 @@ function applySnap(m) {
 }
 function guestStep() {
   // manda mis controles al anfitrión
-  const r = readSources([S_KB1, S_KB2, S_T[0], S_PAD[0], S_PAD[1]]);
+  const r = readSources([S_KB1, S_T[0], S_PAD[0], S_PAD[1]]);
   let tapped = false;
   for (const k of ['p', 'k', 's', 'u']) if (r.t[k]) { NET.cnt[k] += r.t[k]; tapped = true; }
   const mask = r.h.l | r.h.r << 1 | r.h.u << 2 | r.h.d << 3;
@@ -1377,7 +1376,7 @@ function beginPlay() {
   $('#hudBtns').classList.add('on');
   $('#btnPause').textContent = G.mode === 'host' || G.mode === 'guest' ? '✕' : '⏸';
   if (!isTouch()) $('#touch').className = '';
-  else { if (G.mode === 'bots') $('#touch').className = ''; else { buildTouch(G.mode === 'local' ? 2 : 1); lastReady = ''; } goFull(); }
+  else { if (G.mode === 'bots') $('#touch').className = ''; else { buildTouch(1); lastReady = ''; } goFull(); }
   audio();
 }
 function endPlay() { document.body.classList.remove('playing'); $('#hudBtns').classList.remove('on'); $('#touch').className = ''; TOUCH.clear(); G.paused = false; }
@@ -1685,7 +1684,6 @@ $('#cropOk').onclick = () => {
 
 /* ---------- menú, pausa, fin, en línea ---------- */
 $('#mCpu').onclick = () => { audio(); openSelect('cpu'); };
-$('#mLocal').onclick = () => { audio(); openSelect('local'); };
 $('#mBots').onclick = () => { audio(); openSelect('bots'); };
 $('#mOnline').onclick = () => { audio(); openOnline(); };
 $('#mHelp').onclick = () => $('#scrHelp').classList.add('on');
@@ -1718,7 +1716,7 @@ $('#eAgain').onclick = () => {
 };
 $('#eSelect').onclick = () => { if (G.setup.mode === 'host') netSend({ t: 'sel' }); openSelect(G.setup.mode); };
 $('#eQuit').onclick = goMenu;
-document.addEventListener('visibilitychange', () => { if (document.hidden && (G.mode === 'cpu' || G.mode === 'local') && G.phase !== 'over' && !G.paused) togglePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && (G.mode === 'cpu' || G.mode === 'bots') && G.phase !== 'over' && !G.paused) togglePause(); });
 
 /* instalar como app */
 let installPrompt = null;
