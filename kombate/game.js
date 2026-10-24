@@ -135,7 +135,8 @@ const IMG = new Map();
 function faceImg(url, onload) {
   if (!url) return null;
   let im = IMG.get(url);
-  if (!im) { im = new Image(); im.src = url; IMG.set(url, im); }
+  // las caras nuevas vienen recortadas (PNG/WebP con transparencia); las viejas son JPG cuadradas
+  if (!im) { im = new Image(); im.src = url; im.cut = /^data:image\/(png|webp)/.test(url); IMG.set(url, im); }
   if (onload && !im.complete) im.addEventListener('load', onload, { once: true });
   return im;
 }
@@ -160,9 +161,10 @@ function faceArt(img, yaw) {
   for (let i = 0; i < N; i++) {
     const u0 = -1 + 2 * i / N, p0 = Math.asin(u0) + th, p1 = Math.asin(Math.min(1, u0 + 2 / N)) + th, mid = Math.cos((p0 + p1) / 2);
     if (mid < .08) continue;
-    const d0 = first ? 0 : (Math.sin(p0) + 1) / 2 * S, d1 = (Math.sin(p1) + 1) / 2 * S; first = false;
+    const d0 = first && !img.cut ? 0 : (Math.sin(p0) + 1) / 2 * S, d1 = (Math.sin(p1) + 1) / 2 * S; first = false;
     x.drawImage(img, (u0 + 1) / 2 * iw, 0, iw / N + .5, ih, d0, 0, d1 - d0 + .8, S);
-    const sh = (1 - mid) * .45; if (sh > .02) { x.fillStyle = `rgba(0,0,0,${sh})`; x.fillRect(d0, 0, d1 - d0 + .8, S); }
+    // la sombra solo sobre la foto (en las caras recortadas no pinta el fondo transparente)
+    const sh = (1 - mid) * .45; if (sh > .02) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = `rgba(0,0,0,${sh})`; x.fillRect(d0, 0, d1 - d0 + .8, S); x.globalCompositeOperation = 'source-over'; }
   }
   ART.set(key, c); return c;
 }
@@ -278,7 +280,38 @@ const WOUND = {
   }
 };
 // dir = 1 mira a la derecha, -1 a la izquierda; hf = { wounds, hurt, wt } para dibujar las heridas
+// cabeza recortada: el borde del color del jugador sigue la silueta del pelo y la cara
+const OUTL = new Map(), CUTK = 1.22, PAD = 10;
+function outlined(art, key, ring) {
+  const k = key + '|' + ring; let o = OUTL.get(k); if (o) return o;
+  const S = art.width, T = S + PAD * 2; o = mkCanvas(T, T); const x = o.getContext('2d');
+  for (let a = 0; a < 16; a++) x.drawImage(art, PAD + Math.cos(a * Math.PI / 8) * 5, PAD + Math.sin(a * Math.PI / 8) * 5, S, S);
+  x.globalCompositeOperation = 'source-in'; x.fillStyle = ring; x.fillRect(0, 0, T, T);
+  x.globalCompositeOperation = 'source-over'; x.drawImage(art, PAD, PAD, S, S);
+  if (OUTL.size > 40) OUTL.clear();
+  OUTL.set(k, o); return o;
+}
+const WOFF = mkCanvas(160, 160), WX = WOFF.getContext('2d');
+function drawCutFace(c, img, R, ring, flash, dir, yaw, hf) {
+  const art = faceArt(img, yaw), th = .4 * (1 - clamp((yaw || 0) / .45, 0, 1)), Rk = R * CUTK;
+  c.save(); if (dir < 0) c.scale(-1, 1);
+  const o = outlined(art, img.src + '|' + th.toFixed(2), ring), ext = Rk * (1 + 2 * PAD / art.width);
+  c.drawImage(o, -ext, -ext, ext * 2, ext * 2);
+  // heridas y el rojo del golpe, recortados con la misma silueta
+  const wounds = hf && hf.wounds && (hf.hurt > 0 || hf.cry);
+  if (wounds || flash > 0) {
+    WX.setTransform(1, 0, 0, 1, 0, 0); WX.globalCompositeOperation = 'source-over'; WX.globalAlpha = 1; WX.clearRect(0, 0, 160, 160);
+    WX.save(); WX.translate(80, 80);
+    if (wounds) drawWounds(WX, 80, hf, th);
+    WX.restore();
+    if (flash > 0) { WX.fillStyle = `rgba(255,40,30,${Math.min(1, flash / 10) * .5})`; WX.fillRect(0, 0, 160, 160); }
+    WX.globalCompositeOperation = 'destination-in'; WX.drawImage(art, 0, 0, 160, 160); WX.globalCompositeOperation = 'source-over';
+    c.drawImage(WOFF, -Rk, -Rk, Rk * 2, Rk * 2);
+  }
+  c.restore();
+}
 function drawFace(c, img, R, ring, flash, dir = 1, yaw = 0, hf = null) {
+  if (img && img.cut && img.complete && img.naturalWidth) return drawCutFace(c, img, R, ring, flash, dir, yaw, hf);
   c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2);
   c.fillStyle = '#d9a27c'; c.fill();
   c.save(); if (dir < 0) c.scale(-1, 1);
@@ -1573,11 +1606,26 @@ function setCropSrc(c) {
 
 /* detector de caras (MediaPipe, se baja solo la primera vez que se arma una cara) */
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
-let FD = null;
+let FD = null, FSEG = null, VIS = null;
+function visionLib() {
+  if (!VIS) VIS = (async () => { const m = await import(MP + '/vision_bundle.mjs'); return { m, files: await m.FilesetResolver.forVisionTasks(MP + '/wasm') }; })().catch(e => { VIS = null; throw e; });
+  return VIS;
+}
+// separa a la persona (pelo y cara) del fondo
+function loadSegmenter() {
+  if (!FSEG) FSEG = (async () => {
+    const { m, files } = await visionLib();
+    return m.ImageSegmenter.createFromOptions(files, {
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite', delegate: 'CPU' },
+      runningMode: 'IMAGE', outputConfidenceMasks: true, outputCategoryMask: false
+    });
+  })().catch(e => { FSEG = null; throw e; });
+  return FSEG;
+}
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error('tiempo')), ms))]);
 function loadDetector() {
   if (!FD) FD = (async () => {
-    const m = await import(MP + '/vision_bundle.mjs');
-    const files = await m.FilesetResolver.forVisionTasks(MP + '/wasm');
+    const { m, files } = await visionLib();
     return m.FaceDetector.createFromOptions(files, {
       baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite', delegate: 'CPU' },
       runningMode: 'IMAGE', minDetectionConfidence: .45
@@ -1664,14 +1712,49 @@ function drawCrop() {
 $('#cropZoom').oninput = e => { setZoom(+e.target.value); cropMoved(); };
 $('#cropRot').onclick = () => { const s = CR.src, c = mkCanvas(s.height, s.width), x = c.getContext('2d'); x.translate(c.width, 0); x.rotate(Math.PI / 2); x.drawImage(s, 0, 0); setCropSrc(c); };
 $('#cropCancel').onclick = () => { CR.gen++; $('#crop').classList.remove('on'); };
-$('#cropOk').onclick = () => {
-  CR.gen++;
-  const out = mkCanvas(160, 160), x = out.getContext('2d'), k = 160 / 240, s = cropS();
-  x.fillStyle = '#d9a27c'; x.fillRect(0, 0, 160, 160);
+/* Recorta la cabeza: la persona (pelo y cara) según el recortador de MediaPipe, cortada a la altura
+   del mentón y a los costados según dónde está la cara. Sin recortador queda una forma de huevo. */
+async function cutFace() {
+  const S = 256, s = cropS(), k = S / 240, src = mkCanvas(S, S), x = src.getContext('2d');
+  x.fillStyle = '#d9a27c'; x.fillRect(0, 0, S, S);
   // se guarda siempre mirando a la derecha; en la pelea se da vuelta para mirar al rival
-  if (CR.dir < 0) { x.translate(160, 0); x.scale(-1, 1); }
+  if (CR.dir < 0) { x.translate(S, 0); x.scale(-1, 1); }
   x.drawImage(CR.src, (CR.ox - 30) * k, (CR.oy - 30) * k, CR.src.width * s * k, CR.src.height * s * k);
-  const url = out.toDataURL('image/jpeg', .85);
+  let bb = null, mask = null, mw = 0, mh = 0;
+  try { const det = await withTimeout(loadDetector(), 8000); const ds = det.detect(src).detections || []; if (ds[0]) bb = ds.sort((a, b) => b.boundingBox.width - a.boundingBox.width)[0].boundingBox; } catch (e) { }
+  try {
+    const seg = await withTimeout(loadSegmenter(), 8000), r = seg.segment(src), ms = r.confidenceMasks || [];
+    const m = ms[ms.length - 1]; if (m) { mask = m.getAsFloat32Array().slice(); mw = m.width; mh = m.height; }
+    if (r.close) r.close();
+    if (mask) { // algunos modelos dan la probabilidad del fondo: si el centro sale "fondo", se da vuelta
+      const at = (u, v) => mask[Math.min(mh - 1, v * mh | 0) * mw + Math.min(mw - 1, u * mw | 0)];
+      if (at(.5, .5) < (at(.03, .03) + at(.97, .03)) / 2) for (let i = 0; i < mask.length; i++) mask[i] = 1 - mask[i];
+    }
+  } catch (e) { mask = null; }
+  const O = 160, f = O / S, out = mkCanvas(O, O), ox = out.getContext('2d');
+  ox.drawImage(src, 0, 0, O, O);
+  const cx = bb ? (bb.originX + bb.width / 2) * f : 80, bw = bb ? bb.width * f : 84;
+  const top = bb ? bb.originY * f : 44, chin = bb ? Math.min(O - 2, (bb.originY + bb.height * 1.1) * f) : 132, cy = top + (chin - top) * .45;
+  const id = ox.getImageData(0, 0, O, O), px = id.data;
+  for (let y = 0; y < O; y++) for (let xx = 0; xx < O; xx++) {
+    const dx = Math.abs(xx - cx);
+    let hw;
+    if (y >= cy) { const t = (y - cy) / (chin - cy + 6); hw = t >= 1 ? 0 : bw * .62 * Math.sqrt(1 - t * t); } // mentón redondeado
+    else if (mask) { const t = (cy - y) / (cy - top + bw * .9); hw = bw * 1.05 * Math.sqrt(Math.max(0, 1 - t * t)); } // arriba manda el recortador (el pelo)
+    else { const t = (cy - y) / ((cy - top) * 1.9); hw = t >= 1 ? 0 : bw * .64 * Math.sqrt(1 - t * t); }
+    let a = clamp((hw - dx) / 4, 0, 1);
+    if (a > 0 && mask) a *= clamp((mask[Math.min(mh - 1, y / O * mh | 0) * mw + Math.min(mw - 1, xx / O * mw | 0)] - .3) / .35, 0, 1);
+    px[(y * O + xx) * 4 + 3] = Math.round(a * 255);
+  }
+  ox.putImageData(id, 0, 0);
+  const webp = out.toDataURL('image/webp', .9);
+  return webp.startsWith('data:image/webp') ? webp : out.toDataURL('image/png');
+}
+$('#cropOk').onclick = async () => {
+  const btn = $('#cropOk'); if (btn.disabled) return;
+  CR.gen++; btn.disabled = true; const label = btn.textContent; btn.textContent = '✂️ Recortando…'; cropInfo('✂️ Sacando el fondo de la cara…');
+  let url;
+  try { url = await cutFace(); } finally { btn.disabled = false; btn.textContent = label; }
   YAW[faceKey(url)] = CR.dir ? Math.max(.25, CR.yaw) : 0;
   for (const k2 in YAW) if (!FACES.some(u => faceKey(u) === k2) && k2 !== faceKey(url)) delete YAW[k2];
   store.set('kdc_yaw', YAW);
