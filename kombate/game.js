@@ -611,11 +611,11 @@ function placeFighter(f) {
 function setSt(f, st) { if (f.st !== st) { f.st = st; f.sf = 0; } }
 
 function startMatch(setup) {
-  G.setup = setup; G.mode = setup.mode; G.stage = setup.stage; G.lvl = setup.lvl || 'normal';
+  G.setup = setup; G.mode = setup.mode; G.stage = setup.stage; G.lvl = setup.lvl || 'normal'; G.lvls = setup.lvls || null;
   G.f = [mkFighter(0, setup.sel[0]), mkFighter(1, setup.sel[1])];
   const mine = [S_KB1, S_KB2, S_T[0], S_PAD[0], S_PAD[1]];
   G.src = {
-    demo: [[S_CPU[0]], [S_CPU[1]]], cpu: [mine, [S_CPU[1]]], local: [[S_KB1, S_T[0], S_PAD[0]], [S_KB2, S_T[1], S_PAD[1]]],
+    demo: [[S_CPU[0]], [S_CPU[1]]], bots: [[S_CPU[0]], [S_CPU[1]]], cpu: [mine, [S_CPU[1]]], local: [[S_KB1, S_T[0], S_PAD[0]], [S_KB2, S_T[1], S_PAD[1]]],
     host: [mine, [S_NET]], guest: [[], []]
   }[G.mode];
   for (const S of [S_KB1, S_KB2, ...S_T, ...S_PAD, ...S_CPU, S_NET]) for (const k in S.t) S.t[k] = 0;
@@ -926,7 +926,7 @@ function step() {
   phaseStep();
   if (G.phase === 'over' && G.mode !== 'demo') { G.f.forEach(poseStep); return; }
   const live = G.phase === 'fight';
-  G.f.forEach((f, i) => { if (G.src[i][0] === S_CPU[i] && live) cpuThink(f, G.f[1 - i], S_CPU[i], G.mode === 'demo' ? 'normal' : G.lvl); });
+  G.f.forEach((f, i) => { if (G.src[i][0] === S_CPU[i] && live) cpuThink(f, G.f[1 - i], S_CPU[i], G.mode === 'demo' ? 'normal' : G.lvls ? G.lvls[i] : G.lvl); });
   const ins = G.f.map((f, i) => { const r = readSources(G.src[i]); return live ? r : EMPTY; });
   G.f.forEach((f, i) => fighterStep(f, G.f[1 - i], ins[i]));
   combat(); separate(); bounds();
@@ -1234,8 +1234,12 @@ let SEL = store.get('kdc_sel', null);
 if (!Array.isArray(SEL) || SEL.length !== 2) SEL = [{ name: 'Jugador 1', ch: 'toro', face: null }, { name: 'Jugador 2', ch: 'rayo', face: null }];
 let FACES = store.get('kdc_caras', []);
 let STAGE_SEL = store.get('kdc_stage', -1), LVL = store.get('kdc_lvl', 'normal');
+// los dos bots del modo "Bots peleando" tienen sus propias caras, nombres y dificultad
+let BOTS = store.get('kdc_bots', null);
+if (!Array.isArray(BOTS) || BOTS.length !== 2) BOTS = [{ name: 'Bot 1', ch: 'sombra', face: null, lvl: 'normal' }, { name: 'Bot 2', ch: 'tanque', face: null, lvl: 'normal' }];
+let SCORE = [0, 0]; // peleas ganadas por cada bot desde que se eligieron
 let selMode = null;
-function saveSel() { if (!store.set('kdc_sel', SEL)) toast('No hay espacio para guardar más caras en este aparato.'); }
+function saveSel() { if (!store.set('kdc_sel', SEL) || !store.set('kdc_bots', BOTS)) toast('No hay espacio para guardar más caras en este aparato.'); }
 const playing = () => G.mode !== 'demo' && G.phase !== 'over';
 function showScreen(id) { document.querySelectorAll('.scr').forEach(s => s.classList.toggle('on', s.id === id)); }
 function hideScreens() { document.querySelectorAll('.scr').forEach(s => s.classList.remove('on')); }
@@ -1244,7 +1248,8 @@ function beginPlay() {
   document.body.classList.add('playing');
   $('#hudBtns').classList.add('on');
   $('#btnPause').textContent = G.mode === 'host' || G.mode === 'guest' ? '✕' : '⏸';
-  if (isTouch()) { buildTouch(G.mode === 'local' ? 2 : 1); lastReady = ''; goFull(); } else $('#touch').className = '';
+  if (!isTouch()) $('#touch').className = '';
+  else { if (G.mode === 'bots') $('#touch').className = ''; else { buildTouch(G.mode === 'local' ? 2 : 1); lastReady = ''; } goFull(); }
   audio();
 }
 function endPlay() { document.body.classList.remove('playing'); $('#hudBtns').classList.remove('on'); $('#touch').className = ''; TOUCH.clear(); G.paused = false; }
@@ -1275,6 +1280,10 @@ function showEnd() {
   $('#eFace').textContent = w && w.faceUrl ? '' : w ? '🏆' : '🤝';
   $('#eTitle').textContent = w ? '¡' + w.name + ' ganó!' : '¡Empate!';
   $('#eSub').textContent = `${a.name} ${a.wins} – ${b.wins} ${b.name}`;
+  if (G.mode === 'bots') {
+    if (w) SCORE[w.i]++;
+    $('#eSub').textContent += ` (rondas) · Peleas ganadas: ${a.name} ${SCORE[0]} – ${SCORE[1]} ${b.name}`;
+  }
   const guest = G.mode === 'guest';
   $('#eAgain').style.display = $('#eSelect').style.display = guest ? 'none' : '';
   if (guest) $('#eSub').textContent += ' · Esperando que el anfitrión elija la revancha…';
@@ -1282,10 +1291,10 @@ function showEnd() {
 }
 
 /* ---------- selección de peleadores ---------- */
-function panelData() { return selMode === 'host' ? [SEL[0], NET.rsel] : selMode === 'guest' ? [NET.rsel, SEL[0]] : [SEL[0], SEL[1]]; }
+function panelData() { return selMode === 'host' ? [SEL[0], NET.rsel] : selMode === 'guest' ? [NET.rsel, SEL[0]] : selMode === 'bots' ? BOTS : [SEL[0], SEL[1]]; }
 const editable = i => selMode === 'host' ? i === 0 : selMode === 'guest' ? i === 1 : true;
 function openSelect(mode) {
-  selMode = mode; endPlay();
+  selMode = mode; endPlay(); SCORE = [0, 0];
   if (G.mode !== 'demo') startDemo();
   showScreen('scrSelect'); renderSelect();
 }
@@ -1297,19 +1306,20 @@ function drawPreview(cv2, key, face, i, yaw) {
 }
 function renderSelect() {
   const D = panelData(), box = $('#players');
-  $('#sTitle').textContent = { cpu: 'Vos contra la máquina', local: 'Dos jugadores', host: 'En línea · sos el anfitrión', guest: 'En línea · sala ' + NET.code }[selMode] || 'Elegí tu peleador';
+  $('#sTitle').textContent = { cpu: 'Vos contra la máquina', local: 'Dos jugadores', bots: 'Bots peleando · vos mirás', host: 'En línea · sos el anfitrión', guest: 'En línea · sala ' + NET.code }[selMode] || 'Elegí tu peleador';
   box.innerHTML = '';
   D.forEach((d, i) => {
     const el = document.createElement('div'); el.className = 'pl p' + (i + 1) + (editable(i) ? '' : ' ro'); box.appendChild(el);
     if (!d) { el.innerHTML = '<div class="wait" style="padding:30px;text-align:center">Esperando a tu amigo…</div>'; return; }
-    const who = selMode === 'cpu' && i === 1 ? 'Máquina 🤖 (ponele la cara que quieras)' : (selMode === 'host' || selMode === 'guest') ? (editable(i) ? 'Vos' : 'Tu amigo') : 'Jugador ' + (i + 1);
+    const who = selMode === 'cpu' && i === 1 ? 'Máquina 🤖 (ponele la cara que quieras)' : selMode === 'bots' ? 'Bot ' + (i + 1) + ' 🤖' : (selMode === 'host' || selMode === 'guest') ? (editable(i) ? 'Vos' : 'Tu amigo') : 'Jugador ' + (i + 1);
     const ed = editable(i);
     el.innerHTML = `<div class="plHead"><div class="faceBig ${d.face ? '' : 'empty'}" ${d.face ? `style="background-image:url(${d.face})"` : ''}></div>
       <div class="plInfo"><div class="who">${esc(who)}</div><input maxlength="12" value="${esc(d.name)}" placeholder="Nombre" ${ed ? '' : 'readonly'}>
       ${ed ? '<div class="row camBtns"><button class="sm" data-a="cam">📷 Foto</button><button class="sm" data-a="gal">🖼️ Galería</button></div>' : ''}</div></div>
       ${ed ? `<div class="faces">${[`<button class="fc none ${d.face ? '' : 'on'}" data-f="-1" title="Sin foto">🙂</button>`, ...FACES.map((u, k) => `<button class="fc ${u === d.face ? 'on' : ''}" data-f="${k}" style="background-image:url(${u})"><i data-del="${k}">✕</i></button>`)].join('')}</div>` : ''}
       <div class="chars">${CH_KEYS.map(k => `<button class="chr ${d.ch === k ? 'on' : ''}" data-ch="${k}"><canvas width="180" height="220"></canvas><b>${CHARS[k].name}</b></button>`).join('')}</div>
-      <div class="chDesc">${esc(CHARS[d.ch] ? CHARS[d.ch].desc : '')}</div>`;
+      <div class="chDesc">${esc(CHARS[d.ch] ? CHARS[d.ch].desc : '')}</div>
+      ${selMode === 'bots' ? `<div class="row" style="align-items:center;margin-top:6px"><span style="font-size:13px;font-weight:800">Nivel:</span>${LVLS.map(([k, t]) => `<button class="sm ${(d.lvl || 'normal') === k ? 'on' : ''}" data-bl="${k}">${t}</button>`).join('')}</div>` : ''}`;
     el.querySelectorAll('.chr').forEach(b => drawPreview(b.querySelector('canvas'), b.dataset.ch, d.face, i, d.yaw ?? yawOf(d.face)));
     if (!ed) return;
     const changed = () => { saveSel(); if (NET.role) helloSoon(); };
@@ -1321,13 +1331,14 @@ function renderSelect() {
       const del = e.target.dataset.del;
       if (del != null) {
         const u = FACES[+del]; if (!confirm('¿Borrar esta cara guardada?')) return;
-        FACES.splice(+del, 1); store.set('kdc_caras', FACES); for (const s of SEL) if (s.face === u) s.face = null;
+        FACES.splice(+del, 1); store.set('kdc_caras', FACES); for (const s of [...SEL, ...BOTS]) if (s.face === u) s.face = null;
       } else { const k = +b.dataset.f; d.face = k < 0 ? null : FACES[k]; }
       changed(); renderSelect();
     });
     el.querySelectorAll('.chr').forEach(b => b.onclick = () => { d.ch = b.dataset.ch; changed(); renderSelect(); });
+    el.querySelectorAll('[data-bl]').forEach(b => b.onclick = () => { d.lvl = b.dataset.bl; changed(); renderSelect(); });
   });
-  $('#extra').innerHTML = selMode === 'cpu' ? `<div class="secT">Dificultad de la máquina</div><div class="row">${[['facil', '😌 Fácil'], ['normal', '😠 Normal'], ['dificil', '😈 Difícil']].map(([k, t]) => `<button class="sm ${LVL === k ? 'on' : ''}" data-l="${k}">${t}</button>`).join('')}</div>` : '';
+  $('#extra').innerHTML = selMode === 'cpu' ? `<div class="secT">Dificultad de la máquina</div><div class="row">${LVLS.map(([k, t]) => `<button class="sm ${LVL === k ? 'on' : ''}" data-l="${k}">${t}</button>`).join('')}</div>` : '';
   $('#extra').querySelectorAll('[data-l]').forEach(b => b.onclick = () => { LVL = b.dataset.l; store.set('kdc_lvl', LVL); renderSelect(); });
   const guest = selMode === 'guest';
   $('#stgT').style.display = $('#stages').style.display = guest ? 'none' : '';
@@ -1358,8 +1369,10 @@ $('#sGo').onclick = () => {
   if (selMode === 'host') {
     if (!NET.rsel) return;
     netSend({ t: 'start', stage: st }); startMatch({ mode: 'host', sel: [SEL[0], NET.rsel], stage: st });
-  } else startMatch({ mode: selMode, sel: [SEL[0], SEL[1]], stage: st, lvl: LVL });
+  } else if (selMode === 'bots') startMatch({ mode: 'bots', sel: BOTS, stage: st, lvls: BOTS.map(b => b.lvl || 'normal') });
+  else startMatch({ mode: selMode, sel: [SEL[0], SEL[1]], stage: st, lvl: LVL });
 };
+const LVLS = [['facil', '😌 Fácil'], ['normal', '😠 Normal'], ['dificil', '😈 Difícil']];
 
 /* ---------- fotos: cámara, galería y recorte ---------- */
 let photoSlot = 0, camStream = null, camFacing = 'user';
@@ -1519,6 +1532,7 @@ $('#cropOk').onclick = () => {
 /* ---------- menú, pausa, fin, en línea ---------- */
 $('#mCpu').onclick = () => { audio(); openSelect('cpu'); };
 $('#mLocal').onclick = () => { audio(); openSelect('local'); };
+$('#mBots').onclick = () => { audio(); openSelect('bots'); };
 $('#mOnline').onclick = () => { audio(); openOnline(); };
 $('#mHelp').onclick = () => $('#scrHelp').classList.add('on');
 $('#mFull').onclick = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); else goFull(); };
