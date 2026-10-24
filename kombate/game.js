@@ -139,11 +139,40 @@ function faceImg(url, onload) {
   if (onload && !im.complete) im.addEventListener('load', onload, { once: true });
   return im;
 }
-function drawFace(c, img, R, ring, flash) {
+/* Las caras se guardan mirando a la derecha (o de frente). "yaw" dice cuánto está de perfil:
+   0 = de frente, 1 = de perfil. Se guarda aparte, por un código corto sacado de la imagen. */
+let YAW = store.get('kdc_yaw', {});
+const KEYS = new Map();
+function faceKey(url) {
+  let k = KEYS.get(url); if (k) return k;
+  let h = 5381; for (let i = 0; i < url.length; i += 7) h = (h * 33 + url.charCodeAt(i)) | 0;
+  k = (h >>> 0).toString(36) + url.length.toString(36); KEYS.set(url, k); return k;
+}
+const yawOf = url => url ? (YAW[faceKey(url)] || 0) : 0;
+// Pega la foto sobre una "pelota" girada hacia la derecha: así una cara de frente parece mirar al rival.
+const ART = new Map();
+function faceArt(img, yaw) {
+  const th = .4 * (1 - clamp((yaw || 0) / .45, 0, 1));
+  if (th < .03) return img;
+  const key = img.src + '|' + th.toFixed(2); let c = ART.get(key); if (c) return c;
+  const S = 160, N = 40, iw = img.naturalWidth, ih = img.naturalHeight, x = (c = mkCanvas(S, S)).getContext('2d');
+  let first = true;
+  for (let i = 0; i < N; i++) {
+    const u0 = -1 + 2 * i / N, p0 = Math.asin(u0) + th, p1 = Math.asin(Math.min(1, u0 + 2 / N)) + th, mid = Math.cos((p0 + p1) / 2);
+    if (mid < .08) continue;
+    const d0 = first ? 0 : (Math.sin(p0) + 1) / 2 * S, d1 = (Math.sin(p1) + 1) / 2 * S; first = false;
+    x.drawImage(img, (u0 + 1) / 2 * iw, 0, iw / N + .5, ih, d0, 0, d1 - d0 + .8, S);
+    const sh = (1 - mid) * .45; if (sh > .02) { x.fillStyle = `rgba(0,0,0,${sh})`; x.fillRect(d0, 0, d1 - d0 + .8, S); }
+  }
+  ART.set(key, c); return c;
+}
+// dir = 1 mira a la derecha, -1 a la izquierda
+function drawFace(c, img, R, ring, flash, dir = 1, yaw = 0) {
   c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2);
   c.fillStyle = '#d9a27c'; c.fill();
+  c.save(); if (dir < 0) c.scale(-1, 1);
   if (img && img.complete && img.naturalWidth) {
-    c.save(); c.clip(); c.drawImage(img, -R, -R, R * 2, R * 2); c.restore();
+    c.clip(); c.drawImage(faceArt(img, yaw), -R, -R, R * 2, R * 2);
   } else {
     // cara de muñeco cuando no hay foto
     c.fillStyle = '#fff';
@@ -154,6 +183,7 @@ function drawFace(c, img, R, ring, flash) {
     c.beginPath(); c.moveTo(-R * .6, -R * .5); c.lineTo(-R * .15, -R * .36); c.moveTo(R * .6, -R * .5); c.lineTo(R * .15, -R * .36);
     c.moveTo(-R * .3, R * .45); c.quadraticCurveTo(0, R * .3, R * .3, R * .45); c.stroke();
   }
+  c.restore();
   if (flash > 0) { c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.fillStyle = `rgba(255,40,30,${Math.min(1, flash / 10) * .5})`; c.fill(); }
   c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2);
   c.lineWidth = Math.max(3, R * .13); c.strokeStyle = ring; c.stroke();
@@ -440,11 +470,11 @@ function pollPads() {
   }
 }
 
-/* controles táctiles: cruz de 8 direcciones + 4 botones */
+/* controles táctiles: joystick (aparece donde apoyás el dedo y lo sigue) + 4 botones */
 const TOUCH = new Map();
 function buildTouch(n) {
   const el = $('#touch');
-  const dpad = pi => `<div class="dpad" data-pi="${pi}"><div></div><div data-d="u">▲</div><div></div><div data-d="l">◀</div><div></div><div data-d="r">▶</div><div></div><div data-d="d">▼</div><div></div></div>`;
+  const dpad = pi => `<div class="joy" data-pi="${pi}"><div class="jbase"><div class="jknob"></div></div></div>`;
   const btns = pi => `<div class="btns" data-pi="${pi}"><div class="bj" data-b="u">⤒</div><div class="bs" data-b="s">⚡</div><div class="bp" data-b="p">👊</div><div class="bk" data-b="k">🦶</div></div>`;
   el.innerHTML = n === 2
     ? `<div class="pad left">${dpad(0)}${btns(0)}</div><div class="pad right">${btns(1)}${dpad(1)}</div>`
@@ -457,23 +487,30 @@ function onTouch(e) {
   for (const t of e.changedTouches) {
     if (e.type === 'touchstart') {
       const hit = document.elementFromPoint(t.clientX, t.clientY);
-      const dp = hit && hit.closest('.dpad'), bt = hit && hit.closest('.btns');
-      if (dp) TOUCH.set(t.identifier, { d: true, pi: +dp.dataset.pi, el: dp });
-      else if (bt) TOUCH.set(t.identifier, { d: false, pi: +bt.dataset.pi });
-    } else if (e.type === 'touchend' || e.type === 'touchcancel') TOUCH.delete(t.identifier);
+      const jo = hit && hit.closest('.joy'), bt = hit && hit.closest('.btns');
+      if (jo && ![...TOUCH.values()].some(m => m.joy === jo)) {
+        // la base aparece debajo del dedo
+        const zr = jo.getBoundingClientRect(), base = jo.querySelector('.jbase'), R = base.offsetWidth / 2;
+        const m = { joy: jo, pi: +jo.dataset.pi, base, knob: base.firstChild, zr, R, cx: clamp(t.clientX, zr.left + R * .5, zr.right - R * .5), cy: clamp(t.clientY, zr.top + R * .5, zr.bottom - R * .5) };
+        TOUCH.set(t.identifier, m); jo.classList.add('on'); joyPlace(m, 0, 0);
+      } else if (bt) TOUCH.set(t.identifier, { joy: null, pi: +bt.dataset.pi });
+    } else if (e.type === 'touchend' || e.type === 'touchcancel') {
+      const m = TOUCH.get(t.identifier);
+      if (m && m.joy) { m.joy.classList.remove('on'); m.base.style.left = m.base.style.top = ''; m.knob.style.transform = ''; }
+      TOUCH.delete(t.identifier);
+    }
   }
   const hs = [{}, {}];
   for (const t of e.touches) {
     const m = TOUCH.get(t.identifier); if (!m) continue;
-    if (m.d) {
-      const r = m.el.getBoundingClientRect(), dx = t.clientX - (r.left + r.width / 2), dy = t.clientY - (r.top + r.height / 2);
-      if (Math.hypot(dx, dy) < r.width * .12) continue;
-      const o = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); // 0=der, 2=abajo, -2=arriba, ±4=izq
+    if (m.joy) {
+      let dx = t.clientX - m.cx, dy = t.clientY - m.cy; const R = m.R, d = Math.hypot(dx, dy), far = R * 1.35;
+      // si el dedo se va muy lejos, la base lo persigue
+      if (d > far) { const k = (d - far) / d; m.cx += dx * k; m.cy += dy * k; dx = t.clientX - m.cx; dy = t.clientY - m.cy; }
+      joyPlace(m, dx, dy);
       const H8 = hs[m.pi];
-      if (o === 0 || o === 1 || o === -1) H8.r = 1;
-      if (o === 4 || o === -4 || o === 3 || o === -3) H8.l = 1;
-      if (o === 1 || o === 2 || o === 3) H8.d = 1;
-      if (o === -1 || o === -2 || o === -3) H8.u = 1;
+      if (dx > R * .3) H8.r = 1; else if (dx < -R * .3) H8.l = 1;
+      if (dy < -R * .55) H8.u = 1; else if (dy > R * .45) H8.d = 1;
     } else {
       const hit = document.elementFromPoint(t.clientX, t.clientY), b = hit && hit.closest('[data-b]');
       if (b && +b.parentElement.dataset.pi === m.pi) hs[m.pi][b.dataset.b] = 1;
@@ -483,8 +520,13 @@ function onTouch(e) {
     const S = S_T[pi];
     for (const k in S.h) { const v = hs[pi][k] ? 1 : 0; if (v && !S.h[k] && k in S.t) S.t[k]++; S.h[k] = v; }
   }
-  el.querySelectorAll('[data-d],[data-b]').forEach(n => { const pi = +n.parentElement.dataset.pi, k = n.dataset.d || n.dataset.b; n.classList.toggle('on', !!S_T[pi].h[k]); });
+  el.querySelectorAll('[data-b]').forEach(n => { const pi = +n.parentElement.dataset.pi; n.classList.toggle('on', !!S_T[pi].h[n.dataset.b]); });
   if (TOUCH.size || e.type === 'touchstart' && e.target.closest && e.target.closest('#touch .pad')) e.preventDefault();
+}
+function joyPlace(m, dx, dy) {
+  m.base.style.left = (m.cx - m.zr.left) + 'px'; m.base.style.top = (m.cy - m.zr.top) + 'px';
+  const d = Math.hypot(dx, dy), max = m.R * .7, k = d > max ? max / d : 1;
+  m.knob.style.transform = `translate(${dx * k}px,${dy * k}px)`;
 }
 for (const ev of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) document.addEventListener(ev, onTouch, { passive: false });
 
@@ -555,7 +597,7 @@ const P_TUCK = { t: .1, a1: 1.0, a2: 2.4, b1: .3, b2: 1.9, l1: 1.45, l2: -.1, m1
 
 function mkFighter(i, sel) {
   const ch = CHARS[sel.ch] || CHARS.toro;
-  const f = { i, ch, key: sel.ch, name: (sel.name || '').trim() || ('Jugador ' + (i + 1)), faceUrl: sel.face || null, img: faceImg(sel.face), wins: 0, maxHp: ch.hp, en: 0 };
+  const f = { i, ch, key: sel.ch, name: (sel.name || '').trim() || ('Jugador ' + (i + 1)), faceUrl: sel.face || null, img: faceImg(sel.face), yaw: sel.yaw ?? yawOf(sel.face), wins: 0, maxHp: ch.hp, en: 0 };
   placeFighter(f); return f;
 }
 function placeFighter(f) {
@@ -954,7 +996,7 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   limb(nx, ny + 4, lerp(nx, hcx, .5), lerp(ny, hcy, .5), lw * .9, C.neck);
   c.save(); c.translate(hcx, hcy); c.scale(f.face, 1); c.rotate(f.face * P.t * .45);
   if (f.flash > 0) { const q = Math.sin(f.flash * 1.3) * .12; c.scale(1 + q, 1 - q); }
-  drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash);
+  drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, f.face, f.yaw);
   c.restore();
   // brazo de adelante
   limb(shx, shy, fex, fey, lw, C.arm); limb(fex, fey, fhx, fhy, lw * .92, C.arm); ball(fhx, fhy, glove, C.glove);
@@ -1041,7 +1083,7 @@ function drawHUD(c) {
       c.beginPath(); c.arc(sx, sy, 7, 0, 7); c.fillStyle = k < f.wins ? '#ffc83d' : '#00000080'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#fff8'; c.stroke();
     }
     // carita
-    c.save(); c.translate(right ? x + bw + 36 : x - 36, y + 14); drawFace(c, f.img, 27, RING[i], f.flash); c.restore();
+    c.save(); c.translate(right ? x + bw + 36 : x - 36, y + 14); drawFace(c, f.img, 27, RING[i], f.flash, i ? -1 : 1, f.yaw); c.restore();
   });
   // reloj
   c.save(); c.translate(W / 2, y + 12);
@@ -1119,7 +1161,7 @@ function bindConn(c) {
   c.on('close', () => { if (NET.conn === c) netLost(); });
   c.on('error', () => { });
 }
-function sendHello() { const d = SEL[0]; netSend({ t: 'hello', sel: { name: d.name, ch: d.ch, face: d.face }, W }); }
+function sendHello() { const d = SEL[0]; netSend({ t: 'hello', sel: { name: d.name, ch: d.ch, face: d.face, yaw: yawOf(d.face) }, W }); }
 function helloSoon() { clearTimeout(NET.hello); NET.hello = setTimeout(sendHello, 250); }
 function netLost() {
   if (!NET.role) return;
@@ -1247,9 +1289,9 @@ function openSelect(mode) {
   if (G.mode !== 'demo') startDemo();
   showScreen('scrSelect'); renderSelect();
 }
-function drawPreview(cv2, key, face, i) {
+function drawPreview(cv2, key, face, i, yaw) {
   const c = cv2.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv2.width, cv2.height);
-  const f = { ch: CHARS[key], i, face: i === 1 ? -1 : 1, alpha: 1, rot: 0, flash: 0, img: faceImg(face, () => drawPreview(cv2, key, face, i)), pose: { ...P_IDLE }, st: 'idle', sf: 0 };
+  const f = { ch: CHARS[key], i, face: i === 1 ? -1 : 1, yaw, alpha: 1, rot: 0, flash: 0, img: faceImg(face, () => drawPreview(cv2, key, face, i, yaw)), pose: { ...P_IDLE }, st: 'idle', sf: 0 };
   const sc = 0.92 / CHARS[key].b.s;
   drawFighter(c, f, cv2.width / 2 - f.face * 8, cv2.height - 8, sc);
 }
@@ -1268,7 +1310,7 @@ function renderSelect() {
       ${ed ? `<div class="faces">${[`<button class="fc none ${d.face ? '' : 'on'}" data-f="-1" title="Sin foto">🙂</button>`, ...FACES.map((u, k) => `<button class="fc ${u === d.face ? 'on' : ''}" data-f="${k}" style="background-image:url(${u})"><i data-del="${k}">✕</i></button>`)].join('')}</div>` : ''}
       <div class="chars">${CH_KEYS.map(k => `<button class="chr ${d.ch === k ? 'on' : ''}" data-ch="${k}"><canvas width="180" height="220"></canvas><b>${CHARS[k].name}</b></button>`).join('')}</div>
       <div class="chDesc">${esc(CHARS[d.ch] ? CHARS[d.ch].desc : '')}</div>`;
-    el.querySelectorAll('.chr').forEach(b => drawPreview(b.querySelector('canvas'), b.dataset.ch, d.face, i));
+    el.querySelectorAll('.chr').forEach(b => drawPreview(b.querySelector('canvas'), b.dataset.ch, d.face, i, d.yaw ?? yawOf(d.face)));
     if (!ed) return;
     const changed = () => { saveSel(); if (NET.role) helloSoon(); };
     el.querySelector('input').oninput = e => { d.name = e.target.value; changed(); };
@@ -1350,7 +1392,7 @@ $('#camShot').onclick = () => {
   if (camFacing === 'user') { x.translate(c.width, 0); x.scale(-1, 1); }
   x.drawImage(v, 0, 0); closeCam(); openCrop(c);
 };
-const CR = { src: null, base: 1, z: 1, ox: 0, oy: 0, ptr: new Map(), pinch: null };
+const CR = { src: null, base: 1, z: 1, ox: 0, oy: 0, ptr: new Map(), pinch: null, dir: 0, yaw: 0, manual: false, touched: false, found: false, gen: 0, t: 0 };
 function openCrop(img) {
   const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, k = Math.min(1, 1100 / Math.max(w, h));
   const c = mkCanvas(Math.round(w * k), Math.round(h * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
@@ -1358,8 +1400,72 @@ function openCrop(img) {
 }
 function setCropSrc(c) {
   CR.src = c; CR.base = 240 / Math.min(c.width, c.height); CR.z = 1;
-  CR.ox = 150 - c.width * CR.base / 2; CR.oy = 150 - c.height * CR.base / 2; $('#cropZoom').value = 1; drawCrop();
+  CR.ox = 150 - c.width * CR.base / 2; CR.oy = 150 - c.height * CR.base / 2; $('#cropZoom').value = 1;
+  Object.assign(CR, { dir: 0, yaw: 0, manual: false, touched: false, found: false });
+  setDir(0, false); drawCrop(); analyzeFace(true);
 }
+
+/* detector de caras (MediaPipe, se baja solo la primera vez que se arma una cara) */
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+let FD = null;
+function loadDetector() {
+  if (!FD) FD = (async () => {
+    const m = await import(MP + '/vision_bundle.mjs');
+    const files = await m.FilesetResolver.forVisionTasks(MP + '/wasm');
+    return m.FaceDetector.createFromOptions(files, {
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite', delegate: 'CPU' },
+      runningMode: 'IMAGE', minDetectionConfidence: .45
+    });
+  })().catch(e => { FD = null; throw e; });
+  return FD;
+}
+const cropInfo = t => $('#cropInfo').textContent = t;
+// full = analiza la foto entera y centra la cara; si no, solo lo que está dentro del círculo
+async function analyzeFace(full) {
+  const gen = ++CR.gen;
+  if (!CR.found) cropInfo('🔍 Buscando la cara…');
+  let det;
+  try { det = await loadDetector(); } catch (e) { if (gen === CR.gen) cropInfo('Elegí hacia dónde mira la cara 👇'); return; }
+  if (gen !== CR.gen || !$('#crop').classList.contains('on')) return;
+  let img, sx = 1, ox = 0, oy = 0;
+  if (full) {
+    const k = Math.min(1, 640 / Math.max(CR.src.width, CR.src.height));
+    img = mkCanvas(Math.round(CR.src.width * k), Math.round(CR.src.height * k)); img.getContext('2d').drawImage(CR.src, 0, 0, img.width, img.height); sx = 1 / k;
+  } else {
+    // lo que se ve dentro del círculo, en coordenadas de la foto
+    const s = cropS(); img = mkCanvas(240, 240); img.getContext('2d').drawImage(CR.src, CR.ox - 30, CR.oy - 30, CR.src.width * s, CR.src.height * s);
+    sx = 1 / s; ox = (30 - CR.ox) / s; oy = (30 - CR.oy) / s;
+  }
+  let r; try { r = det.detect(img); } catch (e) { return; }
+  const d = (r.detections || []).sort((a, b) => b.boundingBox.width * b.boundingBox.height - a.boundingBox.width * a.boundingBox.height)[0];
+  if (!d) {
+    if (!CR.found) cropInfo(full ? 'No encontré la cara. Acomodala en el círculo 👆 y elegí hacia dónde mira 👇' : 'No encontré la cara: elegí hacia dónde mira 👇');
+    return;
+  }
+  CR.found = true;
+  const kp = d.keypoints, bb = d.boundingBox, W0 = img.width;
+  // nariz comparada con el medio de los ojos: + mira a la derecha, - a la izquierda
+  const eyeMid = (kp[0].x + kp[1].x) / 2 * W0, eyeD = Math.abs(kp[1].x - kp[0].x) * W0;
+  const turn = (kp[2].x * W0 - eyeMid) / Math.max(eyeD, bb.width * .25);
+  if (!CR.manual) {
+    const dir = Math.abs(turn) < .16 ? 0 : Math.sign(turn);
+    CR.yaw = clamp((Math.abs(turn) - .08) / .55, 0, 1); setDir(dir, false);
+  }
+  if (full && !CR.touched) {
+    // centra la cara y la agranda para que llene el círculo
+    const cx = ox + (bb.originX + bb.width / 2) * sx, cy = oy + (bb.originY + bb.height * .42) * sx, bw = bb.width * sx;
+    const s = clamp(150 / bw, CR.base, CR.base * 5); CR.z = s / CR.base; $('#cropZoom').value = CR.z;
+    CR.ox = 150 - cx * s; CR.oy = 150 - cy * s; drawCrop();
+  }
+  cropInfo(['✅ Cara encontrada: mira a la izquierda', '✅ Cara encontrada: está de frente', '✅ Cara encontrada: mira a la derecha'][CR.dir + 1] + '. En la pelea va a mirar a su rival.');
+}
+function setDir(dir, manual) {
+  CR.dir = dir; if (manual) { CR.manual = true; CR.yaw = dir ? .7 : 0; }
+  document.querySelectorAll('#cropDir [data-dir]').forEach(b => b.classList.toggle('on', +b.dataset.dir === dir));
+}
+document.querySelectorAll('#cropDir [data-dir]').forEach(b => b.onclick = () => setDir(+b.dataset.dir, true));
+// cuando el usuario termina de mover la foto, si todavía no se encontró la cara se busca dentro del círculo
+function cropMoved() { CR.touched = true; clearTimeout(CR.t); if (!CR.found && !CR.manual) CR.t = setTimeout(() => analyzeFace(false), 600); }
 const cropS = () => CR.base * CR.z;
 function setZoom(z, cx = 150, cy = 150) {
   const s0 = cropS(); CR.z = clamp(z, 1, 5); const s1 = cropS();
@@ -1385,18 +1491,24 @@ function drawCrop() {
       if (!CR.pinch) CR.pinch = { d, z: CR.z }; else setZoom(CR.pinch.z * d / CR.pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
     }
   });
-  const up = e => { CR.ptr.delete(e.pointerId); CR.pinch = null; };
+  const up = e => { if (CR.ptr.delete(e.pointerId)) cropMoved(); CR.pinch = null; };
   cc.addEventListener('pointerup', up); cc.addEventListener('pointercancel', up);
-  cc.addEventListener('wheel', e => { e.preventDefault(); const p = pos(e); setZoom(CR.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1), p[0], p[1]); }, { passive: false });
+  cc.addEventListener('wheel', e => { e.preventDefault(); const p = pos(e); setZoom(CR.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1), p[0], p[1]); cropMoved(); }, { passive: false });
 }
-$('#cropZoom').oninput = e => setZoom(+e.target.value);
+$('#cropZoom').oninput = e => { setZoom(+e.target.value); cropMoved(); };
 $('#cropRot').onclick = () => { const s = CR.src, c = mkCanvas(s.height, s.width), x = c.getContext('2d'); x.translate(c.width, 0); x.rotate(Math.PI / 2); x.drawImage(s, 0, 0); setCropSrc(c); };
-$('#cropCancel').onclick = () => $('#crop').classList.remove('on');
+$('#cropCancel').onclick = () => { CR.gen++; $('#crop').classList.remove('on'); };
 $('#cropOk').onclick = () => {
+  CR.gen++;
   const out = mkCanvas(160, 160), x = out.getContext('2d'), k = 160 / 240, s = cropS();
   x.fillStyle = '#d9a27c'; x.fillRect(0, 0, 160, 160);
+  // se guarda siempre mirando a la derecha; en la pelea se da vuelta para mirar al rival
+  if (CR.dir < 0) { x.translate(160, 0); x.scale(-1, 1); }
   x.drawImage(CR.src, (CR.ox - 30) * k, (CR.oy - 30) * k, CR.src.width * s * k, CR.src.height * s * k);
   const url = out.toDataURL('image/jpeg', .85);
+  YAW[faceKey(url)] = CR.dir ? Math.max(.25, CR.yaw) : 0;
+  for (const k2 in YAW) if (!FACES.some(u => faceKey(u) === k2) && k2 !== faceKey(url)) delete YAW[k2];
+  store.set('kdc_yaw', YAW);
   const d = panelData()[photoSlot]; if (d) d.face = url;
   FACES = [url, ...FACES.filter(u => u !== url)].slice(0, 12);
   while (!store.set('kdc_caras', FACES) && FACES.length > 1) FACES.pop();
