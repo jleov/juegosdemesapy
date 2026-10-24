@@ -485,7 +485,7 @@ function act(pid, a){
       const total=vend.length*S.cfg.precio;
       S.pozo.linea = S.cfg.modo==='linea' ? Math.round(total*S.cfg.pctLinea/100) : 0;
       S.pozo.bingo = total - S.pozo.linea + S.acum;
-      if(S.acum) sys(`💰 Se suma el pozo acumulado de ${gs(S.acum)} al bingo.`);
+      if(S.acum) sys(`💰 Se suma el pozo acumulado de ${gs(S.acum)} a la lotería.`);
       S.acum=0; S.phase='juego'; S.drawn=[]; S.lastBallAt=0;
       sys(`🎱 ¡Empieza la ronda ${S.round}! ${vend.length} cartones vendidos. Pozo: ${gs(S.pozo.linea+S.pozo.bingo)}.`);
       break; }
@@ -512,7 +512,7 @@ function act(pid, a){
       const enCarton=new Set(cardNums(S.cards[c]));
       const marks=(Array.isArray(a.marks)?a.marks:[]).map(Number).filter(n=>enCarton.has(n)).slice(0,15);
       S.claim.list.push({pid, card:c, tipo, marks});
-      sys(`📣 ${p.emoji} ${p.name} cantó ${tipo==='bingo'?'¡BINGO!':'¡LÍNEA!'} (cartón N° ${c})`);
+      sys(`📣 ${p.emoji} ${p.name} cantó ${tipo==='bingo'?'¡LOTERÍA!':'¡LÍNEA!'} (cartón N° ${c})`);
       break; }
     case 'cerrar':
       if(!isHost || S.phase!=='juego' || S.claim || S.drawn.length<90) return;
@@ -548,7 +548,7 @@ function resolveClaims(){
   items.filter(i=>i.res==='falso').forEach(i=>{
     const p=P(i.pid); if(!p) return;
     if(S.cfg.falso==='anular'){ S.anulados[i.card]=true; i.pena='Cartón anulado por el resto de la ronda.'; }
-    else if(S.cfg.falso==='multa'){ const m=Math.min(p.saldo, S.cfg.precio*2); p.saldo-=m; S.pozo.bingo+=m; i.pena=`Multa de ${gs(m)} (va al pozo del bingo).`; }
+    else if(S.cfg.falso==='multa'){ const m=Math.min(p.saldo, S.cfg.precio*2); p.saldo-=m; S.pozo.bingo+=m; i.pena=`Multa de ${gs(m)} (va al pozo de la lotería).`; }
     sys(`❌ ${p.emoji} ${p.name} cantó en falso con el cartón N° ${i.card}. ${i.pena||''}`);
   });
   items.filter(i=>i.res==='tarde').forEach(i=>{ const p=P(i.pid); if(p) sys(`⏰ ${p.emoji} ${p.name} cantó tarde: ya había salido otra bolilla. No vale.`); });
@@ -560,9 +560,9 @@ function resolveClaims(){
   }
   if(bin.length){
     let pot=S.pozo.bingo;
-    if(S.cfg.modo==='linea' && !S.winners.linea.length){ pot+=S.pozo.linea; S.lineaDesierta=true; sys('Nadie ganó la línea: su premio se suma al bingo.'); }
+    if(S.cfg.modo==='linea' && !S.winners.linea.length){ pot+=S.pozo.linea; S.lineaDesierta=true; sys('Nadie ganó la línea: su premio se suma a la lotería.'); }
     const share=Math.floor(pot/bin.length);
-    bin.forEach(i=>{ i.premio=share; P(i.pid).saldo+=share; sys(`🏆 ¡BINGO! ${P(i.pid).emoji} ${P(i.pid).name} cobra ${gs(share)} (cartón N° ${i.card}).`); });
+    bin.forEach(i=>{ i.premio=share; P(i.pid).saldo+=share; sys(`🏆 ¡LOTERÍA! ${P(i.pid).emoji} ${P(i.pid).name} cobra ${gs(share)} (cartón N° ${i.card}).`); });
     S.winners.bingo=bin.map(i=>({pid:i.pid, card:i.card, premio:share}));
   }
   S.claim=null; S.result={at:Date.now(), items, ball:S.drawn.length};
@@ -573,7 +573,7 @@ function finRonda(){
   S.phase='fin'; S.auto=0;
   if(!S.winners.bingo.length){
     S.acum = S.pozo.bingo + (S.winners.linea.length ? 0 : S.pozo.linea);
-    sys(`Salieron las 90 bolillas y nadie cantó bingo a tiempo. El pozo de ${gs(S.acum)} queda acumulado para la próxima ronda.`);
+    sys(`Salieron las 90 bolillas y nadie cantó lotería a tiempo. El pozo de ${gs(S.acum)} queda acumulado para la próxima ronda.`);
   }
   S.resumen={round:S.round, bolillas:S.drawn.length, linea:S.winners.linea, bingo:S.winners.bingo, acum:S.acum};
 }
@@ -767,7 +767,7 @@ function cardHTML(c, o={}){
   let acts='';
   if(o.mine && S.phase==='juego' && !S.anulados[c]){
     acts = `<div class="acts">${S.cfg.modo==='linea' && S.stage==='linea' ? `<button class="btn gold" data-act="cantar" data-card="${c}" data-tipo="linea">¡LÍNEA!</button>`:''}
-      <button class="btn red" data-act="cantar" data-card="${c}" data-tipo="bingo">¡BINGO!</button></div>`;
+      <button class="btn red" data-act="cantar" data-card="${c}" data-tipo="bingo">¡LOTERÍA!</button></div>`;
   }
   const inf=infoDe(c);
   return `<div class="carton ${o.mine?'mine':''} ${S.anulados[c]?'anul':''}" data-card="${c}" style="--c:${colorDe(inf.p)}">
@@ -821,7 +821,7 @@ function menuHTML(){
   const url = new URLSearchParams(location.search).get('sala') || UI.menuCode;
   return `<div class="menu">
     <div class="logo"><h1>LOTE<span>RÍA</span></h1><div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
-    <div class="muted" style="color:#ddd;margin-top:8px">Elegí tus cartones, anotá lo que sale y ¡cantá bingo!</div></div>
+    <div class="muted" style="color:#ddd;margin-top:8px">Elegí tus cartones, anotá lo que sale y ¡cantá lotería!</div></div>
     <div class="box"><h3>¿Quién sos?</h3>
       <label>Tu nombre</label><input type="text" id="myName" maxlength="18" value="${esc(PREF.name)}" placeholder="Ej: Juana">
       <label>Tu ficha</label><div class="emojis">${EMOJIS.map(e=>`<button class="${e===PREF.emoji?'on':''}" data-act="emoji" data-e="${e}">${e}</button>`).join('')}</div>
@@ -849,7 +849,7 @@ function cfgHTML(){
       <div><label>Saldo para cada jugador</label><select data-cfg="saldo" ${dis}>${[10000,20000].map(v=>`<option value="${v}" ${c.saldo===v?'selected':''}>${gs(v)}</option>`).join('')}</select></div>
       ${num('max','Máximo de cartones por jugador (1 a 4)')}
       ${num('serie','Cartones en venta por ronda (4 a 40)')}
-      <div><label>Premios</label><select data-cfg="modo" ${dis}><option value="linea" ${c.modo==='linea'?'selected':''}>Línea + Bingo (cartón lleno)</option><option value="bingo" ${c.modo==='bingo'?'selected':''}>Solo Bingo (cartón lleno)</option></select></div>
+      <div><label>Premios</label><select data-cfg="modo" ${dis}><option value="linea" ${c.modo==='linea'?'selected':''}>Línea + Lotería (cartón lleno)</option><option value="bingo" ${c.modo==='bingo'?'selected':''}>Solo Lotería (cartón lleno)</option></select></div>
       ${c.modo==='linea'?num('pctLinea','% del pozo para la línea'):''}
       <div><label>Si alguien canta en falso</label><select data-cfg="falso" ${dis}>
         <option value="nada" ${c.falso==='nada'?'selected':''}>Saca su maíz equivocado y sigue jugando</option>
@@ -913,7 +913,7 @@ function juegoHTML(){
   </div>
   <div class="pozo">
     ${S.cfg.modo==='linea'?`<div class="${S.stage!=='linea'?'won':''}">Línea<b>${gs(S.pozo.linea)}</b>${lw?`Ganó ${lw}`:'En juego'}</div>`:''}
-    <div>Bingo (cartón lleno)<b>${gs(S.pozo.bingo)}</b>${S.stage==='linea'&&S.cfg.modo==='linea'?'Después de la línea':'En juego'}</div>
+    <div>Lotería (cartón lleno)<b>${gs(S.pozo.bingo)}</b>${S.stage==='linea'&&S.cfg.modo==='linea'?'Después de la línea':'En juego'}</div>
   </div>
   ${vozSalaHTML()}
   ${canDraw?`<div class="cantor"><div class="flex"><b>🎤 ${NET.myPid===S.cantorPid?'Sos el cantor':'Anfitrión'}</b>
@@ -937,8 +937,8 @@ function finHTML(){
   return `${playersHTML()}
   <div class="box"><h3>🏁 Fin de la ronda ${r.round} · salieron ${r.bolillas} bolillas</h3>
     ${(r.linea||[]).map(w=>win(w,'🎉 Línea')).join('')}
-    ${(r.bingo||[]).map(w=>win(w,'🏆 Bingo')).join('')}
-    ${!(r.bingo||[]).length?`<div class="res tarde"><div class="t">Nadie cantó bingo a tiempo. Pozo acumulado para la próxima: ${gs(S.acum)}</div></div>`:''}
+    ${(r.bingo||[]).map(w=>win(w,'🏆 Lotería')).join('')}
+    ${!(r.bingo||[]).length?`<div class="res tarde"><div class="t">Nadie cantó lotería a tiempo. Pozo acumulado para la próxima: ${gs(S.acum)}</div></div>`:''}
     <h3 style="margin-top:14px">💰 Saldos</h3>
     <table class="rank">${rank.map((p,i)=>`<tr><td>${i+1}.</td><td>${esc(p.emoji+' '+p.name)}${(S.deudas||[]).filter(d=>d.de===p.id).map(d=>`<div class="muted">debe ${gs(d.monto)} a ${esc((P(d.a)||{}).name||'—')}</div>`).join('')}</td><td style="text-align:right"><b>${gs(p.saldo)}</b></td>
       <td style="text-align:right">${host&&p.saldo<S.cfg.precio?`<button class="btn sm" data-act="recargar" data-pid="${p.id}">Recargar</button>`:''}</td></tr>`).join('')}</table>
@@ -949,17 +949,17 @@ function finHTML(){
 const REGLAS = `<h3>📜 Cómo se juega la Lotería</h3><ul class="rules">
   <li><b>Bolillero de 90.</b> Las bolillas van del 1 al 90. El <b>cantor</b> 🎤 las saca de a una y las canta en voz alta.</li>
   <li><b>El cartón</b> es de un solo color y trae <b>3 combinaciones</b>: Serie 1, Serie 2 y Serie 3. Entre ellas no se repite ningún número, y cada cartón de la sala es de un color distinto. Cada combinación tiene 3 filas y 9 columnas, con 15 números: 5 por fila. La 1ª columna lleva del 1 al 9, la 2ª del 10 al 19… y la última del 80 al 90. Pueden jugar hasta 10 jugadores con 2 cartones cada uno (el anfitrión puede cambiar cuántos cartones). <b>Espectadores</b> 👀: cualquiera puede entrar solo a mirar (botón “Entrar solo a mirar”), y también entran como espectadores los que llegan con la mesa completa o con la cantada ya empezada. Miran, chatean y pueden ser el cantor; cuando hay lugar y no se está cantando, tocan “Quiero jugar” y pasan a la mesa.</li>
-  <li>La línea y el bingo se cantan <b>por combinación</b>: cada una tiene sus botones.</li>
+  <li>La línea y la lotería se cantan <b>por combinación</b>: cada una tiene sus botones.</li>
   <li><b>Elegí tus cartones</b> antes de que empiece la ronda. Todo lo que se paga por los cartones forma el <b>pozo</b>.</li>
   <li><b>Poné tu maíz 🌽:</b> cuando sale un número que está en tu cartón, tocalo para ponerle un grano de maíz. Nadie lo pone por vos: si no estás atento, el juego no te avisa.</li>
   <li><b>Bolillas cantadas:</b> arriba se ven todas las bolillas que salieron, en orden, y abajo de tus cartones está el tablero del 1 al 90, para revisar si se te pasó alguna.</li>
   <li><b>¡LÍNEA!</b> Cuando completás una fila entera (5 números) cantás línea y cobrás la parte del pozo de la línea. Hay una sola línea por ronda.</li>
-  <li><b>¡BINGO!</b> Cuando completás los 15 números del cartón (cartón lleno) cantás bingo, ganás el pozo grande y termina la ronda.</li>
+  <li><b>¡LOTERÍA!</b> Cuando completás los 15 números del cartón (cartón lleno) cantás lotería, ganás el pozo grande y termina la ronda.</li>
   <li><b>Se comprueba:</b> al cantar se frena el juego y se revisan los números de tu cartón contra las bolillas que salieron.</li>
   <li><b>Cantar a tiempo:</b> hay que cantar antes de que salga la próxima bolilla. Si se te pasa, perdés el derecho.</li>
   <li><b>Empate:</b> si dos o más cantan con la misma bolilla (dentro de unos segundos), el premio se reparte en partes iguales.</li>
   <li><b>Cantar en falso:</b> si cantaste y al verificar no vino algún número, se muestra en rojo cuál fue. Sacás tu maíz equivocado y la partida sigue. (El anfitrión puede elegir que además se pague multa o se anule el cartón.)</li>
-  <li>Si nadie gana el bingo, el pozo queda <b>acumulado</b> para la ronda siguiente.</li>
+  <li>Si nadie gana la lotería, el pozo queda <b>acumulado</b> para la ronda siguiente.</li>
   <li><b>Préstamos:</b> si te quedás sin plata, tocá tu saldo 💸 arriba para pedir prestado. Los demás te pueden prestar y después les devolvés cuando ganes.</li></ul>`;
 const pedidosAjenos = () => (S && S.pedidos || []).filter(x=>x.pid!==NET.myPid && P(x.pid));
 function prestamosHTML(){
@@ -1034,7 +1034,7 @@ function renderOv(){
   if(S.claim){
     const left=Math.max(0, Math.ceil((S.claim.until-Date.now())/1000));
     ov.innerHTML=`<div class="box"><div class="claimbig">📣 ¡CANTARON!</div>
-      ${S.claim.list.map(c=>{ const p=P(c.pid); return `<div style="text-align:center;font-size:18px;margin:6px 0">${p?esc(p.emoji+' '+p.name):''} cantó <b>${c.tipo==='bingo'?'BINGO':'LÍNEA'}</b> con el cartón N° ${c.card}</div>`; }).join('')}
+      ${S.claim.list.map(c=>{ const p=P(c.pid); return `<div style="text-align:center;font-size:18px;margin:6px 0">${p?esc(p.emoji+' '+p.name):''} cantó <b>${c.tipo==='bingo'?'LOTERÍA':'LÍNEA'}</b> con el cartón N° ${c.card}</div>`; }).join('')}
       <div class="muted" style="text-align:center">Se frena el juego. Comprobando en <b id="claimLeft">${left}</b> s… Si vos también tenés, ¡cantá ahora!</div>
       ${myCards(NET.myPid).filter(c=>!S.anulados[c]).length?`<div style="margin-top:10px">${misCartonesHTML(myCards(NET.myPid).filter(c=>!S.anulados[c]))}</div>`:''}
     </div>`;
@@ -1043,7 +1043,7 @@ function renderOv(){
   if(S.result && UI.closedResult!==S.result.at && S.phase==='juego'){
     const txt={ok:'✅ ¡Correcto!', falso:'❌ Cantó en falso', tarde:'⏰ Llegó tarde: ya había salido otra bolilla', cerrado:'La línea ya se había cantado'};
     ov.innerHTML=`<div class="box"><h3>🔎 Comprobación</h3>${S.result.items.map(i=>{ const p=P(i.pid);
-      return `<div class="res ${i.res}"><div class="t">${p?esc(p.emoji+' '+p.name):''} · ${i.tipo==='bingo'?'BINGO':'LÍNEA'} · ${txt[i.res]}${i.premio?` — cobra ${gs(i.premio)}`:''}</div>
+      return `<div class="res ${i.res}"><div class="t">${p?esc(p.emoji+' '+p.name):''} · ${i.tipo==='bingo'?'LOTERÍA':'LÍNEA'} · ${txt[i.res]}${i.premio?` — cobra ${gs(i.premio)}`:''}</div>
         ${i.res==='falso'?explicaFalso(i):''}
         ${i.pena?`<div class="muted">${esc(i.pena)}</div>`:''}${cardHTML(i.card,{check:true, winRow:i.row, marks:new Set(i.marks||[])})}
         ${i.res==='falso' && i.pid===NET.myPid && !S.anulados[i.card]?`<button class="btn gold wide" style="margin-top:8px" data-act="quitarMal" data-card="${i.card}">🌽 Quitar mi maíz equivocado y seguir</button>`:''}</div>`; }).join('')}
