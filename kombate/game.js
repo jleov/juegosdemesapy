@@ -2035,7 +2035,7 @@ function onNet(m) {
       break;
     case 'wait': if (NET.role === 'spect') { endPlay(); if (G.mode !== 'demo') startDemo(); showScreen('scrSpect'); } break;
     case 'cheer': if (m.s === 0 || m.s === 1) cheerFx(m.s, m.e); break;
-    case 'tour': if (NET.role === 'spect') { TT = m.T; TT.you = m.you; ttShow(); } break;
+    case 'tour': if (NET.role === 'spect') { const old = TT; TT = m.T; TT.you = m.you; ttQueue(old, TT); ttShow(); } break;
     case 'face': if (NET.role === 'spect') { TFACE[m.i] = m.f; if ($('#scrBracket').classList.contains('on')) renderBracket(); } break;
     case 'aud': G.aud = { n: m.n, v: m.v }; break;
     case 'sel': if (NET.role === 'guest') openSelect('guest'); break;
@@ -2694,14 +2694,17 @@ function pickFaceFor(target) {
 $('#fpCam').onclick = () => { $('#facePick').classList.remove('on'); takePhoto(0); };
 $('#fpGal').onclick = () => { $('#facePick').classList.remove('on'); pickPhoto(0); };
 $('#fpCancel').onclick = () => { PHOTO_TARGET = null; $('#facePick').classList.remove('on'); };
+// primero se arman las llaves (sorteadas, y el anfitrión cambia de lugar a quien quiera); después se pelea
 function startTour() {
   const order = [...Array(16).keys()].sort(() => Math.random() - .5);
-  Object.assign(TOUR, { R: [order, [], [], [], []], round: 0, match: 0, status: 'bracket' });
-  saveTour(); showBracket();
+  Object.assign(TOUR, { R: [order, [], [], [], []], round: 0, match: 0, status: 'arrange', pend: [] });
+  bkReset(); saveTour(); showBracket();
 }
+function startFights() { TOUR.status = 'bracket'; TOUR.round = 0; TOUR.match = 0; saveTour(); showBracket(); fx('sfx', 'power'); }
 function showBracket() {
   endPlay(); if (G.mode !== 'demo') startDemo();
-  if (TOUR.status === 'champ') { showChamp(); return; }
+  // al terminar el torneo se ve primero cómo sube el campeón y después la pantalla del campeón
+  if (TOUR.status === 'champ' && !(TOUR.pend || []).length && !BK.anim.length && !BK.cur) { showChamp(); return; }
   showScreen('scrBracket'); renderBracket();
   if (roomHost() && NET.room === 'tour') broadcastTour();
 }
@@ -2713,7 +2716,7 @@ function slotView(i) {
 function renderBracket() {
   const T = NET.role === 'spect' ? TT : TOUR; if (!T) return;
   const host = NET.role !== 'spect';
-  $('#bTitle').textContent = T.status === 'setup' ? '🏆 Torneo · esperando que empiece' : '🏆 Llaves del torneo';
+  $('#bTitle').textContent = T.status === 'setup' ? '🏆 Torneo · esperando que empiece' : T.status === 'arrange' ? '✋ Armando las llaves' : '🏆 Llaves del torneo';
   // el que entró en línea arma su peleador mientras se juntan todos
   const mine = !host && TT && TT.you >= 0 ? SEL[0] : null;
   $('#bMine').innerHTML = mine && T.status === 'setup' ? `<div class="slot me" style="max-width:360px"><button class="fb" id="myFace" ${faceStyle(mine.face)}>${mine.face ? '' : '🙂'}</button>
@@ -2728,23 +2731,20 @@ function renderBracket() {
     $('#bTree').innerHTML = `<div class="slots" style="grid-column:1/-1">${[...Array(16).keys()].map(i => { const s = slotView(i); return `<div class="slot ${s.ctl}"><span class="fb" style="display:flex;align-items:center;justify-content:center;${s.face ? `background-image:url(${s.face})` : ''}">${s.face ? '' : '🙂'}</span><b>${esc(s.name)}</b><span style="font-size:12px">${CHARS[s.ch] ? CHARS[s.ch].name : ''}</span><div class="ctl">${s.ctl === 'net' ? '🌐 Amigo' : s.ctl === 'me' ? '🙋 Anfitrión' : '🤖 Bot'}</div></div>`; }).join('')}</div>`;
     $('#bInfo').textContent = '⏳ El anfitrión arma el torneo y sortea las llaves.'; $('#bBtns').innerHTML = ''; return;
   }
-  const person = (i, r, m) => {
-    if (i == null) return `<div class="bp"><i>?</i>—</div>`;
-    const s = slotView(i), w = T.R[r + 1] && T.R[r + 1][m];
-    const cls = w == null ? '' : w === i ? 'win' : 'lose';
-    return `<div class="bp ${cls}"><i ${faceStyle(s.face)}>${s.face ? '' : '🙂'}</i>${esc(s.name)}${s.ctl === 'me' ? ' 🙋' : s.ctl === 'net' ? ' 🌐' : ''}</div>`;
-  };
-  let html = '';
-  for (let r = 0; r < 4; r++) {
-    html += `<div class="bcol"><h4>${ROUND_NAMES[r]}</h4>`;
-    for (let m = 0; m < 8 >> r; m++) html += `<div class="bm ${T.status === 'bracket' && r === T.round && m === T.match ? 'cur' : ''}">${person(T.R[r][m * 2], r, m)}${person(T.R[r][m * 2 + 1], r, m)}</div>`;
-    html += `</div>`;
-  }
-  const ch = T.R[4][0];
-  html += `<div class="bcol"><h4>Campeón</h4><div class="bchamp">${ch == null ? '<div class="bp" style="justify-content:center"><i>🏆</i></div>?' : `<div class="bp win" style="flex-direction:column"><i ${faceStyle(slotView(ch).face)}>${slotView(ch).face ? '' : '🏆'}</i>👑 ${esc(slotView(ch).name)}</div>`}</div></div>`;
-  $('#bTree').innerHTML = html;
+  // el tablero se dibuja en un canvas (ver bkDraw)
+  if (!$('#bCv')) { $('#bTree').innerHTML = '<canvas id="bCv"></canvas>'; $('#bCv').onclick = bkClick; }
+  $('#bTree').style.display = 'block';
+  if (host && TOUR.pend && TOUR.pend.length) { BK.anim.push(...TOUR.pend); TOUR.pend = []; }
+  bkStart();
   const btns = $('#bBtns');
-  if (T.status !== 'bracket') { $('#bInfo').textContent = T.status === 'champ' ? '🏆 ¡El torneo terminó!' : ''; btns.innerHTML = host ? `<button class="big b5" id="bChamp">🏆 Ver al campeón</button>` : ''; if ($('#bChamp')) $('#bChamp').onclick = showChamp; return; }
+  if (T.status === 'arrange') {
+    $('#bInfo').textContent = host ? '✋ Tocá un peleador y después otro para cambiarlos de lugar. Los que quedan juntos pelean entre sí en la primera ronda.' : '⏳ El anfitrión está armando quién pelea contra quién…';
+    btns.innerHTML = host ? `<button class="big b4" id="bShuffle">🔀 Sortear de nuevo</button><button class="big" id="bStart">🥋 ¡Empezar el torneo!</button>` : '';
+    if ($('#bShuffle')) $('#bShuffle').onclick = () => { TOUR.R[0].sort(() => Math.random() - .5); BK.sel = -1; saveTour(); fx('sfx', 'whoosh'); if (roomHost() && NET.room === 'tour') broadcastTour(); };
+    if ($('#bStart')) $('#bStart').onclick = startFights;
+    return;
+  }
+  if (T.status !== 'bracket') { $('#bInfo').textContent = T.status === 'champ' ? '🏆 ¡El torneo terminó!' : ''; btns.innerHTML = `<button class="big b5" id="bChamp">🏆 Ver al campeón</button>`; $('#bChamp').onclick = showChamp; return; }
   const a = T.R[T.round][T.match * 2], b = T.R[T.round][T.match * 2 + 1], A = slotView(a), B = slotView(b);
   $('#bInfo').textContent = `${ROUND_NAMES[T.round]}${T.round < 3 ? ` · pelea ${T.match + 1} de ${8 >> T.round}` : ''}: ${A.name} contra ${B.name}`;
   if (!host) { btns.innerHTML = `<span class="wait">⏳ El anfitrión maneja el torneo.</span>`; return; }
@@ -2756,9 +2756,150 @@ function renderBracket() {
   if ($('#bSim')) $('#bSim').onclick = () => { simMatch(); showBracket(); };
   if ($('#bSimAll')) $('#bSimAll').onclick = () => { while (TOUR.status === 'bracket') { const { a, b } = curMatch(); if (isHuman(a) || isHuman(b)) break; simMatch(); } showBracket(); };
 }
+/* --- el tablero del gran torneo de artes marciales ---
+   Los 16 abajo; las líneas suben ronda por ronda hasta la cima, donde queda el campeón.
+   Nivel L: 0 = los 16, 1 = cuartos, 2 = semis, 3 = final, 4 = campeón. Nodo (L, j) = TOUR.R[L][j]. */
+const BK = { anim: [], cur: null, sel: -1, raf: 0, champShown: false, conf: [], champAt: 0 };
+const BW = 960, BH = 600, BY = [520, 408, 316, 236, 146], BRAD = [22, 23, 25, 28, 46];
+function bkReset() { Object.assign(BK, { anim: [], cur: null, sel: -1, champShown: false, conf: [], champAt: 0 }); }
+function bkX(L, j) { return L === 0 ? 46 + (j + .5) * (BW - 92) / 16 : (bkX(L - 1, j * 2) + bkX(L - 1, j * 2 + 1)) / 2; }
+// el tramo de línea desde el nodo (L, i) hasta el de arriba
+function bkPath(L, i) {
+  const x0 = bkX(L, i), x1 = bkX(L + 1, i >> 1), ym = (BY[L] + BY[L + 1]) / 2 + 6;
+  return [[x0, BY[L] - BRAD[L] - 2], [x0, ym], [x1, ym], [x1, BY[L + 1] + BRAD[L + 1] + 2]];
+}
+function strokePart(c, pts, p) {
+  const segs = []; let tot = 0;
+  for (let k = 1; k < pts.length; k++) { const d = Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); segs.push(d); tot += d; }
+  let left = tot * p; c.beginPath(); c.moveTo(...pts[0]);
+  for (let k = 1; k < pts.length && left > 0; k++) {
+    const d = segs[k - 1], f = Math.min(1, left / d);
+    c.lineTo(pts[k - 1][0] + (pts[k][0] - pts[k - 1][0]) * f, pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * f); left -= d;
+  }
+  c.stroke();
+  return left <= 0 ? null : pts[pts.length - 1];
+}
+function bkStart() { if (!BK.raf) BK.raf = requestAnimationFrame(bkLoop); }
+function bkLoop(now) {
+  if (!$('#scrBracket').classList.contains('on') || !$('#bCv')) { BK.raf = 0; return; }
+  const T = NET.role === 'spect' ? TT : TOUR;
+  // la animación que toca: una por vez; si hay muchas en fila, van más rápido
+  if (!BK.cur && BK.anim.length) { BK.cur = BK.anim.shift(); BK.cur.t0 = now; BK.cur.dur = BK.anim.length > 2 ? 420 : 1200; SFX.whoosh(); }
+  if (BK.cur) {
+    const p = (now - BK.cur.t0) / BK.cur.dur;
+    if (p >= 1 && !BK.cur.done) { BK.cur.done = now; if (BK.cur.L === 3) { BK.champAt = now; SFX.twinkle(); speak('¡' + slotView(T.R[4][0]).name + ' es el campeón!'); for (let i = 0; i < 140; i++) BK.conf.push({ x: BW / 2, y: BY[4], vx: rnd(-9, 9), vy: rnd(-12, -2), r: rnd(0, 6), vr: rnd(-.3, .3), c: CONF_COL[i % CONF_COL.length], w: rnd(6, 11), h: rnd(3, 6), l: rnd(120, 220) }); } else SFX.pop(); }
+    if (BK.cur.done && now - BK.cur.done > 260) BK.cur = null;
+  }
+  // terminó de subir el campeón: a los 2,5 s se pasa a la pantalla del campeón
+  if (T && T.status === 'champ' && BK.champAt && !BK.champShown && now - BK.champAt > 2500 && !BK.cur && !BK.anim.length) { BK.champShown = true; showChamp(); BK.raf = 0; return; }
+  if (T && T.R) bkDraw(T, now);
+  BK.raf = requestAnimationFrame(bkLoop);
+}
+function bkDraw(T, now) {
+  const cv2 = $('#bCv'), wCss = cv2.parentElement.clientWidth || 600, dpr = Math.min(2, devicePixelRatio || 1);
+  if (cv2.width !== Math.round(wCss * dpr)) { cv2.width = Math.round(wCss * dpr); cv2.height = Math.round(wCss * dpr * BH / BW); cv2.style.width = wCss + 'px'; cv2.style.height = wCss * BH / BW + 'px'; }
+  const c = cv2.getContext('2d'), k = cv2.width / BW, t = now / 1000;
+  c.setTransform(k, 0, 0, k, 0, 0);
+  // cielo de atardecer y el templo del torneo atrás
+  c.fillStyle = grad(c, 0, BH, ['#ff8a2a', '#ffc04d', '#ffe9a8']); c.fillRect(0, 0, BW, BH);
+  c.fillStyle = 'rgba(140,60,20,.25)';
+  c.beginPath(); c.moveTo(BW / 2 - 300, 150); c.quadraticCurveTo(BW / 2, 95, BW / 2 + 300, 150); c.lineTo(BW / 2 + 260, 130); c.quadraticCurveTo(BW / 2, 80, BW / 2 - 260, 130); c.fill();
+  // el tablero
+  rr(c, 18, 56, BW - 36, BH - 70, 18); c.fillStyle = '#f6ecd2'; c.fill(); c.lineWidth = 10; c.strokeStyle = '#6b3a1a'; c.stroke();
+  c.lineWidth = 2; c.strokeStyle = '#c9a36a'; rr(c, 30, 68, BW - 60, BH - 94, 12); c.stroke();
+  // cartel de arriba
+  rr(c, BW / 2 - 300, 14, 600, 56, 12); c.fillStyle = '#c0281e'; c.fill(); c.lineWidth = 5; c.strokeStyle = '#5a0f08'; c.stroke();
+  c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '900 30px system-ui,sans-serif'; c.lineWidth = 7; c.strokeStyle = '#3a0905';
+  c.strokeText('GRAN TORNEO DE ARTES MARCIALES', BW / 2, 43); c.fillStyle = '#ffd21f'; c.fillText('GRAN TORNEO DE ARTES MARCIALES', BW / 2, 43);
+  // nombres de las rondas al costado
+  c.font = '900 13px system-ui,sans-serif'; c.textAlign = 'left'; c.fillStyle = '#8a5a2a';
+  ['', 'CUARTOS', 'SEMIFINAL', 'FINAL', ''].forEach((n, L) => { if (n) c.fillText(n, 40, (BY[L] + BY[L - 1]) / 2 + 8); });
+  // lo que todavía se está por animar no se muestra (ni la línea encendida ni la cara arriba)
+  const hideNode = new Set(), hideSeg = new Set(), cur = BK.cur, cp = cur ? Math.min(1, (now - cur.t0) / cur.dur) : 0;
+  for (const a of [...(cur && cp < 1 ? [cur] : []), ...BK.anim]) { hideNode.add((a.L + 1) + ':' + (a.i >> 1)); hideSeg.add(a.L + ':' + a.i); }
+  if (cur && cp < 1) hideSeg.add(cur.L + ':' + cur.i);
+  // líneas en tinta
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (let L = 0; L < 4; L++) for (let i = 0; i < 16 >> L; i++) { c.lineWidth = 4; c.strokeStyle = '#3a2414'; strokePart(c, bkPath(L, i), 1); }
+  // líneas del que ganó: naranja con brillo
+  const lit = (L, i, p) => { const pts = bkPath(L, i); c.lineWidth = 13; c.strokeStyle = 'rgba(255,200,40,.45)'; strokePart(c, pts, p); c.lineWidth = 7; c.strokeStyle = '#ff6a00'; return strokePart(c, pts, p); };
+  for (let L = 0; L < 4; L++) for (let i = 0; i < 16 >> L; i++) {
+    const w = T.R[L + 1] && T.R[L + 1][i >> 1];
+    if (w != null && T.R[L][i] === w && !hideSeg.has(L + ':' + i)) lit(L, i, 1);
+  }
+  let spark = null;
+  if (cur && cp < 1) spark = lit(cur.L, cur.i, cp);
+  if (spark || (cur && cp < 1)) { // la chispa que va subiendo con la cara del que ganó
+    const pts = bkPath(cur.L, cur.i), segs = []; let tot = 0;
+    for (let q = 1; q < pts.length; q++) { const d = Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1]); segs.push(d); tot += d; }
+    let left = tot * cp, px = pts[0][0], py = pts[0][1];
+    for (let q = 1; q < pts.length && left > 0; q++) { const f = Math.min(1, left / segs[q - 1]); px = pts[q - 1][0] + (pts[q][0] - pts[q - 1][0]) * f; py = pts[q - 1][1] + (pts[q][1] - pts[q - 1][1]) * f; left -= segs[q - 1]; }
+    glow(c, px, py, 30, 'rgba(255,230,120,.95)');
+    const s = slotView(T.R[cur.L][cur.i]);
+    c.save(); c.translate(px, py); drawFace(c, faceImg(s.face), 16, '#ffc83d', 0, px < BW / 2 ? 1 : -1, s.yaw ?? yawOf(s.face), null); c.restore();
+  }
+  // las caras en cada lugar del tablero
+  const ringOf = s => s.ctl === 'me' ? '#2f7bff' : s.ctl === 'net' ? '#1d9e49' : '#3a2414';
+  for (let L = 0; L <= 4; L++) for (let j = 0; j < (16 >> L || 1); j++) {
+    const x = bkX(L, j), y = BY[L], r = BRAD[L], si = T.R[L] ? T.R[L][j] : null;
+    const hidden = hideNode.has(L + ':' + j);
+    if (si == null || hidden) { // lugar vacío
+      c.beginPath(); c.arc(x, y, r, 0, 7); c.fillStyle = '#e9dcbc'; c.fill(); c.setLineDash([5, 5]); c.lineWidth = 3; c.strokeStyle = '#a8865a'; c.stroke(); c.setLineDash([]);
+      c.font = `900 ${r}px system-ui,sans-serif`; c.textAlign = 'center'; c.fillStyle = '#a8865a'; c.fillText(L === 4 ? '🏆' : '?', x, y + 2);
+      continue;
+    }
+    const s = slotView(si), lost = L < 4 && T.R[L + 1] && T.R[L + 1][j >> 1] != null && T.R[L + 1][j >> 1] !== si && !hideNode.has((L + 1) + ':' + (j >> 1));
+    let sc = 1;
+    if (cur && cur.done && (cur.L + 1) + ':' + (cur.i >> 1) === L + ':' + j) sc = 1 + Math.max(0, .5 - (now - cur.done) / 500); // aparece con un saltito
+    if (L === 4) { c.save(); c.globalAlpha = .7; glow(c, x, y, 110 + Math.sin(t * 3) * 8, 'rgba(255,210,60,.9)'); c.restore(); }
+    c.save(); c.translate(x, y); c.scale(sc, sc); if (lost) c.globalAlpha = .42;
+    drawFace(c, faceImg(s.face), r, L === 4 ? '#ffc83d' : ringOf(s), 0, x < BW / 2 ? 1 : -1, s.yaw ?? yawOf(s.face), null);
+    c.restore();
+    if (lost) { c.strokeStyle = 'rgba(192,40,30,.8)'; c.lineWidth = 4; c.beginPath(); c.moveTo(x - r * .6, y - r * .6); c.lineTo(x + r * .6, y + r * .6); c.moveTo(x + r * .6, y - r * .6); c.lineTo(x - r * .6, y + r * .6); c.stroke(); }
+    if (L === 4) { // corona del campeón
+      c.save(); c.translate(x, y - r - 10); c.beginPath(); c.moveTo(-30, 12); c.lineTo(-36, -16); c.lineTo(-16, -2); c.lineTo(0, -24); c.lineTo(16, -2); c.lineTo(36, -16); c.lineTo(30, 12); c.closePath();
+      c.fillStyle = '#ffc83d'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#8a5a00'; c.stroke(); c.restore();
+      c.font = '900 20px system-ui,sans-serif'; c.lineWidth = 5; c.strokeStyle = '#fff6dc'; c.fillStyle = '#c0281e';
+      c.strokeText('👑 ' + s.name.toUpperCase(), x, y + r + 20); c.fillText('👑 ' + s.name.toUpperCase(), x, y + r + 20);
+    }
+    if (L === 0) { // nombre abajo
+      c.font = '900 11px system-ui,sans-serif'; c.textAlign = 'center'; c.fillStyle = lost ? '#a8865a' : '#3a2414';
+      const nm = s.name.length > 9 ? s.name.slice(0, 8) + '…' : s.name; c.fillText(nm, x, y + r + 13);
+      c.font = '700 9px system-ui,sans-serif'; c.fillStyle = '#8a6a44'; c.fillText(CHARS[s.ch] ? CHARS[s.ch].name : '', x, y + r + 25);
+    }
+  }
+  // la pelea que viene: los dos titilan
+  if (T.status === 'bracket' && !cur && !BK.anim.length) {
+    const L = T.round, a = (Math.sin(t * 5) + 1) / 2;
+    for (const j of [T.match * 2, T.match * 2 + 1]) { c.beginPath(); c.arc(bkX(L, j), BY[L], BRAD[L] + 7 + a * 3, 0, 7); c.lineWidth = 4; c.strokeStyle = `rgba(255,80,20,${.5 + a * .5})`; c.stroke(); }
+    const xm = (bkX(L, T.match * 2) + bkX(L, T.match * 2 + 1)) / 2;
+    c.font = '900 16px system-ui,sans-serif'; c.textAlign = 'center'; c.lineWidth = 4; c.strokeStyle = '#fff6dc'; c.fillStyle = '#c0281e';
+    c.strokeText('VS', xm, BY[L] + 4); c.fillText('VS', xm, BY[L] + 4);
+  }
+  // armando las llaves: el que tocaste queda marcado
+  if (T.status === 'arrange') {
+    for (let m = 0; m < 8; m++) { const xm = (bkX(0, m * 2) + bkX(0, m * 2 + 1)) / 2; c.font = '900 12px system-ui,sans-serif'; c.textAlign = 'center'; c.fillStyle = '#c0281e'; c.fillText('VS', xm, BY[0] + 4); }
+    if (BK.sel >= 0) { c.beginPath(); c.arc(bkX(0, BK.sel), BY[0], BRAD[0] + 8, 0, 7); c.lineWidth = 5; c.strokeStyle = `rgba(47,123,255,${.6 + Math.sin(t * 8) * .4})`; c.stroke(); }
+  }
+  // confeti cuando el campeón llega a la cima
+  for (const p of BK.conf) { p.x += p.vx; p.y += p.vy; p.vy += .22; p.vx *= .99; p.r += p.vr; p.l--; c.save(); c.translate(p.x, p.y); c.rotate(p.r); c.globalAlpha = Math.min(1, p.l / 30); c.fillStyle = p.c; c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); c.restore(); }
+  BK.conf = BK.conf.filter(p => p.l > 0 && p.y < BH + 20);
+}
+// tocar dos peleadores de abajo los cambia de lugar (solo el anfitrión, mientras arma las llaves)
+function bkClick(e) {
+  if (NET.role === 'spect' || TOUR.status !== 'arrange') return;
+  const r = e.target.getBoundingClientRect(), x = (e.clientX - r.left) * BW / r.width, y = (e.clientY - r.top) * BH / r.height;
+  let hit = -1; for (let i = 0; i < 16; i++) if (Math.hypot(x - bkX(0, i), y - BY[0]) < 30) hit = i;
+  if (hit < 0) return;
+  if (BK.sel < 0) { BK.sel = hit; SFX.beep(); return; }
+  if (BK.sel !== hit) { const R0 = TOUR.R[0]; [R0[BK.sel], R0[hit]] = [R0[hit], R0[BK.sel]]; saveTour(); SFX.pop(); if (roomHost() && NET.room === 'tour') broadcastTour(); }
+  BK.sel = -1;
+}
 // ¿ese lugar sigue en carrera?
 function aliveIn(i) { const r = TOUR.round; return TOUR.R[r].includes(i) && !(TOUR.R[r + 1] || []).some((w, m) => w != null && (TOUR.R[r][m * 2] === i || TOUR.R[r][m * 2 + 1] === i) && w !== i); }
 function recordWinner(slot) {
+  // para la animación del tablero: el que ganó sube desde su lugar hasta la ronda siguiente
+  (TOUR.pend = TOUR.pend || []).push({ L: TOUR.round, i: TOUR.match * 2 + (TOUR.R[TOUR.round][TOUR.match * 2] === slot ? 0 : 1) });
   TOUR.R[TOUR.round + 1][TOUR.match] = slot;
   if (++TOUR.match >= 8 >> TOUR.round) { TOUR.round++; TOUR.match = 0; }
   if (TOUR.round >= 4) TOUR.status = 'champ';
@@ -2871,8 +3012,16 @@ function tourLeft(c) {
 const ttSel = i => { const s = TT.slots[i]; return { name: s.name, ch: s.ch, face: TFACE[i] || null, yaw: s.yaw }; };
 function ttShow() {
   if (document.body.classList.contains('playing')) return;
-  if (TT.status === 'champ') showChamp();
-  else { showScreen('scrBracket'); renderBracket(); }
+  if (TT.status === 'champ' && !BK.anim.length && !BK.cur) { if (!$('#scrChamp').classList.contains('on')) showChamp(); }
+  else { if (!$('#scrBracket').classList.contains('on')) showScreen('scrBracket'); renderBracket(); }
+}
+// lo que cambió en las llaves desde el último aviso: esos ganadores se ven subir en el tablero
+function ttQueue(old, T) {
+  if (!T.R || T.status === 'setup' || T.status === 'arrange' || !old || !old.R) { if (!T.R || T.status !== 'bracket') bkReset(); return; }
+  for (let L = 1; L <= 4; L++) for (let j = 0; j < (16 >> L || 1); j++) {
+    const w = T.R[L] && T.R[L][j];
+    if (w != null && (!old.R[L] || old.R[L][j] == null)) BK.anim.push({ L: L - 1, i: T.R[L - 1][j * 2] === w ? j * 2 : j * 2 + 1 });
+  }
 }
 
 $('#mTour').onclick = () => { audio(); openTour(); };
