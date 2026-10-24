@@ -54,6 +54,10 @@ input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1p
 .pl{background:rgba(255,255,255,.1);color:#fff;border-radius:10px;padding:5px 9px;font-size:13px;display:flex;gap:6px;align-items:center}
 .pl.me{outline:2px solid var(--gold)}
 .pl.off{opacity:.45}
+#top .ib.micon{background:#2a9d3f;animation:latido 1.4s infinite}
+@keyframes latido{50%{box-shadow:0 0 0 6px rgba(42,157,63,.35)}}
+.habla{background:#2a9d3f;border-radius:6px;padding:0 5px;font-size:11px;font-weight:800}
+.hablan{display:flex;gap:6px;flex-wrap:wrap;align-items:center;color:#fff;font-size:13px;margin-bottom:10px}
 .vozsala{display:flex;flex-direction:column;gap:8px;background:rgba(122,47,191,.35);border:1px solid rgba(190,140,240,.6);color:#fff;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:14px}
 #ov .vozsala{background:#f3e9ff;color:#1d1d1d;border-color:#c9a8ef}
 .espbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(242,193,78,.18);border:1px solid rgba(242,193,78,.5);color:#fff;border-radius:10px;padding:8px 10px;margin:-2px 0 10px;font-size:14px}
@@ -517,6 +521,12 @@ function act(pid, a){
     case 'cerrar':
       if(!isHost || S.phase!=='juego' || S.claim || S.drawn.length<90) return;
       finRonda(); break;
+    /* ---------- chat de voz ---------- */
+    case 'mic':
+      if(p.bot) return; p.mic=!!a.on; break;
+    case 'silenciar': {   // el anfitrión silencia a quien tiene el micrófono abierto (después lo puede volver a prender)
+      const q=P(a.pid); if(!isHost || !q || !q.mic || q.id===pid) return;
+      q.mic=false; q.muteSeq=(q.muteSeq||0)+1; sys(`🔇 El anfitrión silenció el micrófono de ${q.name}.`); break; }
     case 'chat': {
       const x=String(a.x||'').trim().slice(0,200); if(!x) return;
       S.chat.push({pid, name:p.name, emoji:p.emoji, x, at:Date.now()}); if(S.chat.length>120) S.chat.shift();
@@ -643,17 +653,19 @@ function hostStart(resume){
     netBar(false);
     if(saved){
       S=saved.S; NET.myPid=saved.myPid;
-      S.players.forEach(p=>{ if(!p.bot) p.conn = p.id===NET.myPid; });
+      S.players.forEach(p=>{ if(!p.bot){ p.conn = p.id===NET.myPid; p.mic=false; } });
+      if(P(NET.myPid)) P(NET.myPid).peerId=peer.id;
       if(S.claim){ clearTimeout(T.claim); T.claim=setTimeout(resolveClaims, Math.max(500, S.claim.until-Date.now())); }
       if(S.phase==='venta') botsBuy();
       sys('El anfitrión volvió a abrir la sala.');
     } else {
       S=lobbyState();
-      const me=addPlayer(cleanName(PREF.name), PREF.emoji, myToken); NET.myPid=me.id; S.hostPid=me.id; S.cantorPid=me.id;
+      const me=addPlayer(cleanName(PREF.name), PREF.emoji, myToken); me.peerId=peer.id; NET.myPid=me.id; S.hostPid=me.id; S.cantorPid=me.id;
       sys(`Sala ${NET.code} creada. Pasá el código a los demás jugadores.`);
     }
     commit();
   });
+  peer.on('call', onCall);
   peer.on('connection', conn=>{
     conn.on('data', d=>hostOnData(conn, d));
     conn.on('close', ()=>hostOnClose(conn));
@@ -686,7 +698,7 @@ function hostOnData(conn, d){
       else sys(`${p.emoji} ${p.name} entró a la sala.`);
     } else { p.conn=true; sys(`${p.emoji} ${p.name} volvió.`); }
     const old=NET.conns[p.id]; if(old && old!==conn) try{ old.close(); }catch(e){}
-    conn.pid=p.id; NET.conns[p.id]=conn;
+    conn.pid=p.id; NET.conns[p.id]=conn; p.peerId=conn.peer; p.mic=false;   // para el chat de voz
     commit(); return;
   }
   if(!conn.pid || NET.conns[conn.pid]!==conn) return;
@@ -697,13 +709,14 @@ function hostOnData(conn, d){
 function hostOnClose(conn){
   if(!S || !conn.pid || NET.conns[conn.pid]!==conn) return;
   delete NET.conns[conn.pid];
-  const p=P(conn.pid); if(p){ p.conn=false; sys(`${p.emoji} ${p.name} se desconectó.`); }
+  const p=P(conn.pid); if(p){ p.conn=false; p.mic=false; sys(`${p.emoji} ${p.name} se desconectó.`); }
   commit();
 }
 // ---------- cliente ----------
 function clientJoin(code, mirar){
   NET.mode='client'; NET.code=code; NET.welcomed=false; NET.mirar=!!mirar; S=null;
   const peer = NET.peer = newPeer();
+  peer.on('call', onCall);
   peer.on('open', ()=>connectHost());
   peer.on('disconnected', ()=>{ if(!peer.destroyed) setTimeout(()=>{ try{ peer.reconnect(); }catch(e){} }, 1500); });
   peer.on('error', e=>{
@@ -732,11 +745,73 @@ function connectHost(){
   c.on('close', ()=>{ if(NET.mode!=='client' || NET.hostConn!==c) return; netBar('Se perdió la conexión con el anfitrión. Reconectando…'); setTimeout(connectHost, 3000); });
 }
 function leave(clear){
+  apagarVoz();
   if(NET.peer) try{ NET.peer.destroy(); }catch(e){}
   clearTimeout(T.auto); clearTimeout(T.claim);
   if(clear){ forget(NET.mode==='host'?'lot_host':'lot_client'); }
   NET.mode=null; NET.peer=null; NET.conns={}; NET.hostConn=null; S=null; netBar(false);
   $('#chat').classList.remove('on'); closeOv(); render();
+}
+
+/* ====================== CHAT DE VOZ ======================
+   Igual que en el Banquero: cada uno que prende el micrófono llama a todos los que están conectados (jugadores y
+   espectadores); los demás contestan y lo escuchan. El anfitrión puede silenciar a alguien. */
+const VOICE={stream:null, calls:{}, audios:{}, muted:false, muteSeq:null};
+function stopMic(avisar){
+  if(!VOICE.stream) return;
+  VOICE.stream.getTracks().forEach(t=>t.stop()); VOICE.stream=null;
+  Object.values(VOICE.calls).forEach(c=>{ try{ c.close(); }catch(e){} }); VOICE.calls={};
+  if(avisar) doAct({t:'mic', on:false});
+}
+async function toggleMic(){
+  if(VOICE.stream){ stopMic(true); render(); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('Este navegador no permite usar el micrófono (se necesita HTTPS).');
+  try{ VOICE.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}}); }
+  catch(e){ return toast('No se pudo activar el micrófono. Revisá el permiso del navegador (el candado de la barra de direcciones).'); }
+  toast('🎤 Micrófono activado: todos en la sala te escuchan.');
+  doAct({t:'mic', on:true}); voiceSync(); render();
+}
+// llama a los conectados que todavía no tienen mi voz, y corta a los que se fueron
+function voiceSync(){
+  if(!VOICE.stream || !NET.peer || !S) return;
+  const yo=NET.peer.id, vivos=new Set();
+  for(const p of S.players){
+    if(p.bot || !p.conn || !p.peerId || p.peerId===yo) continue;
+    vivos.add(p.peerId);
+    if(!VOICE.calls[p.peerId]){
+      const c=NET.peer.call(p.peerId, VOICE.stream); if(!c) continue;
+      VOICE.calls[p.peerId]=c;
+      const fuera=()=>{ if(VOICE.calls[p.peerId]===c) delete VOICE.calls[p.peerId]; };
+      c.on('close', fuera); c.on('error', fuera);
+    }
+  }
+  for(const id in VOICE.calls) if(!vivos.has(id)){ try{ VOICE.calls[id].close(); }catch(e){} delete VOICE.calls[id]; }
+}
+function onCall(call){
+  call.answer();
+  call.on('stream', st=>{
+    let a=VOICE.audios[call.peer];
+    if(!a){ a=document.createElement('audio'); a.autoplay=true; a.setAttribute('playsinline',''); document.body.appendChild(a); VOICE.audios[call.peer]=a; }
+    a.srcObject=st; a.muted=VOICE.muted; a.play().catch(()=>{});
+  });
+  call.on('close', ()=>{ const a=VOICE.audios[call.peer]; if(a){ a.srcObject=null; a.remove(); delete VOICE.audios[call.peer]; } });
+}
+function toggleSpk(){
+  VOICE.muted=!VOICE.muted;
+  Object.values(VOICE.audios).forEach(a=>{ a.muted=VOICE.muted; if(!VOICE.muted) a.play().catch(()=>{}); });
+  toast(VOICE.muted ? '🔇 No escuchás a los demás.' : '🔊 Escuchás a los que hablan.'); render();
+}
+function apagarVoz(){
+  if(VOICE.stream){ VOICE.stream.getTracks().forEach(t=>t.stop()); VOICE.stream=null; }
+  Object.values(VOICE.calls).forEach(c=>{ try{ c.close(); }catch(e){} }); VOICE.calls={};
+  Object.values(VOICE.audios).forEach(a=>{ a.srcObject=null; a.remove(); }); VOICE.audios={}; VOICE.muteSeq=null;
+}
+// ¿el anfitrión me silenció? (cada silenciada sube un contador; al entrar no cuenta lo viejo)
+function checkForcedMute(){
+  const m=me(); if(!m) return;
+  const seq=m.muteSeq||0;
+  if(VOICE.muteSeq==null){ VOICE.muteSeq=seq; return; }
+  if(seq>VOICE.muteSeq){ VOICE.muteSeq=seq; if(VOICE.stream){ stopMic(false); toast('🔇 El anfitrión silenció tu micrófono. Podés volver a activarlo cuando quieras.'); } }
 }
 
 /* ====================== MARCAS DEL JUGADOR ====================== */
@@ -791,7 +866,7 @@ function playersHTML(){
   const ficha = p => {
     const n=myPlanchas(p.id).length;
     return `<div class="pl ${p.id===NET.myPid?'me':''} ${!p.conn&&!p.bot?'off':''}">${p.emoji} <b>${esc(p.name)}</b>
-      ${p.id===S.hostPid?'👑':''}${p.id===S.cantorPid?'🎤':''}${p.bot?'🤖':''}
+      ${p.id===S.hostPid?'👑':''}${p.id===S.cantorPid?'🎤':''}${p.bot?'🤖':''}${p.mic?'<span class="habla" title="Tiene el micrófono abierto">🔊 hablando</span>':''}${host && p.mic && p.id!==NET.myPid?`<button class="x" title="Silenciar a ${esc(p.name)}" data-act="silenciar" data-pid="${p.id}">🔇</button>`:''}
       ${p.esp?'':`<span>${gs(p.saldo)}</span>`}${n?`<span>· 🎟️${n}</span>`:''}
       ${host && p.id!==S.hostPid && S.phase!=='juego' ? `<button class="x" title="Sacar de la sala" data-act="quitar" data-pid="${p.id}">✕</button>`:''}</div>`;
   };
@@ -812,6 +887,7 @@ function topHTML(){
     ${m?`<button class="ib saldo" data-act="prestamos" title="Préstamos entre jugadores">💸 ${gs(m.saldo)}${pedidosAjenos().length?`<span class="dot">${pedidosAjenos().length}</span>`:''}</button>`:''}
     <button class="ib" data-act="reglas" title="Reglas">📜</button>
     <button class="ib" data-act="sonido" title="Sonido: voz que canta + efectos / solo efectos / silencio">${PREF.voz?'🗣️':PREF.sound?'🔊':'🔇'}</button>
+    <button class="ib ${VOICE.stream?'micon':''}" data-act="mic" title="${VOICE.stream?'Micrófono ACTIVO: tocá para apagarlo':'Chat de voz: tocá para hablar'}">🎙️</button>
     <button class="ib" data-act="chat" title="Chat">💬${unread}</button>
     <button class="ib" data-act="salir" title="Salir">🚪</button>`;
 }
@@ -891,6 +967,13 @@ function ventaHTML(){
   ${vozSalaHTML()}
   <div class="shop">${Object.keys(S.planchas||{}).map(Number).map(planchaHTML).join('')}</div>`;
 }
+// durante la cantada no se ve la lista de jugadores: acá se muestra quién tiene el micrófono abierto
+function hablanHTML(){
+  const h=S.players.filter(p=>p.mic && p.conn), host=NET.myPid===S.hostPid;
+  if(!h.length) return '';
+  return `<div class="hablan">🔊 Hablan: ${h.map(p=>`<span class="pl">${p.emoji} <b>${esc(p.name)}</b>${host && p.id!==NET.myPid?`<button class="x" title="Silenciar a ${esc(p.name)}" data-act="silenciar" data-pid="${p.id}">🔇</button>`:''}</span>`).join('')}
+    ${VOICE.muted?'<span class="muted" style="color:#fbb">(no los estás escuchando)</span>':''}</div>`;
+}
 // mis combinaciones agrupadas por cartón: en la PC un cartón a la izquierda y el otro a la derecha; en el celular uno debajo del otro
 function misCartonesHTML(mine){
   const grupos={}; mine.forEach(c=>{ const p=infoDe(c).p; (grupos[p]=grupos[p]||[]).push(c); });
@@ -900,7 +983,7 @@ function juegoHTML(){
   const last=S.drawn[S.drawn.length-1], canDraw=NET.myPid===S.cantorPid||NET.myPid===S.hostPid, mine=myCards(NET.myPid);
   const cantor=P(S.cantorPid), d=new Set(S.drawn);
   const lw=S.winners.linea.map(w=>P(w.pid)).filter(Boolean).map(p=>p.emoji+' '+esc(p.name)).join(', ');
-  return `<div class="stage">
+  return `${hablanHTML()}<div class="stage">
     ${last?ball(last,'spin" id="bigBall'):`<div class="ball vacia"><span>?</span></div>`}
     <div class="info"><div style="font-size:14px;opacity:.8">${last?`Bolilla ${S.drawn.length} de 90`:'Todavía no salió ninguna bolilla'}${S.vozSala?` · 🎙️ Canta ${esc(S.vozSala.nombre)}`:''}</div>
       ${last?`<div class="nick">“${esc(dichoMostrado(last))}”</div>`:''}
@@ -960,7 +1043,8 @@ const REGLAS = `<h3>📜 Cómo se juega la Lotería</h3><ul class="rules">
   <li><b>Empate:</b> si dos o más cantan con la misma bolilla (dentro de unos segundos), el premio se reparte en partes iguales.</li>
   <li><b>Cantar en falso:</b> si cantaste y al verificar no vino algún número, se muestra en rojo cuál fue. Sacás tu maíz equivocado y la partida sigue. (El anfitrión puede elegir que además se pague multa o se anule el cartón.)</li>
   <li>Si nadie gana la lotería, el pozo queda <b>acumulado</b> para la ronda siguiente.</li>
-  <li><b>Préstamos:</b> si te quedás sin plata, tocá tu saldo 💸 arriba para pedir prestado. Los demás te pueden prestar y después les devolvés cuando ganes.</li></ul>`;
+  <li><b>Préstamos:</b> si te quedás sin plata, tocá tu saldo 💸 arriba para pedir prestado. Los demás te pueden prestar y después les devolvés cuando ganes.</li>
+  <li><b>Chat de voz:</b> tocá 🎙️ arriba para hablar con todos los de la sala (se pone verde mientras hablás); tocalo de nuevo para cortar. En 🗣️ podés dejar de escuchar a los demás. El anfitrión puede silenciar a alguien con 🔇.</li></ul>`;
 const pedidosAjenos = () => (S && S.pedidos || []).filter(x=>x.pid!==NET.myPid && P(x.pid));
 function prestamosHTML(){
   const m=me(), otros=S.players.filter(p=>p.id!==NET.myPid && !p.bot), deudas=S.deudas||[];
@@ -1015,6 +1099,8 @@ function sonidoHTML(){
     ${S ? `<div style="margin-top:8px">${vozSalaHTML()}</div>`:''}
     ${hay?'':'<div class="res tarde" style="margin-top:8px">Este dispositivo no tiene voces en español instaladas, así que las voces automáticas no se van a escuchar.</div>'}
     <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:700"><input type="checkbox" data-act="efectos" ${PREF.sound?'checked':''}> 🔔 Efectos de sonido (bolilla, maíz, aplausos)</label>
+    <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:700"><input type="checkbox" data-act="spk" ${VOICE.muted?'':'checked'}> 🔊 Escuchar el chat de voz de los demás</label>
+    <div class="muted" style="margin-top:4px">Para hablar, tocá 🎙️ arriba (se pone verde mientras el micrófono está abierto).</div>
     <button class="btn wide" style="margin-top:12px" data-act="sonidoClose">Listo</button></div>`;
 }
 // redibuja la ventana encima del juego sin perder lo que se estaba escribiendo
@@ -1109,7 +1195,7 @@ function render(){
   app.innerHTML=`<div class="wrap">${body}</div>`;
   window.scrollTo(0, scroll);
   if(aid){ const el=document.getElementById(aid); if(el){ el.value=aval; el.focus(); } }
-  effects(); renderOv();
+  effects(); renderOv(); checkForcedMute(); voiceSync();
 }
 setInterval(()=>{ const e=$('#claimLeft'); if(e && S && S.claim) e.textContent=Math.max(0,Math.ceil((S.claim.until-Date.now())/1000)); }, 250);
 
@@ -1153,6 +1239,9 @@ document.addEventListener('click', e=>{
     case 'sonido': UI.sonido=true; renderOv(); cargarGrabados().then(()=>{ if(UI.sonido) renderOv(); }); break;
     case 'vozSalaOn': case 'ofrecerVoz': { const g=recInfo(); if(!g) break; PREF.vozSalaId=g.id; savePref(); doAct({t:a==='vozSalaOn'?'vozSala':'ofrecerVoz', on:true, nombre:g.nombre, base:g.base, textos:g.textos}); break; }
     case 'aceptarVoz': case 'rechazarVoz': doAct({t:a}); break;
+    case 'mic': toggleMic(); break;
+    case 'spk': toggleSpk(); renderOv(); break;
+    case 'silenciar': doAct({t:'silenciar', pid:el.dataset.pid}); break;
     case 'vozSalaOff': doAct({t:'vozSala', on:false}); break;
     case 'sonidoClose': UI.sonido=false; renderOv(); break;
     case 'cantorSel': {
