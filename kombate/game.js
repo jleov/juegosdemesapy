@@ -1211,6 +1211,7 @@ function render() {
   c.restore();
   if (G.mode === 'demo') { c.fillStyle = 'rgba(10,4,14,.45)'; c.fillRect(0, 0, W, H); return; }
   drawHUD(c);
+  drawKeys(c);
   if (G.ann && G.ann.t < 85) drawAnn(c);
   if (G.paused) { c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 0, W, H); }
 }
@@ -1257,6 +1258,36 @@ function drawHUD(c) {
     c.lineWidth = 6; c.strokeStyle = '#000'; c.strokeText(G.combo.n + ' GOLPES', x, yy); c.fillStyle = '#ffc83d'; c.fillText(G.combo.n + ' GOLPES', x, yy);
     c.restore();
   }
+}
+// barra de teclas para quien juega en la PC; la tecla se ilumina al apretarla
+const SPEC_NAME = { charge: 'Embestida', fire: 'Bola de energía', tele: 'Teletransporte', slam: 'Golpe al suelo' };
+function drawKeys(c) {
+  if (isTouch() || !['cpu', 'host', 'guest'].includes(G.mode)) return;
+  const me = G.f[G.mode === 'guest' ? 1 : 0]; if (!me) return;
+  const h = S_KB1.h, ready = me.en >= SPEC_COST;
+  const items = [
+    [['W', 'A', 'S', 'D'], 'moverse', [h.u, h.l, h.d, h.r]],
+    [['V'], '👊 puño', [h.p]], [['B'], '🦶 patada', [h.k]], [['G'], '⤒ saltar', [h.u]],
+    [['H'], '⚡ ' + (SPEC_NAME[me.ch.special] || 'habilidad') + (ready ? ' ¡LISTA!' : ''), [h.s], ready]
+  ];
+  c.save(); c.font = '800 14px system-ui,sans-serif'; c.textBaseline = 'middle';
+  const K = 24, gap = 6, sp = 18;
+  const widths = items.map(([ks, label]) => ks.length * (K + 3) + gap + c.measureText(label).width);
+  const total = widths.reduce((a, b) => a + b, 0) + sp * (items.length - 1) + 24, y = H - 22;
+  let x = (W - total) / 2;
+  rr(c, x, y - 17, total, 34, 17); c.fillStyle = 'rgba(0,0,0,.55)'; c.fill();
+  x += 12;
+  items.forEach(([ks, label, on, glowIt], n) => {
+    ks.forEach((k, j) => {
+      rr(c, x, y - K / 2, K, K, 6); c.fillStyle = on[j] ? '#ffc83d' : glowIt ? (G.time % 30 < 15 ? '#b85cff' : '#7a2ebf') : '#ffffff26'; c.fill();
+      c.lineWidth = 1.5; c.strokeStyle = '#ffffff70'; c.stroke();
+      c.fillStyle = on[j] ? '#1a0d00' : '#fff'; c.textAlign = 'center'; c.fillText(k, x + K / 2, y + 1);
+      x += K + 3;
+    });
+    c.textAlign = 'left'; c.fillStyle = glowIt ? '#f1d4ff' : '#ffffffd0'; c.fillText(label, x + gap - 3, y + 1);
+    x += gap + c.measureText(label).width + sp;
+  });
+  c.restore();
 }
 function drawAnn(c) {
   const t = G.ann.t, s = t < 10 ? 2.4 - 1.4 * (t / 10) : 1, a = t > 70 ? (85 - t) / 15 : 1;
