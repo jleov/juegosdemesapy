@@ -2208,9 +2208,12 @@ function netHost(room = 'duel') {
   if (typeof Peer === 'undefined') { oMsg('No se pudo cargar la conexión en línea.'); toast('No se pudo cargar la conexión en línea.'); return; }
   netClose(); NET.role = 'host'; NET.room = room; NET.code = genCode();
   const p = NET.peer = mkPeer(PFX + NET.code); oMsg('Creando sala…');
+  // salas de bots y de torneo: se vuelve a dibujar la pantalla para mostrar el código (o el botón otra vez si falló)
+  const redraw = () => { if ($('#scrTour').classList.contains('on')) renderTour(); else if ($('#scrSelect').classList.contains('on')) renderSelect(); };
+  if (room !== 'duel') setTimeout(() => { if (NET.peer === p && !p.open) { toast('😕 No se pudo abrir la sala. Revisá la conexión a internet y probá de nuevo.', 5000); netClose(); redraw(); } }, 15000);
   p.on('open', () => {
     if (NET.peer !== p) return;
-    if (room === 'bots') { audienceChanged(); toast('📡 Sala abierta: ' + NET.code); return; }
+    if (room !== 'duel') { audienceChanged(); redraw(); toast('📡 Sala abierta: ' + NET.code); return; }
     $('#onA').style.display = 'none'; $('#onB').style.display = 'block'; $('#oShow').textContent = NET.code; oMsg('Esperando que tu amigo entre…');
   });
   p.on('connection', c => {
@@ -2218,7 +2221,9 @@ function netHost(room = 'duel') {
     if (NET.conn && NET.conn.open) { c.on('open', () => { c.send({ t: 'full' }); setTimeout(() => c.close(), 500); }); return; }
     bindConn(c);
   });
-  p.on('error', e => { if (NET.peer !== p) return; if (e.type === 'unavailable-id') { netHost(room); return; } oMsg('Error de conexión (' + e.type + '). Probá de nuevo.'); if (room === 'bots') toast('Error de conexión (' + e.type + ').'); });
+  p.on('error', e => { if (NET.peer !== p) return; if (e.type === 'unavailable-id') { netHost(room); return; } oMsg('Error de conexión (' + e.type + '). Probá de nuevo.');
+    if (room !== 'duel' && !p.open) { toast('😕 No se pudo abrir la sala (' + e.type + '). Probá de nuevo.', 5000); netClose(); redraw(); }
+  });
   p.on('disconnected', () => { try { if (NET.peer === p) p.reconnect(); } catch (e) { } });
 }
 function netJoin(code) {
