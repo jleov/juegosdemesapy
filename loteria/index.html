@@ -12,6 +12,7 @@
 <script src="peerjs.min.js"></script>
 <script src="voces.js"></script>
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="../ice.js"></script>
 <style>
 :root{--bg1:#4a1a7a;--bg2:#1c0a33;--cream:#fff8e6;--ink:#1d1d1d;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f;--muted:#6b6b6b}
 *{box-sizing:border-box}
@@ -627,10 +628,7 @@ function scheduleAuto(){
 
 /* ====================== RED ====================== */
 function newPeer(id){
-  return new Peer(id, {debug:1, config:{iceServers:[
-    {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},
-    {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'}
-  ]}});
+  return new Peer(id, {debug:1, config:{iceServers: window.ICE_SERVERS || [{urls:"stun:stun.l.google.com:19302"}]}});
 }
 function publicState(){ const v=JSON.parse(JSON.stringify(S)); v.players.forEach(p=>delete p.token); return v; }
 function commit(){

@@ -118,10 +118,7 @@ function doAct(a){
   const r=act(me(), a); if(typeof r==='string') toast(r);
 }
 function newPeer(id){
-  return new Peer(id, {debug:1, config:{iceServers:[
-    {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},
-    {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'}
-  ]}});
+  return new Peer(id, {debug:1, config:{iceServers: window.ICE_SERVERS || [{urls:"stun:stun.l.google.com:19302"}]}});
 }
 function netBar(on,txt){ const b=$('#netbar'); b.style.display=on?'block':'none'; if(txt) b.textContent=txt; }
 

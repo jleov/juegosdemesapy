@@ -21,10 +21,7 @@
   }
   const L={cfg:null, peer:null, conn:null, ok:false, lastSeen:0, tried:0, nonce:null};
   function newPeer(){
-    return new Peer({debug:0, config:{iceServers:[
-      {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},
-      {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'}
-    ]}});
+    return new Peer({debug:0, config:{iceServers: window.ICE_SERVERS || [{urls:"stun:stun.l.google.com:19302"}]}});
   }
   function drop(){ const c=L.conn; Object.assign(L,{conn:null, ok:false}); try{ c && c.close(); }catch(e){} }
   function info(){ try{ return L.cfg && L.cfg.info(); }catch(e){ return null; } }

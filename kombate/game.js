@@ -2204,10 +2204,7 @@ const roomHost = () => NET.role === 'host' && (NET.room === 'bots' || NET.room =
 function mkPeer(id) {
   const o = {
     debug: 1, config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' }
-      ]
+      iceServers: window.ICE_SERVERS || [{urls:"stun:stun.l.google.com:19302"}]
     }
   };
   return id ? new Peer(id, o) : new Peer(o);

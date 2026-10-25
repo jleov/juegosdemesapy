@@ -13,6 +13,7 @@
 <!-- librería de conexión entre jugadores (PeerJS 1.5.4), guardada junto al juego para no depender de otro sitio -->
 <script src="peerjs.min.js"></script>
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="../ice.js"></script>
 <style>
 :root{--cream:#fbf4e4;--ink:#1d1d1d;--muted:#6b6b6b;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f;
   --cr:#d52b1e;--cy:#f2b705;--cg:#1f9e4a;--cb:#0038a8;--felt:#0e5c3a;--wood:#5a2e17}
@@ -438,7 +439,7 @@ html,body{overflow-x:clip}
 <div id="fly"></div>
 
 <script src="reglas.js?v=2"></script>
-<script src="juego.js?v=5"></script>
+<script src="juego.js?v=6"></script>
 <script src="../dueno-link.js"></script>
 <script>
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)

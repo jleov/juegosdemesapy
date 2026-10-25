@@ -9,6 +9,7 @@
 <link rel="icon" href="../icon-192.png">
 <script src="../banquero/peerjs.min.js"></script>
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="../ice.js"></script>
 <style>
 :root{--cream:#fff8e6;--blue:#0038a8;--red:#d52b1e;--gold:#f2c14e;--muted:#6b6b6b}
 *{box-sizing:border-box}
@@ -95,9 +96,7 @@ async function start(jwk){
   catch(e){ store('bnq_owner', undefined); A.key=null; return render(); }
   if(jwk.x!==OWNER_PUB.x){ store('bnq_owner', undefined); A.key=null; return render(); }
   A.err='Conectando…'; render();
-  const peer=A.peer=new Peer(PANEL_ID, {debug:1, config:{iceServers:[
-    {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},
-    {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'}]}});
+  const peer=A.peer=new Peer(PANEL_ID, {debug:1, config:{iceServers: window.ICE_SERVERS || [{urls:"stun:stun.l.google.com:19302"}]}});
   peer.on('open', ()=>{ A.err=''; render(); });
   peer.on('disconnected', ()=>{ if(!peer.destroyed) setTimeout(()=>{ try{ peer.reconnect(); }catch(e){} },1500); });
   peer.on('error', e=>{

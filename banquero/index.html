@@ -11,6 +11,7 @@
 <!-- librería de conexión entre jugadores (PeerJS 1.5.4), guardada junto al juego para no depender de otro sitio -->
 <script src="peerjs.min.js"></script>
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="../ice.js"></script>
 <style>
 :root{--felt:#0b3d2e;--cream:#f6f1e1;--ink:#1d1d1d;--red:#d52b1e;--blue:#0038a8;--gold:#e9b949;--muted:#6b6b6b;--line:#2a2a2a}
 *{box-sizing:border-box}
@@ -1471,10 +1472,7 @@ function doAct(a, pid){
   const r=act(pid || meId(), a); if(typeof r==='string') toast(r);
 }
 function newPeer(id){
-  return new Peer(id, {debug:1, config:{iceServers:[
-    {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},
-    {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'}
-  ]}});
+  return new Peer(id, {debug:1, config:{iceServers: window.ICE_SERVERS || [{urls:"stun:stun.l.google.com:19302"}]}});
 }
 
 /* ====================== DUEÑO DEL JUEGO ====================== */
