@@ -321,6 +321,27 @@ body > #comm{display:none !important}   /* el chat solo se muestra dentro de la 
 .deck.cc{background-color:#d96f16}.deck.ca{background-color:#1648a8}
 .deck .ci{font-size:28px}
 @keyframes deckglow{0%,100%{transform:translateY(0);filter:drop-shadow(0 0 2px #ffd400)}50%{transform:translateY(-3px);filter:drop-shadow(0 0 10px #ffd400)}}
+/* mazos de tarjetas sobre el tablero (en diagonal, como en el juego de mesa) */
+.bdeck{position:absolute;z-index:0;width:7.2em;height:4.6em;border-radius:.6em;border:.25em solid #fff;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1em;
+  font-size:max(8px,.78em);letter-spacing:.06em;line-height:1.05;text-align:center;
+  background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 .35em,transparent .35em .8em);
+  box-shadow:.2em .2em 0 #fff,.28em .28em 0 .05em rgba(0,0,0,.25),.45em .45em 0 #fff,.53em .53em 0 .05em rgba(0,0,0,.25),0 .6em 1em rgba(0,0,0,.25)}
+.bdeck .ci{font-size:1.7em}.bdeck b{font-size:.85em}
+.bdeck.cc{background-color:#d96f16;left:6%;top:9%;transform:rotate(-45deg)}
+.bdeck.ca{background-color:#1648a8;right:6%;bottom:9%;transform:rotate(-45deg)}
+.bdeck.glow{z-index:5;cursor:pointer;animation:bdeckglow 1s ease-in-out infinite}
+@keyframes bdeckglow{0%,100%{filter:drop-shadow(0 0 .2em #ffd400)}50%{filter:drop-shadow(0 0 .9em #ffd400) brightness(1.12)}}
+#center > :not(.bdeck){position:relative;z-index:1}
+.v3d .bdeck{transform:rotate(-45deg) translateZ(.4em)}
+/* modo a mano: mi ficha se alza al tocarla */
+.tk.grab{pointer-events:auto;cursor:grab;animation:grabpulse 1s ease-in-out infinite;z-index:6;position:relative}
+@keyframes grabpulse{0%,100%{box-shadow:0 0 0 .15em #ffd400,0 1px 3px rgba(0,0,0,.6)}50%{box-shadow:0 0 0 .4em #ffd400,0 1px 3px rgba(0,0,0,.6)}}
+.tk.grab.lifted{opacity:.35;animation:none;box-shadow:0 0 0 .15em #ffd400}
+.tk.nudge{animation:nudge .45s}
+@keyframes nudge{20%,60%{translate:-.25em 0}40%,80%{translate:.25em 0}}
+#ghostTok{position:fixed;z-index:90;pointer-events:none;width:46px;height:46px;margin:-60px 0 0 -23px;border-radius:50%;background:#fff;border:4px solid var(--pc);
+  display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 14px 18px rgba(0,0,0,.45);animation:ghostup .25s ease-out}
+@keyframes ghostup{from{transform:translateY(40px) scale(.7)}to{transform:none}}
 /* subasta y pozo */
 .aucbig{font-size:1.1em;margin:4px 0}
 .aucrow{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;margin:4px 0}
@@ -1986,7 +2007,7 @@ function toggleHand(){
   const pid=handPid(), p=pid&&P(pid); if(!p) return toast('Estás mirando: no tenés ficha.');
   const on=!p.manual; if(NET.mode!=='local') store('bnq_manual', on);
   doAct({type:'manual', on}, pid);
-  toast(on ? `👆 Modo a mano${NET.mode==='local'?' para '+p.name:''}: después de tirar, tocá la casilla que brilla para mover la ficha, y tocá el mazo para sacar las tarjetas.` : `🎲 Modo automático${NET.mode==='local'?' para '+p.name:''}: la ficha se mueve sola y las tarjetas salen solas.`);
+  toast(on ? `👆 Modo a mano${NET.mode==='local'?' para '+p.name:''}: después de tirar, tocá tu ficha para alzarla y soltala en la casilla que brilla; para las tarjetas, tocá el mazo del tablero.` : `🎲 Modo automático${NET.mode==='local'?' para '+p.name:''}: la ficha se mueve sola y las tarjetas salen solas.`);
 }
 function renderHandBtn(){
   const b=$('#btnHand'); if(!b) return;
@@ -2058,11 +2079,45 @@ function cellPos(i){
   return [1+(i-30), 11];
 }
 function cellSide(i){ if(i%10===0) return 'c'; if(i<10) return 'b'; if(i<20) return 'l'; if(i<30) return 't'; return 'r'; }
+// modo a mano: primero se toca la ficha (se alza y sigue al dedo o al mouse) y después la casilla donde cae
+let LIFT=null, LIFT_AT=0;   // tirada en la que alcé mi ficha y cuándo
+const myMove = () => S && S.phase==='play' && S.tp==='move' && S.mv && canAct(cur().id);
+const lifted = () => myMove() && LIFT===S.rollId+':'+S.mv.to;
+function liftToken(ev){
+  if(!myMove() || lifted()) return;
+  if(ev) ev.stopPropagation();
+  LIFT=S.rollId+':'+S.mv.to; LIFT_AT=Date.now(); SFX.pay && SFX.pay();
+  const g=document.createElement('div'); g.id='ghostTok'; g.textContent=cur().emoji; g.style.setProperty('--pc', cur().color);
+  const x=ev&&ev.clientX!=null?ev.clientX:innerWidth/2, y=ev&&ev.clientY!=null?ev.clientY:innerHeight/2;
+  g.style.left=x+'px'; g.style.top=y+'px'; document.body.appendChild(g);
+  document.querySelectorAll('.tk.grab').forEach(t=>t.classList.add('lifted'));   // sin redibujar: el dedo todavía está apoyado en la ficha
+  renderCenter();
+}
+function dropLift(){ LIFT=null; const g=document.getElementById('ghostTok'); if(g) g.remove(); }
+document.addEventListener('pointermove', e=>{ const g=document.getElementById('ghostTok'); if(g){ g.style.left=e.clientX+'px'; g.style.top=e.clientY+'px'; } });
+// también se puede arrastrar: soltar la ficha encima de la casilla
+document.addEventListener('pointerup', e=>{
+  if(!lifted() || !LIFT_DOWN) return;
+  const moved=Math.hypot(e.clientX-LIFT_DOWN.x, e.clientY-LIFT_DOWN.y); LIFT_DOWN=null;
+  if(moved<12) return;
+  const cell=document.elementsFromPoint(e.clientX, e.clientY).find(el=>el.classList && el.classList.contains('cell'));
+  if(cell) cellClick(+cell.id.slice(1));
+});
+let LIFT_DOWN=null;
 function cellClick(i){
-  // modo a mano: tocar la casilla a la que llega la ficha
-  if(S && S.phase==='play' && S.tp==='move' && S.mv && canAct(cur().id)){
-    if(i===S.mv.to) return doAct({type:'moveTo', i}, cur().id);
-    if(i!==cur().pos) return toast(`👆 Esa no es: contá ${S.mv.n} casillas desde donde está tu ficha. La que brilla es la correcta.`);
+  if(myMove()){
+    const p=cur();
+    if(!lifted()){
+      if(i===p.pos) return liftToken();
+      const t=document.querySelector('.tk.grab'); if(t){ t.classList.remove('nudge'); void t.offsetWidth; t.classList.add('nudge'); }
+      return toast(`✋ Primero tocá tu ficha ${p.emoji} para alzarla.`);
+    }
+    if(i===S.mv.to){ dropLift(); return doAct({type:'moveTo', i}, p.id); }
+    if(i===p.pos){
+      if(Date.now()-LIFT_AT<600) return;   // es el mismo toque con el que la alzó (en 3D llega a la casilla)
+      dropLift(); renderTokens(); renderCenter(); return;   // la vuelve a apoyar donde estaba
+    }
+    return toast(`👆 Esa no es: contá ${S.mv.n} casillas desde donde está tu ficha. La que brilla es la correcta.`);
   }
   showProp(i);
 }
@@ -2226,13 +2281,16 @@ function renderSfxBtn(){ const b=$('#btnSfx'); b.textContent=SFX.on?'🎵':'🔇
 renderSfxBtn(); renderMusicBtn(); $('#musicCredit').textContent='🎶 '+MUSIC_CREDIT;
 
 function renderTokens(){
+  if(LIFT && !lifted()) dropLift();   // ya se movió (o se movió automático): la ficha alzada se suelta
   document.querySelectorAll('.toks').forEach(t=>t.innerHTML='');
   for(const p of S.players){
     if(p.bk) continue;
     const pos = disp[p.id]!=null ? disp[p.id] : p.pos;
     const el=document.createElement('div');
-    el.className='tk'+(p.jail && pos===10?' jailed':'')+(S.phase==='play'&&cur().id===p.id?' now':'');
-    el.style.borderColor=p.color; el.title=p.name;
+    const grab = myMove() && cur().id===p.id;   // modo a mano: mi ficha se puede alzar
+    el.className='tk'+(p.jail && pos===10?' jailed':'')+(S.phase==='play'&&cur().id===p.id&&!grab?' now':'')+(grab?' grab':'')+(grab&&lifted()?' lifted':'');
+    el.style.borderColor=p.color; el.title=grab ? (lifted()?'Ficha alzada: tocá la casilla donde cae':'Tocá tu ficha para alzarla') : p.name;
+    if(grab){ el.onpointerdown=e=>{ e.stopPropagation(); if(!lifted()) liftToken(e); LIFT_DOWN={x:e.clientX, y:e.clientY}; }; el.onclick=e=>e.stopPropagation(); }   // (en 3D, arrastrar la ficha no gira el tablero)
     if(VIEW.mode==='3d'){   // pieza 3D: 6 capas de base + 9 capas de la figura para darle grosor
       el.classList.add('tk3'); el.style.setProperty('--pc', p.color);
       el.innerHTML=`<div class="pbase">${range(6).map(i=>`<i style="transform:translateZ(${(i*.11).toFixed(2)}em)"></i>`).join('')}</div>`+
@@ -2713,7 +2771,10 @@ function renderCenterInner(){
   const r=S.roll||[1,1];
   const dieV = VIEW.mode==='3d' ? die3HTML : dieHTML;
   const pot = rule('pozo') ? `<div class="pot" title="Pozo del Descanso: se lo lleva el que cae en el Descanso">🧉 Pozo: <b>${fmt(S.pot||0)}</b></div>` : '';
-  let h=`<div class="clogo">BANQUERO<small>PARAGUAYO</small></div>${pot}<div class="dice" id="diceSpot" style="visibility:${animating?'hidden':'visible'}">${dieV(r[0],0)}${dieV(r[1],1)}</div><!--HUD-->`;
+  // los dos mazos sobre el tablero, en diagonal como en el juego de verdad; el que toca sacar brilla
+  const drawMine = S.phase==='play' && S.tp==='draw' && S.drawDeck && canAct(cur().id);
+  const deckEl = d => `<div class="bdeck ${d}${S.phase==='play'&&S.tp==='draw'&&S.drawDeck===d?' glow':''}" ${drawMine&&S.drawDeck===d?`onclick="doAct({type:'draw'})" title="Tocá para sacar tu tarjeta"`:`title="Mazo de ${DECK_NAME[d]}"`}><span class="ci">${d==='cc'?'💳':'🏦'}</span><b>${DECK_NAME[d].toUpperCase()}</b></div>`;
+  let h=`${deckEl('cc')}${deckEl('ca')}<div class="clogo">BANQUERO<small>PARAGUAYO</small></div>${pot}<div class="dice" id="diceSpot" style="visibility:${animating?'hidden':'visible'}">${dieV(r[0],0)}${dieV(r[1],1)}</div><!--HUD-->`;
   if(busy){
     c.innerHTML=h+`<div class="status">${Date.now()<diceEndAt?'🎲 Tirando los dados…':`${r[0]} + ${r[1]} = ${r[0]+r[1]}${r[0]===r[1]?' · ¡Dobles!':''} — avanzando…`}</div>`;
     return;
@@ -2774,11 +2835,13 @@ function renderCenterInner(){
                 `<button class="btn ${auc?'gold':'gray'}" onclick="doAct({type:'skip'})">${auc?'🔨 Subastar':'No comprar'}</button>`,
                 `<button class="btn gold" onclick="showBuyTitle()">🃏 Ver título</button>`);
     } else if(S.tp==='move' && S.mv){
-      h+=`<div class="handhint">👆 Mové tu ficha <b>${S.mv.n}</b> casillas: tocá la casilla que brilla.</div>`;
+      h+= lifted()
+        ? `<div class="handhint">✋ ¡Ficha alzada! Ahora tocá la casilla que brilla (${S.mv.n} casillas más adelante).</div>`
+        : `<div class="handhint">👆 Tocá tu ficha ${p.emoji} para alzarla y después tocá la casilla donde cae: avanzás <b>${S.mv.n}</b>.</div>`;
       acts.push(`<button class="btn gray" onclick="doAct({type:'moveTo',i:${S.mv.to}})">Mover automático</button>`);
     } else if(S.tp==='draw' && S.drawDeck){
-      h+=`<div class="handhint">Caíste en <b>${DECK_NAME[S.drawDeck]}</b>: tocá el mazo para sacar tu tarjeta.</div>
-        <button class="deck ${S.drawDeck}" onclick="doAct({type:'draw'})" title="Sacar una tarjeta"><span class="ci">${S.drawDeck==='cc'?'💳':'🏦'}</span><span>${DECK_NAME[S.drawDeck].toUpperCase()}</span></button>`;
+      h+=`<div class="handhint">Caíste en <b>${DECK_NAME[S.drawDeck]}</b>: tocá ese mazo en el tablero (el que brilla) para sacar tu tarjeta.</div>`;
+      acts.push(`<button class="btn gray" onclick="doAct({type:'draw'})">Sacar automático</button>`);
     } else if(S.tp==='end'){
       acts.push(`<button class="btn" onclick="doAct({type:'end'})">✔ Terminar turno</button>`);
     }
@@ -3143,7 +3206,7 @@ function showRules(){
   <h4>Tacumbú (cárcel)</h4><p>Para salir: pagás ${fmt(JAIL_FINE)}, usás la tarjeta “Salga libre” o sacás dobles. Al tercer intento fallido pagás la fianza y salís.</p>
   <h4>Hipotecas y deudas</h4><ul><li>Podés hipotecar por la mitad del precio (sin casas en el grupo). Levantarla cuesta la hipoteca + 10%.</li>
   <li>Vender casas devuelve la mitad de su costo.</li><li>Si quedás con saldo negativo, no podés seguir hasta conseguir dinero. Si no podés, quebrás y tus bienes pasan a tu acreedor.</li></ul>
-  <h4>Modo de juego</h4><p>Con el botón <b>🎲 Modo</b> cada jugador elige: <b>automático</b> (la ficha avanza sola y la tarjeta sale sola) o <b>a mano</b> (después de tirar, la casilla a la que llegás brilla y la tocás para mover tu ficha; si caés en Cuenta Corriente o Caja de Ahorros, tocás el mazo y la tarjeta se da vuelta).</p>
+  <h4>Modo de juego</h4><p>Con el botón <b>🎲 Modo</b> cada jugador elige: <b>automático</b> (la ficha avanza sola y la tarjeta sale sola) o <b>a mano</b> (después de tirar, tocás tu ficha para alzarla y la soltás en la casilla donde cae, que brilla; si caés en Cuenta Corriente o Caja de Ahorros, tocás ese mazo en el centro del tablero y la tarjeta se da vuelta).</p>
   <h4>Reglas especiales (opcionales)</h4><ul>${Object.values(RULES_DEF).map(d=>`<li><b>${d.t}:</b> ${d.d}</li>`).join('')}</ul>
   ${S&&S.phase==='play'?`<p class="muted">En esta partida: ${Object.keys(RULES_DEF).filter(k=>rule(k)).map(k=>RULES_DEF[k].t).join(' · ')||'ninguna regla especial'}.</p>`:''}
   <h4>Negocios</h4><p>Con “🤝 Negociar” podés ofrecer dinero y propiedades a otro jugador. Usá el chat o el micrófono para regatear.</p>
