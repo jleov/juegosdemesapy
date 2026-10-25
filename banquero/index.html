@@ -282,10 +282,14 @@ body > #comm{display:none !important}   /* el chat solo se muestra dentro de la 
 .prow{display:flex;align-items:center;gap:6px;background:#fff;border-radius:8px;padding:6px;margin:4px 0;font-size:13px;flex-wrap:wrap}
 .prow .sw{width:10px;align-self:stretch;border-radius:3px}
 .prow .pn{flex:1 1 120px;font-weight:700}
-.tcols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.tcols input[type=number]{min-width:0}
+@media (max-width:420px){ .tcols .chk{flex-wrap:wrap;row-gap:0} .tcols .chk .tpr{flex-basis:100%;padding-left:24px} }
 .tcols h4{margin:6px 0}
 .chk{display:flex;align-items:center;gap:6px;font-size:13px;background:#fff;border-radius:6px;padding:4px 6px;margin:3px 0}
 .chk input{width:18px;height:18px}
+.chk .tpr{color:#2a7a3f;font-weight:800;font-size:11.5px;white-space:nowrap}
+.tsum{font-size:13px;margin-top:6px;padding:5px 6px;background:#fff6dc;border-radius:6px}
 .cardov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:60;background:rgba(0,0,0,.45);padding:16px}
 .cardov.watch{background:rgba(0,0,0,.15);pointer-events:none}
 .bigcard.noanim{animation:none}
@@ -2654,8 +2658,9 @@ function renderPlayers(){
 }
 function tradeDesc(t){
   const A=P(t.from), Bp=P(t.to);
-  const list=(m,ps,c)=>[m?fmt(m):'', ...ps.map(i=>B[i].n), c?`🎫 ${c} tarjeta${c>1?'s':''} “Salga libre”`:''].filter(Boolean).join(', ')||'nada';
-  return `<b>${esc(A.name)}</b> da: ${esc(list(t.gm,t.gp,t.gc))}<br><b>${esc(Bp.name)}</b> da: ${esc(list(t.rm,t.rp,t.rc))}`;
+  const list=(m,ps,c)=>[m?fmt(m):'', ...ps.map(i=>`${B[i].n} (${fmt(B[i].p*K)})`), c?`🎫 ${c} tarjeta${c>1?'s':''} “Salga libre”`:''].filter(Boolean).join(', ')||'nada';
+  const val=(m,ps)=>ps.length ? ` <span class="muted">· vale ${fmt(tradeValue(m,ps))}</span>` : '';   // dinero + precio de compra de las propiedades
+  return `<b>${esc(A.name)}</b> da: ${esc(list(t.gm,t.gp,t.gc))}${val(t.gm,t.gp)}<br><b>${esc(Bp.name)}</b> da: ${esc(list(t.rm,t.rp,t.rc))}${val(t.rm,t.rp)}`;
 }
 function renderTrades(){
   const mine=S.trades.filter(t=>NET.mode==='local' || t.to===NET.myPid || t.from===NET.myPid);
@@ -2858,19 +2863,30 @@ function showTrade(target, ctx){
   target = target || others[0].id;
   const T=P(target), pf=TRADE_CTX.prefill||{gp:[],rp:[],gc:0,rc:0};
   const chk=(pid,cls,selP,selC)=>(P(pid).jcards.map((_,k)=>`<label class="chk"><input type="checkbox" class="${cls}C" ${k<selC?'checked':''}>🎫 Salga libre de Tacumbú</label>`).join('') +
-    ownedList(pid).filter(tradable).map(i=>`<label class="chk"><input type="checkbox" class="${cls}" value="${i}" ${selP.includes(i)?'checked':''}><span class="dot" style="background:${B[i].g?GROUPS[B[i].g].c:'#999'}"></span>${B[i].s||B[i].n}${S.props[i].m?' (hip.)':''}</label>`).join(''))||'<p class="muted">Nada para ofrecer</p>';
+    ownedList(pid).filter(tradable).map(i=>`<label class="chk"><input type="checkbox" class="${cls}" value="${i}" ${selP.includes(i)?'checked':''}><span class="dot" style="background:${B[i].g?GROUPS[B[i].g].c:'#999'}"></span><span style="flex:1">${B[i].s||B[i].n}${S.props[i].m?' (hip.)':''}</span><small class="tpr" title="Precio de compra">${fmtS(B[i].p*K)}</small></label>`).join(''))||'<p class="muted">Nada para ofrecer</p>';
   const counter=!!TRADE_CTX.replaces;
   const h=`<h3>${counter?'🔁 Contraoferta':'🤝 Negociar'}</h3>
     ${counter?`<p class="muted" style="margin-top:0">Cambiá lo que quieras de la oferta de ${esc(T.name)} y mandásela de vuelta. Su oferta original se reemplaza por la tuya.</p>`:''}
     <label style="font-size:13px;font-weight:700">Con:</label>
     <select id="trTo" ${counter?'disabled':''} onchange="showTrade(this.value,{from:'${me}'})">${others.map(p=>`<option value="${p.id}" ${p.id===target?'selected':''}>${p.emoji} ${esc(p.name)}</option>`).join('')}</select>
-    <div class="tcols">
-      <div><h4>${NET.mode==='local'?esc(P(me).name)+' da':'Vos das'}</h4><input type="number" id="trGm" min="0" step="10000" placeholder="₲ dinero" value="${pf.gm||''}">${chk(me,'trGp',pf.gp,pf.gc)}</div>
-      <div><h4>Pedís a ${esc(T.name)}</h4><input type="number" id="trRm" min="0" step="10000" placeholder="₲ dinero" value="${pf.rm||''}">${chk(target,'trRp',pf.rp,pf.rc)}</div>
+    <div class="tcols" oninput="tradeSums()" onchange="tradeSums()">
+      <div><h4>${NET.mode==='local'?esc(P(me).name)+' da':'Vos das'}</h4><input type="number" id="trGm" min="0" step="10000" placeholder="₲ dinero" value="${pf.gm||''}">${chk(me,'trGp',pf.gp,pf.gc)}<div class="tsum" id="trGsum"></div></div>
+      <div><h4>Pedís a ${esc(T.name)}</h4><input type="number" id="trRm" min="0" step="10000" placeholder="₲ dinero" value="${pf.rm||''}">${chk(target,'trRp',pf.rp,pf.rc)}<div class="tsum" id="trRsum"></div></div>
     </div>
+    <div class="tsum" id="trDiff" style="text-align:center"></div>
+    <p class="muted" style="margin:4px 0 0">Al lado de cada propiedad está su <b>precio de compra</b> al Banco, para que sepas cuánto vale lo que das y lo que pedís.</p>
     <p class="muted">Tip: activá el micrófono o usá el chat para negociar. Las calles con casas no se pueden negociar (vendé las casas primero).</p>
     <button class="btn green wide" onclick="sendTrade()">${counter?'🔁 Enviar contraoferta':'Enviar oferta'}</button>`;
-  modal(h,'trade');
+  modal(h,'trade'); tradeSums();
+}
+// cuánto vale cada lado de la oferta: el dinero más el precio de compra de las propiedades
+const tradeValue = (m, ps) => (m||0) + (ps||[]).reduce((a,i)=>a+B[i].p*K, 0);
+function tradeSums(){
+  const vals=c=>[...document.querySelectorAll('.'+c+':checked')].map(x=>+x.value);
+  const g=tradeValue(+$('#trGm').value||0, vals('trGp')), r=tradeValue(+$('#trRm').value||0, vals('trRp'));
+  $('#trGsum').innerHTML=`Valor: <b>${fmt(g)}</b>`; $('#trRsum').innerHTML=`Valor: <b>${fmt(r)}</b>`;
+  $('#trDiff').innerHTML = !g && !r ? '' : g===r ? '⚖️ Las dos partes valen lo mismo'
+    : g>r ? `⚖️ Das <b>${fmt(g-r)}</b> más de lo que pedís` : `⚖️ Pedís <b>${fmt(r-g)}</b> más de lo que das`;
 }
 function sendTrade(){
   const vals=c=>[...document.querySelectorAll('.'+c+':checked')].map(x=>+x.value);
