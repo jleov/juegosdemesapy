@@ -816,7 +816,7 @@ function showBuyTitle(refresh){
 function lobbyState(){ return {phase:'lobby', players:[], seq:0, hostPid:null, log:[], logSeq:0, rules:myRules()}; }
 // reglas opcionales: las elige el anfitrión en la sala (o este dispositivo para las partidas sin internet)
 const RULES_DEF={
-  pozo:{t:'🧉 Pozo del Descanso', d:'Lo que se paga en Impuesto a la Renta no va al Banco: se junta en el centro del tablero, y el que cae en el Descanso se lleva todo.'},
+  pozo:{t:'🧉 Pozo del Descanso', d:'Lo que se paga en Impuesto a la Renta e Impuesto Inmobiliario no va al Banco: se junta en el centro del tablero, y el que cae en el Descanso se lleva todo.'},
   subasta:{t:'🔨 Subasta', d:'Si el que cae en una propiedad no tiene plata para comprarla, se subasta entre todos los jugadores, con una base del 20% de su precio.'}
 };
 function myRules(){ const r=load('bnq_rules')||{}; return {pozo:!!r.pozo, subasta:!!r.subasta}; }
@@ -826,7 +826,6 @@ function rulesHTML(rules, editable, fn){
 }
 function setMyRule(k,on){ const r=myRules(); r[k]=on; store('bnq_rules', r); }
 function setRoomRule(k,on){ setMyRule(k,on); doAct({type:'rules', rules:myRules()}); }
-const POZO_IDX = B.findIndex(x=>x.n==='Impuesto a la Renta');
 function addPlayer(name, emoji, token, peerId, bot){
   const usedE=S.players.map(p=>p.emoji), usedC=S.players.map(p=>p.color);
   if(!EMOJIS.includes(emoji) || usedE.includes(emoji)) emoji=EMOJIS.find(e=>!usedE.includes(e));
@@ -942,7 +941,7 @@ function land(p, dice, mode){
       startNextPay(); return;
     }
     case 'tax':
-      if(rule('pozo') && p.pos===POZO_IDX){   // va al centro del tablero, no al Banco
+      if(rule('pozo')){   // los dos impuestos van al centro del tablero, no al Banco
         pay(p, sp.a*K, null, sp.n+' → al pozo del Descanso'); S.pot=(S.pot||0)+sp.a*K;
         log(`🧉 El pozo del Descanso ya junta ${fmt(S.pot)}.`);
       } else pay(p, sp.a*K, null, sp.n);
