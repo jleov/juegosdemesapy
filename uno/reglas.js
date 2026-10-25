@@ -236,17 +236,16 @@ function act(pid, a){
     case 'uno': {
       if(S.phase!=='play') return;
       if(S.unoWatch && S.unoWatch.pid===pid){ S.unoWatch=null; log(`📣 ${p.name} cantó ¡UNO! a tiempo.`); ev('uno',{pid}); commit(); return; }
-      if(p.hand.length===2){ if(!p.unoSaid){ p.unoSaid=true; log(`📣 ${p.name} canta ¡UNO!`); ev('uno',{pid}); commit(); } return; }
-      if(p.hand.length===1){ ev('uno',{pid}); commit(); return; }
-      return 'Se canta ¡UNO! cuando te quedan 2 cartas (antes de tirar la penúltima) o justo después, con 1.';
+      if(p.hand.length===1){ ev('uno',{pid}); commit(); return; }   // ya lo había cantado
+      return 'Se canta ¡UNO! cuando te queda una sola carta.';
     }
     case 'catch': {
       const w=S.unoWatch; if(!w) return 'Nadie se olvidó de cantar ¡UNO!';
       if(w.pid===pid) return;
       const t=P(w.pid); S.unoWatch=null;
       if(!t || t.hand.length!==1){ commit(); return; }
-      drawCards(t,2);
-      log(`🚨 ${p.name} agarró a ${t.name} sin cantar ¡UNO!: roba 2 cartas.`, {pid:t.id});
+      drawCards(t,1);
+      log(`🚨 ${p.name} le cantó ¡UNO! antes a ${t.name}: roba 1 carta del mazo.`, {pid:t.id});
       ev('catch', {pid:t.id, by:pid});
       commit(); return;
     }
@@ -316,7 +315,6 @@ function act(pid, a){
       if(seven && (!P(a.target) || a.target===pid)) return 'Elegí con quién cambiar las cartas.';
       if(jump){ S.turn=S.players.indexOf(p); log(`⚡ ${p.name} ¡corta! con una carta igual.`); ev('jump',{pid}); }
       clearWatchFor(pid);
-      if(p.hand.length===2 && a.uno) p.unoSaid=true;
       doPlay(p, c, a);
       commit(); return;
     }
@@ -333,8 +331,7 @@ function doPlay(p, c, a){
   log(`${p.emoji} ${p.name} tira ${cardName(c, isWild(c)?a.color:null)}.`, {card:c, pid:p.id, col:S.color});
   ev('play', {pid:p.id, card:c, col:S.color});
   if(p.hand.length===1){
-    if(p.unoSaid) log(`📣 ${p.name} queda con una carta: ¡UNO!`);
-    else S.unoWatch={pid:p.id, at:Date.now()};
+    S.unoWatch={pid:p.id, at:Date.now()};   // le queda una: tiene que cantar ¡UNO! antes que otro se lo cante
   }
   p.unoSaid=false;
   const n=S.players.length, me=S.players.indexOf(p);
@@ -408,7 +405,7 @@ const BOT_TALK = {
   play:['¡Tomá!','Upéi…','¡Ahí va!','Jaha 😎','Esa te dolió','¡Aguanteee!','Mba\'éichapa la mano 😏'],
   d4:['¡El Pombero te visita! 👹','Che ra\'a, robá nomás 😈','+4 y un tereré 🧉'],
   uno:['¡UNO! 📣','¡Peteĩ! (uno) 📣','¡UNO, atención! 📣'],
-  catchd:['¡Te agarré! No cantaste UNO 🚨','Ndaje… ¡olvidaste el UNO! 🚨'],
+  catchd:['¡UNO! 📣 Te lo canté primero, robá una 😜','Ndaje… ¡UNO! Te gané de mano 📣'],
   draw:['Nde… a robar 😩','Ndaipóri… robo','Ni una me sirve 😅'],
 };
 const pick = a => a[rnd(a.length)];
@@ -441,7 +438,6 @@ function botChoose(b){
   if(S.opts.sevenZero && best.v==='7' && b.hand.length>1){
     const t=S.players.filter(x=>x!==b).sort((x,y)=>x.hand.length-y.hand.length)[0]; a.target=t.id;
   }
-  if(b.hand.length===2) a.uno = b.bot ? Math.random()<.88 : true;
   return a;
 }
 function botTick(){
@@ -451,7 +447,7 @@ function botTick(){
   const w=S.unoWatch;
   if(w){
     const t=P(w.pid);
-    if(t && t.bot && BOT.selfTry!==w.at){ BOT.selfTry=w.at; if(Math.random()<.5){ setTimeout(()=>{ if(S.unoWatch && S.unoWatch.pid===t.id){ act(t.id,{type:'uno'}); botChat(t,pick(BOT_TALK.uno)); } }, 500+rnd(900)); } }
+    if(t && autoPlays(t) && BOT.selfTry!==w.at){ BOT.selfTry=w.at; if(!t.bot || Math.random()<.85){ setTimeout(()=>{ if(S.unoWatch && S.unoWatch.pid===t.id){ act(t.id,{type:'uno'}); if(t.bot) botChat(t,pick(BOT_TALK.uno)); } }, 700+rnd(1500)); } }
     const catchers=S.players.filter(x=>x.bot && x.id!==w.pid);
     if(catchers.length && now-w.at>1800 && BOT.watchTry!==w.at){
       BOT.watchTry=w.at;
@@ -464,7 +460,7 @@ function botTick(){
     BOT.jumpTry=now;
     for(const b of S.players.filter(x=>x.bot && x!==cur())){
       const c=b.hand.find(x=>canJumpIn(b,x));
-      if(c && Math.random()<.3){ const a={type:'play', id:c.id}; if(b.hand.length===2) a.uno=true;
+      if(c && Math.random()<.3){ const a={type:'play', id:c.id};
         if(S.opts.sevenZero && c.v==='7') a.target=S.players.filter(x=>x!==b).sort((x,y)=>x.hand.length-y.hand.length)[0].id; BOT.next=now+1200; return act(b.id,a); }
     }
   }
@@ -478,7 +474,6 @@ function botTick(){
     const c=b.hand.find(x=>x.id===a.id);
     if(c && c.v==='d4' && Math.random()<.5) botChat(b,pick(BOT_TALK.d4));
     else if(Math.random()<.08) botChat(b,pick(BOT_TALK.play));
-    if(a.uno && b.bot) setTimeout(()=>botChat(b,pick(BOT_TALK.uno)),300);
   } else if(a.type==='draw' && Math.random()<.1) botChat(b,pick(BOT_TALK.draw));
   const r=act(b.id,a);
   if(typeof r==='string'){ console.warn('bot', r, a); if(a.type==='play') act(b.id, S.drawn?{type:'pass'}:{type:'draw'}); }

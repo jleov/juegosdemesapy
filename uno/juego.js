@@ -801,14 +801,15 @@ function renderActions(){
     } else {
       s = V.pending4 ? `👹 ${esc(VP(V.pending4.victim).name)} decide si acepta el +4 o reta…` : V.pickColor ? `🕸️ ${esc(VP(V.pickColor.pid).name)} elige el color de salida…` : `⏳ Turno de <b>${esc(cp.emoji)} ${esc(cp.name)}</b>${cp.bot?' 🤖':''} · color ${col}`;
     }
-    const n=(p.hand||[]).length, mustUno=(n===2 && !p.unoSaid) || (V.unoWatch && V.unoWatch.pid===me());
-    if(n<=2) h+=`<button class="btn uno ${mustUno?'hot':''}" onclick="doAct({type:'uno'})" ${mustUno?'':'disabled'}>${p.unoSaid&&n===2?'✅ UNO cantado':'📣 ¡UNO!'}</button>`;
+    const n=(p.hand||[]).length, mustUno=!!(V.unoWatch && V.unoWatch.pid===me());
+    if(mustUno){ h+=`<button class="btn uno hot" onclick="doAct({type:'uno'})">📣 ¡UNO!</button>`; s=`📣 <b>¡Te queda una carta!</b> Tocá ¡UNO! rápido, antes que otro te lo cante (si no, robás 1).`; }
+    else if(n===1) h+=`<button class="btn uno" disabled>✅ UNO</button>`;
   } else {
     s = `👀 Turno de <b>${esc(cp.emoji)} ${esc(cp.name)}</b> · color ${col}`;
   }
   if(V.unoWatch && V.unoWatch.pid!==me() && p){
     const w=VP(V.unoWatch.pid);
-    h+=`<button class="btn catch" onclick="doAct({type:'catch'})">🚨 ¡${esc(w?w.name:'')} no cantó UNO!</button>`;
+    h+=`<button class="btn catch" onclick="doAct({type:'catch'})">📣 ¡UNO! a ${esc(w?w.name:'')}</button>`;
   }
   A.innerHTML=h; st.innerHTML=s;
 }
@@ -868,7 +869,7 @@ function processEvents(before){
     } else if(e.k==='uno'){
       const p=VP(e.pid); setTimeout(()=>{ bigText('¡UNO!', p?p.name+' · ¡Peteĩ!':''); sfx.uno(); say('¡Uno!'); }, delay);
     } else if(e.k==='catch'){
-      const p=VP(e.pid), by=VP(e.by); setTimeout(()=>{ bigText('🚨 ¡Te agarré!', `${by?by.name:''} → ${p?p.name:''} roba 2`); sfx.catch(); }, delay);
+      const p=VP(e.pid), by=VP(e.by); setTimeout(()=>{ bigText('📣 ¡Te canté UNO!', `${by?by.name:''} → ${p?p.name:''} roba 1`); sfx.catch(); }, delay);
     } else if(e.k==='challenge'){
       setTimeout(()=>{ bigText(e.ok?'🕵️ ¡Era trampa!':'🕵️ Era legal', e.ok?'El del +4 roba 4':'El que retó roba 6'); sfx.catch(); }, delay);
     } else if(e.k==='jump'){ const p=VP(e.pid); setTimeout(()=>{ bigText('⚡ ¡Cortó!', p?p.name:''); }, delay); }
@@ -1032,7 +1033,7 @@ function showRules(){
     <li>Si se acaba el mazo, se mezclan las tiradas (menos la de arriba).</li>
   </ul>
   <h3>📣 ¡UNO!</h3>
-  <p>Cuando tirás tu penúltima carta tenés que cantar <b>¡UNO!</b> (tocá el botón amarillo antes o justo después de tirar). Si otro te agarra antes de que juegue el siguiente, <b>robás 2</b>.</p>
+  <p>Cuando te queda <b>una sola carta</b> tenés que cantar <b>¡UNO!</b> (tocá el botón amarillo). Si otro jugador te canta el UNO antes que vos (con el botón “📣 ¡UNO! a …”), <b>robás 1 carta del mazo</b>. Hay tiempo hasta que juegue el siguiente.</p>
   <h3>🕵️ Retar el +4</h3>
   <p>El que recibe un +4 puede retar. Si el que lo tiró tenía una carta del color de la mesa, roba 4 él (y el que retó ve sus cartas). Si era legal, el que retó roba 6.</p>
   <h3>🏆 Puntos</h3>
