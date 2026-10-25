@@ -828,7 +828,7 @@ function showBuyTitle(refresh){
   if(S.tp!=='buy' || S.pendingBuy==null){ if(refresh) closeModal(); return; }
   const i=S.pendingBuy, p=cur(), sp=B[i], mine=canAct(p.id);
   let h=`<h3>🃏 ${mine?'¿Comprás este título?':esc(p.name)+' está por decidir'}</h3><div style="max-width:260px;margin:0 auto 10px">${titleCard(i)}</div>`;
-  if(mine) h+=`<div class="row"><button class="btn green" ${p.money<sp.p*K?'disabled':''} onclick="closeModal();showBuyPicker()">Comprar ${fmt(sp.p*K)}</button><button class="btn gray" onclick="closeModal();doAct({type:'skip'})">No comprar</button></div>
+  if(mine) h+=`<div class="row"><button class="btn green" ${p.money<sp.p*K?'disabled':''} onclick="closeModal();showBuyPicker()">Comprar ${fmt(sp.p*K)}</button><button class="btn gray" onclick="closeModal();doAct({type:'skip'})">${rule('subasta')?'🔨 No comprar: subastar':'No comprar'}</button></div>
     <button class="btn wide" style="margin-top:8px;background:#2a9d3f" onclick="showTitles('mine')">Ver mis títulos</button>`;
   modal(h,'buy',i);
 }
@@ -838,7 +838,7 @@ function lobbyState(){ return {phase:'lobby', players:[], seq:0, hostPid:null, l
 // reglas opcionales: las elige el anfitrión en la sala (o este dispositivo para las partidas sin internet)
 const RULES_DEF={
   pozo:{t:'🧉 Pozo del Descanso', d:'Lo que se paga en Impuesto a la Renta e Impuesto Inmobiliario no va al Banco: se junta en el centro del tablero, y el que cae en el Descanso se lleva todo.'},
-  subasta:{t:'🔨 Subasta', d:'Si el que cae en una propiedad no tiene plata para comprarla, se subasta entre todos los jugadores, con una base del 20% de su precio.'}
+  subasta:{t:'🔨 Subasta', d:'Si el que cae en una propiedad no la compra (porque no le alcanza o porque no quiere), se subasta entre todos los jugadores, con una base del 20% de su precio. Si nadie oferta, sigue en el Banco.'}
 };
 function myRules(){ const r=load('bnq_rules')||{}; return {pozo:!!r.pozo, subasta:!!r.subasta}; }
 const rule = k => !!(S && S.rules && S.rules[k]);
@@ -993,8 +993,12 @@ function drawCard(p, deck, flip){
   log(`${p.name} saca ${DECK_NAME[deck]}: “${c.x}”`);
   switch(c.k){
     case 'money': if(c.v>=0){ p.money+=c.v*K; } else pay(p,-c.v*K,null,'tarjeta'); break;
-    case 'goto': if(c.to<p.pos) passGo(p); p.pos=c.to; land(p,diceSum(),null); return;
-    case 'back': p.pos=(p.pos+40-c.n)%40; land(p,diceSum(),null); return;
+    case 'goto':
+      if(handMode(p)){ S.mv={to:c.to, n:(c.to-p.pos+40)%40, card:true, go:c.to<p.pos}; S.tp='move'; return; }   // a mano: la lleva él
+      if(c.to<p.pos) passGo(p); p.pos=c.to; land(p,diceSum(),null); return;
+    case 'back':
+      if(handMode(p)){ S.mv={to:(p.pos+40-c.n)%40, n:-c.n, card:true}; S.tp='move'; return; }
+      p.pos=(p.pos+40-c.n)%40; land(p,diceSum(),null); return;
     case 'jail': goJail(p); return;
     case 'free': p.jcards.push(deck); break;
     case 'repairs': {
@@ -1012,6 +1016,7 @@ function drawCard(p, deck, flip){
       return;
     case 'nearest': {
       let i=p.pos; do{ i=(i+1)%40; }while(B[i].t!==c.type);
+      if(handMode(p)){ S.mv={to:i, n:(i-p.pos+40)%40, card:true, go:i<p.pos, mode:c.type==='tr'?'x2':'x10'}; S.tp='move'; return; }
       if(i<p.pos) passGo(p);
       p.pos=i; land(p, diceSum(), c.type==='tr'?'x2':'x10'); return;
     }
@@ -1163,8 +1168,10 @@ function act(pid, a){
   switch(a.type){
     case 'moveTo': {   // modo a mano: tocó la casilla a la que llega
       if(!turn || S.tp!=='move' || !S.mv) return;
-      if(i!==S.mv.to) return `Esa no es: tenés que avanzar ${S.mv.n} casillas desde ${B[p.pos].s||B[p.pos].n}.`;
-      const n=S.mv.n; S.mv=null; move(p, n); break;
+      if(i!==S.mv.to) return `Esa no es: la casilla que brilla es ${B[S.mv.to].n}.`;
+      const mv=S.mv; S.mv=null;
+      if(mv.card){ if(mv.go) passGo(p); p.pos=mv.to; land(p, diceSum(), mv.mode||null); break; }   // lo que mandó la tarjeta
+      move(p, mv.n); break;
     }
     case 'draw': {     // modo a mano: tocó el mazo para sacar la tarjeta
       if(!turn || S.tp!=='draw' || !S.drawDeck) return;
@@ -1205,7 +1212,7 @@ function act(pid, a){
     case 'skip': {
       if(!turn||S.tp!=='buy') return;
       const idx=S.pendingBuy;
-      if(rule('subasta') && p.money<B[idx].p*K){ log(`${p.name} no tiene plata para comprar ${B[idx].n}.`); startAuction(idx); break; }
+      if(rule('subasta')){ log(`${p.name} no compra ${B[idx].n}${p.money<B[idx].p*K?' (no le alcanza)':''}: va a subasta.`); startAuction(idx); break; }
       log(`${p.name} no compra ${B[idx].n}.`); afterMove(p); break;
     }
     case 'end': if(!turn||S.tp!=='end') return; if(p.money<0) return 'Primero salí del saldo negativo.'; nextTurn(); break;
@@ -2117,7 +2124,7 @@ function cellClick(i){
       if(Date.now()-LIFT_AT<600) return;   // es el mismo toque con el que la alzó (en 3D llega a la casilla)
       dropLift(); renderTokens(); renderCenter(); return;   // la vuelve a apoyar donde estaba
     }
-    return toast(`👆 Esa no es: contá ${S.mv.n} casillas desde donde está tu ficha. La que brilla es la correcta.`);
+    return toast(S.mv.card ? `👆 Esa no es: la tarjeta te manda a ${B[S.mv.to].n} (la casilla que brilla).` : `👆 Esa no es: contá ${S.mv.n} casillas desde donde está tu ficha. La que brilla es la correcta.`);
   }
   showProp(i);
 }
@@ -2829,15 +2836,16 @@ function renderCenterInner(){
       const i=S.pendingBuy, sp=B[i], gh=groupHave(p.id,i);
       h+=`<div class="pcard"><div class="bar" style="background:${sp.g?GROUPS[sp.g].c:'#999'}"></div><b>${sp.ic||''} ${sp.n}</b><br>Precio: <b>${fmt(sp.p*K)}</b>
         <div style="font-size:.9em">Cobrarías: <b>${rentIfBought(p.id,i)}</b><br><span class="muted">${gh.text}</span></div></div>`;
-      const short=p.money<sp.p*K, auc=short && rule('subasta');
-      if(auc) h+=`<div class="muted">No te alcanza: se puede subastar entre todos desde ${fmt(Math.ceil(sp.p*K*.2/K)*K)}.</div>`;
+      const short=p.money<sp.p*K, auc=rule('subasta');
+      if(auc) h+=`<div class="muted">${short?'No te alcanza. ':''}Si no la comprás, se subasta entre todos desde ${fmt(Math.ceil(sp.p*K*.2/K)*K)}.</div>`;
       acts.push(`<button class="btn green" onclick="showBuyPicker()" ${short?'disabled':''}>Comprar</button>`,
-                `<button class="btn ${auc?'gold':'gray'}" onclick="doAct({type:'skip'})">${auc?'🔨 Subastar':'No comprar'}</button>`,
+                `<button class="btn ${auc?'gold':'gray'}" onclick="doAct({type:'skip'})">${auc?'🔨 No comprar: subastar':'No comprar'}</button>`,
                 `<button class="btn gold" onclick="showBuyTitle()">🃏 Ver título</button>`);
     } else if(S.tp==='move' && S.mv){
+      const dest = S.mv.card ? `la tarjeta te manda a <b>${B[S.mv.to].n}</b>` : `avanzás <b>${S.mv.n}</b>`;
       h+= lifted()
-        ? `<div class="handhint">✋ ¡Ficha alzada! Ahora tocá la casilla que brilla (${S.mv.n} casillas más adelante).</div>`
-        : `<div class="handhint">👆 Tocá tu ficha ${p.emoji} para alzarla y después tocá la casilla donde cae: avanzás <b>${S.mv.n}</b>.</div>`;
+        ? `<div class="handhint">✋ ¡Ficha alzada! Ahora tocá la casilla que brilla (${S.mv.card?B[S.mv.to].n:S.mv.n+' casillas más adelante'}).</div>`
+        : `<div class="handhint">👆 Tocá tu ficha ${p.emoji} para alzarla y después tocá la casilla donde cae: ${dest}.</div>`;
       acts.push(`<button class="btn gray" onclick="doAct({type:'moveTo',i:${S.mv.to}})">Mover automático</button>`);
     } else if(S.tp==='draw' && S.drawDeck){
       h+=`<div class="handhint">Caíste en <b>${DECK_NAME[S.drawDeck]}</b>: tocá ese mazo en el tablero (el que brilla) para sacar tu tarjeta.</div>`;
@@ -2849,7 +2857,7 @@ function renderCenterInner(){
     let w='';
     if(S.tp==='buy') w=`Está decidiendo si compra ${B[S.pendingBuy].n}…`;
     else if(S.tp==='roll') w = p.jail ? 'Está preso en Tacumbú…' : 'Va a tirar los dados…';
-    else if(S.tp==='move') w = `👆 Está moviendo su ficha ${S.mv?S.mv.n:''} casillas…`;
+    else if(S.tp==='move') w = S.mv&&S.mv.card ? `👆 Está llevando su ficha a ${B[S.mv.to].n}…` : `👆 Está moviendo su ficha ${S.mv?S.mv.n:''} casillas…`;
     else if(S.tp==='draw') w = `Está por sacar una tarjeta de ${DECK_NAME[S.drawDeck]||'un mazo'}…`;
     else w='Está terminando su turno…';
     if(isNeg(p)) w='No pudo pagar: debe conseguir dinero o quebrar…';
