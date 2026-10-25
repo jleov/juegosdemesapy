@@ -906,7 +906,7 @@ function placeFighter(f) {
   Object.assign(f, {
     x: STAGE_W / 2 + (f.i ? 170 : -170), y: 0, vx: 0, vy: 0, face: f.i ? -1 : 1, tx: 0, ty: 0,
     hp: f.maxHp, hpLag: f.maxHp, st: 'idle', sf: 0, atk: null, an: '', hitDone: false, stun: 0, combo: 0, flash: 0, alpha: 1, rot: 0, inv: 0,
-    buf: { p: 0, k: 0, s: 0 }, pose: { ...P_IDLE }, ai: null, spec: null, slamLand: 0, crouchBlock: false, pal: 0, squash: 0, seq: [], holdBack: 0, holdDown: 0, airAtk: false, en: 0
+    buf: { p: 0, k: 0, s: 0 }, pose: { ...P_IDLE }, ai: null, spec: null, slamLand: 0, crouchBlock: false, pal: 0, squash: 0, inflate: 0, thin: 0, upside: false, pin: false, seq: [], holdBack: 0, holdDown: 0, airAtk: false, en: 0
   });
   f.tx = f.x; f.ty = 0;
 }
@@ -1269,17 +1269,17 @@ const FATAL = {
   sombra: { name: 'Mil patadas', seq: ['B', 'B', 'K'], anim: 'tele' },
   tanque: { name: 'Aplastada', seq: ['D', 'D', 'K'], anim: 'slam' },
   escarcha: { name: 'Congelado y roto', seq: ['D', 'B', 'P'], anim: 'freeze' },
-  latigo: { name: 'Revoleada al cielo', seq: ['F', 'F', 'P'], anim: 'launch' },
+  latigo: { name: 'Revoleada con el lazo', seq: ['F', 'F', 'P'], anim: 'lasso' },
   dragon: { name: 'Gancho al cielo', seq: ['D', 'F', 'K'], anim: 'launch' },
-  tornado: { name: 'Tornado de patadas', seq: ['B', 'F', 'K'], anim: 'tele' },
-  muralla: { name: 'Aplastamuro', seq: ['B', 'D', 'P'], anim: 'slam' },
-  terere: { name: 'Termazo', seq: ['B', 'B', 'P'], anim: 'launch' },
+  tornado: { name: 'Huracán', seq: ['B', 'F', 'K'], anim: 'tornado' },
+  muralla: { name: 'Sándwich de piedra', seq: ['B', 'D', 'P'], anim: 'walls' },
+  terere: { name: 'Termazo', seq: ['B', 'B', 'P'], anim: 'termo' },
   meteoro: { name: 'Meteorito gigante', seq: ['D', 'D', 'S'], anim: 'boom' },
-  luchador: { name: 'Llave final', seq: ['F', 'D', 'P'], anim: 'slam' },
-  halcon: { name: 'Picada final', seq: ['F', 'F', 'K'], anim: 'launch' },
-  sonico: { name: 'Grito que deja en los huesos', seq: ['B', 'B', 'S'], anim: 'fire', style: 'sonic' },
-  bumeran: { name: 'Bumerán loco', seq: ['D', 'B', 'K'], anim: 'tele' },
-  bombita: { name: 'Bombazo', seq: ['F', 'D', 'K'], anim: 'boom', style: 'bomb' }
+  luchador: { name: 'Clavado de cabeza', seq: ['F', 'D', 'P'], anim: 'piledriver' },
+  halcon: { name: 'Vuelo sin regreso', seq: ['F', 'F', 'K'], anim: 'eagle' },
+  sonico: { name: 'Grito que lo infla', seq: ['B', 'B', 'S'], anim: 'inflate' },
+  bumeran: { name: 'Lluvia de bumeranes', seq: ['D', 'B', 'K'], anim: 'boomers' },
+  bombita: { name: 'Cuenta regresiva', seq: ['F', 'D', 'K'], anim: 'bombtag' }
 };
 const SEQ_ICON = { D: '⬇️', F: '➡️', B: '⬅️', P: '👊', K: '🦶', S: '⚡' };
 function trackSeq(f, inp) {
@@ -1304,7 +1304,7 @@ function startFinish() {
 function startFatal() {
   const w0 = G.f[G.fin.w], FD0 = FATAL[w0.key] || FATAL.toro;
   G.fatal = { w: G.fin.w, type: FD0.anim, style: FD0.style || '', hit: 0 };
-  G.fin = null; G.phase = 'fatal'; G.pf = 0;
+  G.fin = null; G.phase = 'fatal'; G.pf = 0; G.ann = null;
   const w = G.f[G.fatal.w]; w.vx = 0; setSt(w, 'idle'); w.hitDone = true;
   fx('sfx', 'power'); fx('aura', w.x, 110, w.i);
 }
@@ -1319,6 +1319,7 @@ function palette(ch, kind) {
   p = { ...ch, c }; PAL.set(key, p); return p;
 }
 function phys(f) {
+  if (f.pin) return false; // lo mueve el remate a mano
   f.x += f.vx;
   if (f.y > 0 || f.vy > 0) { f.y += f.vy; f.vy -= f.st === 'fly' ? .12 : GRAV; if (f.y <= 0 && f.st !== 'fly') { f.y = 0; f.vy = 0; return true; } }
   return false;
@@ -1409,6 +1410,92 @@ function fatalStep() {
       G.mets = G.mets.filter(m => !m.dead);
       if (F.hit && t === F.hit + 60) fx('twinkle', o.x, 430);
       break;
+    case 'inflate': // Sónico: lo infla a gritos como un globo hasta que revienta
+      if (t === 1) { w.st = 'special'; w.spec = 'sonic'; w.face = dir; }
+      if (w.st === 'special') w.sf = 12;
+      if (t > 8 && t < 104) {
+        o.st = 'dizzy'; o.inflate = Math.min(1.3, (t - 8) / 90 * 1.3); o.x += t % 2 ? 1.5 : -1.5;
+        if (t % 7 === 0) { fx('rings', w.x + dir * 60, 120); fx('shake', 3); }
+      }
+      if (t === 104) { o.inflate = 0; fx('boom', o.x, 90, 1); fx('say', '¡Pum!'); Object.assign(o, { st: 'fly', sf: 0, vx: dir * 3, vy: 24, y: .1, hurt: 1, flash: 12 }); setSt(w, 'win'); }
+      if (t === 165) fx('twinkle', o.x, 430);
+      break;
+    case 'tornado': // Tornado: arma un huracán que lo chupa dando vueltas y lo revolea
+      if (t === 1) { w.st = 'special'; w.spec = 'spin'; w.face = dir; F.cx = w.x; }
+      if (w.st === 'special') w.sf = 6 + (t % 36);
+      if (t >= 22 && t < 124) {
+        const k = (t - 22) / 102; o.pin = true; o.st = 'fly';
+        o.x = F.cx + Math.sin(t * .32) * 80 * (1 - k * .4); o.y = k * 360;
+        if (t % 9 === 0) { fx('dust', F.cx, 10); fx('sfx', 'whoosh'); }
+      }
+      if (t === 124) { o.pin = false; o.vx = dir * 11; o.vy = 9; o.hurt = 1; fx('sfx', 'ko'); }
+      if (t === 128) setSt(w, 'win');
+      if (t === 175) fx('twinkle', o.x, 430);
+      break;
+    case 'boomers': // Bumerán: un montón de bumeranes le pegan por todos lados y uno se lo lleva
+      if (t === 1) { w.st = 'special'; w.spec = 'boom'; w.face = dir; }
+      if (w.st === 'special') w.sf = 12;
+      if (t >= 12 && t < 100 && t % 8 === 4) { fx('hit', o.x + rnd(-25, 25), 100 + rnd(-40, 50), 1); o.st = 'hit'; o.sf = 0; o.face = -o.face; o.flash = 8; fx('shake', 4); }
+      if (t === 100) { o.pin = true; o.st = 'fly'; o.hurt = 1; F.bx = o.x; fx('sfx', 'whoosh'); }
+      if (t > 100 && t < 160) { o.x += dir * 13; o.y = 110 + Math.sin((t - 100) * .15) * 40; }
+      if (t === 104) setSt(w, 'win');
+      if (t === 160) { o.pin = false; o.vy = 6; fx('twinkle', o.x, 300); }
+      break;
+    case 'walls': // Muralla: dos paredes de piedra salen del piso y lo dejan finito como un papel
+      if (t === 1) { w.st = 'special'; w.spec = 'counter'; w.face = dir; F.cx = o.x; fx('shake', 6); fx('sfx', 'slam'); }
+      if (w.st === 'special') w.sf = 10;
+      if (t === 10) o.st = 'dizzy';
+      if (t === 54) { o.thin = 1; o.st = 'idle'; o.flash = 12; o.hurt = 1; fx('shake', 22); fx('sfx', 'slam'); fx('dust', F.cx, 30); fx('hit', F.cx, 110, 1); }
+      if (t === 96) { setSt(w, 'win'); fx('sfx', 'land'); }
+      if (t === 118) { Object.assign(o, { st: 'ko', sf: 0, vy: 2, y: .1 }); fx('sfx', 'whoosh'); } // se cae como una hoja
+      break;
+    case 'piledriver': // Luchador: lo da vuelta, salta y lo clava de cabeza en el piso
+      if (t === 1) { w.st = 'special'; w.spec = 'grab'; w.grab = { t: 0 }; w.face = dir; Object.assign(o, { pin: true, st: 'held', upside: true }); fx('sfx', 'grab'); }
+      if (!F.hit) {
+        if (t === 12) { w.vy = 17; w.y = .1; fx('sfx', 'jump'); }
+        o.x = w.x + w.face * 8; o.y = w.y + 390; // cabeza abajo arriba de la del luchador
+        if (t > 14 && lw) {
+          F.hit = t; w.grab = null; F.cx = o.x; o.x = F.cx; o.y = 115; o.st = 'stuck'; o.hurt = 1; o.flash = 12;
+          fx('boom', F.cx, 0); fx('shake', 24); fx('sfx', 'slam'); fx('dust', F.cx, 40);
+          w.st = 'jump'; w.sf = 0; w.vy = 8; w.y = .1; w.vx = -dir * 3.5;
+        }
+      } else if (lw && w.st === 'jump') { setSt(w, 'win'); w.vx = 0; }
+      break;
+    case 'lasso': // Látigo: lo enlaza, lo revolea por arriba de la cabeza y lo tira lejos
+      if (t === 1) { w.st = 'special'; w.spec = 'whip'; w.sf = 9; w.face = dir; fx('sfx', 'whip'); }
+      if (w.st === 'special') w.sf = 3;
+      if (t >= 18 && t < 112) {
+        const a = (t - 18) * .19 - Math.PI / 2 * dir; o.pin = true; o.st = 'fly';
+        o.x = w.x + Math.cos(a) * 135; o.y = 165 + Math.sin(a) * 100;
+        if (t % 12 === 0) fx('sfx', 'whoosh');
+      }
+      if (t === 112) { o.pin = false; o.vx = dir * 13; o.vy = 17; o.hurt = 1; fx('sfx', 'whip'); setSt(w, 'win'); }
+      if (t === 168) fx('twinkle', o.x, 430);
+      break;
+    case 'termo': // Tereré: le cae un termo gigante en la cabeza
+      if (t === 1) { setSt(w, 'win'); F.cx = o.x; o.st = 'dizzy'; }
+      if (t === 44) { F.hit = t; fx('hit', o.x, 200, 1); fx('sfx', 'slam'); fx('shake', 18); o.squash = .5; o.flash = 12; o.hurt = 1; fx('say', '¡Toing!'); }
+      if (t > 44 && t < 100) o.squash = Math.max(o.squash, .3);
+      if (t === 100) Object.assign(o, { st: 'ko', sf: 0, vy: 3, y: .1 });
+      break;
+    case 'eagle': // Halcón: se lo lleva volando fuera de la pantalla y lo suelta desde el cielo
+      if (t === 1) { w.pin = true; w.st = 'special'; w.spec = 'dive'; w.sf = 2; F.sx = w.x; F.sy = w.y; }
+      if (t < 20) { const k = t / 20; w.x = lerp(F.sx, o.x, k); w.y = lerp(F.sy, 210, k); }
+      if (t === 20) { o.pin = true; o.st = 'held'; fx('sfx', 'grab'); }
+      if (t >= 20 && t < 70) { w.y += 10; o.x = w.x; o.y = w.y - 120; w.sf = 2; }
+      if (t === 100) { o.pin = false; Object.assign(o, { st: 'fall', y: 720, vy: -24, vx: 0 }); fx('sfx', 'whoosh'); }
+      if (t > 100 && lo && !F.hit) { F.hit = t; o.st = 'ko'; o.hurt = 1; fx('boom', o.x, 0, 1); fx('shake', 24); }
+      if (t === 130) { w.x = o.x - dir * 120; w.y = 600; w.pin = false; w.st = 'jump'; w.vy = -4; }
+      if (t > 130 && lw && w.st === 'jump') setSt(w, 'win');
+      break;
+    case 'bombtag': // Bombita: le pega una bomba con cuenta regresiva
+      if (t === 1) { w.st = 'special'; w.spec = 'bomb'; w.sf = 0; w.face = dir; }
+      if (t === 14) { o.st = 'dizzy'; F.tag = true; fx('sfx', 'grab'); setSt(w, 'idle'); }
+      if (t === 30 || t === 60 || t === 90) fx('sfx', 'beep');
+      if (t === 40) w.x -= dir * 60;
+      if (t === 120) { F.tag = false; o.pal = 2; Object.assign(o, { st: 'fly', sf: 0, vx: dir * 4, vy: 22, y: .1, hurt: 1, flash: 12 }); fx('boom', o.x, 60, 1); fx('say', '¡Bum!'); setSt(w, 'win'); }
+      if (t === 178) fx('twinkle', o.x, 430);
+      break;
   }
 }
 
@@ -1474,6 +1561,7 @@ function targetPose(f) {
     case 'zapped': { const j = () => rnd(-.25, .25); return { t: j() * .5, a1: 2.3 + j(), a2: 2.5 + j(), b1: -2.1 + j(), b2: -2.3 + j(), l1: .65 + j(), l2: .6, m1: -.65 + j(), m2: -.6 }; }
     case 'fly': return { t: -.5, a1: 2.4, a2: 2.8, b1: -2.2, b2: -1.6, l1: 1.1, l2: .6, m1: .6, m2: .1 };
     case 'flat': return { t: 0, a1: 1.57, a2: 1.57, b1: -1.57, b2: -1.57, l1: .35, l2: .35, m1: -.35, m2: -.35 };
+    case 'stuck': { const k = Math.sin(T * .5); return { t: 0, a1: .3, a2: .3, b1: -.3, b2: -.3, l1: .5 + k * .5, l2: .2 + k * .6, m1: -.5 + k * .5, m2: -.2 + k * .6 }; } // clavado de cabeza: patalea
   }
   return P_IDLE;
 }
@@ -1483,6 +1571,7 @@ function poseStep(f) {
   if (f.st === 'fly') f.rot += .28 * (f.vx >= 0 ? 1 : -1) * f.face; // da vueltas por el aire
   else { const rt = (f.st === 'down' || f.st === 'ko') && f.y <= 2 ? -1.57 : (f.st === 'fall' || f.st === 'ko') ? -.8 : f.st === 'held' ? -1.4 : 0; f.rot = lerp(f.rot, rt, .2); }
   f.squash = lerp(f.squash || 0, f.st === 'flat' ? 1 : 0, .45);
+  if (f.upside) f.rot = Math.PI; // cabeza abajo
   f.hpLag = f.hpLag > f.hp ? Math.max(f.hp, f.hpLag - .4) : f.hp;
 }
 
@@ -1577,6 +1666,8 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   if (f.rot) c.translate(0, -16 * Math.min(1, Math.abs(f.rot) / 1.57) * s);
   c.scale(vf * s, s);
   if (f.squash > .01) c.scale(1 + f.squash * .9, 1 - f.squash * .8); // aplastado como panqueque
+  if (f.inflate > .01) c.scale(1 + f.inflate, 1 + f.inflate * .85); // inflado como globo
+  if (f.thin > .01) c.scale(1 - f.thin * .86, 1); // finito como un papel
   c.rotate(f.rot);
   const hipH = Math.max(Math.cos(P.l1) * SEG.T + Math.cos(P.l2) * SEG.S, Math.cos(P.m1) * SEG.T + Math.cos(P.m2) * SEG.S);
   const hx = 0, hy = -hipH, L = B.torso;
@@ -1694,6 +1785,70 @@ function drawHat(c, type, col, R, OL, T) {
     c.quadraticCurveTo(-R * 1.2, -R * .3 + Math.sin(T * .3) * 4, -R * 1.5, -R * .1 + Math.sin(T * .3 + 1) * 6); c.stroke();
   }
 }
+// lo que aparece en algunos remates: huracán, bumeranes, paredes, pozo, lazo, termo y la bomba con cuenta regresiva
+function drawFatalObjs(c, cx) {
+  const F = G.fatal; if (!F || G.phase !== 'fatal') return;
+  const t = G.pf, w = G.f[F.w], o = G.f[1 - F.w]; if (!w || !o) return;
+  const X = x => x - cx, Y = y => GROUND - y;
+  c.save();
+  switch (F.type) {
+    case 'tornado': if (t >= 8 && t < 140) {
+      const a = Math.min(1, (t - 8) / 20) * (t > 124 ? Math.max(0, (140 - t) / 16) : 1), x0 = X(F.cx ?? w.x);
+      c.globalAlpha = .5 * a;
+      for (let k = 0; k < 14; k++) { c.strokeStyle = k % 2 ? '#d8dee4' : '#9aa6b2'; c.lineWidth = 7; c.beginPath(); c.ellipse(x0 + Math.sin(t * .3 + k * .7) * 12, GROUND - k * 30, 30 + k * 10, 9, 0, 0, 7); c.stroke(); }
+    } break;
+    case 'boomers':
+      if (t >= 10 && t < 100) for (let k = 0; k < 6; k++) { const a = t * .22 + k * Math.PI / 3; drawShot(c, {}, X(o.x) + Math.cos(a) * 88, Y(110) + Math.sin(a) * 62, 'boom'); }
+      if (t >= 100 && t < 160) drawShot(c, {}, X(o.x), Y(o.y) + 24, 'boom');
+      break;
+    case 'walls': {
+      const x0 = X(F.cx ?? o.x), rise = Math.min(1, t / 24), close = t < 40 ? 0 : Math.min(1, (t - 40) / 14), sink = t > 92 ? Math.min(1, (t - 92) / 20) : 0;
+      const h = 290 * rise * (1 - sink), gap = 122 - 106 * close;
+      if (h < 2) break;
+      for (const sd of [-1, 1]) {
+        const bx = sd < 0 ? x0 - gap - 70 : x0 + gap;
+        c.fillStyle = '#8a8f98'; c.fillRect(bx, GROUND - h, 70, h); c.strokeStyle = '#4a4f58'; c.lineWidth = 3; c.strokeRect(bx, GROUND - h, 70, h);
+        c.fillStyle = '#6f747d'; for (let yy = GROUND - h + 8, r = 0; yy < GROUND - 10; yy += 28, r++) for (let k = 0; k < 2; k++) c.fillRect(bx + 5 + k * 32 + (r % 2) * 10, yy, 24, 22);
+      }
+      break;
+    }
+    case 'piledriver': if (F.hit) { // la tierra que le tapa la cabeza
+      const x0 = X(F.cx ?? o.x);
+      c.fillStyle = '#5a3d22'; c.beginPath(); c.roundRect(x0 - 75, GROUND - 6, 150, 90, 14); c.fill();
+      c.fillStyle = '#7a5a3a'; c.beginPath(); c.ellipse(x0, GROUND - 4, 82, 16, 0, Math.PI, 0); c.fill();
+      c.strokeStyle = '#3a2414'; c.lineWidth = 3; c.beginPath(); c.moveTo(x0 - 60, GROUND + 10); c.lineTo(x0 - 30, GROUND + 30); c.moveTo(x0 + 40, GROUND + 8); c.lineTo(x0 + 62, GROUND + 26); c.stroke();
+    } break;
+    case 'lasso': if (t >= 8 && t < 112) {
+      const hx = X(w.x + w.face * 25), hy = Y(w.y + 150), k = Math.min(1, (t - 8) / 10), tx = lerp(hx, X(o.x), k), ty = lerp(hy, Y(o.y + 110), k);
+      c.strokeStyle = '#c9a46a'; c.lineWidth = 4; c.beginPath(); c.moveTo(hx, hy); c.quadraticCurveTo((hx + tx) / 2, Math.min(hy, ty) - 30, tx, ty); c.stroke();
+      if (k >= 1) { c.beginPath(); c.ellipse(tx, ty, 28, 12, 0, 0, 7); c.stroke(); }
+    } break;
+    case 'termo': {
+      const x0 = X(F.cx ?? o.x), head = Y(o.y + 215) - 150; let top, rot = 0, dx = 0;
+      if (t >= 8 && t <= 44) { const k = (t - 8) / 36; top = lerp(-200, head, k * k); }
+      else if (t > 44 && t < 92) { const k = (t - 44) / 48; top = head - Math.sin(k * Math.PI) * 110; rot = k * 1.8; dx = (t - 44) * 2.4; }
+      else break;
+      c.translate(x0 + dx, top + 75); c.rotate(rot);
+      c.fillStyle = '#2e8b57'; c.strokeStyle = '#123d24'; c.lineWidth = 4; c.beginPath(); c.roundRect(-34, -75, 68, 150, 14); c.fill(); c.stroke();
+      c.fillStyle = '#c9a227'; c.fillRect(-34, -42, 68, 10); c.fillRect(-34, 32, 68, 10);
+      c.fillStyle = '#1a1a1a'; c.beginPath(); c.roundRect(-24, -94, 48, 22, 6); c.fill();
+      c.fillStyle = '#fff'; c.font = '900 17px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('PY', 0, 0);
+      break;
+    }
+    case 'bombtag': if (F.tag) {
+      const x = X(o.x), y = Y(o.y + 80);
+      c.fillStyle = '#1a1a1a'; c.beginPath(); c.arc(x, y, 20, 0, 7); c.fill();
+      c.strokeStyle = '#8a6a44'; c.lineWidth = 3; c.beginPath(); c.moveTo(x + 8, y - 16); c.quadraticCurveTo(x + 14, y - 28, x + 20, y - 26); c.stroke();
+      glow(c, x + 20, y - 26, 12 + Math.sin(t) * 4, 'rgba(255,210,60,.95)');
+      if (t >= 30) {
+        const n = t < 60 ? 3 : t < 90 ? 2 : 1, fs = 70 + ((t - 30) % 30) * 1.4;
+        c.font = `900 ${fs}px system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 8; c.strokeStyle = '#3a0905'; c.fillStyle = '#ff4d3a';
+        c.strokeText(n, x, Y(o.y + 270)); c.fillText(n, x, Y(o.y + 270));
+      }
+    } break;
+  }
+  c.restore();
+}
 function drawShot(c, p, x, y, k) {
   const T = G.time;
   if (k === 'ice') {
@@ -1745,6 +1900,7 @@ function render() {
     }
     drawFighter(c, f, f.x - cx, GROUND - f.y);
   }
+  drawFatalObjs(c, cx);
   for (const b of G.bolts) { // rayos del cielo
     const R = rng(b.seed + (G.time >> 1)), x0 = b.x - cx, yEnd = GROUND - 150;
     for (const [w, col] of [[14, 'rgba(120,200,255,.35)'], [6, '#bff3ff'], [2.5, '#fff']]) {
@@ -2055,24 +2211,24 @@ function netTick() {
 function snapshot() {
   return {
     t: 's',
-    f: G.f.map(f => ({ x: Math.round(f.x), y: Math.round(f.y), fc: f.face, hp: f.hp, en: Math.round(f.en), st: f.st, sf: f.sf, an: f.an, vx: Math.round(f.vx * 10) / 10, vy: Math.round(f.vy * 10) / 10, w: f.wins, fl: f.flash, al: Math.round(f.alpha * 100) / 100, cb: f.crouchBlock ? 1 : 0, sp: f.spec, sl: f.slamLand ? 1 : 0, hu: Math.round(f.hurt * 1000) / 1000, pl: f.pal || 0 })),
+    f: G.f.map(f => ({ x: Math.round(f.x), y: Math.round(f.y), fc: f.face, hp: f.hp, en: Math.round(f.en), st: f.st, sf: f.sf, an: f.an, vx: Math.round(f.vx * 10) / 10, vy: Math.round(f.vy * 10) / 10, w: f.wins, fl: f.flash, al: Math.round(f.alpha * 100) / 100, cb: f.crouchBlock ? 1 : 0, sp: f.spec, sl: f.slamLand ? 1 : 0, hu: Math.round(f.hurt * 1000) / 1000, pl: f.pal || 0, inf: Math.round((f.inflate || 0) * 100) / 100, th: f.thin ? 1 : 0, up: f.upside ? 1 : 0 })),
     pr: G.proj.map(p => [Math.round(p.x), Math.round(p.y), Math.round(p.vx * 10) / 10, p.o.i, p.kind || 'fire', p.t]),
     mt: G.mets.map(m => [Math.round(m.x), Math.round(m.y), m.big ? 1 : 0, m.kind || '']),
     wv: G.waves.map(w => [Math.round(w.x), w.o.i, w.life]),
-    ph: G.phase, pf: G.pf, fw: G.fin ? G.fin.w : -1, tm: G.timer, rd: G.round, cb: G.combo, ev: G.ev.splice(0)
+    ph: G.phase, pf: G.pf, fa: G.fatal ? { w: G.fatal.w, type: G.fatal.type, cx: G.fatal.cx, tag: G.fatal.tag ? 1 : 0, hit: G.fatal.hit } : null, fw: G.fin ? G.fin.w : -1, tm: G.timer, rd: G.round, cb: G.combo, ev: G.ev.splice(0)
   };
 }
 function applySnap(m) {
   m.f.forEach((d, i) => {
     const f = G.f[i]; if (!f) return;
     if (d.st !== f.st || d.sf < f.sf) f.sf = d.sf;
-    Object.assign(f, { tx: d.x, ty: d.y, face: d.fc, hp: d.hp, en: d.en, st: d.st, an: d.an, atk: ATK[d.an] || null, vx: d.vx, vy: d.vy, wins: d.w, flash: d.fl, alpha: d.al, crouchBlock: !!d.cb, spec: d.sp, slamLand: d.sl ? (f.slamLand || f.sf) : 0, hurt: d.hu || 0, pal: d.pl || 0 });
+    Object.assign(f, { tx: d.x, ty: d.y, face: d.fc, hp: d.hp, en: d.en, st: d.st, an: d.an, atk: ATK[d.an] || null, vx: d.vx, vy: d.vy, wins: d.w, flash: d.fl, alpha: d.al, crouchBlock: !!d.cb, spec: d.sp, slamLand: d.sl ? (f.slamLand || f.sf) : 0, hurt: d.hu || 0, pal: d.pl || 0, inflate: d.inf || 0, thin: d.th || 0, upside: !!d.up });
     if (Math.abs(f.sf - d.sf) > 3) f.sf = d.sf;
   });
   G.proj = m.pr.map(a => ({ x: a[0], y: a[1], vx: a[2], o: G.f[a[3]], kind: a[4] || 'fire', t: a[5] || 0 }));
   G.mets = (m.mt || []).map(a => ({ x: a[0], y: a[1], big: !!a[2], kind: a[3] }));
   G.waves = m.wv.map(a => ({ x: a[0], o: G.f[a[1]], life: a[2], vx: 0 }));
-  G.phase = m.ph; G.timer = m.tm; G.round = m.rd; G.combo = m.cb; G.pf = m.pf || 0; G.fin = m.fw >= 0 ? { w: m.fw } : null;
+  G.phase = m.ph; G.timer = m.tm; G.round = m.rd; G.combo = m.cb; G.pf = m.pf || 0; G.fatal = m.fa || null; G.fin = m.fw >= 0 ? { w: m.fw } : null;
   for (const e of m.ev) runFx(...e);
 }
 function guestStep() {
