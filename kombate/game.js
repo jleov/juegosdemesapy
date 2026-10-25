@@ -1797,9 +1797,8 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   const [bex, bey] = seg(shx, shy, P.b1, SEG.U), [bhx, bhy] = seg(bex, bey, P.b2, SEG.F);
   c.lineCap = 'round'; c.lineJoin = 'round';
   const limb = (x1, y1, x2, y2, w, col) => { c.strokeStyle = OL; c.lineWidth = w + 5; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); };
-  const ball = (x, y, r, col) => { c.beginPath(); c.arc(x, y, r, 0, 7); c.fillStyle = col; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OL; c.stroke(); };
   const shoe = (x, y, a, col) => { c.save(); c.translate(x, y); c.rotate(-a); c.beginPath(); c.ellipse(6, 0, 12, lw * .45, 0, 0, 7); c.fillStyle = col; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OL; c.stroke(); c.restore(); };
-  const glove = ch.special === 'charge' ? lw * 1.05 : lw * .82;
+  const glove = ch.special === 'charge' ? lw * 1.15 : lw * .98;
   // bufanda del ninja (atrás de todo)
   if (C.scarf) {
     c.strokeStyle = C.scarf; c.lineWidth = 7; c.beginPath(); c.moveTo(nx, ny + 4);
@@ -1812,7 +1811,7 @@ function drawFighter(c, f, sx, sy, sc = 1) {
     c.fillStyle = C.cape; c.fill(); c.lineWidth = 3; c.strokeStyle = OL; c.stroke();
   }
   // brazo y pierna de atrás
-  limb(shx, shy, bex, bey, lw, D.arm); limb(bex, bey, bhx, bhy, lw * .92, D.arm); ball(bhx, bhy, glove, D.glove);
+  limb(shx, shy, bex, bey, lw, D.arm); limb(bex, bey, bhx, bhy, lw * .92, D.arm); boxGlove(c, bhx, bhy, P.b2, glove, D.glove, OL, C.belt);
   limb(hx, hy, bkx, bky, lw * 1.15, D.pants); limb(bkx, bky, bfx, bfy, lw, D.pants); shoe(bfx, bfy, P.m2, D.shoe);
   // torso
   c.beginPath();
@@ -1859,7 +1858,7 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   }
   c.restore();
   // brazo de adelante
-  limb(shx, shy, fex, fey, lw, C.arm); limb(fex, fey, fhx, fhy, lw * .92, C.arm); ball(fhx, fhy, glove, C.glove);
+  limb(shx, shy, fex, fey, lw, C.arm); limb(fex, fey, fhx, fhy, lw * .92, C.arm); boxGlove(c, fhx, fhy, P.a2, glove, C.glove, OL, C.belt);
   // bola cargándose en las manos
   if (f.st === 'special' && f.spec === 'fire' && f.sf < 14) { c.globalAlpha = f.alpha * .9; glow(c, (fhx + bhx) / 2, (fhy + bhy) / 2, 10 + f.sf * 1.6, 'rgba(120,220,255,.9)'); }
   if (f.st === 'special' && f.spec === 'ice' && f.sf < 15) { c.globalAlpha = f.alpha * .9; glow(c, (fhx + bhx) / 2, (fhy + bhy) / 2, 10 + f.sf * 1.5, 'rgba(210,245,255,.95)'); }
@@ -1885,6 +1884,26 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   c.restore();
 }
 // sombreros y vinchas arriba de la cara (mirando a la derecha)
+// guante de boxeo en la punta del brazo: a = ángulo del antebrazo (hacia donde apunta el puño), r = tamaño
+const GLOVE_CUFF = new Map();
+function boxGlove(c, x, y, a, r, col, OL, alt) {
+  // muñequera: blanca en los guantes oscuros; en los claros, del color del cinturón (o más oscura)
+  let cuff = GLOVE_CUFF.get(col + alt);
+  if (!cuff) { const n = parseInt(col.slice(1), 16), lum = (n >> 16) * .3 + (n >> 8 & 255) * .59 + (n & 255) * .11; cuff = lum > 170 ? (alt && alt !== col ? alt : shade(col, -.35)) : '#f2f2f2'; GLOVE_CUFF.set(col + alt, cuff); }
+  c.save(); c.translate(x, y); c.rotate(-a); // ahora +y apunta hacia donde va el puño
+  c.lineWidth = 2.5; c.strokeStyle = OL; c.lineJoin = 'round';
+  // muñequera
+  c.beginPath(); c.roundRect(-r * .62, -r * .95, r * 1.24, r * .7, r * .2); c.fillStyle = cuff; c.fill(); c.stroke();
+  // pulgar al costado
+  c.beginPath(); c.ellipse(r * .78, -r * .05, r * .36, r * .55, -.35, 0, 7); c.fillStyle = col; c.fill(); c.stroke();
+  // el guante acolchado
+  c.beginPath(); c.ellipse(0, r * .42, r * 1.02, r * 1.18, 0, 0, 7); c.fillStyle = col; c.fill(); c.stroke();
+  // los dedos marcados y el brillo
+  c.strokeStyle = shade(col, -.3); c.lineWidth = 1.6;
+  c.beginPath(); c.arc(0, r * .55, r * .62, Math.PI * .15, Math.PI * .85); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-r * .38, r * .05, r * .22, r * .38, .4, 0, 7); c.fill();
+  c.restore();
+}
 function drawHat(c, type, col, R, OL, T) {
   c.lineWidth = 2.5; c.strokeStyle = OL; c.fillStyle = col;
   if (type === 'cowboy') {
