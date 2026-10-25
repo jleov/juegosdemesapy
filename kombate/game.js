@@ -43,7 +43,8 @@ function audio() {
   if (AC.state === 'suspended') AC.resume();
   return AC;
 }
-const quiet = () => muted || G.mode === 'demo';
+// la pelea de muestra del menú no hace ruido; los sonidos de las pantallas (tablero, campeón) sí suenan
+const quiet = () => muted || G.demoStep;
 function sNoise(dur, f, vol, type = 'lowpass', f2) {
   if (quiet()) return; const a = audio(); if (!a) return;
   const t = a.currentTime, s = a.createBufferSource(), fl = a.createBiquadFilter(), g = a.createGain();
@@ -1674,7 +1675,7 @@ function poseStep(f) {
   // el que gana elige un festejo (en línea lo elige el anfitrión y les llega a los demás)
   if (f.st === 'win' && !f.celebId && G.mode !== 'guest' && G.mode !== 'spect') {
     const C = CELEBS[Math.random() * CELEBS.length | 0]; f.celebId = C.id; f.sf = 0;
-    fx('voice', f.i, 'win'); if (C.id === 'siuu') setTimeout(() => fx('say', '¡Siuuuuu!'), 700);
+    fx('voice', f.i, 'win'); if (C.id === 'siuu') setTimeout(() => { if (G.mode !== 'demo') fx('say', '¡Siuuuuu!'); }, 700);
   }
   if (f.st !== 'win' && f.celebId && G.mode !== 'guest' && G.mode !== 'spect') f.celebId = null;
   const tp = targetPose(f), k = f.st === 'attack' || f.st === 'special' || f.st === 'hit' || f.st === 'zapped' ? .5 : .28;
@@ -1731,7 +1732,8 @@ function partsStep() {
 }
 
 /* ------------------------- paso de simulación ------------------------- */
-function step() {
+function step() { G.demoStep = G.mode === 'demo'; try { stepInner(); } finally { G.demoStep = false; } }
+function stepInner() {
   G.time++;
   pollPads();
   if (G.ann) G.ann.t++;
@@ -3130,7 +3132,7 @@ function bkLoop(now) {
   if (!$('#scrBracket').classList.contains('on') || !$('#bCv')) { BK.raf = 0; return; }
   const T = NET.role === 'spect' ? TT : TOUR;
   // la animación que toca: una por vez; si hay muchas en fila, van más rápido
-  if (!BK.cur && BK.anim.length) { BK.cur = BK.anim.shift(); BK.cur.t0 = now; BK.cur.dur = BK.anim.length > 2 ? 420 : 1200; SFX.whoosh(); }
+  if (!BK.cur && BK.anim.length) { BK.cur = BK.anim.shift(); BK.cur.t0 = now; BK.cur.dur = BK.anim.length > 2 ? 420 : 2200; SFX.whoosh(); if (BK.cur.dur > 1000 && BK.cur.L < 3) { const T0 = NET.role === 'spect' ? TT : TOUR; if (T0 && T0.R) speak('Pasa a la siguiente fase el luchador: ' + slotView(T0.R[BK.cur.L][BK.cur.i]).name); } }
   if (BK.cur) {
     const p = (now - BK.cur.t0) / BK.cur.dur;
     if (p >= 1 && !BK.cur.done) { BK.cur.done = now; if (BK.cur.L === 3) { BK.champAt = now; SFX.twinkle(); speak('¡' + slotView(T.R[4][0]).name + ' es el campeón!'); for (let i = 0; i < 140; i++) BK.conf.push({ x: BW / 2, y: BY[4], vx: rnd(-9, 9), vy: rnd(-12, -2), r: rnd(0, 6), vr: rnd(-.3, .3), c: CONF_COL[i % CONF_COL.length], w: rnd(6, 11), h: rnd(3, 6), l: rnd(120, 220) }); } else SFX.pop(); }
