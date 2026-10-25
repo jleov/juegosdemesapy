@@ -302,6 +302,31 @@ body > #comm{display:none !important}   /* el chat solo se muestra dentro de la 
 .cardlist{padding-left:22px;margin:4px 0}.cardlist li{font-size:13.5px;margin:3px 0}
 .bigcard p{font-size:18px;font-weight:600;background:rgba(255,255,255,.15);border-radius:10px;padding:12px;margin:10px 0}
 @keyframes flip{from{transform:rotateY(90deg) scale(.6)}to{transform:none}}
+/* tarjeta sacada a mano: se ve el dorso y se da vuelta */
+.flipstack{display:grid;width:min(340px,100%);perspective:900px}
+.flipstack>*{grid-area:1/1;width:100%}
+.cardback{border-radius:16px;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:220px;box-shadow:0 12px 40px rgba(0,0,0,.6);
+  border:6px solid rgba(255,255,255,.85);background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 6px,transparent 6px 14px);animation:flipout .5s .35s ease-in forwards;z-index:1;pointer-events:none;letter-spacing:2px}
+.cardback.cc{background-color:#d96f16}.cardback.ca{background-color:#1648a8}
+.cardback .ci{font-size:56px}.cardback small{opacity:.8;font-size:10px}
+.bigcard.flipin{animation:flipin .5s .85s ease-out both}
+@keyframes flipout{from{transform:rotateY(0)}to{transform:rotateY(90deg)}}
+@keyframes flipin{from{transform:rotateY(-90deg)}to{transform:none}}
+/* modo a mano: la casilla a la que llega la ficha brilla */
+.cell.target{z-index:4;cursor:pointer;animation:cellglow 1s ease-in-out infinite}
+@keyframes cellglow{0%,100%{box-shadow:inset 0 0 0 .25em #ffd400,0 0 .4em .15em rgba(255,212,0,.7);background-color:#fffbe0}50%{box-shadow:inset 0 0 0 .35em #ffb300,0 0 1.2em .5em rgba(255,212,0,.95);background-color:#fff3a8}}
+.handhint{margin:4px 0;font-weight:700}
+.deck{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:10em;height:6.4em;margin:6px auto;border-radius:12px;border:4px solid #fff;color:#fff;font-weight:900;font-size:max(9px,.8em);letter-spacing:1px;cursor:pointer;
+  background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 5px,transparent 5px 12px);box-shadow:3px 3px 0 #fff,4px 4px 0 1px rgba(0,0,0,.25),7px 7px 0 #fff,8px 8px 0 1px rgba(0,0,0,.25);animation:deckglow 1.1s ease-in-out infinite}
+.deck.cc{background-color:#d96f16}.deck.ca{background-color:#1648a8}
+.deck .ci{font-size:28px}
+@keyframes deckglow{0%,100%{transform:translateY(0);filter:drop-shadow(0 0 2px #ffd400)}50%{transform:translateY(-3px);filter:drop-shadow(0 0 10px #ffd400)}}
+/* subasta y pozo */
+.aucbig{font-size:1.1em;margin:4px 0}
+.aucrow{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;margin:4px 0}
+.pot{display:inline-block;margin:2px auto;background:rgba(255,255,255,.85);border:2px solid #2a9d3f;border-radius:20px;padding:1px 10px;font-size:.85em;color:#1b5e2a}
+.rulechk{align-items:flex-start;font-size:13px;line-height:1.35}
+.rulechk input{margin-top:2px;flex:0 0 auto}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;z-index:80;max-width:90vw;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.5)}
 .netbar{position:fixed;top:0;left:0;right:0;background:var(--red);color:#fff;text-align:center;font-size:13px;padding:4px;z-index:70;display:none}
 .rules h4{margin:12px 0 4px}.rules p,.rules li{font-size:14px;line-height:1.4}
@@ -350,6 +375,11 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <p class="muted">Pasen el celular o la PC de mano en mano (2 a 6 jugadores). Tocá 👤/🤖 para que un lugar lo juegue un bot.</p>
       <div id="localNames"></div>
       <div class="row" style="margin-top:8px"><button class="btn gray" id="btnAddLocal">+ Jugador</button><button class="btn gold" id="btnLocal">Empezar</button></div>
+    </div>
+    <div class="box">
+      <h3>⚙️ Reglas especiales</h3>
+      <p class="muted" style="margin-top:0">Para las partidas en este dispositivo y contra bots. En una sala en línea las elige el anfitrión antes de empezar.</p>
+      <div id="menuRules"></div>
     </div>
     <div class="box">
       <h3>🔗 Enlaces del juego</h3>
@@ -401,6 +431,7 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <ul class="plist" id="lobbyPlayers"></ul>
       <button class="btn gray wide" id="btnAddBot" style="margin-bottom:8px">🤖 Agregar un bot</button>
       <button class="btn red wide" id="btnStart">🎲 Empezar partida</button>
+      <div id="lobbyRules" style="margin-top:10px"></div>
       <p class="muted" id="lobbyWait" style="text-align:center"></p>
       <div class="row" style="margin-top:8px"><button class="btn gray" onclick="confirmLeave()">🏠 Volver al inicio</button><button class="btn gray btnMusic" style="flex:0 0 auto" onclick="toggleMusic()" title="Música de fondo">🎶</button></div>
     </div>
@@ -436,6 +467,7 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
           <button class="btn sm gray btnMusic" style="flex:0 0 auto" onclick="toggleMusic()" title="Música de fondo">🎶</button>
           <button class="btn sm red" style="flex:0 0 auto" onclick="confirmLeave()" title="Volver al inicio">🏠 Inicio</button>
           <button class="btn sm" id="btnView" style="background:#4a2f7a" onclick="toggleView()" title="Cambiar entre tablero plano y 3D">🧊 Vista 3D</button>
+          <button class="btn sm" id="btnHand" style="background:#0f6e6e" onclick="toggleHand()" title="Elegí cómo jugar: automático o moviendo vos la ficha y sacando las tarjetas">🎲 Modo: automático</button>
         </div>
         <div class="trades" id="trades"></div>
         <div class="wallet" id="wallet"></div>
@@ -781,7 +813,20 @@ function showBuyTitle(refresh){
 }
 
 /* ====================== MOTOR (sólo anfitrión) ====================== */
-function lobbyState(){ return {phase:'lobby', players:[], seq:0, hostPid:null, log:[], logSeq:0}; }
+function lobbyState(){ return {phase:'lobby', players:[], seq:0, hostPid:null, log:[], logSeq:0, rules:myRules()}; }
+// reglas opcionales: las elige el anfitrión en la sala (o este dispositivo para las partidas sin internet)
+const RULES_DEF={
+  pozo:{t:'🧉 Pozo del Descanso', d:'Lo que se paga en Impuesto a la Renta no va al Banco: se junta en el centro del tablero, y el que cae en el Descanso se lleva todo.'},
+  subasta:{t:'🔨 Subasta', d:'Si el que cae en una propiedad no tiene plata para comprarla, se subasta entre todos los jugadores, con una base del 20% de su precio.'}
+};
+function myRules(){ const r=load('bnq_rules')||{}; return {pozo:!!r.pozo, subasta:!!r.subasta}; }
+const rule = k => !!(S && S.rules && S.rules[k]);
+function rulesHTML(rules, editable, fn){
+  return Object.entries(RULES_DEF).map(([k,d])=>`<label class="chk rulechk"><input type="checkbox" ${rules&&rules[k]?'checked':''} ${editable?'':'disabled'} onchange="${fn}('${k}',this.checked)"><span><b>${d.t}</b><br><span class="muted">${d.d}</span></span></label>`).join('');
+}
+function setMyRule(k,on){ const r=myRules(); r[k]=on; store('bnq_rules', r); }
+function setRoomRule(k,on){ setMyRule(k,on); doAct({type:'rules', rules:myRules()}); }
+const POZO_IDX = B.findIndex(x=>x.n==='Impuesto a la Renta');
 function addPlayer(name, emoji, token, peerId, bot){
   const usedE=S.players.map(p=>p.emoji), usedC=S.players.map(p=>p.color);
   if(!EMOJIS.includes(emoji) || usedE.includes(emoji)) emoji=EMOJIS.find(e=>!usedE.includes(e));
@@ -799,13 +844,16 @@ function startGame(){
   const players = shuffle(S.players).map(p=>Object.assign(p,{money:START_MONEY,bills:billsOf(START_MONEY),pos:0,jail:false,jailT:0,jcards:[],bk:false,cred:null}));
   S = {phase:'play', players, seq:S.seq, hostPid:S.hostPid, props:{}, turn:0, tp:'roll', dbl:0, rolledDbl:false,
        roll:[1,1], rollId:0, card:null, cardId:0, pendingBuy:null, decks:{cc:shuffle(range(CARDS.cc.length)), ca:shuffle(range(CARDS.ca.length))},
-       trades:[], tradeSeq:0, log:[], logSeq:0, winner:null, rent:null, rentSeq:0, rolled:{}, observers:S.observers||[], ownerTok:S.ownerTok, ver:2, turnAt:Date.now(), startedAt:Date.now()};
+       trades:[], tradeSeq:0, log:[], logSeq:0, winner:null, rent:null, rentSeq:0, rolled:{}, observers:S.observers||[], ownerTok:S.ownerTok, ver:2, turnAt:Date.now(), startedAt:Date.now(),
+       rules:S.rules||myRules(), pot:0, auction:null, aucSeq:0, mv:null, drawDeck:null};
   log('¡Empieza la partida! El Banquero reparte a cada jugador '+fmt(START_MONEY)+': 10 billetes de ₲ 100.000, 6 de ₲ 50.000, 6 de ₲ 20.000, 5 de ₲ 10.000, 4 de ₲ 5.000, 4 de ₲ 2.000 y 2 monedas de ₲ 1.000.');
+  const on=Object.keys(RULES_DEF).filter(k=>S.rules[k]).map(k=>RULES_DEF[k].t);
+  if(on.length) log('Reglas especiales de esta partida: '+on.join(' · ')+'.');
   log('Turno de '+cur().name+'.');
 }
 function backToLobby(){
-  const players=S.players.filter(p=>p.conn || NET.mode==='local'), observers=(S.observers||[]).filter(o=>o.conn);
-  S = lobbyState(); S.players=players; S.observers=observers; S.seq=players.reduce((m,p)=>Math.max(m,+p.id.slice(1)),0);
+  const players=S.players.filter(p=>p.conn || NET.mode==='local'), observers=(S.observers||[]).filter(o=>o.conn), rules=S.rules;
+  S = lobbyState(); S.players=players; S.observers=observers; if(rules) S.rules=rules; S.seq=players.reduce((m,p)=>Math.max(m,+p.id.slice(1)),0);
   S.hostPid=NET.myPid;
 }
 
@@ -893,16 +941,35 @@ function land(p, dice, mode){
       queuePay(p.id, owner.id, rentOf(p.pos,dice,mode), 'alquiler de '+sp.n, p.pos);
       startNextPay(); return;
     }
-    case 'tax': pay(p, sp.a*K, null, sp.n); break;
-    case 'cc': case 'ca': drawCard(p, sp.t); return;
+    case 'tax':
+      if(rule('pozo') && p.pos===POZO_IDX){   // va al centro del tablero, no al Banco
+        pay(p, sp.a*K, null, sp.n+' → al pozo del Descanso'); S.pot=(S.pot||0)+sp.a*K;
+        log(`🧉 El pozo del Descanso ya junta ${fmt(S.pot)}.`);
+      } else pay(p, sp.a*K, null, sp.n);
+      break;
+    case 'free':
+      if(rule('pozo')){
+        if(S.pot>0){ p.money+=S.pot; log(`🧉🎉 ¡${p.name} cae en el Descanso y se lleva todo el pozo: ${fmt(S.pot)}!`); S.pot=0; }
+        else log('🧉 El pozo del Descanso está vacío.');
+      }
+      break;
+    case 'cc': case 'ca':
+      if(handMode(p)){ S.tp='draw'; S.drawDeck=sp.t; return; }   // la saca tocando el mazo
+      drawCard(p, sp.t); return;
     case 'gojail': goJail(p); return;
   }
   afterMove(p);
 }
-function drawCard(p, deck){
+// modo "a mano": el jugador mueve su ficha y saca las tarjetas él mismo (los bots y los desconectados siempre en automático)
+const handMode = p => !!(p.manual && !p.bot && (NET.mode!=='host' || p.conn));
+function stepMove(p, steps){
+  if(handMode(p)){ S.mv={to:(p.pos+steps)%40, n:steps}; S.tp='move'; return; }
+  move(p, steps);
+}
+function drawCard(p, deck, flip){
   const d=S.decks[deck], id=d.shift(), c=CARDS[deck][id];
   if(c.k!=='free') d.push(id);
-  S.card={deck, x:c.x, e:c.e||null, id:++S.cardId, who:p.name, pid:p.id, open:true, at:Date.now()};
+  S.card={deck, x:c.x, e:c.e||null, id:++S.cardId, who:p.name, pid:p.id, open:true, at:Date.now(), flip:!!flip};
   log(`${p.name} saca ${DECK_NAME[deck]}: “${c.x}”`);
   switch(c.k){
     case 'money': if(c.v>=0){ p.money+=c.v*K; } else pay(p,-c.v*K,null,'tarjeta'); break;
@@ -937,20 +1004,42 @@ function doRoll(p){
   log(`🎲 ${p.name} saca ${d1} + ${d2} = ${sum}${dbl?' (¡dobles!)':''}.`);
   if(p.jail){
     S.rolledDbl=false;
-    if(dbl){ p.jail=false; p.jailT=0; log(`${p.name} sale de Tacumbú con dobles.`); move(p,sum); return; }
+    if(dbl){ p.jail=false; p.jailT=0; log(`${p.name} sale de Tacumbú con dobles.`); stepMove(p,sum); return; }
     p.jailT++;
-    if(p.jailT>=3){ pay(p,JAIL_FINE,null,'fianza de Tacumbú'); p.jail=false; p.jailT=0; move(p,sum); return; }
+    if(p.jailT>=3){ pay(p,JAIL_FINE,null,'fianza de Tacumbú'); p.jail=false; p.jailT=0; stepMove(p,sum); return; }
     log(`${p.name} sigue preso (intento ${p.jailT} de 3).`); S.tp='end'; return;
   }
   if(dbl){ S.dbl++; if(S.dbl>=3){ log('¡Tres dobles seguidos!'); goJail(p); return; } S.rolledDbl=true; }
   else S.rolledDbl=false;
-  move(p,sum);
+  stepMove(p,sum);
 }
+// --- subasta (regla opcional) ---
+function startAuction(idx){
+  const price=B[idx].p*K, base=Math.max(K, Math.ceil(price*0.2/K)*K);
+  S.auction={id:++S.aucSeq, idx, base, high:0, by:null, ends:Date.now()+20000, passed:[]};
+  S.pendingBuy=null; S.tp='auction';
+  log(`🔨 ¡Se subasta ${B[idx].n}! Base: ${fmt(base)} (el 20% de ${fmt(price)}). Todos pueden ofertar.`);
+}
+const aucMin = A => A.high ? A.high+10*K : A.base;   // la oferta más chica que se puede hacer ahora (se sube de a ₲ 10.000 o más)
+function finishAuction(){
+  const A=S.auction; if(!A) return; S.auction=null;
+  const w=A.by && P(A.by);
+  if(w && !w.bk && w.money>=A.high){
+    w.money-=A.high; S.props[A.idx]={o:w.id,h:0,m:false};
+    log(`🔨 ¡Vendido! ${w.name} se queda con ${B[A.idx].n} por ${fmt(A.high)}.`);
+  } else log(`🔨 Nadie ofertó por ${B[A.idx].n}: sigue en el Banco.`);
+  if(S.phase==='play' && cur()) afterMove(cur());
+}
+setInterval(()=>{   // el martillo: cuando se acaba el tiempo, se cierra la subasta
+  if(!S || !S.auction || S.phase!=='play' || (NET.mode!=='host' && NET.mode!=='local')) return;
+  if(Date.now()>=S.auction.ends){ finishAuction(); checkWinner(); commit(); }
+}, 500);
 // ¿a quién está esperando la partida y desde cuándo?
 const IDLE_MS = 60000;   // después de 1 minuto sin responder, el anfitrión puede actuar
 let idleSnooze={pid:null, until:0};   // "seguir esperando" (solo en el dispositivo del anfitrión)
 function waitInfo(){
   if(!S || S.phase!=='play') return null;
+  if(S.auction) return null;   // la subasta se cierra sola por tiempo
   if(S.card && S.card.open) return {pid:S.card.pid, since:S.card.at, what:'cerrar su tarjeta', kind:'turn'};
   if(S.rent){ const R=S.rent, pid=R.stage==='pay'?R.from:R.to;
     return {pid, since:R.at, what:R.stage==='pay'?'pagar':'dar el vuelto', kind:pid===cur().id?'turn':'pay'}; }
@@ -966,7 +1055,7 @@ function idleTarget(ignoreSnooze){   // jugador conectado que no responde hace r
   return {...w, p, ms};
 }
 function nextTurn(){
-  S.dbl=0; S.rolledDbl=false; S.pendingBuy=null; S.turnAt=Date.now();
+  S.dbl=0; S.rolledDbl=false; S.pendingBuy=null; S.turnAt=Date.now(); S.mv=null; S.drawDeck=null;
   if(alive().length<=1) return;
   do{ S.turn=(S.turn+1)%S.players.length; }while(cur().bk);
   S.tp='roll';
@@ -1037,6 +1126,9 @@ function act(pid, a){
     if(a.type==='removeBot' && pid===S.hostPid){
       const b=P(a.id); if(b && b.bot){ S.players=S.players.filter(x=>x!==b); commit(); } return;
     }
+    if(a.type==='rules' && pid===S.hostPid){
+      const r=a.rules||{}; S.rules=Object.fromEntries(Object.keys(RULES_DEF).map(k=>[k,!!r[k]])); commit(); return;
+    }
     if(a.type==='start' && pid===S.hostPid){
       if(S.players.length<2) return 'Se necesitan al menos 2 jugadores.';
       startGame(); commit();
@@ -1044,10 +1136,35 @@ function act(pid, a){
     return;
   }
   if(S.phase==='over'){ if(a.type==='lobby' && pid===S.hostPid){ backToLobby(); commit(); } return; }
+  if(a.type==='manual'){ p.manual=!!a.on; commit(); return; }   // cada uno elige cómo mover su ficha
   if(p.bk) return 'Estás en quiebra.';
   const turn = cur().id===pid;
   const i = a.i|0;
   switch(a.type){
+    case 'moveTo': {   // modo a mano: tocó la casilla a la que llega
+      if(!turn || S.tp!=='move' || !S.mv) return;
+      if(i!==S.mv.to) return `Esa no es: tenés que avanzar ${S.mv.n} casillas desde ${B[p.pos].s||B[p.pos].n}.`;
+      const n=S.mv.n; S.mv=null; move(p, n); break;
+    }
+    case 'draw': {     // modo a mano: tocó el mazo para sacar la tarjeta
+      if(!turn || S.tp!=='draw' || !S.drawDeck) return;
+      const d=S.drawDeck; S.drawDeck=null; drawCard(p, d, true); break;
+    }
+    case 'bid': {
+      const A=S.auction; if(!A) return;
+      const amt=Math.round((+a.amt||0)/K)*K;
+      if(A.by===p.id) return 'Ya vas ganando la subasta.';
+      if(amt<aucMin(A)) return `La oferta mínima es ${fmt(aucMin(A))}.`;
+      if(amt>p.money) return 'No te alcanza el dinero para esa oferta.';
+      A.high=amt; A.by=p.id; A.passed=A.passed.filter(x=>x!==p.id); A.ends=Math.max(A.ends, Date.now()+8000);
+      log(`🔨 ${p.name} ofrece ${fmt(amt)} por ${B[A.idx].n}.`); break;
+    }
+    case 'pass': {
+      const A=S.auction; if(!A || A.by===p.id || A.passed.includes(p.id)) return;
+      A.passed.push(p.id); log(`🔨 ${p.name} pasa.`);
+      if(alive().every(x=>x.id===A.by || A.passed.includes(x.id))) finishAuction();   // ya no queda nadie para ofertar
+      break;
+    }
     case 'roll': if(!turn||S.tp!=='roll') return; if(p.money<0) return 'Primero salí del saldo negativo.'; doRoll(p); break;
     case 'buy': {
       if(!turn||S.tp!=='buy') return;
@@ -1065,7 +1182,12 @@ function act(pid, a){
       p.money-=price; S.props[idx]={o:p.id,h:0,m:false};
       log(`🏷️ ${p.name} compra ${B[idx].n} por ${fmt(price)}.`); afterMove(p); break;
     }
-    case 'skip': if(!turn||S.tp!=='buy') return; log(`${p.name} no compra ${B[S.pendingBuy].n}.`); afterMove(p); break;
+    case 'skip': {
+      if(!turn||S.tp!=='buy') return;
+      const idx=S.pendingBuy;
+      if(rule('subasta') && p.money<B[idx].p*K){ log(`${p.name} no tiene plata para comprar ${B[idx].n}.`); startAuction(idx); break; }
+      log(`${p.name} no compra ${B[idx].n}.`); afterMove(p); break;
+    }
     case 'end': if(!turn||S.tp!=='end') return; if(p.money<0) return 'Primero salí del saldo negativo.'; nextTurn(); break;
     case 'jailPay':
       if(!turn||S.tp!=='roll'||!p.jail) return; if(p.money<JAIL_FINE) return 'No te alcanza para la fianza.';
@@ -1188,7 +1310,7 @@ function act(pid, a){
       if(cur().conn && !idle) return;
       log(idle ? `⏭ ${cur().name} no respondía: el anfitrión saltó su turno.` : `${cur().name} no está conectado: se salta su turno.`);
     }
-      if(S.card) S.card.open=false; drainPays(); nextTurn(); break;
+      if(S.card) S.card.open=false; drainPays(); if(S.auction) finishAuction(); nextTurn(); break;
     default: return;
   }
   checkWinner(); commit();
@@ -1229,6 +1351,20 @@ function botTick(){
       else botChat(b,`Así no me conviene… te hago una contraoferta: agregá ${fmt(extra)} 🔁`);
     }
     else { botChat(b,'Mmm… no me conviene.'); act(b.id,{type:'tradeReject',id:t.id}); }
+    return;
+  }
+  // subasta: cada bot oferta hasta lo que le parece que vale (de a uno, para que se pueda seguir)
+  if(S.auction){
+    const A=S.auction; if(Date.now()-(A.botAt||0)<1300) return;
+    const sp=B[A.idx], price=sp.p*K;
+    for(const b of alive().filter(x=>x.bot && x.id!==A.by && !A.passed.includes(x.id))){
+      const completes = sp.g && groupIdx(sp.g).every(j=>j===A.idx || (S.props[j]&&S.props[j].o===b.id));
+      const limit=Math.min(price*(completes?1.3:.85), b.money-BOT_RESERVE);
+      const step = price>=200*K ? 20*K : 10*K, next = A.high ? A.high+step : A.base;
+      A.botAt=Date.now();
+      if(next<=limit){ if(Math.random()<.35) botChat(b, `¡${fmt(next)}! 🔨`); return act(b.id,{type:'bid', amt:next}); }
+      return act(b.id,{type:'pass'});
+    }
     return;
   }
   // tarjeta abierta: el bot la "lee" unos segundos y la cierra; mientras tanto nadie juega
@@ -1288,6 +1424,7 @@ function publicState(forPid){
   });
   (s.observers||[]).forEach(o=>delete o.token);
   delete s.ownerTok;
+  s.sent=Date.now();   // para que la cuenta regresiva de la subasta sea igual en todos los relojes
   return s;
 }
 function commit(){
@@ -1773,7 +1910,7 @@ function clientOnData(d){
   if(d.t==='welcome'){ NET.myPid=d.pid; NET.obs=d.obs||null; NET.welcomed=true; NET.taken=null; store('bnq_client',{code:NET.code, at:Date.now()}); if(location.hash!=='#'+NET.code) history.replaceState(null,'','#'+NET.code);
     if(d.why && (!NET.obsToasted || d.force)){ NET.obsToasted=true; toast(d.why); }
     if(d.force){ VOICE.muteSeq=null; stopMic(false); closeModal(); } }   // cambió de lugar (jugador ↔ observador)
-  else if(d.t==='state'){ S=d.s; render(); checkForcedMute(); }
+  else if(d.t==='state'){ S=d.s; if(S.sent) NET.skew=S.sent-Date.now(); render(); checkForcedMute(); }
   else if(d.t==='chat'){ CHAT.push(d.m); renderChat(d.m); }
   else if(d.t==='backup'){ NET.backup={s:d.s, chat:d.chat}; }                        // copia por si me toca ser anfitrión
   else if(d.t==='migrate'){ NET.backup={s:d.s, chat:d.chat}; takeoverHost('handover'); }   // el anfitrión se va y me pasa el mando
@@ -1844,6 +1981,27 @@ function renderVoice(){
   $('#btnSpk').textContent = VOICE.muted ? '🔇' : '🔊';
   $('#voiceBar').style.display = NET.mode==='local' || NET.mode==='spy' ? 'none' : 'flex';   // los observadores también pueden escuchar y hablar
 }
+// modo de juego de cada uno: automático o a mano (mover la ficha y sacar las tarjetas tocando)
+function handPid(){ if(!S || S.phase!=='play') return null; if(NET.mode==='local'){ const c=cur(); return c && !c.bot ? c.id : meId(); } return NET.myPid; }
+function toggleHand(){
+  const pid=handPid(), p=pid&&P(pid); if(!p) return toast('Estás mirando: no tenés ficha.');
+  const on=!p.manual; if(NET.mode!=='local') store('bnq_manual', on);
+  doAct({type:'manual', on}, pid);
+  toast(on ? `👆 Modo a mano${NET.mode==='local'?' para '+p.name:''}: después de tirar, tocá la casilla que brilla para mover la ficha, y tocá el mazo para sacar las tarjetas.` : `🎲 Modo automático${NET.mode==='local'?' para '+p.name:''}: la ficha se mueve sola y las tarjetas salen solas.`);
+}
+function renderHandBtn(){
+  const b=$('#btnHand'); if(!b) return;
+  const pid=handPid(), p=pid&&P(pid);
+  b.style.display = p && !p.bk && NET.mode!=='spy' ? '' : 'none';
+  if(p) b.textContent = p.manual ? `👆 Modo: a mano${NET.mode==='local'?' ('+p.name+')':''}` : `🎲 Modo: automático${NET.mode==='local'?' ('+p.name+')':''}`;
+}
+// en línea se recuerda lo que elegiste la última vez
+function syncHandPref(){
+  if(NET.mode==='local' || NET.mode==='spy' || !S || S.phase!=='play' || !NET.myPid) return;
+  const me=P(NET.myPid); if(!me || me.bk || NET.handSynced===S.startedAt) return;
+  NET.handSynced=S.startedAt;
+  const want=!!load('bnq_manual'); if(!!me.manual!==want) setTimeout(()=>doAct({type:'manual', on:want}),0);
+}
 // botón del anfitrión para silenciar a quien tiene el micrófono abierto (jugador u observador)
 const muteBtn = x => NET.mode==='host' && x && x.mic && x.id!==NET.myPid
   ? `<button class="mutebtn" title="Silenciar el micrófono de ${esc(x.name)}" onclick="event.stopPropagation();doAct({type:'muteOther',id:'${x.id}'})">🔇 Silenciar</button>` : '';
@@ -1876,7 +2034,7 @@ function render(){
   if(!S) return;
   if(S.phase==='lobby'){ show('lobby'); renderLobby(); placeComm('#lobbyComm'); }
   else { show('game'); if(!$('#board').children.length) buildBoard(); placeComm('#gameComm'); renderGame(); }
-  renderLog(); renderVoice(); voiceSync(); musicSync(); renderHandoff();
+  renderLog(); renderVoice(); voiceSync(); musicSync(); renderHandoff(); renderHandBtn(); syncHandPref();
 }
 function placeComm(sel){ const c=$('#comm'), t=$(sel); if(c.parentElement!==t) t.appendChild(c); }
 
@@ -1886,6 +2044,7 @@ function renderLobby(){
   const isHost = NET.mode==='host';
   $('#lobbyPlayers').innerHTML=S.players.map(p=>`<li><span class="dot" style="background:${p.color}"></span><span style="font-size:22px">${p.emoji}</span><b style="flex:1">${p.bot?'🤖 ':''}${esc(p.name)}${p.id===NET.myPid?' (vos)':''}</b>${p.id===S.hostPid?'<span class="muted">anfitrión</span>':''}${p.mic?' 🎤':''}${muteBtn(p)}${p.bot&&isHost?`<button class="btn sm gray" onclick="doAct({type:'removeBot',id:'${p.id}'})">✕</button>`:''}</li>`).join('')
     + ((S.observers||[]).length ? `<li style="background:#eef3ff">👀 <span style="flex:1">Mirando: ${S.observers.map(obsName).join(', ')}</span></li>` : '');
+  $('#lobbyRules').innerHTML=`<h4 style="margin:0 0 4px">⚙️ Reglas especiales${isHost?'':' <span class="muted">(las elige el anfitrión)</span>'}</h4>`+rulesHTML(S.rules, isHost, 'setRoomRule');
   $('#btnAddBot').style.display = isHost ? 'block' : 'none';
   $('#btnAddBot').disabled = S.players.length>=6;
   $('#btnStart').style.display = isHost ? 'block' : 'none';
@@ -1900,6 +2059,14 @@ function cellPos(i){
   return [1+(i-30), 11];
 }
 function cellSide(i){ if(i%10===0) return 'c'; if(i<10) return 'b'; if(i<20) return 'l'; if(i<30) return 't'; return 'r'; }
+function cellClick(i){
+  // modo a mano: tocar la casilla a la que llega la ficha
+  if(S && S.phase==='play' && S.tp==='move' && S.mv && canAct(cur().id)){
+    if(i===S.mv.to) return doAct({type:'moveTo', i}, cur().id);
+    if(i!==cur().pos) return toast(`👆 Esa no es: contá ${S.mv.n} casillas desde donde está tu ficha. La que brilla es la correcta.`);
+  }
+  showProp(i);
+}
 function buildBoard(){
   const b=$('#board'); b.innerHTML='';
   for(let i=0;i<40;i++){
@@ -1912,7 +2079,7 @@ function buildBoard(){
       h+=`<div class="ct">${sp.ic?`<div class="ic">${sp.ic}</div>`:''}<div class="nm">${sp.s}</div>${sp.p?`<div class="pr">${fmtS(sp.p*K)}</div>`:sp.a?`<div class="pr">${fmtS(sp.a*K)}</div>`:''}</div>`;
     }
     el.innerHTML=h+'<div class="toks"></div>';
-    el.onclick=()=>showProp(i);
+    el.onclick=()=>cellClick(i);
     b.appendChild(el);
   }
   const ctr=document.createElement('div'); ctr.id='center'; b.appendChild(ctr);
@@ -2258,7 +2425,9 @@ function renderGame(){
   for(let i=0;i<40;i++){
     const el=$('#c'+i), o=S.props[i], sp=B[i];
     el.classList.toggle('owned', !!o); el.classList.toggle('mort', !!(o&&o.m));
-    el.classList.toggle('hl', S.tp==='buy' && S.pendingBuy===i);
+    el.classList.toggle('hl', (S.tp==='buy' && S.pendingBuy===i) || (S.auction && S.auction.idx===i));
+    el.classList.toggle('target', S.tp==='move' && !!S.mv && S.mv.to===i);   // modo a mano: la casilla a la que llega brilla
+    if(sp.t==='free'){ const pr=el.querySelector('.pr'); if(pr) pr.textContent = rule('pozo') ? (S.pot ? '🧉 '+fmtS(S.pot) : '🧉 Pozo vacío') : sp.sub; }
     if(o) el.style.setProperty('--oc', P(o.o).color);
     if(sp.t==='st'){ const band=el.querySelector('.band'); const h=o?o.h:0;
       if(band.dataset.h!==String(h)){
@@ -2517,12 +2686,35 @@ function renderCenter(){
   if(i<0){ hud.innerHTML=''; return; }
   c.innerHTML=html.slice(0,i); hud.innerHTML=html.slice(i);
 }
+// subasta en el centro del tablero: cada uno oferta desde su celular (en un solo dispositivo, cada persona tiene su fila)
+const aucLeft = () => S && S.auction ? Math.max(0, Math.ceil((S.auction.ends-(Date.now()+(NET.skew||0)))/1000)) : 0;
+function auctionHTML(){
+  const A=S.auction, sp=B[A.idx], top=A.by&&P(A.by);
+  let h=`<div class="status">🔨 Subasta: ${sp.ic||''} ${esc(sp.n)}</div>
+    <div>Precio de lista ${fmt(sp.p*K)} · base <b>${fmt(A.base)}</b></div>
+    <div class="aucbig">${top?`<span style="color:${top.color}">${top.emoji} ${esc(top.name)}</span> va ganando con <b>${fmt(A.high)}</b>`:'Todavía nadie ofertó'}</div>
+    <div class="muted">⏱️ Se cierra en <b id="aucLeft">${aucLeft()}</b> s (cada oferta suma tiempo)</div>`;
+  const who = NET.mode==='local' ? alive().filter(x=>!x.bot) : alive().filter(x=>x.id===NET.myPid);
+  for(const p of who){
+    const opts = A.high ? [10,50,100].map(x=>({v:A.high+x*K, l:'+'+x+' mil'})) : [0,20,50].map(x=>({v:A.base+x*K, l:fmtS(A.base+x*K)}));
+    const tag = NET.mode==='local' ? `<b style="color:${p.color}">${p.emoji} ${esc(p.name)}</b>: ` : '';
+    if(A.by===p.id){ h+=`<div class="aucrow">${tag}✔ Vas ganando</div>`; continue; }
+    if(A.passed.includes(p.id)){ h+=`<div class="aucrow muted">${tag}Pasaste</div>`; continue; }
+    h+=`<div class="aucrow">${tag}${opts.map(o=>`<button class="btn sm green" ${p.money!=null&&o.v>p.money?'disabled':''} title="Ofrecer ${fmt(o.v)}" onclick="doAct({type:'bid',amt:${o.v}},'${p.id}')">${o.l}</button>`).join('')}
+      <button class="btn sm gray" onclick="doAct({type:'pass'},'${p.id}')">Paso</button></div>`;
+  }
+  const passed=A.passed.map(id=>P(id)).filter(Boolean);
+  if(passed.length) h+=`<div class="muted">Pasaron: ${passed.map(x=>esc(x.name)).join(', ')}</div>`;
+  return h+`<div class="clog">${S.log.slice(-3).map(l=>`<div>${esc(l.m)}</div>`).join('')}</div>`;
+}
+setInterval(()=>{ const el=document.getElementById('aucLeft'); if(el) el.textContent=aucLeft(); }, 300);
 function renderCenterInner(){
   const c=$('#center'); if(!c) return;
   const animating=Date.now()<diceShowAt+60, busy=Date.now()<uiHoldUntil;   // los dados del centro aparecen cuando terminó la animación
   const r=S.roll||[1,1];
   const dieV = VIEW.mode==='3d' ? die3HTML : dieHTML;
-  let h=`<div class="clogo">BANQUERO<small>PARAGUAYO</small></div><div class="dice" id="diceSpot" style="visibility:${animating?'hidden':'visible'}">${dieV(r[0],0)}${dieV(r[1],1)}</div><!--HUD-->`;
+  const pot = rule('pozo') ? `<div class="pot" title="Pozo del Descanso: se lo lleva el que cae en el Descanso">🧉 Pozo: <b>${fmt(S.pot||0)}</b></div>` : '';
+  let h=`<div class="clogo">BANQUERO<small>PARAGUAYO</small></div>${pot}<div class="dice" id="diceSpot" style="visibility:${animating?'hidden':'visible'}">${dieV(r[0],0)}${dieV(r[1],1)}</div><!--HUD-->`;
   if(busy){
     c.innerHTML=h+`<div class="status">${Date.now()<diceEndAt?'🎲 Tirando los dados…':`${r[0]} + ${r[1]} = ${r[0]+r[1]}${r[0]===r[1]?' · ¡Dobles!':''} — avanzando…`}</div>`;
     return;
@@ -2554,6 +2746,7 @@ function renderCenterInner(){
     if(acts.length) h+=`<div class="acts">${acts.join('')}</div>`;
     c.innerHTML=h; return;
   }
+  if(S.auction){ c.innerHTML=h+auctionHTML(); return; }
   if(S.tp==='rent'){   // pagos de una tarjeta que esperan a que se cierre
     c.innerHTML=h+`<div class="status">💵 Pagos de la tarjeta</div><div class="muted">Empiezan cuando ${esc(S.card?S.card.who:'')} cierre la tarjeta…</div>`; return;
   }
@@ -2576,9 +2769,17 @@ function renderCenterInner(){
       const i=S.pendingBuy, sp=B[i], gh=groupHave(p.id,i);
       h+=`<div class="pcard"><div class="bar" style="background:${sp.g?GROUPS[sp.g].c:'#999'}"></div><b>${sp.ic||''} ${sp.n}</b><br>Precio: <b>${fmt(sp.p*K)}</b>
         <div style="font-size:.9em">Cobrarías: <b>${rentIfBought(p.id,i)}</b><br><span class="muted">${gh.text}</span></div></div>`;
-      acts.push(`<button class="btn green" onclick="showBuyPicker()" ${p.money<sp.p*K?'disabled':''}>Comprar</button>`,
-                `<button class="btn gray" onclick="doAct({type:'skip'})">No comprar</button>`,
+      const short=p.money<sp.p*K, auc=short && rule('subasta');
+      if(auc) h+=`<div class="muted">No te alcanza: se puede subastar entre todos desde ${fmt(Math.ceil(sp.p*K*.2/K)*K)}.</div>`;
+      acts.push(`<button class="btn green" onclick="showBuyPicker()" ${short?'disabled':''}>Comprar</button>`,
+                `<button class="btn ${auc?'gold':'gray'}" onclick="doAct({type:'skip'})">${auc?'🔨 Subastar':'No comprar'}</button>`,
                 `<button class="btn gold" onclick="showBuyTitle()">🃏 Ver título</button>`);
+    } else if(S.tp==='move' && S.mv){
+      h+=`<div class="handhint">👆 Mové tu ficha <b>${S.mv.n}</b> casillas: tocá la casilla que brilla.</div>`;
+      acts.push(`<button class="btn gray" onclick="doAct({type:'moveTo',i:${S.mv.to}})">Mover automático</button>`);
+    } else if(S.tp==='draw' && S.drawDeck){
+      h+=`<div class="handhint">Caíste en <b>${DECK_NAME[S.drawDeck]}</b>: tocá el mazo para sacar tu tarjeta.</div>
+        <button class="deck ${S.drawDeck}" onclick="doAct({type:'draw'})" title="Sacar una tarjeta"><span class="ci">${S.drawDeck==='cc'?'💳':'🏦'}</span><span>${DECK_NAME[S.drawDeck].toUpperCase()}</span></button>`;
     } else if(S.tp==='end'){
       acts.push(`<button class="btn" onclick="doAct({type:'end'})">✔ Terminar turno</button>`);
     }
@@ -2586,6 +2787,8 @@ function renderCenterInner(){
     let w='';
     if(S.tp==='buy') w=`Está decidiendo si compra ${B[S.pendingBuy].n}…`;
     else if(S.tp==='roll') w = p.jail ? 'Está preso en Tacumbú…' : 'Va a tirar los dados…';
+    else if(S.tp==='move') w = `👆 Está moviendo su ficha ${S.mv?S.mv.n:''} casillas…`;
+    else if(S.tp==='draw') w = `Está por sacar una tarjeta de ${DECK_NAME[S.drawDeck]||'un mazo'}…`;
     else w='Está terminando su turno…';
     if(isNeg(p)) w='No pudo pagar: debe conseguir dinero o quebrar…';
     if(!p.conn) w='⚠️ Se desconectó.';
@@ -2913,11 +3116,14 @@ function renderCardOverlay(){
   if(r.dataset.id===key) return;
   const isNew = !r.dataset.id || !r.dataset.id.startsWith(c.id+':');
   r.dataset.id=key;
-  r.innerHTML=`<div class="cardov ${mine||hostCanClose?'':'watch'}"><div class="bigcard ${c.deck}${isNew?'':' noanim'}"><div class="ci">${c.deck==='cc'?'💳':'🏦'}</div><h2>${DECK_NAME[c.deck].toUpperCase()}</h2>${c.e?`<div class="cemo">${c.e}</div>`:''}
+  // sacada a mano: primero se ve el dorso y la tarjeta se da vuelta
+  const flip = isNew && c.flip;
+  const back = flip ? `<div class="cardback ${c.deck}"><div class="ci">${c.deck==='cc'?'💳':'🏦'}</div><b>${DECK_NAME[c.deck].toUpperCase()}</b><small>BANQUERO PARAGUAYO</small></div>` : '';
+  r.innerHTML=`<div class="cardov ${mine||hostCanClose?'':'watch'}"><div class="flipstack">${back}<div class="bigcard ${c.deck}${flip?' flipin':isNew?'':' noanim'}"><div class="ci">${c.deck==='cc'?'💳':'🏦'}</div><h2>${DECK_NAME[c.deck].toUpperCase()}</h2>${c.e?`<div class="cemo">${c.e}</div>`:''}
     <div>${mine?(NET.mode==='local'?esc(c.who)+', sacaste:':'Sacaste:'):esc(c.who)+' sacó:'}</div><p>${esc(c.x)}</p>
     ${mine||hostCanClose?`<button class="btn wide" style="background:#fff;color:#222;font-size:16px" onclick="doAct({type:'cardClose'},'${c.pid}')">${mine?'✔ Entendido, cerrar':drawer.bot?`✔ Ya la leímos, cerrar`:'Cerrar (jugador desconectado)'}</button>
            ${drawer.bot&&!mine?`<small>Es la tarjeta de un bot: cerrala cuando todos la hayan leído.</small>`:''}`
-          :`<small>⏳ Esperando que ${drawer&&drawer.bot?'el anfitrión cierre la tarjeta de '+esc(c.who):esc(c.who)+' la lea y la cierre'}…</small>`}${idle?`<div class="cardidle">${idle}</div>`:''}</div></div>`;
+          :`<small>⏳ Esperando que ${drawer&&drawer.bot?'el anfitrión cierre la tarjeta de '+esc(c.who):esc(c.who)+' la lea y la cierre'}…</small>`}${idle?`<div class="cardidle">${idle}</div>`:''}</div></div></div>`;
   if(isNew) SFX.card();
 }
 function showRules(){
@@ -2938,6 +3144,9 @@ function showRules(){
   <h4>Tacumbú (cárcel)</h4><p>Para salir: pagás ${fmt(JAIL_FINE)}, usás la tarjeta “Salga libre” o sacás dobles. Al tercer intento fallido pagás la fianza y salís.</p>
   <h4>Hipotecas y deudas</h4><ul><li>Podés hipotecar por la mitad del precio (sin casas en el grupo). Levantarla cuesta la hipoteca + 10%.</li>
   <li>Vender casas devuelve la mitad de su costo.</li><li>Si quedás con saldo negativo, no podés seguir hasta conseguir dinero. Si no podés, quebrás y tus bienes pasan a tu acreedor.</li></ul>
+  <h4>Modo de juego</h4><p>Con el botón <b>🎲 Modo</b> cada jugador elige: <b>automático</b> (la ficha avanza sola y la tarjeta sale sola) o <b>a mano</b> (después de tirar, la casilla a la que llegás brilla y la tocás para mover tu ficha; si caés en Cuenta Corriente o Caja de Ahorros, tocás el mazo y la tarjeta se da vuelta).</p>
+  <h4>Reglas especiales (opcionales)</h4><ul>${Object.values(RULES_DEF).map(d=>`<li><b>${d.t}:</b> ${d.d}</li>`).join('')}</ul>
+  ${S&&S.phase==='play'?`<p class="muted">En esta partida: ${Object.keys(RULES_DEF).filter(k=>rule(k)).map(k=>RULES_DEF[k].t).join(' · ')||'ninguna regla especial'}.</p>`:''}
   <h4>Negocios</h4><p>Con “🤝 Negociar” podés ofrecer dinero y propiedades a otro jugador. Usá el chat o el micrófono para regatear.</p>
   <h4>Jugar en línea</h4><p>Uno crea la sala y pasa el código. Funciona entre redes distintas (wifi, datos móviles). Si alguien se desconecta, vuelve a entrar con el mismo código desde el mismo dispositivo y recupera su lugar.</p>
   <p class="muted" style="margin-top:14px">El sello del centro del tablero es un homenaje al Banco Central del Paraguay. Es un juego de entretenimiento sin relación oficial con el BCP.</p>
@@ -3074,6 +3283,7 @@ $('#myName').value = load('bnq_name') || '';
 $('#myName').oninput = e=>store('bnq_name', e.target.value);
 renderTokenPicker();
 localNames.push({n:'Jugador 1',bot:false},{n:'Jugador 2',bot:false}); renderLocalNames();
+$('#menuRules').innerHTML=rulesHTML(myRules(), true, 'setMyRule');
 $('#btnAddLocal').onclick=()=>{ if(localNames.length<6){ localNames.push({n:'Jugador '+(localNames.length+1),bot:false}); renderLocalNames(); } };
 $('#btnVsBots').onclick=startVsBots;
 $('#btnLocal').onclick=startLocal;
