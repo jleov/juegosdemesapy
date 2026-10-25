@@ -38,8 +38,15 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
 .btn{display:block;text-align:center;border-radius:10px;padding:12px;font-weight:800;color:#fff;background:var(--blue)}
 .lotbtn{background:#7a2fbf}
 /* la ficha de la Lotería (igual que su ícono): aro rojo con el 90 */
-.lotchip{display:inline-flex;align-items:center;justify-content:center;font-size:.5em;width:2.3em;height:2.3em;border-radius:50%;background:#fff;border:.4em solid #d52b1e;
-  box-shadow:0 1px 3px rgba(0,0,0,.35);color:#111;font-weight:900;vertical-align:.25em;line-height:1;letter-spacing:0}
+/* ficha de madera de la Lotería, igual a las del juego: madera clara, aro y número pintados de rojo */
+.wood{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;position:relative;flex:none;color:#c62828;font-weight:900;font-family:Arial,Helvetica,sans-serif;line-height:1;letter-spacing:0;
+  background:repeating-radial-gradient(circle at 42% 38%,rgba(150,100,40,0) 0 6px,rgba(150,100,40,.07) 6px 7px),radial-gradient(circle at 35% 30%,#fbf0d8,#ecd4a6 45%,#d9b67f 78%,#bf9459);
+  box-shadow:inset 0 -4px 8px rgba(110,70,20,.35),inset 0 3px 5px rgba(255,255,255,.6),0 6px 14px rgba(0,0,0,.45)}
+.wood::before{content:"";position:absolute;inset:9%;border-radius:50%;border:3px solid rgba(198,40,40,.8)}
+.wood span{position:relative}
+.wood.big{width:104px;height:104px;font-size:44px}
+.wood.chip{width:30px;height:30px;font-size:13px;vertical-align:3px;box-shadow:inset 0 -2px 4px rgba(110,70,20,.35),0 2px 4px rgba(0,0,0,.4)}
+.wood.chip::before{border-width:1.5px;inset:7%}
 .cover.kdc{background:radial-gradient(circle at 30% 20%,#a8281e,#3a1028 75%)}
 .kdcbtn{background:#d0322a}
 .cover.uno{background:radial-gradient(circle at 30% 20%,#7a4220,#2a140a 75%)}
@@ -81,8 +88,8 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
         <span class="btn">Jugar al Banquero</span></div>
     </a>
     <a class="game" href="loteria/">
-      <div class="cover lot"><img src="loteria/icon-192.png" alt=""></div>
-      <div class="body"><h2><span class="lotchip" aria-hidden="true">90</span> Lotería</h2>
+      <div class="cover lot"><span class="wood big" aria-hidden="true"><span>90</span></span></div>
+      <div class="body"><h2><span class="wood chip" aria-hidden="true"><span>90</span></span> Lotería</h2>
         <p>Bingo de 90 bolillas: elegí tus cartones, poné tu maíz en lo que sale y cantá línea o bingo.</p>
         <span class="btn lotbtn">Jugar a la Lotería</span></div>
     </a>
