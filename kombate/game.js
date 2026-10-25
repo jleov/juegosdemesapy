@@ -2243,7 +2243,11 @@ function bindConn(c) {
     NET.conn = c; NET.rx = performance.now(); NET.last = { p: 0, k: 0, s: 0, u: 0 }; NET.cnt = { p: 0, k: 0, s: 0, u: 0 };
     // el anfitrión avisa qué tipo de sala es; el que entra espera ese aviso
     if (NET.role === 'host') { c.send({ t: 'room', kind: 'duel' }); sendHello(); $('#scrOnline').classList.remove('on'); openSelect('host'); toast('✅ ¡Conectados! Elijan sus peleadores.'); }
-    else oMsg('Conectado. Entrando a la sala…');
+    else {
+      oMsg('Conectado. Entrando a la sala…'); NET.gotRoom = false;
+      // si el anfitrión tiene una versión vieja no avisa el tipo de sala: entonces es una pelea entre dos
+      setTimeout(() => { if (NET.conn === c && NET.role === 'guest' && !NET.gotRoom) { sendHello(); $('#scrOnline').classList.remove('on'); openSelect('guest'); } }, 3000);
+    }
   });
   c.on('data', onNet);
   c.on('close', () => { if (NET.conn === c) netLost(); });
@@ -2299,7 +2303,7 @@ function onNet(m) {
   NET.rx = performance.now();
   if (!m || !m.t) return;
   switch (m.t) {
-    case 'room':
+    case 'room': NET.gotRoom = true;
       $('#scrOnline').classList.remove('on');
       if (m.kind === 'tour') { NET.role = 'spect'; NET.room = 'tour'; CHEER_SIDE = -1; TT = null; sendHello(); toast('🏆 ¡Entraste al torneo!'); }
       else if (m.kind === 'bots') { NET.role = 'spect'; CHEER_SIDE = -1; showScreen('scrSpect'); $('#spCode').textContent = NET.code; toast('📺 ¡Entraste a mirar la pelea de bots!'); }
@@ -2841,7 +2845,7 @@ function openOnline(code) {
   $('#oCode').value = code || ''; $('#scrOnline').classList.add('on');
   if (code) netJoin(code);
 }
-$('#oHost').onclick = netHost;
+$('#oHost').onclick = () => netHost('duel'); // ojo: sin la flecha le llegaría el clic como tipo de sala
 $('#oJoin').onclick = () => netJoin($('#oCode').value);
 $('#oCode').onkeydown = e => { if (e.key === 'Enter') netJoin($('#oCode').value); };
 $('#oClose').onclick = () => { netClose(); $('#scrOnline').classList.remove('on'); };
