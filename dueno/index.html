@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Panel del dueño · Juegos PY</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1c1240">
+<link rel="icon" href="../icon-192.png">
+<script src="../banquero/peerjs.min.js"></script>
+<script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<style>
+:root{--cream:#fff8e6;--blue:#0038a8;--red:#d52b1e;--gold:#f2c14e;--muted:#6b6b6b}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(circle at 30% 10%,#33236e,#120b2b 75%) fixed;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1d1d1d}
+input,button{font:inherit}
+.wrap{max-width:900px;margin:0 auto;padding:20px 14px 40px}
+h1{color:#fff;text-align:center;margin:0 0 4px;font-size:clamp(26px,6vw,38px);text-shadow:0 3px 0 #000}
+h1 span{color:var(--gold)}
+.sub{color:#cfc8ea;text-align:center;margin-bottom:16px;font-size:14px}
+.box{background:var(--cream);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:14px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff;text-decoration:none;display:inline-block;text-align:center}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.gray{background:#7a7a7a}.btn.green{background:#2a9d3f}.btn.wide{width:100%}
+input[type=password]{width:100%;padding:11px 12px;border:1px solid #c9c2a8;border-radius:10px}
+.muted{color:var(--muted);font-size:13px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.sum div{background:rgba(255,255,255,.1);color:#fff;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px}
+.sum img{width:38px;height:38px;border-radius:9px}
+.sum b{font-size:22px;display:block;line-height:1}
+.sum small{color:#cfc8ea}
+.game h2{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:20px}
+.game h2 img{width:34px;height:34px;border-radius:8px}
+.room{border:1px solid #e6dcc0;background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.room .top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.room .code{font-size:20px;font-weight:900;letter-spacing:3px;color:var(--blue)}
+.pl{margin:6px 0;line-height:1.7}
+.pl span{white-space:nowrap;margin-right:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.empty{text-align:center;color:var(--muted);padding:6px 0 2px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:9;max-width:92%;text-align:center}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#2a9d3f;margin-right:6px;animation:p 1.6s infinite}
+@keyframes p{50%{opacity:.3}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>👑 Panel del <span>dueño</span></h1>
+  <div class="sub">Todas las salas abiertas de Juegos de Mesa Digital PY: Banquero, Lotería, Face Punch y UNO.</div>
+  <div id="body"></div>
+</div>
+<div id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function store(k,v){ try{ if(v===undefined) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function load(k){ try{ const v=localStorage.getItem(k); return v==null?null:JSON.parse(v); }catch(e){ return null; } }
+function toast(x){ const t=$('#toast'); t.textContent=x; t.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display='none',4000); }
+
+// la misma contraseña y la misma llave que el panel del Banquero
+const OWNER_PUB = {x:'eLdK1LWh1LGyAlt0IW6Apa9bnuRt1LwLi3D1MQtqtHk', y:'XPx_IfKocm2ZANCG_As4PxsgjToAMnZMEaWlzZWWBKk'};
+const PANEL_ID = 'jmdpy26-dueno';
+const EC={name:'ECDSA', namedCurve:'P-256'}, SIG={name:'ECDSA', hash:'SHA-256'};
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+async function keyFromPassword(pw){
+  const enc=new TextEncoder();
+  const base=await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
+  const d=new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2', salt:enc.encode('banquero-paraguayo-dueno-v1'), iterations:300000, hash:'SHA-256'}, base, 256));
+  const der=new Uint8Array([0x30,0x41,0x02,0x01,0x00,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x04,0x27,0x30,0x25,0x02,0x01,0x01,0x04,0x20, ...d]);
+  const key=await crypto.subtle.importKey('pkcs8', der, EC, true, ['sign']);
+  return crypto.subtle.exportKey('jwk', key);
+}
+
+const GAMES = {
+  banquero:{n:'Banquero Paraguayo', ico:'../banquero/icon-192.png', phase:{lobby:'⏳ En la sala de espera', play:'🎲 Jugando', over:'🏁 Terminada'}},
+  loteria: {n:'Lotería',           ico:'../loteria/icon-192.png',  phase:{lobby:'⏳ En la sala de espera', venta:'🎟️ Vendiendo cartones', juego:'🎱 Cantando', fin:'🏁 Ronda terminada'}},
+  kombate: {n:'Face Punch',        ico:'../kombate/icon-192.png',  phase:{}},
+  uno:     {n:'UNO Paraguayo',     ico:'../uno/icon-192.png',      phase:{lobby:'⏳ En la sala de espera', play:'🃏 Jugando', roundEnd:'🏆 Entre manos', over:'🏁 Terminada'}},
+};
+const KIND = {duel:'🥊 Pelea entre dos', bots:'🤖 Sala de bots (con público)', tour:'🏆 Torneo'};
+const A={key:null, peer:null, rooms:{}, err:'', pending:{}};
+
+async function login(){
+  const pw=$('#pw').value;
+  if(pw.length<8) return toast('La contraseña tiene que tener al menos 8 letras o números.');
+  if(!window.crypto || !crypto.subtle) return toast('Abrí el panel desde el enlace con https.');
+  $('#pw').value=''; $('#msg').textContent='Comprobando…';
+  const jwk=await keyFromPassword(pw);
+  if(jwk.x!==OWNER_PUB.x || jwk.y!==OWNER_PUB.y){ $('#msg').textContent='❌ Contraseña incorrecta.'; return; }
+  store('bnq_owner', jwk); start(jwk);
+}
+async function start(jwk){
+  try{ A.key=await crypto.subtle.importKey('jwk', jwk, EC, false, ['sign']); }
+  catch(e){ store('bnq_owner', undefined); A.key=null; return render(); }
+  if(jwk.x!==OWNER_PUB.x){ store('bnq_owner', undefined); A.key=null; return render(); }
+  A.err='Conectando…'; render();
+  const peer=A.peer=new Peer(PANEL_ID, {debug:1, config:{iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},
+    {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'}]}});
+  peer.on('open', ()=>{ A.err=''; render(); });
+  peer.on('disconnected', ()=>{ if(!peer.destroyed) setTimeout(()=>{ try{ peer.reconnect(); }catch(e){} },1500); });
+  peer.on('error', e=>{
+    if(e.type==='unavailable-id'){ A.err='El panel ya está abierto en otro aparato o pestaña. Cerralo allá y tocá “Reintentar”.'; peer.destroy(); A.peer=null; render(); }
+  });
+  peer.on('connection', conn=>{
+    conn.on('data', async d=>{
+      if(!d || typeof d!=='object') return;
+      if(d.t==='hi'){ const sig=await crypto.subtle.sign(SIG, A.key, new TextEncoder().encode(String(d.nonce))); conn.send({t:'proof', sig:b64u(sig)}); return; }
+      if(d.t==='pong'){ for(const k in A.rooms) if(A.rooms[k].conn===conn) A.rooms[k].at=Date.now(); return; }
+      if(!d.game || !d.code || !GAMES[d.game]) return;
+      const k=d.game+':'+d.code;
+      if(d.t==='room'){
+        const old=A.rooms[k];
+        if(old && old.conn!==conn){ try{ old.conn.close(); }catch(e){} }   // cambió el anfitrión de esa sala
+        A.rooms[k]={game:d.game, code:d.code, conn, info:d.info, at:Date.now()}; conn._k=k;
+        render();
+      } else if(d.t==='iamOk' && A.pending[k]){
+        const w=A.pending[k]; delete A.pending[k];
+        if(w.tab && !w.tab.closed) w.tab.location.href=w.url; else location.href=w.url;
+      }
+    });
+    conn.on('close', ()=>{ const r=conn._k && A.rooms[conn._k]; if(r && r.conn===conn){ delete A.rooms[conn._k]; render(); } });
+  });
+}
+setInterval(()=>{   // pulso con cada sala y limpieza de las que ya no responden
+  let gone=false;
+  for(const k in A.rooms){ const r=A.rooms[k];
+    if(Date.now()-r.at>25000){ try{ r.conn.close(); }catch(e){} delete A.rooms[k]; gone=true; continue; }
+    if(r.conn.open) try{ r.conn.send({t:'ping'}); }catch(e){} }
+  if(gone) render(); else if(A.key) refreshAgo();
+}, 5000);
+function retry(){ if(A.peer){ try{ A.peer.destroy(); }catch(e){} A.peer=null; } const s=load('bnq_owner'); if(s) start(s); }
+function logout(){ if(A.peer) try{ A.peer.destroy(); }catch(e){} Object.assign(A,{peer:null, key:null, rooms:{}, err:''}); store('bnq_owner', undefined); render(); }
+
+const ago = t => { if(!t) return ''; const m=Math.round((Date.now()-t)/60000); return m<1?'recién':m<60?`hace ${m} min`:`hace ${Math.floor(m/60)} h ${m%60} min`; };
+function refreshAgo(){ document.querySelectorAll('[data-at]').forEach(e=>e.textContent=ago(+e.dataset.at)); }
+// token con el que cada juego reconoce a este aparato (el mismo que usa el juego al entrar)
+function tokenOf(key){ let t=load(key); if(!t){ t=Math.random().toString(36).slice(2)+Date.now().toString(36); store(key,t); } return t; }
+// entrar como dueño (a la vista de todos): la sala anota este aparato y después se abre el juego
+function enter(k){
+  const r=A.rooms[k]; if(!r || !r.conn.open) return toast('Esa sala ya no responde.');
+  const tok = r.game==='uno' ? tokenOf('uno_token') : tokenOf('bnq_token');
+  const url = r.game==='uno' ? `../uno/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
+  const tab = window.open('about:blank', '_blank');
+  A.pending[k]={url, tab};
+  try{ r.conn.send({t:'iam', token:tok}); }catch(e){}
+  if(r.game==='banquero') toast('Se abre el Banquero con el código puesto: escribí tu nombre y tocá “Entrar”. Vas a entrar como 👑 dueño.');
+  setTimeout(()=>{ if(A.pending[k]){ delete A.pending[k]; if(tab && !tab.closed) tab.close(); toast('La sala no contestó. Probá de nuevo.'); } }, 10000);
+}
+
+function roomHTML(k, r){
+  const i=r.info||{}, G=GAMES[r.game];
+  const phase = r.game==='kombate' ? (KIND[i.kind]||'🥊 Sala') : (G.phase[i.phase]||i.phase||'');
+  const players=(i.players||[]).map(p=>{
+    const extra = p.cards!=null ? ` (${p.cards}🂠${i.opts&&i.opts.target?' · '+p.pts+' pts':''})` : '';
+    return `<span style="${p.bk?'opacity:.5;text-decoration:line-through':''}">${esc(p.e||'')} ${p.bot?'🤖':''}${esc(p.n)}${!i.local&&p.n===i.host?' 👑':''}${!i.local&&!p.bot&&!p.conn?' ⚠️':''}${extra}</span>`;
+  }).join('');
+  let det='';
+  if(i.turn) det+=`<div class="muted">Turno de <b>${esc(i.turn)}</b>${i.round?` · mano ${i.round}`:''}</div>`;
+  if(r.game==='loteria') det+=`<div class="muted">${i.cantor?`🎤 Canta <b>${esc(i.cantor)}</b>`:''}${i.phase==='juego'?` · salieron <b>${i.balls}</b> de 90 bolillas`:''}${i.round?` · ronda ${i.round}`:''}</div>`;
+  if(r.game==='kombate') det+=`<div class="muted">${i.kind==='duel'?(i.guest?'Los dos peleadores conectados':'Esperando al rival'):`👀 ${i.viewers||0} mirando`}</div>`;
+  const obs=i.obs||[];
+  if(obs.length) det+=`<div class="muted">👀 Mirando: ${obs.map(o=>(o.owner?'👑 ':'')+esc(o.n)).join(', ')}</div>`;
+  let btns='';
+  if(r.game==='banquero'){
+    if(!i.local) btns+=`<button class="btn sm green" onclick="enter('${k}')">👑 Entrar a la vista</button>`;
+    btns+=`<a class="btn sm gray" href="../banquero/#panel-dueno" target="_blank" rel="noopener">🕵️ Mirar sin que me vean (panel del Banquero)</a>`;
+  } else if(r.game==='uno'){
+    if(!i.local) btns+=`<button class="btn sm green" onclick="enter('${k}')">👑 Entrar a mirar</button>`;
+  } else if(r.game==='loteria'){
+    btns+=`<a class="btn sm" href="../loteria/?sala=${encodeURIComponent(r.code)}" target="_blank" rel="noopener">👀 Abrir la sala</a><span class="muted" style="align-self:center">(ahí tocá “Entrar solo a mirar”)</span>`;
+  } else if(r.game==='kombate' && i.kind!=='duel'){
+    btns+=`<a class="btn sm" href="../kombate/?sala=${encodeURIComponent(r.code)}" target="_blank" rel="noopener">👀 Mirar la pelea</a>`;
+  }
+  return `<div class="room"><div class="top">${i.local?'<b>📱 Partida en un solo aparato (contra bots)</b>':`<span class="code">${esc(r.code)}</span>`}
+      <span class="muted">${esc(phase)}${i.started?` · <span data-at="${i.started}">${ago(i.started)}</span>`:''}</span></div>
+    ${players?`<div class="pl">${players}</div>`:''}${det}
+    ${btns?`<div class="row">${btns}</div>`:''}
+    ${i.local?'<div class="muted" style="margin-top:4px">Se juega en un solo celular o PC: no tiene sala para entrar.</div>':''}</div>`;
+}
+function render(){
+  const el=$('#body');
+  if(!A.key){
+    el.innerHTML=`<div class="box"><p style="margin-top:0">Escribí la contraseña del dueño (la misma del panel del Banquero). Se pide una sola vez en cada aparato.</p>
+      <input type="password" id="pw" placeholder="Contraseña del dueño" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+      <button class="btn green wide" style="margin-top:8px" onclick="login()">🔑 Entrar</button><p class="muted" id="msg"></p></div>`;
+    return;
+  }
+  const all=Object.entries(A.rooms).filter(([k,r])=>r.info);
+  const byGame=g=>all.filter(([k,r])=>r.game===g).sort((a,b)=>(a[1].info.local?1:0)-(b[1].info.local?1:0));
+  el.innerHTML = (A.err?`<div class="box">${esc(A.err)} ${A.peer?'':'<button class="btn sm" onclick="retry()">🔄 Reintentar</button>'}</div>`:'')
+    + `<div class="sum">${Object.keys(GAMES).map(g=>`<div><img src="${GAMES[g].ico}" alt=""><span><b>${byGame(g).length}</b><small>${GAMES[g].n}</small></span></div>`).join('')}</div>`
+    + `<p class="muted" style="color:#cfc8ea;text-align:center"><span class="dot"></span>Salas abiertas ahora: <b style="color:#fff">${all.length}</b>. Aparecen solas mientras este panel está abierto (tardan unos segundos).</p>`
+    + Object.keys(GAMES).map(g=>{ const rs=byGame(g);
+        return `<div class="box game"><h2><img src="${GAMES[g].ico}" alt="">${GAMES[g].n} <span class="muted">(${rs.length})</span></h2>
+          ${rs.length ? rs.map(([k,r])=>roomHTML(k,r)).join('') : '<div class="empty">🛋️ No hay salas abiertas.</div>'}</div>`; }).join('')
+    + `<button class="btn gray wide" onclick="logout()">🔒 Cerrar sesión de dueño en este aparato</button>
+       <p class="muted" style="color:#cfc8ea;text-align:center">Face Punch muestra las salas en línea (pelea entre dos, sala de bots y torneo); las peleas contra la máquina no tienen sala.</p>`;
+}
+render();
+const saved=load('bnq_owner'); if(saved) start(saved);
+</script>
+</body>
+</html>

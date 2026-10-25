@@ -1,6 +1,6 @@
 // Service worker de Kombate de Caras: permite instalarlo como app y abrirlo sin conexión.
 // Solo borra sus propias cachés (prefijo "kombate-").
-const CACHE = 'kombate-v20';
+const CACHE = 'kombate-v21';
 const FILES = ['./', './index.html', './game.js', './peerjs.min.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

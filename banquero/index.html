@@ -1637,6 +1637,7 @@ function renderOwner(){
             ${i.local?'':`<button class="btn sm green" onclick="ownerJoin('${code}')">👑 Entrar a la vista</button>`}</div>
           ${i.local?'<div class="muted" style="margin-top:4px">Se juega en un solo celular o PC (contra bots o pasándose el aparato): no tiene sala, así que solo se puede mirar.</div>':''}</div>`; }).join('')
       : `<p style="text-align:center;font-size:40px;margin:10px 0">🛋️</p><p class="muted" style="text-align:center">No hay salas abiertas en este momento.</p>`)
+    + `<a class="btn green wide" style="display:block;text-align:center;text-decoration:none;margin-top:6px" href="../dueno/">👑 Ver las salas de todos los juegos</a>`
     + `<button class="btn gray wide" style="margin-top:6px" onclick="ownerLogout()">🔒 Cerrar sesión de dueño en este dispositivo</button>`;
 }
 // mirar una partida sin aparecer en ningún lado: solo el tablero (sin chat, sin voz, sin la plata secreta)
@@ -3431,6 +3432,21 @@ $('#btnInstall').onclick=async()=>{
   modal(`<h3>📲 Cómo instalar el Banquero</h3>${pasos}<p class="muted">El juego queda con su ícono 🟡₲ y se abre como una app, en pantalla completa.</p>`,'install');
 };
 refreshInstall();
+</script>
+<script src="../dueno-link.js"></script>
+<script>
+// también le cuenta al panel del dueño de todos los juegos (juegosdemesapy/dueno/) cómo va esta partida
+if(window.DuenoLink) DuenoLink.start({game:'banquero',
+  info(){
+    if(!S || (NET.mode!=='host' && NET.mode!=='local')) return null;
+    const local=NET.mode==='local'; if(local && !S.localCode) S.localCode=genCode();
+    let turn=null; try{ if(S.phase==='play') turn=cur().name; }catch(e){}
+    return {code: local ? S.localCode : NET.code, local, phase:S.phase, host:(P(S.hostPid)||{}).name||'', turn, started:S.startedAt||null,
+      players:S.players.map(p=>({n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot || local, bk:!!p.bk})),
+      obs:(S.observers||[]).filter(o=>o.conn).map(o=>({n:o.name, owner:!!o.owner}))};
+  },
+  onIam(tok){ if(NET.mode!=='host') return; S.ownerTok=[...new Set([...(S.ownerTok||[]), tok])].slice(-4); commit(); }
+});
 </script>
 </body>
 </html>

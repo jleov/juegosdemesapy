@@ -1283,5 +1283,18 @@ cargarGrabados();
 window.addEventListener('focus', ()=>cargarGrabados().then(()=>{ if(UI.sonido) renderOv(); else if(S) render(); }));
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
+<script src="../dueno-link.js"></script>
+<script>
+// le cuenta al panel del dueño de todos los juegos (juegosdemesapy/dueno/) cómo va esta sala (solo el anfitrión)
+if(window.DuenoLink) DuenoLink.start({game:'loteria',
+  info(){
+    if(!S || NET.mode!=='host') return null;
+    const cantor=P(S.cantorPid);
+    return {code:NET.code, local:false, phase:S.phase, round:S.round, host:(P(S.hostPid)||{}).name||'', cantor:cantor?cantor.name:'',
+      balls:(S.drawn||[]).length, players:S.players.filter(p=>!p.esp).map(p=>({n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot})),
+      obs:S.players.filter(p=>p.esp && p.conn).map(p=>({n:p.name}))};
+  }
+});
+</script>
 </body>
 </html>

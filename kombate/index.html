@@ -370,5 +370,18 @@ kbd{background:#ffffff22;border-radius:5px;padding:1px 6px;font-family:inherit;f
 
 <script src="peerjs.min.js"></script>
 <script src="game.js"></script>
+<script src="../dueno-link.js"></script>
+<script>
+// le cuenta al panel del dueño de todos los juegos (juegosdemesapy/dueno/) qué sala de pelea está abierta (solo el que la creó)
+if(window.DuenoLink) DuenoLink.start({game:'kombate',
+  info(){
+    if(NET.role!=='host' || !NET.peer || !NET.peer.open || !NET.code) return null;
+    const names=[]; try{ (G.setup&&G.setup.sel||SEL||[]).forEach(s=>s&&s.name&&names.push(s.name)); }catch(e){}
+    return {code:NET.code, local:false, kind:NET.room, phase:(typeof G!=='undefined'&&G.phase)||'',
+      guest:!!(NET.conn&&NET.conn.open), viewers:NET.specs.size,
+      players:names.slice(0,2).map(n=>({n, e:'🥊', bot:NET.room!=='duel', conn:true})), obs:[]};
+  }
+});
+</script>
 </body>
 </html>

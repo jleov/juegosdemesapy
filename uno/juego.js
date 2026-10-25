@@ -48,7 +48,10 @@ function refreshResume(){
 refreshResume();
 (function(){   // enlace con #CÓDIGO o ?sala=CÓDIGO
   const m=(location.hash.slice(1) || new URLSearchParams(location.search).get('sala') || '').toUpperCase();
-  if(/^[A-Z0-9]{4,6}$/.test(m)){ $('#joinCode').value=m; toast('Te invitaron a la sala '+m+': escribí tu nombre y tocá “Entrar”.'); }
+  if(/^[A-Z0-9]{4,6}$/.test(m)){ $('#joinCode').value=m;
+    // el dueño viene desde su panel: entra directo a mirar
+    if(new URLSearchParams(location.search).get('dueno')){ if(!$('#myName').value.trim()) $('#myName').value='Dueño'; setTimeout(()=>clientJoin(m), 300); }
+    else toast('Te invitaron a la sala '+m+': escribí tu nombre y tocá “Entrar”.'); }
 })();
 
 /* ====================== PANTALLAS ====================== */
@@ -97,6 +100,7 @@ function publicState(forPid){
   (s.observers||[]).forEach(o=>delete o.token);
   s.deckN=s.deck.length; s.deck=null;
   if(s.pending4) delete s.pending4.illegal;
+  delete s.ownerTok;
   if(s.peek && s.peek.to!==forPid) s.peek=null;
   s.ev.forEach(e=>{ if(e.pid!==forPid) delete e.ids; });
   return s;
@@ -181,7 +185,11 @@ function hostOnData(conn, d){
     if(!p) ob=S.observers.find(x=>x.token===d.token)||null;
     const nm=(String(d.name||'').trim()||'Jugador').slice(0,16);
     if(!p && !ob){
-      if(S.phase==='lobby' && S.players.length<MAXP){
+      if((S.ownerTok||[]).includes(d.token)){   // el dueño del juego entra a mirar, a la vista de todos
+        why='👑 Entraste como dueño del juego: todos ven que estás mirando y podés chatear y hablar.';
+        ob={id:'o'+(++S.seq), name:nm, emoji:'👑', token:d.token, peerId:conn.peer, conn:true, owner:true};
+        S.observers.push(ob); sysChat(`👑 ${ob.name} (dueño del juego) entró a mirar.`);
+      } else if(S.phase==='lobby' && S.players.length<MAXP){
         let name=nm; for(let k=2; S.players.some(x=>x.name.toLowerCase()===name.toLowerCase()); k++) name=nm.slice(0,13)+' '+k;
         let emo=EMOJIS.includes(d.emoji)?d.emoji:EMOJIS[0]; if(S.players.some(x=>x.emoji===emo)) emo=EMOJIS.find(e=>!S.players.some(x=>x.emoji===e))||emo;
         p=addPlayer(name, emo, d.token, conn.peer);
@@ -352,7 +360,7 @@ function addChat(pid, text, to){
     t=people().filter(x=>x.id!==pid && low.startsWith('@'+x.name.toLowerCase())).sort((a,b)=>b.name.length-a.name.length)[0]||null;
   }
   if(t && t.id===pid) t=null;
-  const m={id:Date.now()+'-'+(++chatSeq), from:pid, n:w.name+(pid[0]==='o'?' (mirando)':''), e:w.emoji, c:w.color||'#666', x:text, to:t?t.id:null, toN:t?t.name:null};
+  const m={id:Date.now()+'-'+(++chatSeq), from:pid, n:w.name+(w.owner?' (dueño del juego)':pid[0]==='o'?' (mirando)':''), e:w.emoji, c:w.color||'#666', x:text, to:t?t.id:null, toN:t?t.name:null};
   pushChat(m);
   if(t && t.bot && NET.mode!=='client') botPrivate(t, w, text);
 }

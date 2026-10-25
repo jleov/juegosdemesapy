@@ -140,6 +140,7 @@ $('#btnInstall').onclick=async()=>{
   $('#ovBox').innerHTML=`<h3>📲 Cómo instalar Juegos de Mesa</h3>${pasos}<p style="font-size:13px;color:#666">Queda con el ícono 🎲 y se abre como una app, con el Banquero y la Lotería adentro.</p><button onclick="document.getElementById('ov').classList.remove('on')">Entendido</button>`;
   $('#ov').classList.add('on');
 };
+if(location.hash==="#panel-dueno") location.replace("dueno/");   // panel del dueño de todos los juegos
 refreshInstall();
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>

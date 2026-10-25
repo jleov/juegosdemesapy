@@ -438,6 +438,22 @@ html,body{overflow-x:clip}
 <div id="fly"></div>
 
 <script src="reglas.js?v=1"></script>
-<script src="juego.js?v=3"></script>
+<script src="juego.js?v=4"></script>
+<script src="../dueno-link.js"></script>
+<script>
+// le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)
+if(window.DuenoLink) DuenoLink.start({game:"uno",
+  info(){
+    if(!S || (NET.mode!=="host" && NET.mode!=="local")) return null;
+    const local=NET.mode==="local"; if(local && !S.localCode) S.localCode="L"+genCode();
+    const c=S.phase==="play" ? S.players[S.turn] : null;
+    return {code: local ? S.localCode : NET.code, local, phase:S.phase, round:S.round, started:S.startedAt||null,
+      host:(P(S.hostPid)||{}).name||"", turn:c ? c.name : null, opts:S.opts,
+      players:S.players.map(p=>({n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot, cards:p.hand.length, pts:p.score})),
+      obs:(S.observers||[]).filter(o=>o.conn).map(o=>({n:o.name, owner:!!o.owner}))};
+  },
+  onIam(tok){ if(NET.mode!=="host") return; S.ownerTok=[...new Set([...(S.ownerTok||[]), tok])].slice(-4); commit(); }
+});
+</script>
 </body>
 </html>
