@@ -1,6 +1,6 @@
 'use strict';
 /* ==================================================================
-   KOMBATE DE CARAS — pelea 2D con la cara de tus amigos
+   FACE PUNCH (antes Face Punch) — pelea 2D con la cara de tus amigos
    Lienzo lógico de alto 540; el ancho se adapta a la pantalla (760–1280).
    Coordenadas del mundo: x de 0 a STAGE_W, y = altura sobre el piso.
    ================================================================== */
@@ -648,7 +648,7 @@ const STAGES = [
       for (const tx of [120, STAGE_W - 120]) { c.beginPath(); c.moveTo(ox + tx - 40, 60); c.lineTo(ox + tx + 40, 60); c.lineTo(ox + STAGE_W / 2 + 300 * Math.sign(STAGE_W / 2 - tx), GROUND); c.lineTo(ox + STAGE_W / 2 - 100 * Math.sign(STAGE_W / 2 - tx), GROUND); c.fill(); }
     },
     mid(c, R) {
-      const ads = [['KOMBATE', '#d52b1e', '#fff'], ['DE CARAS', '#ffd21f', '#111'], ['JLEOV GAMES', '#0038a8', '#fff'], ['PY 🇵🇾', '#fff', '#d52b1e'], ['¡PIÑA!', '#1d9e49', '#fff']];
+      const ads = [['FACE', '#d52b1e', '#fff'], ['PUNCH', '#ffd21f', '#111'], ['JLEOV GAMES', '#0038a8', '#fff'], ['PY 🇵🇾', '#fff', '#d52b1e'], ['¡PIÑA!', '#1d9e49', '#fff']];
       c.fillStyle = '#0a0d18'; c.fillRect(0, GROUND - 92, STAGE_W, 62);
       for (let i = 0, x = 0; x < STAGE_W; i++, x += 220) {
         const [t, bg, fg] = ads[i % ads.length]; c.fillStyle = bg; c.fillRect(x + 4, GROUND - 86, 212, 48);
@@ -2261,6 +2261,7 @@ function onSpecMsg(c, m) {
   if (!m || !m.t) return;
   if (m.t === 'in') { readNetInput(c._src, c._last, m); return; }
   if (m.t === 'hello') { tourHello(c, m.sel); return; }
+  if (m.t === 'vote') { castVote(c.peer, c._name, m.s, c._slot); return; }
   if (m.t === 'side') { c._side = m.s === 0 || m.s === 1 ? m.s : -1; audienceChanged(); }
   else if (m.t === 'cheer') {
     const now = performance.now(); if (now - (c._ct || 0) < 150 || !CHEERS.includes(m.e) || (m.s !== 0 && m.s !== 1)) return;
@@ -2839,8 +2840,8 @@ $('#oCode').onkeydown = e => { if (e.key === 'Enter') netJoin($('#oCode').value)
 $('#oClose').onclick = () => { netClose(); $('#scrOnline').classList.remove('on'); };
 const roomLink = () => location.origin + location.pathname + '?sala=' + NET.code;
 $('#oShare').onclick = () => {
-  const text = NET.room === 'bots' ? '🍿 ¡Vení a mirar la pelea de bots en Kombate de Caras y alentá a tu favorito! Código ' + NET.code : '¡Peleemos! Entrá a mi sala de Kombate de Caras con el código ' + NET.code;
-  const data = { title: 'Kombate de Caras', text, url: roomLink() };
+  const text = NET.room === 'bots' ? '🍿 ¡Vení a mirar la pelea de bots en Face Punch y alentá a tu favorito! Código ' + NET.code : '¡Peleemos! Entrá a mi sala de Face Punch con el código ' + NET.code;
+  const data = { title: 'Face Punch', text, url: roomLink() };
   if (navigator.share) navigator.share(data).catch(() => { }); else $('#oCopy').onclick();
 };
 $('#oCopy').onclick = () => { navigator.clipboard.writeText(roomLink()).then(() => toast('📋 Link copiado. Pasáselo a tu amigo.')).catch(() => toast(roomLink(), 6000)); };
@@ -2875,14 +2876,14 @@ const NEXT_NAMES = ['cuartos de final', 'la semifinal', 'la final', ''];
 let PHOTO_TARGET = null, TT = null; const TFACE = [];
 function defaultTour() {
   return {
-    name: 'Gran Torneo de Kombate', mode: 'solo', need: 1, lvl: 'normal', status: 'setup', R: null, round: 0, match: 0,
+    name: 'Gran Torneo Face Punch', mode: 'solo', need: 1, lvl: 'normal', status: 'setup', R: null, round: 0, match: 0,
     slots: CH_KEYS.map((k, i) => ({ name: CHARS[k].name, ch: k, face: null, ctl: i === 0 ? 'me' : 'bot' }))
   };
 }
 let TOUR = store.get('kdc_tour', null);
 if (!TOUR || !Array.isArray(TOUR.slots) || TOUR.slots.length !== 16) TOUR = defaultTour();
 TOUR.slots.forEach(s => { if (s.ctl === 'net') s.ctl = 'bot'; if (!CHARS[s.ch]) s.ch = 'toro'; });
-if (!TOUR.name) TOUR.name = 'Gran Torneo de Kombate';
+if (!TOUR.name || TOUR.name === 'Gran Torneo de Kombate') TOUR.name = 'Gran Torneo Face Punch';
 if (TOUR.mode === 'online' && TOUR.status !== 'setup') TOUR.status = 'setup'; // un torneo en línea no se retoma sin los amigos
 function saveTour() { if (!store.set('kdc_tour', TOUR)) toast('No hay espacio para guardar las caras del torneo en este aparato.'); }
 const curMatch = () => ({ a: TOUR.R[TOUR.round][TOUR.match * 2], b: TOUR.R[TOUR.round][TOUR.match * 2 + 1] });
@@ -2910,7 +2911,7 @@ function renderTour() {
   const T = TOUR;
   document.querySelectorAll('#tModes [data-tm]').forEach(b => b.classList.toggle('on', b.dataset.tm === T.mode));
   const roomOpen = roomHost() && NET.room === 'tour' && NET.peer && NET.peer.open, friends = [...NET.specs].filter(c => c._slot >= 0).length;
-  $("#tOpts").innerHTML = `<div class="secT">Nombre del torneo</div><input id="tName" class="inp" style="font-size:18px;letter-spacing:1px;text-transform:none;text-align:left;max-width:420px;padding:10px 12px" maxlength="30" value="${esc(T.name || "")}" placeholder="Gran Torneo de Kombate">
+  $("#tOpts").innerHTML = `<div class="secT">Nombre del torneo</div><input id="tName" class="inp" style="font-size:18px;letter-spacing:1px;text-transform:none;text-align:left;max-width:420px;padding:10px 12px" maxlength="30" value="${esc(T.name || "")}" placeholder="Gran Torneo Face Punch">
     <div class="secT">Peleas</div><div class="row">
       <button class="sm ${T.need === 1 ? 'on' : ''}" data-need="1">⚡ A 1 ronda</button><button class="sm ${T.need === 2 ? 'on' : ''}" data-need="2">🥊 Al mejor de 3</button>
       <span style="width:12px"></span><span style="font-weight:800;font-size:13px">Bots:</span>${LVLS.map(([k, t]) => `<button class="sm ${T.lvl === k ? "on" : ""}" data-tl="${k}">${t}</button>`).join("")}
@@ -2974,11 +2975,11 @@ function rosterData(slots) {
   return { app: 'kombate-de-caras', tipo: 'peleadores', v: 1, slots: slots.map(s => ({ name: s.name, ch: s.ch, face: s.face || null, yaw: s.yaw ?? yawOf(s.face) })) };
 }
 async function exportRoster() {
-  const txt = JSON.stringify(rosterData(TOUR.slots)), name = 'kombate-peleadores.json';
+  const txt = JSON.stringify(rosterData(TOUR.slots)), name = 'facepunch-peleadores.json';
   const file = new File([txt], name, { type: 'application/json' });
   // en el celular se comparte directo (WhatsApp, etc.); si no se puede, se descarga el archivo
   try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Peleadores de Kombate de Caras', text: '🥊 Mis 16 peleadores de Kombate de Caras. Abrí el juego → 🏆 Torneo → 📥 Cargar peleadores.' }); return; }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Peleadores de Face Punch', text: '🥊 Mis 16 peleadores de Face Punch. Abrí el juego → 🏆 Torneo → 📥 Cargar peleadores.' }); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; }
   const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
@@ -2987,7 +2988,7 @@ async function exportRoster() {
 // pone los peleadores recibidos en el torneo de este aparato (acepta el archivo o lo que mandó la sala)
 function loadRoster(data) {
   const list = data && Array.isArray(data.slots) ? data.slots : null;
-  if (!list || list.length !== 16) { toast('Ese archivo no es de peleadores de Kombate de Caras.'); return false; }
+  if (!list || list.length !== 16) { toast('Ese archivo no es de peleadores de Face Punch.'); return false; }
   if (TOUR.status !== 'setup' && TOUR.R && !confirm('Tenés un torneo a medias. ¿Lo reemplazo por estos peleadores?')) return false;
   const meIdx = TOUR.slots.findIndex(s => s.ctl === 'me');
   TOUR.slots = list.map((s, i) => {
@@ -3010,7 +3011,7 @@ $('#fileTour').onchange = e => {
 // primero se arman las llaves (sorteadas, y el anfitrión cambia de lugar a quien quiera); después se pelea
 function startTour() {
   const order = [...Array(16).keys()].sort(() => Math.random() - .5);
-  Object.assign(TOUR, { R: [order, [], [], [], []], round: 0, match: 0, status: 'arrange', pend: [] });
+  Object.assign(TOUR, { R: [order, [], [], [], []], round: 0, match: 0, status: 'arrange', pend: [], bets: null, score: {} });
   bkReset(); saveTour(); showBracket();
 }
 function startFights() { TOUR.status = 'bracket'; TOUR.round = 0; TOUR.match = 0; saveTour(); showBracket(); fx('sfx', 'power'); }
@@ -3063,11 +3064,13 @@ function renderBracket() {
     btns.innerHTML = host ? `<button class="big b4" id="bShuffle">🔀 Sortear de nuevo</button><button class="big" id="bStart">🥋 ¡Empezar el torneo!</button>` : '';
     if ($('#bShuffle')) $('#bShuffle').onclick = () => { TOUR.R[0].sort(() => Math.random() - .5); BK.sel = -1; saveTour(); fx('sfx', 'whoosh'); if (roomHost() && NET.room === 'tour') broadcastTour(); };
     if ($('#bStart')) $('#bStart').onclick = startFights;
+    if ($('#bBets')) $('#bBets').innerHTML = '';
     return;
   }
-  if (T.status !== 'bracket') { $('#bInfo').textContent = T.status === 'champ' ? '🏆 ¡El torneo terminó!' : ''; btns.innerHTML = `<button class="big b5" id="bChamp">🏆 Ver al campeón</button>`; $('#bChamp').onclick = showChamp; return; }
+  if (T.status !== 'bracket') { betBoard(T, host); $('#bInfo').textContent = T.status === 'champ' ? '🏆 ¡El torneo terminó!' : ''; btns.innerHTML = `<button class="big b5" id="bChamp">🏆 Ver al campeón</button>`; $('#bChamp').onclick = showChamp; return; }
   const a = T.R[T.round][T.match * 2], b = T.R[T.round][T.match * 2 + 1], A = slotView(a), B = slotView(b);
   $('#bInfo').textContent = `${ROUND_NAMES[T.round]}${T.round < 3 ? ` · pelea ${T.match + 1} de ${8 >> T.round}` : ''}: ${A.name} contra ${B.name}`;
+  renderBets(T, a, b, A, B, host);
   if (!host) { btns.innerHTML = `<span class="wait">⏳ El anfitrión maneja el torneo.</span>`; return; }
   const human = isHuman(a) || isHuman(b), meAlive = TOUR.slots.some((s, i) => s.ctl !== 'bot' && aliveIn(i));
   btns.innerHTML = human ? `<button class="big" id="bPlay">🥊 ¡A pelear!</button>`
@@ -3076,6 +3079,28 @@ function renderBracket() {
   if ($('#bWatch')) $('#bWatch').onclick = playTourMatch;
   if ($('#bSim')) $('#bSim').onclick = () => { simMatch(); showBracket(); };
   if ($('#bSimAll')) $('#bSimAll').onclick = () => { while (TOUR.status === 'bracket') { const { a, b } = curMatch(); if (isHuman(a) || isHuman(b)) break; simMatch(); } showBracket(); };
+}
+const betBoardHtml = list => list.length ? `<div class="secT">🎯 Los que más acertaron</div><ol class="betList">${list.map((s, i) => `<li>${['🥇', '🥈', '🥉'][i] || ''} <b>${esc(s.name)}</b> · ${s.ok} de ${s.n}</li>`).join('')}</ol>` : '';
+function betBoard(T, host) { if ($('#bBets')) $('#bBets').innerHTML = betBoardHtml(host ? scoreList() : (T.score || [])); }
+// el cuadro de pronósticos de la pelea que viene y la tabla de los que más acertaron
+function renderBets(T, a, b, A, B, host) {
+  const el = $('#bBets'); if (!el) return;
+  let bets, mine, mineSlot, closed;
+  if (host) { const X = betsNow(); bets = [0, 1].map(s => Object.values(X.votes).filter(v => v === s).length); mine = X.votes.host; closed = X.closed; mineSlot = TOUR.slots.findIndex(s => s.ctl === 'me'); }
+  else { const X = T.bets || {}; bets = X.counts || [0, 0]; mine = X.mine; closed = X.closed; mineSlot = T.you; }
+  const fighting = mineSlot >= 0 && (mineSlot === a || mineSlot === b);
+  const btn = (s, S, n) => `<button class="bet ${mine === s ? 'on' : ''}" data-bet="${s}" ${closed || fighting ? 'disabled' : ''}><i ${faceStyle(S.face)}>${S.face ? '' : '🙂'}</i><span><b>${esc(S.name)}</b><small>${n} voto${n === 1 ? '' : 's'}</small></span></button>`;
+  const list = host ? scoreList() : (T.score || []);
+  el.innerHTML = `<div class="secT">🎯 ¿Quién gana esta pelea?</div>
+    <div class="row">${btn(0, A, bets[0])}<span style="align-self:center;font-weight:900;color:var(--red)">VS</span>${btn(1, B, bets[1])}</div>
+    <div class="hint" style="text-align:left">${fighting ? '🥊 Es tu pelea: esta no la podés votar.' : closed ? '🔒 Ya empezó: la votación está cerrada.' : mine != null ? '✅ Votaste. Podés cambiar tu voto hasta que empiece la pelea.' : 'Votá antes de que empiece. Si acertás, sumás un punto.'}</div>
+    ${list.length ? `<div class="secT">🏅 Los que más aciertan</div><ol class="betList">${list.map((s, i) => `<li>${['🥇', '🥈', '🥉'][i] || ''} <b>${esc(s.name)}</b> · ${s.ok} de ${s.n}</li>`).join('')}</ol>` : ''}`;
+  el.querySelectorAll('[data-bet]').forEach(bt => bt.onclick = () => {
+    const s = +bt.dataset.bet;
+    if (host) castVote('host', (SEL[0].name || 'Anfitrión'), s, mineSlot);
+    else { netSend({ t: 'vote', s }); if (T.bets) { T.bets.mine = s; renderBracket(); } }
+    SFX.pop();
+  });
 }
 /* --- el tablero del gran torneo de artes marciales ---
    Los 16 abajo; las líneas suben ronda por ronda hasta la cima, donde queda el campeón.
@@ -3219,7 +3244,31 @@ function bkClick(e) {
 }
 // ¿ese lugar sigue en carrera?
 function aliveIn(i) { const r = TOUR.round; return TOUR.R[r].includes(i) && !(TOUR.R[r + 1] || []).some((w, m) => w != null && (TOUR.R[r][m * 2] === i || TOUR.R[r][m * 2 + 1] === i) && w !== i); }
+/* --- pronósticos: antes de cada pelea, los que miran votan quién gana; al final se ve quién acertó más ---
+   TOUR.bets = { key: 'ronda-pelea', closed, votes: { id: 0|1 }, names: { id: nombre } }; TOUR.score = { id: { name, ok, n } } */
+const betKey = () => TOUR.round + '-' + TOUR.match;
+function betsNow() { if (!TOUR.bets || TOUR.bets.key !== betKey()) TOUR.bets = { key: betKey(), closed: false, votes: {}, names: {} }; return TOUR.bets; }
+function castVote(id, name, side, slot) {
+  if (TOUR.status !== 'bracket' || (side !== 0 && side !== 1)) return;
+  const B = betsNow(), { a, b } = curMatch();
+  if (B.closed || (slot != null && slot >= 0 && (slot === a || slot === b))) return; // los que pelean no votan su pelea
+  B.votes[id] = side; B.names[id] = (name || 'Alguien').slice(0, 12);
+  saveTour();
+  if (roomHost() && NET.room === 'tour') broadcastTour();
+  if ($('#scrBracket').classList.contains('on')) renderBracket();
+}
+function scoreBets(winSide) {
+  const B = TOUR.bets; if (!B || B.key !== betKey()) return;
+  TOUR.score = TOUR.score || {};
+  for (const id in B.votes) {
+    const s = TOUR.score[id] || (TOUR.score[id] = { name: B.names[id], ok: 0, n: 0 });
+    s.name = B.names[id] || s.name; s.n++; if (B.votes[id] === winSide) s.ok++;
+  }
+  TOUR.bets = null;
+}
+const scoreList = () => Object.values(TOUR.score || {}).sort((x, y) => y.ok - x.ok || x.n - y.n).slice(0, 20);
 function recordWinner(slot) {
+  scoreBets(TOUR.R[TOUR.round][TOUR.match * 2] === slot ? 0 : 1);
   // para la animación del tablero: el que ganó sube desde su lugar hasta la ronda siguiente
   (TOUR.pend = TOUR.pend || []).push({ L: TOUR.round, i: TOUR.match * 2 + (TOUR.R[TOUR.round][TOUR.match * 2] === slot ? 0 : 1) });
   TOUR.R[TOUR.round + 1][TOUR.match] = slot;
@@ -3234,6 +3283,7 @@ function simMatch() {
 }
 function playTourMatch() {
   const { a, b } = curMatch(), A = TOUR.slots[a], B = TOUR.slots[b];
+  betsNow().closed = true; // empieza la pelea: se cierran los pronósticos
   const title = ROUND_NAMES[TOUR.round] + (TOUR.round < 3 ? ' · Pelea ' + (TOUR.match + 1) + ' de ' + (8 >> TOUR.round) : '');
   audio();
   startMatch({ mode: 'tour', sel: [A, B], stage: ARENA, need: TOUR.need, lvls: [TOUR.lvl, TOUR.lvl], title, tname: TOUR.name, tour: { a, b } });
@@ -3304,6 +3354,7 @@ function showChamp() {
     c.font = '900 20px system-ui,sans-serif'; c.lineWidth = 5; const ct = ('CAMPEÓN · ' + (T.name || 'Gran Torneo')).toUpperCase(); c.font = `900 ${Math.min(20, 20 * 560 / Math.max(560, c.measureText(ct).width))}px system-ui,sans-serif`; c.strokeText(ct, 320, 352); c.fillStyle = '#fff'; c.fillText(ct, 320, 352);
     champRAF = requestAnimationFrame(draw);
   };
+  $('#chBets').innerHTML = betBoardHtml(NET.role === 'spect' ? (T.score || []) : scoreList());
   draw(); fx('sfx', 'twinkle'); speak('¡' + s.name + ', campeón de ' + (T.name || 'el gran torneo') + '!');
 }
 $('#chTree').onclick = () => { showScreen('scrBracket'); renderBracket(); };
@@ -3314,8 +3365,14 @@ $('#chQuit').onclick = goMenu;
 function tourState(c) {
   return {
     t: 'tour', you: c._slot,
-    T: { name: TOUR.name, mode: TOUR.mode, need: TOUR.need, status: TOUR.status, R: TOUR.R, round: TOUR.round, match: TOUR.match, slots: TOUR.slots.map(s => ({ name: s.name, ch: s.ch, ctl: s.ctl, yaw: s.yaw ?? yawOf(s.face) })) }
+    T: { bets: tourBetsFor(c), score: scoreList(), name: TOUR.name, mode: TOUR.mode, need: TOUR.need, status: TOUR.status, R: TOUR.R, round: TOUR.round, match: TOUR.match, slots: TOUR.slots.map(s => ({ name: s.name, ch: s.ch, ctl: s.ctl, yaw: s.yaw ?? yawOf(s.face) })) }
   };
+}
+// lo que ve cada uno de la votación: cuántos votos tiene cada lado y a quién votó él
+function tourBetsFor(c) {
+  if (TOUR.status !== 'bracket') return null;
+  const B = betsNow();
+  return { closed: B.closed, counts: [0, 1].map(s => Object.values(B.votes).filter(v => v === s).length), mine: B.votes[c.peer] };
 }
 function sendFaces(c) {
   TOUR.slots.forEach((s, i) => { const k = s.face ? faceKey(s.face) : ''; if (c._fk[i] !== k) { c._fk[i] = k; try { c.send({ t: 'face', i, f: s.face || null }); } catch (e) { } } });
@@ -3328,6 +3385,7 @@ function tourJoined(c) {
 }
 function tourHello(c, sel) {
   if (NET.room !== 'tour' || !sel) return;
+  c._name = (sel.name || 'Amigo').slice(0, 12);
   if (TOUR.status === 'setup' && TOUR.mode === 'online') { // fuera de "en línea" los que entran solo miran
     if (c._slot < 0) { const i = TOUR.slots.findIndex(s => s.ctl === 'bot'); if (i >= 0) c._slot = i; }
     if (c._slot >= 0) Object.assign(TOUR.slots[c._slot], { name: (sel.name || 'Amigo').slice(0, 12), ch: CHARS[sel.ch] ? sel.ch : 'toro', face: sel.face || null, yaw: sel.yaw || 0, ctl: 'net' });

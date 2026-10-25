@@ -1,6 +1,6 @@
 {
-  "name": "Kombate de Caras",
-  "short_name": "Kombate",
+  "name": "Face Punch",
+  "short_name": "Face Punch",
   "description": "Juego de pelea 2D con la cara de tus amigos. Para celular y PC.",
   "start_url": "./",
   "scope": "./",
