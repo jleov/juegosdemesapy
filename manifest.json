@@ -16,6 +16,7 @@
   ],
   "shortcuts": [
     { "name": "Banquero Paraguayo", "short_name": "Banquero", "url": "banquero/", "icons": [{ "src": "banquero/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Lotería", "short_name": "Lotería", "url": "loteria/", "icons": [{ "src": "loteria/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Lotería", "short_name": "Lotería", "url": "loteria/", "icons": [{ "src": "loteria/icon-192.png", "sizes": "192x192" }] },
+    { "name": "UNO Paraguayo", "short_name": "UNO", "url": "uno/", "icons": [{ "src": "uno/icon-192.png", "sizes": "192x192" }] }
   ]
 }
