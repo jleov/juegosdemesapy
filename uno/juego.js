@@ -81,6 +81,7 @@ function leaveClick(){
   setTimeout(leaveToMenu, 250);
 }
 function leaveToMenu(){
+  musicStop();
   stopMic(false);
   try{ if(NET.peer) NET.peer.destroy(); }catch(e){}
   Object.assign(NET,{mode:null, peer:null, code:null, conns:{}, hostConn:null, myPid:null, obs:null, welcomed:false, backup:null});
@@ -537,6 +538,34 @@ function say(t){ if(!SND.on || !window.speechSynthesis) return; try{ const u=new
 function toggleSound(){ SND.on=!SND.on; store('uno_snd', SND.on); $('#btnSnd').textContent=SND.on?'🔊':'🔇'; if(SND.on) sfx.turn(); }
 $('#btnSnd').textContent=SND.on?'🔊':'🔇';
 document.addEventListener('pointerdown', ()=>actx(), {once:true});
+// música de fondo: la misma del Banquero, suave, en la sala y en la partida (no en el menú)
+const MUSIC_CREDIT = 'Música: "Monkeys Spinning Monkeys" de Kevin MacLeod (incompetech.com). Licencia Creative Commons Atribución 4.0: creativecommons.org/licenses/by/4.0/';
+const MUSIC = { on: load('uno_music')!==false, buf:null, src:null, gain:null, loading:false, VOL:.1 };
+function musicLoad(){
+  if(MUSIC.buf || MUSIC.loading) return Promise.resolve(); MUSIC.loading=true;
+  const c=actx(); if(!c){ MUSIC.loading=false; return Promise.resolve(); }
+  return fetch('musica.mp3').then(r=>r.arrayBuffer()).then(b=>c.decodeAudioData(b)).then(buf=>{ MUSIC.buf=buf; }).catch(()=>{ MUSIC.loading=false; });
+}
+function musicStart(){
+  if(!MUSIC.on || MUSIC.src) return;
+  musicLoad().then(()=>{
+    if(!MUSIC.buf || MUSIC.src || !MUSIC.on || !musicWanted()) return;
+    const c=actx(), s=c.createBufferSource(), g=c.createGain();
+    s.buffer=MUSIC.buf; s.loop=true; s.connect(g); g.connect(c.destination);
+    g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(MUSIC.VOL, c.currentTime+2.5);   // entra suave
+    s.start(); MUSIC.src=s; MUSIC.gain=g;
+  });
+}
+function musicStop(){
+  if(!MUSIC.src) return;
+  const c=actx(), s=MUSIC.src, g=MUSIC.gain; MUSIC.src=null; MUSIC.gain=null;
+  try{ g.gain.setValueAtTime(g.gain.value, c.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime+.8); s.stop(c.currentTime+.85); }catch(e){}
+}
+const musicWanted = () => !!S && !!NET.mode;
+function musicSync(){ if(MUSIC.on && musicWanted()) musicStart(); else musicStop(); renderMusicBtn(); }
+function toggleMusic(){ MUSIC.on=!MUSIC.on; store('uno_music', MUSIC.on); musicSync(); toast(MUSIC.on?'🎶 Música de fondo prendida (suave).':'🔕 Música de fondo apagada.'); }
+function renderMusicBtn(){ $$('.btnMusic').forEach(b=>{ b.textContent = MUSIC.on ? '🎶' : '🔕'; b.title = MUSIC.on ? 'Apagar la música de fondo' : 'Prender la música de fondo'; }); }
+renderMusicBtn(); $('#musicCredit').textContent='🎶 '+MUSIC_CREDIT;
 
 /* ====================== CARTAS ====================== */
 function cardHTML(c, cls, style){
@@ -562,7 +591,7 @@ function render(){
   V = NET.mode==='client' ? S : publicState(me());
   if(V.phase==='lobby'){ show('lobby'); renderLobby(); }
   else { show('game'); renderGame(); }
-  renderSidePanels(); renderChatTo(); renderVoice(); voiceSync();
+  renderSidePanels(); renderChatTo(); renderVoice(); voiceSync(); musicSync();
 }
 function playerTag(p){
   const host=p.id===V.hostPid;
@@ -1005,6 +1034,7 @@ function showRules(){
   <p>Además, cada grupo puede escribir sus propias reglas en la sala y todos pueden <b>sugerir reglas nuevas y votarlas 👍</b>.</p>
   <h3>💬 Chat y voz</h3>
   <p>Escribí <b>@nombre</b> (o elegí a alguien en “Para”) para mandarle un <b>mensaje privado</b>: solo lo ven ustedes dos. Con <b>🤫 Pedir en secreto</b> le pedís un color o un número a alguien sin que los demás se enteren. Con 🎤 hablan por voz.</p>
+  <p class="muted">🎶 ${MUSIC_CREDIT}</p>
   <button class="btn wide" onclick="closeModal()">Entendido</button></div>`);
 }
 

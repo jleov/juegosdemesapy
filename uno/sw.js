@@ -1,6 +1,6 @@
 // Service worker mínimo: permite instalar el UNO Paraguayo como app.
-const CACHE = 'uno-v2';
-const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './reglas.js', './juego.js'];
+const CACHE = 'uno-v3';
+const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './reglas.js', './juego.js', './musica.mp3'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

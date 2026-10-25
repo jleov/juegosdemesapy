@@ -316,13 +316,14 @@ html,body{overflow-x:clip}
     <p class="muted" style="margin-bottom:0">En la sala en línea también se pueden sumar bots para completar la mesa.</p>
   </div>
   <button class="btn dark wide" onclick="showRules()">📜 Reglas del UNO (oficiales y de la casa)</button>
+  <p class="muted" id="musicCredit" style="color:#e8cfb0;text-align:center;font-size:11px;margin-top:14px"></p>
 </div></div>
 
 <!-- ======================= SALA DE ESPERA ======================= -->
 <div class="screen" id="lobby"><div class="lobbywrap">
   <div class="lmain">
     <div class="box">
-      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1">🃏 Sala de espera</h3><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🏠 Salir</button></div>
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1">🃏 Sala de espera</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música de fondo">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🏠 Salir</button></div>
       <div id="lobbyCodeBox"><p class="muted" style="text-align:center;margin:8px 0 0">Código de la sala</p><div class="code" id="lobbyCode">—</div>
         <div class="row"><button class="btn sm" onclick="shareRoom()">📤 Compartir enlace</button><button class="btn sm gray" onclick="copyCode()">📋 Copiar código</button></div></div>
       <div id="lobbyObs"></div>
@@ -357,6 +358,7 @@ html,body{overflow-x:clip}
     <span class="sp"></span>
     <button class="btn sm dark" id="btnView" onclick="toggleView()">🧊 3D</button>
     <button class="btn sm dark" id="btnSnd" onclick="toggleSound()">🔊</button>
+    <button class="btn sm dark btnMusic" onclick="toggleMusic()" title="Música de fondo">🎶</button>
     <button class="btn sm dark hidem" onclick="showRules()">📜</button>
     <button class="btn sm dark" id="btnSide" onclick="toggleSide()">💬<span class="badge" id="unread" style="display:none">0</span></button>
     <button class="btn sm red" onclick="leaveClick()">🏠</button>
@@ -436,6 +438,6 @@ html,body{overflow-x:clip}
 <div id="fly"></div>
 
 <script src="reglas.js?v=1"></script>
-<script src="juego.js?v=2"></script>
+<script src="juego.js?v=3"></script>
 </body>
 </html>
