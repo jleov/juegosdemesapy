@@ -85,6 +85,45 @@ const SFX = {
   power() { sTone(400, 1200, .25, .15, 'triangle'); },
   beep() { sTone(660, 660, .08, .12, 'square'); }
 };
+/* ---------- voces de los peleadores ----------
+   Voz sintetizada: una nota áspera (la "garganta") pasada por tres filtros que hacen la vocal.
+   p = tono base, v = vocal, g = voz rasposa. kind: atk (al pegar), hurt (le duele), ko, power (habilidad), win (se ríe). */
+const VOICE = {
+  toro: { p: 95, v: 'a', g: .8 }, rayo: { p: 195, v: 'a' }, sombra: { p: 118, v: 'o' }, tanque: { p: 72, v: 'o', g: 1 },
+  escarcha: { p: 270, v: 'i' }, latigo: { p: 112, v: 'e', g: .4 }, dragon: { p: 150, v: 'a' }, tornado: { p: 175, v: 'e' },
+  muralla: { p: 66, v: 'u', g: 1 }, terere: { p: 128, v: 'e' }, meteoro: { p: 105, v: 'o', g: .3 }, luchador: { p: 88, v: 'a', g: .9 },
+  halcon: { p: 220, v: 'i' }, sonico: { p: 160, v: 'a', g: .7 }, bumeran: { p: 138, v: 'o' }, bombita: { p: 185, v: 'a', g: .3 }
+};
+const VOWELS = { a: [780, 1250, 2550], e: [520, 1850, 2550], i: [320, 2250, 3000], o: [520, 900, 2450], u: [360, 720, 2400] };
+let distCurve = null;
+function voice(f, kind) {
+  if (quiet() || !f) return; const a = audio(); if (!a) return;
+  const now = a.currentTime; if (f._vt && now - f._vt < (kind === 'atk' ? .25 : .12)) return; f._vt = now;
+  const V = VOICE[f.key] || VOICE.toro, jit = 1 + rnd(-.06, .06);
+  const vow = kind === 'hurt' ? (Math.random() < .5 ? 'u' : 'o') : kind === 'ko' ? 'a' : kind === 'win' ? 'a' : V.v;
+  const fm = VOWELS[vow].map(x => x * (V.p > 180 ? 1.18 : V.p < 90 ? .9 : 1));
+  // forma de cada sonido: duración y cómo sube o baja el tono
+  const S = { atk: [.15, 1.15, .85], hurt: [.3, 1.3, .7], ko: [1, 1.35, .45], power: [.42, 1, 1.25], win: [.55, 1.3, 1.1] }[kind] || [.2, 1, 1];
+  const [dur, p0, p1] = S, P = V.p * jit, out = a.createGain();
+  out.gain.setValueAtTime(.0001, now); out.gain.exponentialRampToValueAtTime(kind === 'ko' ? .85 : .65, now + .02);
+  if (kind === 'win') for (let k = 0; k < 3; k++) { out.gain.setValueAtTime(.65, now + k * .18); out.gain.exponentialRampToValueAtTime(.03, now + k * .18 + .13); } // ja-ja-ja
+  out.gain.exponentialRampToValueAtTime(.0001, now + dur);
+  const src = a.createOscillator(); src.type = 'sawtooth';
+  src.frequency.setValueAtTime(P * p0, now); src.frequency.exponentialRampToValueAtTime(P * p1, now + dur);
+  if (kind === 'hurt' || kind === 'ko') { // temblor de dolor
+    const lfo = a.createOscillator(), lg = a.createGain(); lfo.frequency.value = kind === 'ko' ? 7 : 16; lg.gain.value = P * .06;
+    lfo.connect(lg).connect(src.frequency); lfo.start(now); lfo.stop(now + dur + .05);
+  }
+  let node = src;
+  if (V.g) { // voz rasposa
+    if (!distCurve) { distCurve = new Float32Array(256); for (let i = 0; i < 256; i++) { const x = i / 128 - 1; distCurve[i] = Math.tanh(x * 3); } }
+    const ws = a.createWaveShaper(); ws.curve = distCurve; const pre = a.createGain(); pre.gain.value = 1 + V.g * 2; src.connect(pre).connect(ws); node = ws;
+  }
+  fm.forEach((fq, k) => { const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = fq; bp.Q.value = 9 + k * 3; const g = a.createGain(); g.gain.value = [1, .55, .25][k] * 2.2; node.connect(bp).connect(g).connect(out); });
+  // un poco de aire (respiración)
+  if (noiseBuf) { const n = a.createBufferSource(); n.buffer = noiseBuf; const nf = a.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = fm[1]; const ng = a.createGain(); ng.gain.value = .12; n.connect(nf).connect(ng).connect(out); n.start(now, Math.random() * .5, dur + .05); }
+  out.connect(a.destination); src.start(now); src.stop(now + dur + .05);
+}
 function speak(t) {
   if (quiet() || !('speechSynthesis' in window)) return;
   try {
@@ -661,6 +700,15 @@ const STAGES = [
     // el ring de piedra del gran torneo, con el templo atrás y el público alrededor
     name: 'Arena del Torneo',
     flags: [140, 420, 700, 900, 1180, 1460],
+    fxFar(c, camx) { // cartel colgado en el templo con el nombre del torneo
+      const tx = -camx * .25 + STAGE_W / 2, y = GROUND - 300, name = ((G.mode === 'tour' || G.mode === 'spect') && G.tourName ? G.tourName : 'Gran Torneo').toUpperCase();
+      c.save(); c.font = '900 30px system-ui,sans-serif'; const w = Math.min(500, c.measureText(name).width + 60), fs = Math.min(30, 30 * 440 / Math.max(440, c.measureText(name).width));
+      c.fillStyle = '#5a3a1a'; c.fillRect(tx - w / 2 - 6, y - 34, 6, 70); c.fillRect(tx + w / 2, y - 34, 6, 70);
+      c.fillStyle = '#c0281e'; c.beginPath(); c.moveTo(tx - w / 2, y - 28); c.lineTo(tx + w / 2, y - 28); c.lineTo(tx + w / 2, y + 22); c.lineTo(tx, y + 34); c.lineTo(tx - w / 2, y + 22); c.closePath(); c.fill();
+      c.lineWidth = 4; c.strokeStyle = '#ffc83d'; c.stroke();
+      c.font = `900 ${fs}px system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 6; c.strokeStyle = '#3a0905'; c.strokeText(name, tx, y); c.fillStyle = '#ffd21f'; c.fillText(name, tx, y);
+      c.restore();
+    },
     far(c, R) {
       c.fillStyle = grad(c, 0, GROUND, ['#3d9be9', '#8fcfff', '#e3f5ff']); c.fillRect(0, 0, STAGE_W, H);
       c.fillStyle = '#ffffffdd'; for (let i = 0; i < 9; i++) { const x = R() * STAGE_W, y = 30 + R() * 100; for (let k = 0; k < 5; k++) { c.beginPath(); c.arc(x + k * 24, y + (k % 2) * 7, 20 + R() * 12, 0, 7); c.fill(); } }
@@ -677,7 +725,7 @@ const STAGES = [
         if (k < 2) { c.fillStyle = '#efe6d2'; c.fillRect(tx - w / 2 + 70, y - 70, w - 140, 42); }
       }
       c.fillStyle = '#ffd21f'; c.beginPath(); c.arc(tx, base - 340, 12, 0, 7); c.fill();
-      c.fillStyle = '#2a1408'; c.font = '900 26px system-ui,sans-serif'; c.textAlign = 'center'; c.fillText('GRAN TORNEO', tx, base - 150);
+      // el cartel con el nombre del torneo se dibuja aparte (fxFar), así cambia según el torneo
     },
     mid(c, R) {
       // gradas con público a los costados del ring
@@ -906,14 +954,14 @@ function placeFighter(f) {
   Object.assign(f, {
     x: STAGE_W / 2 + (f.i ? 170 : -170), y: 0, vx: 0, vy: 0, face: f.i ? -1 : 1, tx: 0, ty: 0,
     hp: f.maxHp, hpLag: f.maxHp, st: 'idle', sf: 0, atk: null, an: '', hitDone: false, stun: 0, combo: 0, flash: 0, alpha: 1, rot: 0, inv: 0,
-    buf: { p: 0, k: 0, s: 0 }, pose: { ...P_IDLE }, ai: null, spec: null, slamLand: 0, crouchBlock: false, pal: 0, squash: 0, inflate: 0, thin: 0, upside: false, pin: false, seq: [], holdBack: 0, holdDown: 0, airAtk: false, en: 0
+    buf: { p: 0, k: 0, s: 0 }, pose: { ...P_IDLE }, ai: null, spec: null, slamLand: 0, crouchBlock: false, pal: 0, squash: 0, inflate: 0, thin: 0, upside: false, pin: false, celebId: null, cy: 0, crot: 0, vflip: false, seq: [], holdBack: 0, holdDown: 0, airAtk: false, en: 0
   });
   f.tx = f.x; f.ty = 0;
 }
 function setSt(f, st) { if (f.st !== st) { f.st = st; f.sf = 0; } }
 
 function startMatch(setup) {
-  G.paused = false; G.setup = setup; G.mode = setup.mode; G.need = setup.need || 2; G.me = setup.me ?? -1; G.tourTitle = setup.title || ''; G.stage = setup.stage; G.lvl = setup.lvl || 'normal'; G.lvls = setup.lvls || null;
+  G.paused = false; G.setup = setup; G.mode = setup.mode; G.need = setup.need || 2; G.me = setup.me ?? -1; G.tourTitle = setup.title || ''; G.tourName = setup.tname || ''; G.stage = setup.stage; G.lvl = setup.lvl || 'normal'; G.lvls = setup.lvls || null;
   const seeds = G.seeds = setup.seeds || newSeeds();
   G.f = [mkFighter(0, setup.sel[0], seeds[0]), mkFighter(1, setup.sel[1], seeds[1])];
   const mine = [S_KB1, S_T[0], S_PAD[0], S_PAD[1]];
@@ -1034,12 +1082,13 @@ function startAttack(f, name) {
   f.atk = ATK[name]; f.an = name; f.st = 'attack'; f.sf = 0; f.hitDone = false;
   if (f.y <= 0) f.vx = 0;
   fx('sfx', 'whoosh');
+  if (Math.random() < .5) fx('voice', f.i, 'atk');
 }
 function startSpecial(f, o) {
   f.en -= SPEC_COST; f.spec = f.ch.special; setSt(f, 'special'); f.sf = 0; f.hitDone = false; f.vx = 0; f.slamLand = 0;
   if (f.spec === 'slam') { f.vy = 11; f.y = .1; }
   f.grab = null;
-  fx('aura', f.x, 110 * f.ch.b.s, f.i); fx('sfx', 'power');
+  fx('aura', f.x, 110 * f.ch.b.s, f.i); fx('sfx', 'power'); fx('voice', f.i, 'power');
 }
 function specialStep(f, o) {
   const t = f.sf, s = f.ch.b.s, sp = f.spec;
@@ -1181,12 +1230,12 @@ function applyHit(att, def, a, px, py) {
     att.wins++; G.winner = att.i; G.phase = 'ko'; G.pf = 0; G.slow = 70;
     // si con esto ganó la pelea, viene el remate
     G.fin = att.wins >= G.need ? { w: att.i, cpuAt: 45 + (Math.random() * 70 | 0) } : null;
-    fx('hit', px, py, 1); fx('sfx', 'ko'); fx('shake', 18); ann('K.O.'); fx('say', 'K O'); G.hitstop = 22; return;
+    fx('hit', px, py, 1); fx('sfx', 'ko'); fx('voice', def.i, 'ko'); fx('shake', 18); ann('K.O.'); fx('say', 'K O'); G.hitstop = 22; return;
   }
   def.grab = null;
   if (a.knock || def.y > 0) { def.st = 'fall'; def.sf = 0; def.vy = a.launch || 6; def.y = Math.max(def.y, .1); def.vx = dir * (Math.abs(a.push) * .8 + 1.5); }
   else { def.st = a.freeze ? 'frozen' : 'hit'; def.sf = 0; def.stun = a.st; def.vx = dir * a.push; if (a.freeze) fx('sfx', 'ice'); }
-  fx('hit', px, py, heavy ? 1 : 0); fx('shake', heavy ? 9 : 4);
+  fx('hit', px, py, heavy ? 1 : 0); fx('shake', heavy ? 9 : 4); fx('voice', def.i, 'hurt');
   G.hitstop = heavy ? 8 : 5;
 }
 function combat() {
@@ -1328,6 +1377,8 @@ function fatalStep() {
   const F = G.fatal, t = G.pf, w = G.f[F.w], o = G.f[1 - F.w], dir = o.x >= w.x ? 1 : -1;
   w.sf++; o.sf++; if (w.flash > 0) w.flash--; if (o.flash > 0) o.flash--;
   const lw = phys(w), lo = phys(o);
+  // el que pierde se queja en cada golpe y grita cuando sale volando o queda tirado
+  if (o.st !== F.lastSt) { if (['fly', 'ko', 'flat', 'stuck', 'zapped', 'frozen'].includes(o.st)) fx('voice', o.i, 'ko'); else if (o.st === 'hit' || o.st === 'held') fx('voice', o.i, 'hurt'); F.lastSt = o.st; }
   if (lo && o.st === 'ko') { G.shake = Math.max(G.shake, 7); fx('dust', o.x, 18); }
   switch (F.type) {
     case 'charge': // cornada: lo embiste y lo manda a volar hasta el cielo
@@ -1554,7 +1605,7 @@ function targetPose(f) {
     case 'hit': return { t: -.45, a1: .2, a2: 1.0, b1: -.5, b2: .2, l1: .5, l2: .2, m1: -.3, m2: -.3 };
     case 'fall': case 'ko': case 'down':
       return f.y > 2 ? { t: -.5, a1: 2.4, a2: 2.8, b1: -2.2, b2: -1.6, l1: 1.1, l2: .6, m1: .6, m2: .1 } : { t: 0, a1: .6, a2: .9, b1: -.6, b2: -.4, l1: .15, l2: .05, m1: -.1, m2: -.05 };
-    case 'win': { const w = Math.sin(T * .15); return { t: -.05, a1: 2.9 + w * .15, a2: 3.1, b1: 2.7 - w * .15, b2: 3.0, l1: .25, l2: .05, m1: -.25, m2: -.05 }; }
+    case 'win': return celebPose(f);
     case 'frozen': return { ...f.pose }; // queda duro como estaba
     case 'held': return { t: -.5, a1: 2.4, a2: 2.8, b1: -2.2, b2: -1.6, l1: 1.1, l2: .6, m1: .6, m2: .1 };
     case 'dizzy': { const s = Math.sin(T * .09 + f.i); return { t: .2 + s * .22, a1: .15 + s * .2, a2: .35, b1: -.15 - s * .2, b2: .05, l1: .25 + s * .1, l2: .05, m1: -.25 + s * .1, m2: -.1 }; }
@@ -1565,13 +1616,74 @@ function targetPose(f) {
   }
   return P_IDLE;
 }
+/* ---------- festejos del ganador ----------
+   celebFrame(id, t) da la pose en el cuadro t y además: cy (cuánto se levanta), crot (vuelta en el aire),
+   flip (mira para el otro lado) y dx (cuánto se corre, solo en la pantalla del campeón). */
+const CELEBS = [
+  { id: 'siuu', name: '¡SIUUU!', dur: 170 }, { id: 'dance', name: '¡A bailar!', dur: 170 }, { id: 'flex', name: '¡Mirá estos músculos!', dur: 150 },
+  { id: 'flip', name: '¡Mortal para atrás!', dur: 130 }, { id: 'plane', name: '¡El avioncito!', dur: 180 }, { id: 'roar', name: '¡AAAAH!', dur: 160 }
+];
+function celebFrame(id, t) {
+  const run = (ph, k = 1) => { const s = Math.sin(ph); return { l1: .1 + .6 * s * k, l2: .1 + .6 * s * k - .6 * Math.max(0, Math.cos(ph)) * k, m1: .1 - .6 * s * k, m2: .1 - .6 * s * k - .6 * Math.max(0, -Math.cos(ph)) * k }; };
+  let p, cy = 0, crot = 0, flip = false, dx = 0;
+  switch (id) {
+    case 'siuu': // corre, salta, gira en el aire y cae con los brazos abiertos para abajo
+      if (t < 40) { p = { t: .35, a1: 1.6 + Math.sin(t * .5) * .8, a2: 2.4, b1: .2 - Math.sin(t * .5) * .8, b2: 1.6, ...run(t * .5) }; dx = t * 2.2; }
+      else if (t < 72) { const k = (t - 40) / 32; cy = Math.sin(k * Math.PI) * 95; dx = 88; flip = k > .5; p = { ...P_TUCK, a1: 2.2, a2: 2.6, b1: -2.2, b2: -2.6 }; }
+      else { const k = Math.min(1, (t - 72) / 8); dx = 88; flip = true; cy = 0; p = { t: -.2 * k, a1: lerp(1.6, .85, k), a2: lerp(2, .85, k), b1: lerp(-1.6, -.85, k), b2: lerp(-2, -.85, k), l1: .6, l2: .12, m1: -.6, m2: -.12 }; }
+      break;
+    case 'dance': { // baile: brazos de un lado a otro, salta y se da vuelta
+      const s = Math.sin(t * .3), b = Math.abs(Math.sin(t * .25));
+      cy = b * 12; flip = Math.floor(t / 42) % 2 === 1;
+      p = { t: s * .18, a1: 1.3 + s * 1.2, a2: 1.8 + s * 1.2, b1: 1.3 - s * 1.2, b2: 1.8 - s * 1.2, l1: .35 + s * .3, l2: .1, m1: -.35 + s * .3, m2: -.1 };
+      break;
+    }
+    case 'flex': { // muestra los músculos con los dos brazos
+      const s = Math.sin(t * .18) * .12;
+      p = { t: -.08 + s * .3, a1: 2.05 + s, a2: 3.5, b1: -2.05 - s, b2: -3.5, l1: .5, l2: .05, m1: -.5, m2: -.05 };
+      cy = Math.max(0, Math.sin(t * .18)) * 4;
+      break;
+    }
+    case 'flip': // mortal para atrás
+      if (t < 16) p = P_CROUCH;
+      else if (t < 64) { const k = (t - 16) / 48; cy = Math.sin(k * Math.PI) * 140; crot = -Math.PI * 2 * k; p = P_TUCK; }
+      else p = { t: -.05, a1: 2.9, a2: 3.1, b1: 2.7, b2: 3.0, l1: .3, l2: .05, m1: -.3, m2: -.05 };
+      break;
+    case 'plane': { // avioncito: brazos abiertos y corre en círculos
+      const ph = t * .07, s = Math.cos(ph);
+      dx = Math.sin(ph) * 110; flip = s < 0; crot = Math.sin(ph) * .22;
+      p = { t: .35, a1: 1.57, a2: 1.62, b1: -1.57, b2: -1.62, ...run(t * .45, .8) };
+      break;
+    }
+    case 'roar': // se tira de rodillas y grita al cielo
+      if (t < 28) { dx = t * 3.5; p = { t: -.3, a1: 2.0, a2: 2.5, b1: -1.6, b2: -1.2, l1: 1.45, l2: 0, m1: .35, m2: -1.4 }; }
+      else { dx = 98; const s = Math.sin(t * .6) * .06; p = { t: -.38 + s, a1: 2.55 + s, a2: 2.95, b1: -2.55 - s, b2: -2.95, l1: 1.45, l2: 0, m1: .35, m2: -1.4 }; }
+      break;
+    default: { const w = Math.sin(t * .15); p = { t: -.05, a1: 2.9 + w * .15, a2: 3.1, b1: 2.7 - w * .15, b2: 3.0, l1: .25, l2: .05, m1: -.25, m2: -.05 }; }
+  }
+  return { p, cy, crot, flip, dx };
+}
+function celebPose(f) {
+  const C = CELEBS.find(c => c.id === f.celebId);
+  if (!C) return celebFrame('', G.time);
+  const r = celebFrame(C.id, f.sf % C.dur);
+  f.cy = r.cy; f.crot = r.crot; f.vflip = r.flip;
+  return r.p;
+}
 function poseStep(f) {
+  // el que gana elige un festejo (en línea lo elige el anfitrión y les llega a los demás)
+  if (f.st === 'win' && !f.celebId && G.mode !== 'guest' && G.mode !== 'spect') {
+    const C = CELEBS[Math.random() * CELEBS.length | 0]; f.celebId = C.id; f.sf = 0;
+    fx('voice', f.i, 'win'); if (C.id === 'siuu') setTimeout(() => fx('say', '¡Siuuuuu!'), 700);
+  }
+  if (f.st !== 'win' && f.celebId && G.mode !== 'guest' && G.mode !== 'spect') f.celebId = null;
   const tp = targetPose(f), k = f.st === 'attack' || f.st === 'special' || f.st === 'hit' || f.st === 'zapped' ? .5 : .28;
   for (const key in tp) f.pose[key] = lerp(f.pose[key] ?? tp[key], tp[key], k);
   if (f.st === 'fly') f.rot += .28 * (f.vx >= 0 ? 1 : -1) * f.face; // da vueltas por el aire
   else { const rt = (f.st === 'down' || f.st === 'ko') && f.y <= 2 ? -1.57 : (f.st === 'fall' || f.st === 'ko') ? -.8 : f.st === 'held' ? -1.4 : 0; f.rot = lerp(f.rot, rt, .2); }
   f.squash = lerp(f.squash || 0, f.st === 'flat' ? 1 : 0, .45);
   if (f.upside) f.rot = Math.PI; // cabeza abajo
+  if (f.st !== 'win') { f.cy = 0; f.crot = 0; f.vflip = false; }
   f.hpLag = f.hpLag > f.hp ? Math.max(f.hp, f.hpLag - .4) : f.hp;
 }
 
@@ -1584,6 +1696,7 @@ function runFx(type, a, b, c) {
     case 'sfx': if (SFX[a]) SFX[a](); break;
     case 'ann': G.ann = { text: a, t: 0 }; break;
     case 'say': speak(a); break;
+    case 'voice': voice(G.f[a], b); break;
     case 'shake': G.shake = Math.max(G.shake, a); break;
     case 'dust': for (let i = 0; i < (b || 8); i++) G.parts.push({ x: a + rnd(-20, 20), y: rnd(0, 10), vx: rnd(-2.5, 2.5), vy: rnd(.5, 3), l: 22, L: 22, c: 'rgba(220,200,170,.8)', r: rnd(4, 9), g: -.05, dust: 1 }); break;
     case 'smoke': for (let i = 0; i < 18; i++) G.parts.push({ x: a + rnd(-30, 30), y: b + rnd(-70, 70), vx: rnd(-1.5, 1.5), vy: rnd(-.5, 1.5), l: 28, L: 28, c: 'rgba(140,90,220,.7)', r: rnd(8, 18), g: 0, dust: 1 }); break;
@@ -1661,10 +1774,12 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   const ch = f.pal ? palette(f.ch, f.pal) : f.ch, B = ch.b, C = ch.c, P = f.pose, s = B.s * sc, OL = C.line, lw = B.limb, D = C.dark, T = G.time;
   // en el torbellino se da vuelta a cada rato (solo el dibujo, el golpe sigue para adelante)
   const vf = f.st === 'special' && f.spec === 'spin' && f.sf >= 6 && f.sf < 46 && (f.sf >> 2) & 1 ? -f.face : f.face;
-  c.save(); c.translate(sx, sy); c.globalAlpha = f.alpha;
+  const vfx = f.vflip ? -vf : vf; // festejos que se dan vuelta
+  c.save(); c.translate(sx, sy - (f.cy || 0)); c.globalAlpha = f.alpha;
+  if (f.crot) { c.translate(0, -95 * s); c.rotate(f.crot * vfx); c.translate(0, 95 * s); } // vuelta en el aire de los festejos
   if (f.st === 'special' && f.spec === 'counter' && f.sf >= 3 && f.sf < 44) glow(c, 0, -100 * s, 120 * s, `rgba(255,220,120,${.3 + Math.sin(T * .4) * .12})`);
   if (f.rot) c.translate(0, -16 * Math.min(1, Math.abs(f.rot) / 1.57) * s);
-  c.scale(vf * s, s);
+  c.scale(vfx * s, s);
   if (f.squash > .01) c.scale(1 + f.squash * .9, 1 - f.squash * .8); // aplastado como panqueque
   if (f.inflate > .01) c.scale(1 + f.inflate, 1 + f.inflate * .85); // inflado como globo
   if (f.thin > .01) c.scale(1 - f.thin * .86, 1); // finito como un papel
@@ -1728,10 +1843,10 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   // cuello y cara
   const R = 31, hcx = nx + ux * R * .78, hcy = ny + uy * R * .78;
   limb(nx, ny + 4, lerp(nx, hcx, .5), lerp(ny, hcy, .5), lw * .9, C.neck);
-  c.save(); c.translate(hcx, hcy); c.scale(vf, 1); c.rotate(vf * P.t * .45);
+  c.save(); c.translate(hcx, hcy); c.scale(vfx, 1); c.rotate(vfx * P.t * .45);
   if (f.flash > 0) { const q = Math.sin(f.flash * 1.3) * .12; c.scale(1 + q, 1 - q); }
-  drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, vf, f.yaw, f);
-  if (C.hat) { c.save(); c.scale(vf, 1); drawHat(c, C.hat, C.hatc, R, OL, T); c.restore(); }
+  drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, vfx, f.yaw, f);
+  if (C.hat) { c.save(); c.scale(vfx, 1); drawHat(c, C.hat, C.hatc, R, OL, T); c.restore(); }
   if (((f.st === 'ko' || f.st === 'down') && f.y <= 2) || f.st === 'dizzy') { // estrellitas mareado
     for (let k = 0; k < 3; k++) {
       const a = T * .12 + k * 2.09, sx = Math.cos(a) * R * 1.1, sy = -R * .9 + Math.sin(a) * R * .3;
@@ -2186,7 +2301,7 @@ function onNet(m) {
     case 'full': oMsg('Esa sala ya está llena.'); netClose(); break;
     case 'start':
       if (NET.role === 'guest' && NET.rsel) { hideScreens(); startMatch({ mode: 'guest', sel: [NET.rsel, SEL[0]], stage: m.stage, seeds: m.seeds }); }
-      else if (NET.role === 'spect' && m.kind === 'tour' && TT) { hideScreens(); startMatch({ mode: 'spect', sel: [ttSel(m.a), ttSel(m.b)], stage: m.stage, seeds: m.seeds, need: m.need, me: m.me, title: m.title }); }
+      else if (NET.role === 'spect' && m.kind === 'tour' && TT) { hideScreens(); startMatch({ mode: 'spect', sel: [ttSel(m.a), ttSel(m.b)], stage: m.stage, seeds: m.seeds, need: m.need, me: m.me, title: m.title, tname: m.tname }); }
       else if (NET.role === 'spect' && m.sel) { hideScreens(); startMatch({ mode: 'spect', sel: m.sel, stage: m.stage, seeds: m.seeds }); }
       break;
     case 'wait': if (NET.role === 'spect') { endPlay(); if (G.mode !== 'demo') startDemo(); showScreen('scrSpect'); } break;
@@ -2211,7 +2326,7 @@ function netTick() {
 function snapshot() {
   return {
     t: 's',
-    f: G.f.map(f => ({ x: Math.round(f.x), y: Math.round(f.y), fc: f.face, hp: f.hp, en: Math.round(f.en), st: f.st, sf: f.sf, an: f.an, vx: Math.round(f.vx * 10) / 10, vy: Math.round(f.vy * 10) / 10, w: f.wins, fl: f.flash, al: Math.round(f.alpha * 100) / 100, cb: f.crouchBlock ? 1 : 0, sp: f.spec, sl: f.slamLand ? 1 : 0, hu: Math.round(f.hurt * 1000) / 1000, pl: f.pal || 0, inf: Math.round((f.inflate || 0) * 100) / 100, th: f.thin ? 1 : 0, up: f.upside ? 1 : 0 })),
+    f: G.f.map(f => ({ x: Math.round(f.x), y: Math.round(f.y), fc: f.face, hp: f.hp, en: Math.round(f.en), st: f.st, sf: f.sf, an: f.an, vx: Math.round(f.vx * 10) / 10, vy: Math.round(f.vy * 10) / 10, w: f.wins, fl: f.flash, al: Math.round(f.alpha * 100) / 100, cb: f.crouchBlock ? 1 : 0, sp: f.spec, sl: f.slamLand ? 1 : 0, hu: Math.round(f.hurt * 1000) / 1000, pl: f.pal || 0, inf: Math.round((f.inflate || 0) * 100) / 100, th: f.thin ? 1 : 0, up: f.upside ? 1 : 0, ce: f.celebId || '' })),
     pr: G.proj.map(p => [Math.round(p.x), Math.round(p.y), Math.round(p.vx * 10) / 10, p.o.i, p.kind || 'fire', p.t]),
     mt: G.mets.map(m => [Math.round(m.x), Math.round(m.y), m.big ? 1 : 0, m.kind || '']),
     wv: G.waves.map(w => [Math.round(w.x), w.o.i, w.life]),
@@ -2222,7 +2337,7 @@ function applySnap(m) {
   m.f.forEach((d, i) => {
     const f = G.f[i]; if (!f) return;
     if (d.st !== f.st || d.sf < f.sf) f.sf = d.sf;
-    Object.assign(f, { tx: d.x, ty: d.y, face: d.fc, hp: d.hp, en: d.en, st: d.st, an: d.an, atk: ATK[d.an] || null, vx: d.vx, vy: d.vy, wins: d.w, flash: d.fl, alpha: d.al, crouchBlock: !!d.cb, spec: d.sp, slamLand: d.sl ? (f.slamLand || f.sf) : 0, hurt: d.hu || 0, pal: d.pl || 0, inflate: d.inf || 0, thin: d.th || 0, upside: !!d.up });
+    Object.assign(f, { tx: d.x, ty: d.y, face: d.fc, hp: d.hp, en: d.en, st: d.st, an: d.an, atk: ATK[d.an] || null, vx: d.vx, vy: d.vy, wins: d.w, flash: d.fl, alpha: d.al, crouchBlock: !!d.cb, spec: d.sp, slamLand: d.sl ? (f.slamLand || f.sf) : 0, hurt: d.hu || 0, pal: d.pl || 0, inflate: d.inf || 0, thin: d.th || 0, upside: !!d.up, celebId: d.ce || null });
     if (Math.abs(f.sf - d.sf) > 3) f.sf = d.sf;
   });
   G.proj = m.pr.map(a => ({ x: a[0], y: a[1], vx: a[2], o: G.f[a[3]], kind: a[4] || 'fire', t: a[5] || 0 }));
@@ -2760,13 +2875,14 @@ const NEXT_NAMES = ['cuartos de final', 'la semifinal', 'la final', ''];
 let PHOTO_TARGET = null, TT = null; const TFACE = [];
 function defaultTour() {
   return {
-    mode: 'solo', need: 1, lvl: 'normal', status: 'setup', R: null, round: 0, match: 0,
+    name: 'Gran Torneo de Kombate', mode: 'solo', need: 1, lvl: 'normal', status: 'setup', R: null, round: 0, match: 0,
     slots: CH_KEYS.map((k, i) => ({ name: CHARS[k].name, ch: k, face: null, ctl: i === 0 ? 'me' : 'bot' }))
   };
 }
 let TOUR = store.get('kdc_tour', null);
 if (!TOUR || !Array.isArray(TOUR.slots) || TOUR.slots.length !== 16) TOUR = defaultTour();
 TOUR.slots.forEach(s => { if (s.ctl === 'net') s.ctl = 'bot'; if (!CHARS[s.ch]) s.ch = 'toro'; });
+if (!TOUR.name) TOUR.name = 'Gran Torneo de Kombate';
 if (TOUR.mode === 'online' && TOUR.status !== 'setup') TOUR.status = 'setup'; // un torneo en línea no se retoma sin los amigos
 function saveTour() { if (!store.set('kdc_tour', TOUR)) toast('No hay espacio para guardar las caras del torneo en este aparato.'); }
 const curMatch = () => ({ a: TOUR.R[TOUR.round][TOUR.match * 2], b: TOUR.R[TOUR.round][TOUR.match * 2 + 1] });
@@ -2794,7 +2910,8 @@ function renderTour() {
   const T = TOUR;
   document.querySelectorAll('#tModes [data-tm]').forEach(b => b.classList.toggle('on', b.dataset.tm === T.mode));
   const roomOpen = roomHost() && NET.room === 'tour' && NET.peer && NET.peer.open, friends = [...NET.specs].filter(c => c._slot >= 0).length;
-  $('#tOpts').innerHTML = `<div class="secT">Peleas</div><div class="row">
+  $("#tOpts").innerHTML = `<div class="secT">Nombre del torneo</div><input id="tName" class="inp" style="font-size:18px;letter-spacing:1px;text-transform:none;text-align:left;max-width:420px;padding:10px 12px" maxlength="30" value="${esc(T.name || "")}" placeholder="Gran Torneo de Kombate">
+    <div class="secT">Peleas</div><div class="row">
       <button class="sm ${T.need === 1 ? 'on' : ''}" data-need="1">⚡ A 1 ronda</button><button class="sm ${T.need === 2 ? 'on' : ''}" data-need="2">🥊 Al mejor de 3</button>
       <span style="width:12px"></span><span style="font-weight:800;font-size:13px">Bots:</span>${LVLS.map(([k, t]) => `<button class="sm ${T.lvl === k ? "on" : ""}" data-tl="${k}">${t}</button>`).join("")}
       <span style="width:12px"></span><button class="sm" id="tRandCh">🎲 Personajes al azar</button><button class="sm" id="tRandFace">🙂 Repartir caras guardadas</button><button class="sm" id="tReset">↺ Nombres originales</button><button class="sm" id="tExport">📤 Pasar peleadores</button><button class="sm" id="tImport">📥 Cargar peleadores</button></div>` +
@@ -2805,6 +2922,7 @@ function renderTour() {
         : 'Los que entren con el código miran todas las peleas en vivo y alientan a su favorito con emojis y confeti. No toman lugares: pelean los de la lista.'}</div>`
       : roomHost() ? `<div class="hint" style="text-align:left">Abriendo sala…</div>`
         : `<button class="sm" id="tRoom">📡 ${T.mode === 'online' ? 'Abrir sala para mis amigos' : 'Abrir sala para que miren'}</button>`);
+  $('#tName').oninput = e => { T.name = e.target.value.slice(0, 30); saveTour(); if (roomHost() && NET.room === 'tour') { clearTimeout(T._nt); T._nt = setTimeout(broadcastTour, 400); } };
   $('#tOpts').querySelectorAll('[data-need]').forEach(b => b.onclick = () => { T.need = +b.dataset.need; saveTour(); renderTour(); });
   $('#tOpts').querySelectorAll('[data-tl]').forEach(b => b.onclick = () => { T.lvl = b.dataset.tl; saveTour(); renderTour(); });
   $('#tRandCh').onclick = () => { const ks = [...CH_KEYS].sort(() => Math.random() - .5); T.slots.forEach((s, i) => { if (s.ctl !== 'net') s.ch = ks[i]; }); saveTour(); renderTour(); };
@@ -3013,7 +3131,8 @@ function bkDraw(T, now) {
   // cartel de arriba
   rr(c, BW / 2 - 300, 14, 600, 56, 12); c.fillStyle = '#c0281e'; c.fill(); c.lineWidth = 5; c.strokeStyle = '#5a0f08'; c.stroke();
   c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '900 30px system-ui,sans-serif'; c.lineWidth = 7; c.strokeStyle = '#3a0905';
-  c.strokeText('GRAN TORNEO DE ARTES MARCIALES', BW / 2, 43); c.fillStyle = '#ffd21f'; c.fillText('GRAN TORNEO DE ARTES MARCIALES', BW / 2, 43);
+  const tn = (T.name || 'Gran Torneo de Artes Marciales').toUpperCase(); c.font = `900 ${Math.min(30, 30 * 540 / Math.max(540, c.measureText(tn).width))}px system-ui,sans-serif`;
+  c.strokeText(tn, BW / 2, 43); c.fillStyle = '#ffd21f'; c.fillText(tn, BW / 2, 43);
   // nombres de las rondas al costado
   c.font = '900 13px system-ui,sans-serif'; c.textAlign = 'left'; c.fillStyle = '#8a5a2a';
   ['', 'CUARTOS', 'SEMIFINAL', 'FINAL', ''].forEach((n, L) => { if (n) c.fillText(n, 40, (BY[L] + BY[L - 1]) / 2 + 8); });
@@ -3117,12 +3236,12 @@ function playTourMatch() {
   const { a, b } = curMatch(), A = TOUR.slots[a], B = TOUR.slots[b];
   const title = ROUND_NAMES[TOUR.round] + (TOUR.round < 3 ? ' · Pelea ' + (TOUR.match + 1) + ' de ' + (8 >> TOUR.round) : '');
   audio();
-  startMatch({ mode: 'tour', sel: [A, B], stage: ARENA, need: TOUR.need, lvls: [TOUR.lvl, TOUR.lvl], title, tour: { a, b } });
+  startMatch({ mode: 'tour', sel: [A, B], stage: ARENA, need: TOUR.need, lvls: [TOUR.lvl, TOUR.lvl], title, tname: TOUR.name, tour: { a, b } });
   if (roomHost() && NET.room === 'tour') { G.ev = []; for (const c of NET.specs) if (c.open) try { c.send(tourStartMsg(c)); } catch (e) { } }
 }
 function tourStartMsg(c) {
   const { a, b } = G.setup.tour;
-  return { t: 'start', kind: 'tour', a, b, stage: G.stage, seeds: G.seeds, need: G.need, title: G.tourTitle, me: c._slot === a ? 0 : c._slot === b ? 1 : -1 };
+  return { t: 'start', kind: 'tour', a, b, stage: G.stage, seeds: G.seeds, need: G.need, title: G.tourTitle, tname: G.tourName, me: c._slot === a ? 0 : c._slot === b ? 1 : -1 };
 }
 // terminó una pelea del torneo: el que ganó pasa de ronda
 function tourMatchDone() {
@@ -3150,30 +3269,42 @@ function showChamp() {
   for (let i = 0; i < 120; i++) conf.push({ x: Math.random() * 640, y: -Math.random() * 420, vy: 1 + Math.random() * 2.5, vx: rnd(-.6, .6), r: rnd(0, 6), vr: rnd(-.15, .15), c: CONF_COL[i % CONF_COL.length], w: rnd(6, 11), h: rnd(3, 6) });
   cancelAnimationFrame(champRAF);
   const cv2 = $('#chCv'), c = cv2.getContext('2d');
+  // el campeón de cuerpo entero, haciendo un festejo tras otro
+  const cf = { ch: CHARS[s.ch] || CHARS.toro, key: s.ch, i: 0, img, yaw: s.yaw ?? yawOf(s.face), face: 1, alpha: 1, rot: 0, flash: 0, pose: { ...P_IDLE }, st: 'win', sf: 0, squash: 0, inflate: 0, thin: 0 };
+  let ci = Math.random() * CELEBS.length | 0, t0 = performance.now(), announced = -1;
   const draw = () => {
     if (!$('#scrChamp').classList.contains('on')) return;
     c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 640, 420);
-    const t = performance.now() / 1000;
-    glow(c, 320, 170, 230, 'rgba(255,200,61,.45)');
-    // trofeo
-    c.save(); c.translate(320, 262); c.scale(.75, .75);
-    c.fillStyle = '#ffc83d'; c.strokeStyle = '#8a5a00'; c.lineWidth = 5;
+    const now = performance.now(), t = now / 1000, C = CELEBS[ci], fr = (now - t0) / 1000 * 60;
+    if (fr >= C.dur) { ci = (ci + 1) % CELEBS.length; t0 = now; }
+    if (announced !== t0) { announced = t0; voice(cf, 'win'); if (CELEBS[ci].id === 'siuu') setTimeout(() => speak('¡Siuuuuu!'), 650); }
+    const r = celebFrame(CELEBS[ci].id, Math.min(fr, CELEBS[ci].dur - 1));
+    for (const k in r.p) cf.pose[k] = lerp(cf.pose[k] ?? r.p[k], r.p[k], .35);
+    cf.cy = r.cy; cf.crot = r.crot; cf.vflip = r.flip;
+    glow(c, 250, 210, 230, 'rgba(255,200,61,.45)');
+    // podio
+    c.fillStyle = '#c0281e'; c.fillRect(110, 318, 300, 26); c.fillStyle = '#8a1a12'; c.fillRect(110, 340, 300, 8);
+    c.fillStyle = '#ffd21f'; c.font = '900 16px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('1º', 260, 331);
+    c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(170 + r.dx * .9, 318, 46, 8, 0, 0, 7); c.fill();
+    drawFighter(c, cf, 170 + r.dx * .9, 318, 1.12 / cf.ch.b.s);
+    // trofeo al costado
+    c.save(); c.translate(520, 250); c.scale(.62, .62); c.rotate(Math.sin(t * 2) * .05);
+    c.fillStyle = '#ffc83d'; c.strokeStyle = '#8a5a00'; c.lineWidth = 6;
     c.beginPath(); c.moveTo(-70, -60); c.lineTo(70, -60); c.quadraticCurveTo(70, 30, 0, 40); c.quadraticCurveTo(-70, 30, -70, -60); c.fill(); c.stroke();
     c.beginPath(); c.arc(-80, -25, 26, Math.PI * .5, Math.PI * 1.5); c.stroke(); c.beginPath(); c.arc(80, -25, 26, -Math.PI * .5, Math.PI * .5); c.stroke();
     c.fillRect(-14, 40, 28, 30); c.fillRect(-55, 70, 110, 22); c.strokeRect(-55, 70, 110, 22);
     c.restore();
-    // la cara del campeón arriba del trofeo, con corona
-    c.save(); c.translate(320, 150 + Math.sin(t * 2) * 5); drawFace(c, img, 86, '#ffc83d', 0, 1, s.yaw ?? yawOf(s.face), null); c.restore();
-    c.save(); c.translate(320, 50 + Math.sin(t * 2) * 5);
-    c.beginPath(); c.moveTo(-46, 18); c.lineTo(-54, -24); c.lineTo(-24, -4); c.lineTo(0, -36); c.lineTo(24, -4); c.lineTo(54, -24); c.lineTo(46, 18); c.closePath();
-    c.fillStyle = '#ffc83d'; c.fill(); c.lineWidth = 4; c.strokeStyle = '#8a5a00'; c.stroke(); c.restore();
+    // el nombre del festejo
+    c.save(); c.translate(320, 44); c.rotate(-.04);
+    c.font = '900 34px system-ui,sans-serif'; c.textAlign = 'center'; c.lineWidth = 7; c.strokeStyle = '#3a0905'; c.fillStyle = '#fff3a0';
+    c.strokeText(CELEBS[ci].name, 0, 0); c.fillText(CELEBS[ci].name, 0, 0); c.restore();
     for (const p of conf) { p.y += p.vy; p.x += p.vx + Math.sin(t + p.r) * .4; p.r += p.vr; if (p.y > 430) { p.y = -10; p.x = Math.random() * 640; } c.save(); c.translate(p.x, p.y); c.rotate(p.r); c.fillStyle = p.c; c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); c.restore(); }
     c.textAlign = 'center'; c.lineWidth = 7; c.strokeStyle = '#3a0905'; c.font = '900 40px system-ui,sans-serif'; c.fillStyle = '#ffc83d';
     c.strokeText('¡' + s.name.toUpperCase() + '!', 320, 395); c.fillText('¡' + s.name.toUpperCase() + '!', 320, 395);
-    c.font = '900 20px system-ui,sans-serif'; c.lineWidth = 5; c.strokeText('CAMPEÓN DEL GRAN TORNEO', 320, 352); c.fillStyle = '#fff'; c.fillText('CAMPEÓN DEL GRAN TORNEO', 320, 352);
+    c.font = '900 20px system-ui,sans-serif'; c.lineWidth = 5; const ct = ('CAMPEÓN · ' + (T.name || 'Gran Torneo')).toUpperCase(); c.font = `900 ${Math.min(20, 20 * 560 / Math.max(560, c.measureText(ct).width))}px system-ui,sans-serif`; c.strokeText(ct, 320, 352); c.fillStyle = '#fff'; c.fillText(ct, 320, 352);
     champRAF = requestAnimationFrame(draw);
   };
-  draw(); fx('sfx', 'twinkle'); speak('¡' + s.name + ', campeón del gran torneo!');
+  draw(); fx('sfx', 'twinkle'); speak('¡' + s.name + ', campeón de ' + (T.name || 'el gran torneo') + '!');
 }
 $('#chTree').onclick = () => { showScreen('scrBracket'); renderBracket(); };
 $('#chNew').onclick = () => { TOUR.status = 'setup'; TOUR.R = null; saveTour(); openTour(); if (roomHost() && NET.room === 'tour') broadcastTour(); };
@@ -3183,7 +3314,7 @@ $('#chQuit').onclick = goMenu;
 function tourState(c) {
   return {
     t: 'tour', you: c._slot,
-    T: { mode: TOUR.mode, need: TOUR.need, status: TOUR.status, R: TOUR.R, round: TOUR.round, match: TOUR.match, slots: TOUR.slots.map(s => ({ name: s.name, ch: s.ch, ctl: s.ctl, yaw: s.yaw ?? yawOf(s.face) })) }
+    T: { name: TOUR.name, mode: TOUR.mode, need: TOUR.need, status: TOUR.status, R: TOUR.R, round: TOUR.round, match: TOUR.match, slots: TOUR.slots.map(s => ({ name: s.name, ch: s.ch, ctl: s.ctl, yaw: s.yaw ?? yawOf(s.face) })) }
   };
 }
 function sendFaces(c) {
