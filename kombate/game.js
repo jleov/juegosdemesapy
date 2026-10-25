@@ -2797,7 +2797,7 @@ function renderTour() {
   $('#tOpts').innerHTML = `<div class="secT">Peleas</div><div class="row">
       <button class="sm ${T.need === 1 ? 'on' : ''}" data-need="1">⚡ A 1 ronda</button><button class="sm ${T.need === 2 ? 'on' : ''}" data-need="2">🥊 Al mejor de 3</button>
       <span style="width:12px"></span><span style="font-weight:800;font-size:13px">Bots:</span>${LVLS.map(([k, t]) => `<button class="sm ${T.lvl === k ? "on" : ""}" data-tl="${k}">${t}</button>`).join("")}
-      <span style="width:12px"></span><button class="sm" id="tRandCh">🎲 Personajes al azar</button><button class="sm" id="tRandFace">🙂 Repartir caras guardadas</button><button class="sm" id="tReset">↺ Nombres originales</button></div>` +
+      <span style="width:12px"></span><button class="sm" id="tRandCh">🎲 Personajes al azar</button><button class="sm" id="tRandFace">🙂 Repartir caras guardadas</button><button class="sm" id="tReset">↺ Nombres originales</button><button class="sm" id="tExport">📤 Pasar peleadores</button><button class="sm" id="tImport">📥 Cargar peleadores</button></div>` +
     `<div class="secT">📡 Sala del torneo</div>` + (roomOpen
       ? `<div class="row" style="align-items:center"><span>Sala <b style="color:var(--gold);letter-spacing:3px;font-size:20px">${esc(NET.code)}</b>${T.mode === 'online' ? ` · 🌐 ${friends} peleando` : ''} · 👀 ${NET.specs.size} conectado${NET.specs.size === 1 ? '' : 's'}</span><button class="sm" id="tShare">📤 Compartir link</button><button class="sm" id="tCopy">📋 Copiar</button></div>
          <div class="hint" style="text-align:left">${T.mode === 'online'
@@ -2810,6 +2810,7 @@ function renderTour() {
   $('#tRandCh').onclick = () => { const ks = [...CH_KEYS].sort(() => Math.random() - .5); T.slots.forEach((s, i) => { if (s.ctl !== 'net') s.ch = ks[i]; }); saveTour(); renderTour(); };
   $('#tRandFace').onclick = () => { if (!FACES.length) { toast('Todavía no hay caras guardadas: tocá una cara para sacar una foto.'); return; } const fs = [...FACES].sort(() => Math.random() - .5); T.slots.forEach((s, i) => { if (s.ctl !== 'net') { s.face = fs[i % fs.length]; s.yaw = yawOf(s.face); } }); saveTour(); renderTour(); };
   $('#tReset').onclick = () => { T.slots.forEach(s => { if (s.ctl !== 'net') s.name = CHARS[s.ch].name; }); saveTour(); renderTour(); };
+  $('#tExport').onclick = exportRoster; $('#tImport').onclick = () => $('#fileTour').click();
   if ($('#tRoom')) $('#tRoom').onclick = () => { netHost('tour'); renderTour(); };
   if ($('#tShare')) $('#tShare').onclick = () => $('#oShare').onclick();
   if ($('#tCopy')) $('#tCopy').onclick = () => $('#oCopy').onclick();
@@ -2850,6 +2851,44 @@ function pickFaceFor(target) {
 $('#fpCam').onclick = () => { $('#facePick').classList.remove('on'); takePhoto(0); };
 $('#fpGal').onclick = () => { $('#facePick').classList.remove('on'); pickPhoto(0); };
 $('#fpCancel').onclick = () => { PHOTO_TARGET = null; $('#facePick').classList.remove('on'); };
+/* --- pasar los 16 peleadores (caras, nombres y personajes) a otro aparato --- */
+function rosterData(slots) {
+  return { app: 'kombate-de-caras', tipo: 'peleadores', v: 1, slots: slots.map(s => ({ name: s.name, ch: s.ch, face: s.face || null, yaw: s.yaw ?? yawOf(s.face) })) };
+}
+async function exportRoster() {
+  const txt = JSON.stringify(rosterData(TOUR.slots)), name = 'kombate-peleadores.json';
+  const file = new File([txt], name, { type: 'application/json' });
+  // en el celular se comparte directo (WhatsApp, etc.); si no se puede, se descarga el archivo
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Peleadores de Kombate de Caras', text: '🥊 Mis 16 peleadores de Kombate de Caras. Abrí el juego → 🏆 Torneo → 📥 Cargar peleadores.' }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('📤 Se guardó el archivo "' + name + '". Mandáselo a tu amigo para que lo cargue en 🏆 Torneo → 📥 Cargar peleadores.', 6000);
+}
+// pone los peleadores recibidos en el torneo de este aparato (acepta el archivo o lo que mandó la sala)
+function loadRoster(data) {
+  const list = data && Array.isArray(data.slots) ? data.slots : null;
+  if (!list || list.length !== 16) { toast('Ese archivo no es de peleadores de Kombate de Caras.'); return false; }
+  if (TOUR.status !== 'setup' && TOUR.R && !confirm('Tenés un torneo a medias. ¿Lo reemplazo por estos peleadores?')) return false;
+  const meIdx = TOUR.slots.findIndex(s => s.ctl === 'me');
+  TOUR.slots = list.map((s, i) => {
+    const face = typeof s.face === 'string' && /^data:image\/(png|webp|jpeg);base64,/.test(s.face) && s.face.length < 400000 ? s.face : null;
+    if (face) { YAW[faceKey(face)] = +s.yaw || 0; }
+    return { name: String(s.name || 'Peleador').slice(0, 12), ch: CHARS[s.ch] ? s.ch : 'toro', face, yaw: +s.yaw || 0, ctl: TOUR.mode === 'solo' && i === Math.max(0, meIdx) ? 'me' : 'bot' };
+  });
+  store.set('kdc_yaw', YAW);
+  Object.assign(TOUR, { status: 'setup', R: null, round: 0, match: 0, pend: [] });
+  saveTour(); toast('📥 ¡Listo! Ya tenés los 16 peleadores con sus caras y nombres.', 4000);
+  return true;
+}
+$('#fileTour').onchange = e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { let d = null; try { d = JSON.parse(rd.result); } catch (err) { } if (loadRoster(d) && $('#scrTour').classList.contains('on')) renderTour(); };
+  rd.readAsText(f);
+};
+
 // primero se arman las llaves (sorteadas, y el anfitrión cambia de lugar a quien quiera); después se pelea
 function startTour() {
   const order = [...Array(16).keys()].sort(() => Math.random() - .5);
@@ -2882,6 +2921,14 @@ function renderBracket() {
     $('#myFace').onclick = () => pickFaceFor(SEL[0]);
     $('#myName').oninput = e => { SEL[0].name = e.target.value; saveSel(); helloSoon(); };
     $('#myCh').onchange = e => { SEL[0].ch = e.target.value; saveSel(); sendHello(); };
+  }
+  if (!host && TT) { // el que mira puede llevarse los 16 peleadores del anfitrión a su aparato
+    $('#bMine').insertAdjacentHTML('beforeend', `<div class="row" style="margin-top:6px"><button class="sm" id="bSaveRoster">💾 Guardar estos 16 peleadores en mi aparato</button></div>`);
+    $('#bSaveRoster').onclick = () => {
+      const missing = TT.slots.filter((s, i) => s.ctl !== 'net' && TFACE[i] === undefined).length;
+      if (missing) { toast('Esperá un segundo, todavía están llegando las caras…'); return; }
+      loadRoster(rosterData(TT.slots.map((s, i) => ({ ...s, face: TFACE[i] || null }))));
+    };
   }
   if (T.status === 'setup' || !T.R) {
     $('#bTree').innerHTML = `<div class="slots" style="grid-column:1/-1">${[...Array(16).keys()].map(i => { const s = slotView(i); return `<div class="slot ${s.ctl}"><span class="fb" style="display:flex;align-items:center;justify-content:center;${s.face ? `background-image:url(${s.face})` : ''}">${s.face ? '' : '🙂'}</span><b>${esc(s.name)}</b><span style="font-size:12px">${CHARS[s.ch] ? CHARS[s.ch].name : ''}</span><div class="ctl">${s.ctl === 'net' ? '🌐 Amigo' : s.ctl === 'me' ? '🙋 Anfitrión' : '🤖 Bot'}</div></div>`; }).join('')}</div>`;
