@@ -625,6 +625,8 @@ function seatOrder(){
   const n=V.players.length, mi=V.players.findIndex(p=>p.id===me());
   return {n, base: mi<0 ? 0 : mi, mi};
 }
+// en 3D los que están a los costados giran un poco sus cartas hacia la cámara (si no, se verían de canto)
+const rot3 = r => { const d=((180-r+540)%360)-180; return r + d*.45; };
 function renderSeats(){
   if(!V || V.phase==='lobby') return;
   const {n, base, mi} = seatOrder(), curId=V.players[V.turn] && V.players[V.turn].id;
@@ -642,7 +644,7 @@ function renderSeats(){
     const b=BUB[p.id], bub = b && Date.now()-b.at<4500 ? `<div class="bub">${esc(b.x.slice(0,90))}</div>` : '';
     const offline=!p.bot && !p.conn;
     h+=`<div class="seat ${p.id===curId&&V.phase==='play'?'turn':''} ${offline?'off':''} ${isMe?'me':''}" data-pid="${p.id}" style="left:${x}%;top:${y}%">
-      ${isMe?'':`<div class="fan" style="--rot:${ang-90}deg">${fan}</div>`}
+      ${isMe?'':`<div class="fan" style="--rot:${ang-90}deg;--rot3:${rot3(ang-90)}deg">${fan}</div>`}
       <div class="tag" style="--pc:${p.color}"><span class="av">${esc(p.emoji)}</span><span><b>${esc(p.name)}${isMe?' (vos)':''}</b><small>🂠 ${cnt}${V.opts.target?` · ${p.score} pts`:''}${p.bot?' · 🤖':''}${p.mic?' · 🎙️':''}${offline?' · ⚠️ sin conexión':''}${p.id===V.hostPid&&NET.mode!=='local'?' · 👑':''}</small></span>
       ${cnt===1&&V.phase==='play'?'<span class="unob">¡UNO!</span>':''}</div>${bub}</div>`;
   });
