@@ -238,6 +238,13 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
     <input type="text" id="setName" maxlength="24">
     <h4>Micrófono</h4>
     <select id="setMic"></select>
+    <h4>Cuando conecto un auricular (Bluetooth o con cable)</h4>
+    <label class="opt"><input type="radio" name="bt" value="both"><span><b>Hablar y escuchar por el auricular</b><small>Usa el micrófono del auricular. En Bluetooth el sonido pasa a «modo llamada» y se escucha un poco peor.</small></span></label>
+    <label class="opt"><input type="radio" name="bt" value="listen"><span><b>Solo escuchar por el auricular</b><small>Hablás con el micrófono del celular o la PC. Se escucha con mejor calidad (ideal para películas).</small></span></label>
+    <div id="outBox" class="hidden">
+      <h4>Escuchar por</h4>
+      <select id="setOut"></select>
+    </div>
     <h4>Quitar ruido de fondo</h4>
     <label class="opt"><input type="radio" name="ns" value="ia"><span><b>Inteligente (tipo Krisp)</b><small>Deja solo tu voz: quita ventilador, aire, teclado, perros, tráfico. Recomendado.</small></span></label>
     <label class="opt"><input type="radio" name="ns" value="nav"><span><b>La del navegador</b><small>Más liviana, quita menos ruido.</small></span></label>

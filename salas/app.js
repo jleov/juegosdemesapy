@@ -34,7 +34,7 @@ const ICON = {
 
 /* ---------------- ajustes guardados ---------------- */
 const cfg = Object.assign({
-  name: '', mic: '', ns: 'ia', gate: -58, quality: 'motion', res: 'q1080', autoSub: true, subLang: 'multi', subs: true, subSize: '1', vols: {},
+  name: '', mic: '', btMode: 'both', out: '', ns: 'ia', gate: -58, quality: 'motion', res: 'q1080', autoSub: true, subLang: 'multi', subs: true, subSize: '1', vols: {},
 }, (() => { try { return JSON.parse(localStorage.getItem('salas_cfg') || '{}'); } catch (e) { return {}; } })());
 const saveCfg = () => { try { localStorage.setItem('salas_cfg', JSON.stringify(cfg)); } catch (e) {} };
 
@@ -210,24 +210,83 @@ async function audioStart() {
   A.dest = A.ctx.createMediaStreamDestination();
   A.gate.connect(A.dest);
   await micOpen();
+  // con «Automático», si ya hay un auricular conectado se elige según el modo
+  if (!cfg.mic) { const id = await autoMicId(); if (id && id !== A.micId) await micOpen(id).catch(() => {}); }
+  knownIns = await audioInputs();
   if (A.ctx.state === 'suspended') await A.ctx.resume();
   setInterval(gateTick, 20);
   setInterval(talkTick, 120);
-  navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener('devicechange', fillMics);
+  navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener('devicechange', onDevices);
 }
 
-async function micOpen() {
+// id: micrófono a usar en este momento (sin guardarlo); si no se pasa, el elegido en Ajustes
+async function micOpen(id = cfg.mic) {
   const want = { echoCancellation: true, noiseSuppression: cfg.ns === 'nav', autoGainControl: true, channelCount: 1 };
   let raw;
-  try { raw = await navigator.mediaDevices.getUserMedia({ audio: cfg.mic ? { ...want, deviceId: { exact: cfg.mic } } : want }); }
+  try { raw = await navigator.mediaDevices.getUserMedia({ audio: id ? { ...want, deviceId: { exact: id } } : want }); }
   catch (e) {
-    if (!cfg.mic || e.name === 'NotAllowedError') throw e;
-    cfg.mic = ''; saveCfg();   // el micrófono elegido ya no está: se usa el normal
+    if (!id || e.name === 'NotAllowedError') throw e;
+    if (id === cfg.mic) { cfg.mic = ''; saveCfg(); }   // el micrófono elegido ya no está: se usa el normal
     raw = await navigator.mediaDevices.getUserMedia({ audio: want });
   }
   if (A.raw) A.raw.getTracks().forEach(t => t.stop());
   A.raw = raw;
+  const tr = raw.getAudioTracks()[0];
+  A.micId = tr && tr.getSettings ? tr.getSettings().deviceId : '';
+  A.micLabel = tr ? tr.label : '';
   await micWire();
+  // si la app está minimizada en el celular, se manda directo el micrófono nuevo
+  if (typeof bgRaw !== 'undefined' && bgRaw && tr) { tr.enabled = !S.muted; micSenders().forEach(s => s.replaceTrack(tr).catch(() => {})); }
+}
+
+/* ---------------- auriculares (Bluetooth o con cable) ---------------- */
+const HEADSET = /bluetooth|headset|hands-?free|auricular|airpods|buds|headphone|\bbt\b/i;
+let knownIns = null;
+const audioInputs = async () => {
+  try {
+    return (await navigator.mediaDevices.enumerateDevices())
+      .filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
+  } catch (e) { return []; }
+};
+// con «Automático»: auricular conectado → su micrófono (modo «both») o el del celular (modo «listen»)
+async function autoMicId(list) {
+  const ins = list || await audioInputs();
+  const head = ins.find(d => HEADSET.test(d.label));
+  if (!head) return '';
+  if (cfg.btMode === 'listen') { const phone = ins.find(d => !HEADSET.test(d.label)); return phone ? phone.deviceId : ''; }
+  return head.deviceId;
+}
+async function onDevices() {
+  fillMics();
+  if (!A.ctx || !S.me || S.left) return;
+  const ins = await audioInputs();
+  const prev = knownIns || [];
+  knownIns = ins;
+  const added = ins.filter(d => !prev.some(p => p.deviceId === d.deviceId));
+  const removed = prev.filter(p => !ins.some(d => d.deviceId === p.deviceId));
+  const head = added.find(d => HEADSET.test(d.label));
+  const lostMine = removed.some(d => d.deviceId === A.micId);
+  if (cfg.mic && !lostMine) return;   // eligió un micrófono fijo en Ajustes y sigue conectado
+  try {
+    if (head) {
+      await micOpen(await autoMicId(ins));
+      toast(cfg.btMode === 'listen'
+        ? `🎧 Se conectó «${head.label}»: escuchás por el auricular y hablás con el micrófono del celular.`
+        : `🎧 Se conectó «${head.label}»: hablás y escuchás por el auricular.`, 6000);
+    } else if (lostMine || removed.some(d => HEADSET.test(d.label))) {
+      await micOpen(await autoMicId(ins));
+      toast('Se desconectó el auricular: ahora usás el micrófono y el altavoz del aparato.', 6000);
+    }
+  } catch (e) { toast('No se pudo cambiar el micrófono: ' + e.message); }
+  fillMics();
+}
+
+/* ---------------- por dónde se escucha ---------------- */
+const canSink = 'setSinkId' in HTMLMediaElement.prototype;
+function applySink(el) { if (canSink && el && cfg.out) el.setSinkId(cfg.out).catch(() => {}); }
+function applySinkAll() {
+  S.remote.forEach(r => r.el && (canSink ? r.el.setSinkId(cfg.out || '').catch(() => {}) : 0));
+  if (A.ctx && A.ctx.setSinkId) A.ctx.setSinkId(cfg.out || '').catch(() => {});
 }
 
 async function micWire() {
@@ -545,7 +604,7 @@ function addRemote(key, call, md, st) {
   const p = S.peers.get(peer);
   const r = { key, peer, sid, kind: md.kind === 'screen' ? 'screen' : 'mic', stream: st, call, label: String(md.label || 'Pantalla').slice(0, 40), hasAudio: !!md.audio, peerName: p && p.name, vol: 100 };
   if (r.kind === 'mic') {
-    r.el = new Audio(); r.el.autoplay = true; r.el.srcObject = st;
+    r.el = new Audio(); r.el.autoplay = true; r.el.srcObject = st; applySink(r.el);
     r.el.play().catch(() => toast('Tocá la pantalla para escuchar a los demás.'));
     try { const src = A.ctx.createMediaStreamSource(st); r.an = A.ctx.createAnalyser(); r.an.fftSize = 1024; src.connect(r.an); } catch (e) {}
   } else {
@@ -897,7 +956,7 @@ function screenTile(key, stream, title, mine, ls, r) {
   const v = document.createElement('video');
   v.autoplay = true; v.playsInline = true; v.srcObject = stream;
   v.muted = mine || S.deaf;
-  if (r) { r.el = v; applyVolume(r); }
+  if (r) { r.el = v; applyVolume(r); applySink(v); }
   t.appendChild(v);
   t.insertAdjacentHTML('beforeend', `<div class="badge">EN VIVO</div><div class="subs" style="--subsize:${cfg.subSize}"></div><div class="tag"><span>${esc(title)}</span><small class="qinfo" data-q="${esc(key)}"></small></div><div class="tools"></div>`);
   const tools = t.querySelector('.tools');
@@ -991,16 +1050,28 @@ let dlgOpen = false;
 async function fillMics() {
   const sel = $('#setMic');
   try {
-    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
-    sel.innerHTML = '<option value="">El del sistema</option>' + devs.filter(d => d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications')
-      .map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || 'Micrófono ' + (i + 1))}</option>`).join('');
+    const all = await navigator.mediaDevices.enumerateDevices();
+    const ins = all.filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    const now = A.micLabel ? ` — ahora: ${A.micLabel}` : '';
+    sel.innerHTML = `<option value="">Automático (cambia solo al conectar un auricular)${esc(now)}</option>` +
+      ins.map((d, i) => `<option value="${esc(d.deviceId)}">${HEADSET.test(d.label) ? '🎧 ' : ''}${esc(d.label || 'Micrófono ' + (i + 1))}</option>`).join('');
     sel.value = cfg.mic;
+    // salida: solo si el navegador deja elegirla y hay más de una
+    const outs = all.filter(d => d.kind === 'audiooutput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    const show = canSink && outs.length > 0;
+    $('#outBox').classList.toggle('hidden', !show);
+    if (show) {
+      $('#setOut').innerHTML = '<option value="">Automático (el del sistema)</option>' +
+        outs.map((d, i) => `<option value="${esc(d.deviceId)}">${HEADSET.test(d.label) ? '🎧 ' : ''}${esc(d.label || 'Salida ' + (i + 1))}</option>`).join('');
+      $('#setOut').value = outs.some(d => d.deviceId === cfg.out) ? cfg.out : '';
+    }
   } catch (e) {}
 }
 function openSettings() {
   fillMics();
   $('#setName').value = S.name;
   document.querySelectorAll('input[name=ns]').forEach(r => r.checked = r.value === cfg.ns);
+  document.querySelectorAll('input[name=bt]').forEach(r => r.checked = r.value === (cfg.btMode || 'both'));
   $('#setGate').value = cfg.gate;
   $('#setLoop').checked = A.loop;
   $('#setQuality').value = cfg.quality;
@@ -1019,7 +1090,15 @@ $('#dlgSet').addEventListener('close', () => {
   if (nm && nm !== S.name) { S.name = nm; cfg.name = nm; saveCfg(); broadcast({ t: 'hi', name: nm, muted: S.muted, deaf: S.deaf }); if (S.regConn && S.regConn.open) S.regConn.send({ t: 'hello', name: nm }); render(); }
 });
 $('#btnSetOk').onclick = () => $('#dlgSet').close();
-$('#setMic').onchange = async e => { cfg.mic = e.target.value; saveCfg(); try { await micOpen(); } catch (x) { toast('No se pudo usar ese micrófono.'); } };
+$('#setMic').onchange = async e => {
+  cfg.mic = e.target.value; saveCfg();
+  try { await micOpen(cfg.mic || await autoMicId()); fillMics(); } catch (x) { toast('No se pudo usar ese micrófono.'); }
+};
+document.querySelectorAll('input[name=bt]').forEach(r => r.onchange = async () => {
+  cfg.btMode = r.value; saveCfg();
+  if (!cfg.mic) { try { await micOpen(await autoMicId()); fillMics(); } catch (e) {} }
+});
+$('#setOut').onchange = e => { cfg.out = e.target.value; saveCfg(); applySinkAll(); };
 document.querySelectorAll('input[name=ns]').forEach(r => r.onchange = async () => {
   const prev = cfg.ns; cfg.ns = r.value; saveCfg();
   try { if ((prev === 'nav') !== (cfg.ns === 'nav')) await micOpen(); else await micWire(); } catch (e) { toast('No se pudo cambiar: ' + e.message); }
