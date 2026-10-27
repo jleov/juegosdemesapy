@@ -68,7 +68,7 @@ function localStart(){
   const p=addPlayer(myName(), myEmoji(), myToken, null); NET.myPid=p.id; S.hostPid=p.id;
   const n=+$('#nBots').value; for(let i=0;i<n;i++) addBot();
   startGame(); sysChat('🃏 Partida de práctica contra bots. Las reglas de la casa se cambian en la pestaña 🏠 Reglas (para la próxima partida).');
-  LAST.ev=null; commit();
+  LAST.ev=null; FACES={}; commit(); shareMyFace();
 }
 function leaveClick(){
   if(NET.mode==='local'){ if(S && S.phase==='play' && !confirm('¿Salir de la partida contra los bots?')) return; return leaveToMenu(); }
@@ -84,6 +84,7 @@ function leaveClick(){
   setTimeout(leaveToMenu, 250);
 }
 function leaveToMenu(){
+  camsReset();
   musicStop();
   stopMic(false);
   try{ if(NET.peer) NET.peer.destroy(); }catch(e){}
@@ -131,7 +132,7 @@ function hostStart(resume){
   peer.on('open', id=>{
     if(saved){
       S=saved.S; CHAT=saved.CHAT||[]; NET.myPid=saved.myPid;
-      S.players.forEach(p=>{ if(!p.bot){ p.conn = p.id===NET.myPid; p.mic=false; if(!p.conn) p.offAt=Date.now(); } });
+      S.players.forEach(p=>{ if(!p.bot){ p.conn = p.id===NET.myPid; p.mic=false; p.cam=false; if(!p.conn) p.offAt=Date.now(); } });
       S.observers=[]; P(NET.myPid).peerId=id;
     } else {
       S=lobbyState(); CHAT=[];
@@ -139,7 +140,7 @@ function hostStart(resume){
       sysChat('Sala '+NET.code+' creada. Pasales el código o el enlace a tus amigos.');
     }
     history.replaceState(null,'','#'+NET.code);
-    LAST.ev=null; commit(); renderChat();
+    LAST.ev=null; if(!saved) FACES={}; commit(); renderChat(); shareMyFace();
   });
   wireHostPeer(peer, ()=>{
     if(resume){ toast('La sala sigue abierta en otro aparato (otro jugador quedó de anfitrión). Entrá con el código.'); peer.destroy(); store('uno_host',undefined); NET.mode=null; $('#joinCode').value=NET.code; return; }
@@ -200,15 +201,17 @@ function hostOnData(conn, d){
     else { why='Volviste a mirar 👀.'; sysChat(`👀 ${ob.name} volvió a mirar.`); }
     const who=p||ob;
     if(NET.conns[who.id] && NET.conns[who.id]!==conn) try{ NET.conns[who.id].close(); }catch(e){}
-    conn.pid=who.id; NET.conns[who.id]=conn; who.conn=true; who.peerId=conn.peer; who.mic=false; delete who.offAt;
+    conn.pid=who.id; NET.conns[who.id]=conn; who.conn=true; who.peerId=conn.peer; who.mic=false; who.cam=false; delete who.offAt;
     if(p) conn.send({t:'welcome', pid:p.id, code:NET.code});
     else conn.send({t:'welcome', pid:null, obs:ob.id, why, code:NET.code});
     conn.send({t:'chatlog', list:chatFor(who.id)});
+    conn.send({t:'faces', map:FACES});
     commit(); return;
   }
   const pid=conn.pid; if(!pid) return;
   if(d.t==='act'){ const r=act(pid, d.a||{}); if(typeof r==='string') try{ conn.send({t:'err', m:r}); }catch(e){} }
   else if(d.t==='chat') addChat(pid, d.text, d.to);
+  else if(d.t==='face') hostSetFace(pid, d.img);
 }
 // un observador se sentó a la mesa: su conexión pasa a ser la del jugador nuevo
 function onSeatChange(oldId, newId){
@@ -224,7 +227,7 @@ function hostOnClose(conn){
   if(ob){ S.observers=S.observers.filter(x=>x!==ob); sysChat(`👀 ${ob.name} dejó de mirar.`); commit(); return; }
   const p=P(pid); if(!p) return;
   if(S.phase==='lobby'){ S.players=S.players.filter(x=>x!==p); sysChat(`${p.name} salió de la sala.`); }
-  else if(!p.bot){ p.conn=false; p.mic=false; p.offAt=Date.now(); sysChat(`⚠️ ${p.name} se desconectó. Si no vuelve, un bot juega por él en su turno.`); }
+  else if(!p.bot){ p.conn=false; p.mic=false; p.cam=false; p.offAt=Date.now(); sysChat(`⚠️ ${p.name} se desconectó. Si no vuelve, un bot juega por él en su turno.`); }
   commit();
 }
 setInterval(()=>{   // pulso para notar cortes bruscos
@@ -274,7 +277,7 @@ function takeoverHost(reason){
   NET.mode='host'; NET.conns={}; NET.hostConn=null; NET.obs=null; NET.backup=null; NET.hostLost=false; NET.noSave=false;
   S=bk.s; CHAT=bk.chat||[]; renderChat();
   const mine=P(NET.myPid), old=P(oldId);
-  S.players.forEach(p=>{ if(p.id!==NET.myPid && !p.bot){ p.conn=false; p.mic=false; p.offAt=Date.now(); } });
+  S.players.forEach(p=>{ if(p.id!==NET.myPid && !p.bot){ p.conn=false; p.mic=false; p.cam=false; p.offAt=Date.now(); } });
   S.observers=[];
   if(old && reason!=='handover'){ if(S.phase==='lobby') S.players=S.players.filter(p=>p!==old); }
   S.hostPid=NET.myPid;
@@ -334,10 +337,12 @@ function clientOnData(d){
     NET.myPid=d.pid; NET.obs=d.obs||null; NET.welcomed=true;
     store('uno_client',{code:NET.code, at:Date.now()}); if(location.hash!=='#'+NET.code) history.replaceState(null,'','#'+NET.code);
     if(d.why) toast(d.why);
+    setTimeout(shareMyFace, 300);   // mi foto, si tengo
   }
   else if(d.t==='state'){ S=d.s; render(); }
   else if(d.t==='chat'){ CHAT.push(d.m); renderChat(d.m); }
   else if(d.t==='chatlog'){ CHAT=d.list||[]; renderChat(); }
+  else if(d.t==='faces' || d.t==='face') clientFace(d);
   else if(d.t==='backup'){ NET.backup={s:d.s, chat:d.chat}; }
   else if(d.t==='migrate'){ NET.backup={s:d.s, chat:d.chat}; takeoverHost('handover'); }
   else if(d.t==='kicked'){ toast('🚪 El anfitrión te sacó de la mesa.'); store('uno_client',undefined); leaveToMenu(); }
@@ -497,6 +502,7 @@ function voiceSync(){
   for(const id in VOICE.calls) if(!live.has(id)){ try{ VOICE.calls[id].close(); }catch(e){} delete VOICE.calls[id]; }
 }
 function onCall(call){
+  if(call.metadata && call.metadata.kind==='cam') return camOnCall(call);   // cámara de un jugador (caras.js)
   call.answer();
   call.on('stream', st=>{
     let a=VOICE.audios[call.peer];
@@ -596,11 +602,11 @@ function render(){
   V = NET.mode==='client' ? S : publicState(me());
   if(V.phase==='lobby'){ show('lobby'); renderLobby(); }
   else { show('game'); renderGame(); }
-  renderSidePanels(); renderChatTo(); renderVoice(); voiceSync(); musicSync();
+  renderSidePanels(); renderChatTo(); renderVoice(); voiceSync(); musicSync(); camSync();
 }
 function playerTag(p){
   const host=p.id===V.hostPid;
-  return `<span class="dot" style="background:${p.color}"></span><span style="font-size:20px">${esc(p.emoji)}</span><span class="nm">${esc(p.name)}${p.id===me()?' <span class="muted">(vos)</span>':''}</span>`
+  return `<span class="dot" style="background:${p.color}"></span>${FACES[p.id]?`<img class="fthumb" src="${FACES[p.id]}" alt="">`:`<span style="font-size:20px">${esc(p.emoji)}</span>`}<span class="nm">${esc(p.name)}${p.id===me()?' <span class="muted">(vos)</span>':''}</span>`
     + `${host?'👑':''}${p.bot?'🤖':''}${p.mic?'🎙️':''}${!p.bot&&!p.conn?'⚠️':''}`;
 }
 
@@ -679,10 +685,11 @@ function renderSeats(){
     const offline=!p.bot && !p.conn;
     h+=`<div class="seat ${p.id===curId&&V.phase==='play'?'turn':''} ${offline?'off':''} ${isMe?'me':''}" data-pid="${p.id}" style="left:${x}%;top:${y}%">
       ${isMe?'':`<div class="fan" style="--rot:${ang-90}deg;--rot3:${rot3(ang-90)}deg">${fan}</div>`}
-      <div class="tag" style="--pc:${p.color}"><span class="av">${esc(p.emoji)}</span><span><b>${esc(p.name)}${isMe?' (vos)':''}</b><small>🂠 ${cnt}${V.opts.target?` · ${p.score} pts`:''}${p.bot?' · 🤖':''}${p.mic?' · 🎙️':''}${offline?' · ⚠️ sin conexión':''}${p.id===V.hostPid&&NET.mode!=='local'?' · 👑':''}</small></span>
+      ${isMe?"":headHTML(p)}<div class="tag" style="--pc:${p.color}"><span class="av">${esc(p.emoji)}</span><span><b>${esc(p.name)}${isMe?' (vos)':''}</b><small>🂠 ${cnt}${V.opts.target?` · ${p.score} pts`:''}${p.bot?' · 🤖':''}${p.mic?' · 🎙️':''}${offline?' · ⚠️ sin conexión':''}${p.id===V.hostPid&&NET.mode!=='local'?' · 👑':''}</small></span>
       ${cnt===1&&V.phase==='play'?'<span class="unob">¡UNO!</span>':''}</div>${bub}</div>`;
   });
   $('#seats').innerHTML=h;
+  headsAfterRender();
 }
 function renderCenter(){
   const t=V.discard[V.discard.length-1];
@@ -722,7 +729,8 @@ function renderHand(){
   if(!p){ el.innerHTML=`<div class="empty">👀 Mirando la partida</div>`; $('#mineTag').innerHTML=''; return; }
   const hand=sortHand(p.hand||[]), k=hand.length, myTurn=isMyTurnPlain();
   const curId=V.players[V.turn]&&V.players[V.turn].id;
-  $('#mineTag').innerHTML = `<div class="mine ${curId===me()&&V.phase==='play'?'turn':''}" style="--pc:${p.color}"><span class="av">${esc(p.emoji)}</span><b>${esc(p.name)}</b> · 🂠 ${k}${V.opts.target?' · '+p.score+' pts':''}</div>`;
+  $('#mineTag').innerHTML = `<div class="mine ${curId===me()&&V.phase==='play'?'turn':''}" style="--pc:${p.color}">${headHTML(p)}<span class="av">${esc(p.emoji)}</span><b>${esc(p.name)}</b> · 🂠 ${k}${V.opts.target?" · "+p.score+" pts":""}</div>`;
+  headsAfterRender();
   el.innerHTML = hand.map(c=>cardHTML(c, cardOk(p,c)?'ok':(myTurn?'no':''))).join('');
   const cards=$$('#hand .card'); if(!cards.length) return;
   const W=el.clientWidth, cw=cards[0].offsetWidth;

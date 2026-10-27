@@ -162,7 +162,7 @@ html,body{overflow-x:clip}
 @keyframes bubin{from{transform:translate(-50%,calc(-100% - 10px)) scale(.6);opacity:0}}
 /* ---------- vista 3D ---------- */
 .v3d .stage{perspective:820px;perspective-origin:50% 0%}
-.v3d .mesa{transform-style:preserve-3d;transform:translateY(-4%) rotateX(var(--tilt)) rotateZ(var(--spin)) scale(var(--zoom));transition:transform .5s}
+.v3d .mesa{transform-style:preserve-3d;transform:translateY(3%) rotateX(var(--tilt)) rotateZ(var(--spin)) scale(var(--zoom));transition:transform .5s}
 .v3d .mesa.dragging{transition:none}
 .v3d #seats{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
 .v3d #seats .seat{pointer-events:auto}
@@ -170,7 +170,7 @@ html,body{overflow-x:clip}
 /* en 3D cada uno sostiene sus cartas parado, como en una ronda de verdad: el abanico se abre hacia arriba, con el dorso hacia el centro de la mesa */
 .v3d .seat .fan{--sw:clamp(30px,5.6vmin,54px);transform-style:preserve-3d;transform:rotate(var(--rot)) translateY(calc(var(--sw) * -.35)) rotate(calc(var(--rot3) - var(--rot))) rotateX(-100deg) rotateY(180deg)}
 .v3d .seat .tag{transform:translate(-50%,-50%) translateZ(calc(clamp(30px,5.6vmin,54px) * 1.9)) rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1))}
-.v3d .seat .bub{transform:translate(-50%,-50%) translateZ(calc(clamp(30px,5.6vmin,54px) * 2.6)) rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1)) translateY(-40px)}
+.v3d .seat .bub{transform:translate(-50%,-50%) translateZ(calc(clamp(30px,5.6vmin,54px) * 4.2)) rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1)) translateY(-40px)}
 .v3d .pila .layers{position:absolute;inset:0}
 .v3d .pila .layers i{position:absolute;inset:0;border-radius:calc(var(--w) * .12);background:#1b1b1b;border:1px solid #444}
 .v3d .colchip,.v3d .pila .n{transform:translateX(-50%) rotateX(calc(var(--tilt) * -1));transform-origin:50% 0}
@@ -277,6 +277,22 @@ html,body{overflow-x:clip}
 @keyframes unopop{15%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}30%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%) scale(1)}}
 .yourturn{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:var(--gold);color:#3a1c10;font-weight:900;padding:10px 22px;border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,.5);z-index:85;pointer-events:none;animation:turnpop 1.6s forwards}
 @keyframes turnpop{0%{opacity:0;transform:translate(-50%,10px)}15%{opacity:1;transform:translate(-50%,0)}80%{opacity:1}100%{opacity:0}}
+/* ---------- caras: una cabecita con foto o cámara arriba de las cartas ---------- */
+.head{--hw2:46px;position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);width:var(--hw2);height:calc(var(--hw2) * 1.2);
+  border-radius:48% 48% 44% 44% / 58% 58% 42% 42%;overflow:hidden;background:var(--pc,#888);box-shadow:0 0 0 3px var(--pc,#888),0 4px 10px rgba(0,0,0,.55);
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--hw2) * .5);pointer-events:none;z-index:2}
+.head img,.head video{width:100%;height:100%;object-fit:cover;display:block}
+.head.live img,.head.live span{display:none}
+.head .rec{position:absolute;top:5px;right:7px;width:7px;height:7px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 5px #ff2d2d;animation:pulso2 1.4s infinite}
+.mine{position:relative}
+.mine .head{--hw2:44px;left:6px;transform:none}
+.mine .head video,.facepv video{transform:scaleX(-1)}   /* tu propia cámara se ve como en un espejo */
+.seat>.head{left:0;top:0;bottom:auto;transform:translate(-50%,calc(-100% - 20px))}
+.v3d .seat>.head{--hw2:58px;transform:translate(-50%,-50%) translateZ(calc(clamp(30px,5.6vmin,54px) * 2.5)) rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1)) translateY(-62%)}
+.facepv{display:flex;justify-content:center;margin:6px 0 14px}
+.facepv .head{position:relative;left:auto;bottom:auto;transform:none;--hw2:120px}
+.fthumb{width:26px;height:31px;object-fit:cover;border-radius:48% 48% 44% 44% / 58% 58% 42% 42%;flex:none}
+@media (max-width:600px){.head{--hw2:36px}.mine .head{--hw2:38px}.v3d .seat>.head{--hw2:44px}}
 .obsbar{background:#2b1d3f;color:#fff;text-align:center;font-size:13px;padding:5px}
 @media (max-width:600px){
   .topbar .hidem{display:none}
@@ -330,6 +346,7 @@ html,body{overflow-x:clip}
       <div id="lobbyObs"></div>
       <h3 style="margin-top:14px">Jugadores <span class="muted" id="pcount"></span></h3>
       <ul class="plist" id="plist"></ul>
+      <button class="btn sm dark" style="margin-bottom:8px" onclick="faceModal()">📷 Mi cara: foto o cámara (opcional)</button>
       <div id="lobbyHostBtns"></div>
     </div>
     <div class="box">
@@ -358,6 +375,7 @@ html,body{overflow-x:clip}
     <span class="btn sm dark" id="roomTag" style="cursor:default" title="Código de la sala"></span>
     <span class="sp"></span>
     <button class="btn sm dark" id="btnView" onclick="toggleView()">🧊 3D</button>
+    <button class="btn sm dark" onclick="faceModal()" title="Tu foto o tu cámara arriba de tus cartas">📷</button>
     <button class="btn sm dark" id="btnSnd" onclick="toggleSound()">🔊</button>
     <button class="btn sm dark btnMusic" onclick="toggleMusic()" title="Música de fondo">🎶</button>
     <button class="btn sm dark hidem" onclick="showRules()">📜</button>
@@ -439,7 +457,8 @@ html,body{overflow-x:clip}
 <div id="fly"></div>
 
 <script src="reglas.js?v=2"></script>
-<script src="juego.js?v=6"></script>
+<script src="juego.js?v=7"></script>
+<script src="caras.js?v=1"></script>
 <script src="../dueno-link.js"></script>
 <script>
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)

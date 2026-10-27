@@ -179,6 +179,7 @@ function act(pid, a){
   const p=P(pid);
   switch(a.type){
     case 'mic': { const w=p||OB(pid); if(w){ w.mic=!!a.on; commit(); } return; }
+    case 'cam': { const w=p||OB(pid); if(w){ w.cam=!!a.on; commit(); } return; }
     case 'suggest': {
       const t=String(a.text||'').trim().slice(0,240); if(!t) return 'Escribí la regla que querés sugerir.';
       const w=p||OB(pid); if(!w) return;
