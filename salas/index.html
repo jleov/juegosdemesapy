@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salas de Voz</title>
+<meta name="description" content="Salas de llamada con amigos: voz sin ruido, varias pantallas y subtítulos en español.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%235865f2'/%3E%3Cpath d='M12 5a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V8a3 3 0 0 0-3-3zm-5 7a5 5 0 0 0 10 0M12 17v2' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#1e1f22; --panel:#2b2d31; --panel2:#313338; --hover:#3a3c42; --line:#3f4147;
+  --text:#f2f3f5; --muted:#a6a9b0; --accent:#5865f2; --accent2:#4752c4;
+  --green:#23a55a; --red:#da373c; --yellow:#f0b232; --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+svg{width:20px;height:20px;flex:none}
+
+/* ---------- entrada ---------- */
+#home{height:100%;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+.card{background:var(--panel);border-radius:14px;padding:24px;width:100%;max-width:440px;box-shadow:0 10px 40px #0006}
+.card h1{margin:0 0 4px;font-size:24px}
+.card p.sub{margin:0 0 18px;color:var(--muted);font-size:14px}
+label.f{display:block;font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;letter-spacing:.03em}
+input[type=text],select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;outline:none}
+input[type=text]:focus,select:focus{border-color:var(--accent)}
+.rooms{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rooms button{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:left;display:flex;gap:8px;align-items:center}
+.rooms button:hover{background:var(--hover)}
+.rooms button.sel{border-color:var(--accent);background:#5865f222}
+.btn{background:var(--accent);border:0;border-radius:8px;padding:11px 16px;font-weight:600;color:#fff}
+.btn:hover{background:var(--accent2)}
+.btn.wide{width:100%;margin-top:18px}
+.btn.ghost{background:var(--panel2);color:var(--text)}
+.btn.ghost:hover{background:var(--hover)}
+.note{font-size:12px;color:var(--muted);margin-top:12px}
+.err{color:#ff8a8d;font-size:13px;margin-top:10px}
+
+/* ---------- sala ---------- */
+#room{height:100%;display:grid;grid-template-columns:240px 1fr auto;grid-template-rows:1fr}
+#side{background:var(--panel);display:flex;flex-direction:column;min-width:0}
+#side header{padding:14px 14px 10px;border-bottom:1px solid #0003}
+#side header h2{margin:0;font-size:16px;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#netState{font-size:12px;color:var(--muted);margin-top:2px}
+#netState.ok{color:var(--green)}
+#members{flex:1;overflow:auto;padding:8px}
+.mem{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:default}
+.mem:hover{background:var(--hover)}
+.av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;flex:none;outline:2px solid transparent;outline-offset:1px;transition:outline-color .1s}
+.av.talk{outline-color:var(--green)}
+.mem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem .ic{display:flex;gap:2px;color:var(--red)}
+.mem .ic svg{width:16px;height:16px}
+.mem .live{background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:4px;padding:1px 4px}
+.mem input[type=range]{width:100%;margin-top:4px}
+.memvol{padding:0 8px 6px 48px;font-size:12px;color:var(--muted)}
+#invite{margin:8px;display:flex;gap:6px}
+#invite button{flex:1}
+
+#main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+#stage{flex:1;min-height:0;padding:12px;display:flex;flex-direction:column;gap:10px}
+#big{flex:1;min-height:0;display:grid;gap:10px}
+#strip{display:flex;gap:10px;overflow-x:auto;flex:none}
+#strip .tile{width:180px;height:110px;flex:none}
+#strip:empty{display:none}
+.tile{position:relative;background:var(--panel2);border-radius:var(--radius);overflow:hidden;min-height:0;min-width:0;display:flex;align-items:center;justify-content:center;outline:3px solid transparent;outline-offset:-3px;transition:outline-color .1s}
+.tile.talk{outline-color:var(--green)}
+.tile video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+.tile .user{display:flex;flex-direction:column;align-items:center;gap:8px}
+.tile .user .av{width:72px;height:72px;font-size:28px}
+#strip .tile .user .av{width:44px;height:44px;font-size:18px}
+.tag{position:absolute;left:8px;bottom:8px;background:#000a;border-radius:6px;padding:3px 8px;font-size:13px;display:flex;gap:6px;align-items:center;max-width:calc(100% - 16px);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;z-index:2}
+.tag svg{width:14px;height:14px;color:#ff8a8d}
+.tools{position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:opacity .15s;z-index:3;align-items:center}
+.tile:hover .tools,.tile:focus-within .tools{opacity:1}
+.tools button{background:#000b;border:0;border-radius:6px;width:32px;height:32px;display:grid;place-items:center}
+.tools button:hover{background:#000}
+.tools button.on{background:var(--accent)}
+.tools input[type=range]{width:90px;accent-color:var(--accent)}
+.tools .vol{background:#000b;border-radius:6px;padding:0 8px;height:32px;display:flex;align-items:center;gap:6px}
+.subs{position:absolute;left:50%;transform:translateX(-50%);bottom:42px;width:min(92%,900px);text-align:center;pointer-events:none;z-index:2;display:flex;flex-direction:column;align-items:center;gap:4px}
+.subs span{background:#000c;color:#fff;border-radius:6px;padding:3px 10px;font-size:calc(20px * var(--subsize,1));line-height:1.3;text-shadow:0 1px 2px #000}
+.subs span.pend{color:#cfd2d8;font-style:italic}
+.tile:fullscreen .subs{bottom:60px}
+.tile:fullscreen .subs span{font-size:calc(30px * var(--subsize,1))}
+.badge{position:absolute;top:8px;left:8px;background:var(--red);color:#fff;font-size:11px;font-weight:800;border-radius:4px;padding:2px 6px;z-index:2}
+.badge.cc{left:auto;right:8px;top:auto;bottom:8px;background:#000a;color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:20px}
+.playbtn{position:absolute;inset:0;margin:auto;width:max-content;height:max-content;z-index:4}
+
+#bar{display:flex;justify-content:center;gap:10px;padding:10px;background:var(--panel);flex:none;flex-wrap:wrap}
+.cb{width:48px;height:48px;border-radius:50%;border:0;background:var(--panel2);display:grid;place-items:center;position:relative}
+.cb:hover{background:var(--hover)}
+.cb.off{background:#fff;color:var(--red)}
+.cb.red{background:var(--red);color:#fff}
+.cb.red:hover{background:#a12828}
+.cb.act{background:var(--accent);color:#fff}
+.cb .count{position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:11px;border-radius:10px;padding:0 5px;font-weight:700}
+.cb[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:56px;left:50%;transform:translateX(-50%);background:#111214;color:#fff;font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;pointer-events:none}
+
+#chat{width:300px;background:var(--panel);display:flex;flex-direction:column;border-left:1px solid #0003}
+#chat header{padding:14px;font-weight:700;border-bottom:1px solid #0003;display:flex;justify-content:space-between;align-items:center}
+#chat header button{background:none;border:0;color:var(--muted)}
+#msgs{flex:1;overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.msg .who{font-weight:700;font-size:13px}
+.msg .who small{color:var(--muted);font-weight:400;margin-left:6px}
+.msg .tx{word-wrap:break-word;white-space:pre-wrap}
+.msg.sys{color:var(--muted);font-size:13px;font-style:italic}
+#chatForm{padding:10px;display:flex;gap:6px}
+#chatForm input{flex:1}
+
+/* ---------- ajustes ---------- */
+dialog{background:var(--panel);color:var(--text);border:0;border-radius:14px;padding:0;width:min(520px,calc(100% - 32px));max-height:calc(100% - 32px)}
+dialog::backdrop{background:#000a}
+dialog .in{padding:20px;overflow:auto;max-height:calc(100vh - 80px)}
+dialog h3{margin:0 0 4px;font-size:20px}
+dialog h4{margin:20px 0 4px;font-size:13px;text-transform:uppercase;color:var(--muted);letter-spacing:.03em}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:8px;background:var(--panel2);margin-top:6px;cursor:pointer}
+.opt input{margin-top:4px;accent-color:var(--accent)}
+.opt small{display:block;color:var(--muted)}
+.meter{height:10px;border-radius:5px;background:var(--bg);position:relative;overflow:hidden;margin-top:8px}
+.meter i{position:absolute;left:0;top:0;bottom:0;background:var(--green);width:0;transition:width .05s}
+.meter b{position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--yellow)}
+input[type=range].full{width:100%;accent-color:var(--accent)}
+.row{display:flex;gap:10px;align-items:center;margin-top:8px}
+.row label{flex:1}
+dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;background:var(--panel2)}
+
+#toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:#111214;color:#fff;padding:10px 16px;border-radius:8px;z-index:99;box-shadow:0 6px 20px #0008;max-width:calc(100% - 32px);font-size:14px}
+
+@media (max-width:900px){
+  #room{grid-template-columns:1fr}
+  #side{position:fixed;left:0;top:0;bottom:72px;width:260px;z-index:20;transform:translateX(-100%);transition:transform .2s;box-shadow:4px 0 20px #0008}
+  #side.open{transform:none}
+  #chat{position:fixed;right:0;top:0;bottom:72px;width:min(340px,100%);z-index:20;box-shadow:-4px 0 20px #0008}
+  #stage{padding:8px}
+  .tools{opacity:1}
+  .cb{width:44px;height:44px}
+}
+@media (min-width:901px){ #btnSide{display:none} }
+</style>
+</head>
+<body>
+
+<section id="home">
+  <div class="card">
+    <h1>Salas de Voz</h1>
+    <p class="sub">Hablá con tus amigos sin ruido de fondo, compartí varias pantallas y mirá subtítulos en español de lo que se reproduce.</p>
+    <label class="f" for="inName">Tu nombre</label>
+    <input type="text" id="inName" maxlength="24" placeholder="Ej: Leo" autocomplete="nickname">
+    <label class="f">Sala</label>
+    <div class="rooms" id="roomPick"></div>
+    <label class="f" for="inRoom">O escribí el nombre de otra sala</label>
+    <input type="text" id="inRoom" maxlength="40" placeholder="Ej: cumple-de-ale">
+    <button class="btn wide" id="btnEnter">Entrar a la sala</button>
+    <div class="err hidden" id="homeErr"></div>
+    <p class="note">Usá auriculares para que no se escuche el eco. Para compartir el sonido de la PC, elegí «Toda la pantalla» y marcá «Compartir audio del sistema».</p>
+  </div>
+</section>
+
+<section id="room" class="hidden">
+  <aside id="side">
+    <header>
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg><span id="roomName"></span></h2>
+      <div id="netState">Conectando…</div>
+    </header>
+    <div id="members"></div>
+    <div id="invite"><button class="btn ghost" id="btnInvite">Copiar invitación</button></div>
+  </aside>
+
+  <main id="main">
+    <div id="stage">
+      <div id="big"></div>
+      <div id="strip"></div>
+    </div>
+    <div id="bar">
+      <button class="cb" id="btnSide" data-tip="Personas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 11a3 3 0 1 0 0-6M22 21a6 6 0 0 0-4-5.6"/></svg></button>
+      <button class="cb" id="btnMic" data-tip="Silenciar (M)"></button>
+      <button class="cb" id="btnDeaf" data-tip="Ensordecer"></button>
+      <button class="cb" id="btnShare" data-tip="Compartir pantalla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M12 7v6M9 10l3-3 3 3"/></svg><span class="count hidden" id="shareCount"></span></button>
+      <button class="cb" id="btnSet" data-tip="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      <button class="cb" id="btnChat" data-tip="Chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="count hidden" id="unread"></span></button>
+      <button class="cb red" id="btnLeave" data-tip="Salir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.7 13.3a16 16 0 0 0 3.4 2.6l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2V20a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3.2a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.4 2.1L8.1 9.6"/><path d="M22 2 2 22"/></svg></button>
+    </div>
+  </main>
+
+  <aside id="chat" class="hidden">
+    <header>Chat de la sala <button id="btnChatClose" aria-label="Cerrar chat">✕</button></header>
+    <div id="msgs"></div>
+    <form id="chatForm" autocomplete="off"><input type="text" id="chatIn" maxlength="500" placeholder="Escribí un mensaje"><button class="btn">Enviar</button></form>
+  </aside>
+</section>
+
+<dialog id="dlgSet">
+  <div class="in">
+    <h3>Ajustes</h3>
+    <h4>Tu nombre</h4>
+    <input type="text" id="setName" maxlength="24">
+    <h4>Micrófono</h4>
+    <select id="setMic"></select>
+    <h4>Quitar ruido de fondo</h4>
+    <label class="opt"><input type="radio" name="ns" value="ia"><span><b>Inteligente (tipo Krisp)</b><small>Deja solo tu voz: quita ventilador, aire, teclado, perros, tráfico. Recomendado.</small></span></label>
+    <label class="opt"><input type="radio" name="ns" value="nav"><span><b>La del navegador</b><small>Más liviana, quita menos ruido.</small></span></label>
+    <label class="opt"><input type="radio" name="ns" value="off"><span><b>Apagado</b><small>Tu micrófono tal cual.</small></span></label>
+    <h4>Cortar cuando no hablás</h4>
+    <div class="meter" id="meter"><i></i><b></b></div>
+    <input type="range" class="full" id="setGate" min="-90" max="-20" step="1">
+    <div class="row"><small style="color:var(--muted);flex:1">Lo que queda debajo de la línea amarilla no se envía. Movela a la derecha si se cuelan ruidos.</small></div>
+    <div class="row"><label for="setLoop">Escucharme para probar (con auriculares)</label><input type="checkbox" id="setLoop"></div>
+    <h4>Pantalla compartida</h4>
+    <select id="setQuality">
+      <option value="motion">Fluida — para videos, películas y juegos</option>
+      <option value="detail">Nítida — para texto y documentos</option>
+    </select>
+    <h4>Subtítulos en español</h4>
+    <div class="row"><label for="setAutoSub">Subtitular el sonido de lo que comparto</label><input type="checkbox" id="setAutoSub"></div>
+    <div class="row"><label for="setSubLang">Idioma de lo que se reproduce</label>
+      <select id="setSubLang" style="width:auto">
+        <option value="multi">Automático</option>
+        <option value="en">Inglés</option>
+        <option value="es">Español</option>
+        <option value="pt">Portugués</option>
+        <option value="fr">Francés</option>
+        <option value="it">Italiano</option>
+        <option value="de">Alemán</option>
+        <option value="ja">Japonés</option>
+        <option value="ko">Coreano</option>
+      </select></div>
+    <div class="row"><label for="setSubs">Mostrar subtítulos</label><input type="checkbox" id="setSubs"></div>
+    <div class="row"><label for="setSubSize">Tamaño de letra</label>
+      <select id="setSubSize" style="width:auto"><option value="0.8">Chica</option><option value="1">Normal</option><option value="1.3">Grande</option><option value="1.7">Muy grande</option></select></div>
+  </div>
+  <footer><button class="btn" id="btnSetOk">Listo</button></footer>
+</dialog>
+
+<div id="toast" class="hidden"></div>
+
+<script src="vendor/peerjs.min.js"></script>
+<script src="../ice.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
