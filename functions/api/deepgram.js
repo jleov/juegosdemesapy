@@ -1,7 +1,8 @@
 // Cloudflare Pages Function: /api/deepgram
 // Entrega a las Salas un permiso de 1 minuto para abrir los subtítulos en vivo de Deepgram,
 // así la clave de Deepgram nunca llega al navegador.
-// Necesita en el proyecto de Cloudflare Pages la variable (secreta) DEEPGRAM_API_KEY.
+// Necesita en el proyecto de Cloudflare Pages la variable secreta DEEPGRAM_KEY, con una clave
+// de Deepgram de permiso «Member» (DEEPGRAM_API_KEY quedó con una clave sin ese permiso).
 const ALLOWED = [/^https:\/\/juegosdemesapy\.pages\.dev$/, /^https:\/\/[a-z0-9-]+\.juegosdemesapy\.pages\.dev$/, /^https:\/\/jleov\.github\.io$/, /^https?:\/\/localhost(:\d+)?$/];
 
 export async function onRequest({ request, env }) {
@@ -17,10 +18,12 @@ export async function onRequest({ request, env }) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   const json = (obj, status) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
   if (!okOrigin) return json({ error: 'origen no permitido' }, 403);
-  if (!env.DEEPGRAM_API_KEY) return json({ error: 'falta configurar DEEPGRAM_API_KEY' }, 503);
+  // DEEPGRAM_KEY: clave con permiso «Member» (la que permite dar permisos temporales)
+  const key = env.DEEPGRAM_KEY || env.DEEPGRAM_API_KEY;
+  if (!key) return json({ error: 'falta configurar DEEPGRAM_KEY' }, 503);
   const r = await fetch('https://api.deepgram.com/v1/auth/grant', {
     method: 'POST',
-    headers: { 'Authorization': `Token ${env.DEEPGRAM_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Token ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ ttl_seconds: 60 }),
   });
   if (!r.ok) return json({ error: 'Deepgram no dio el permiso', status: r.status, detalle: (await r.text()).slice(0, 300) }, 502);
