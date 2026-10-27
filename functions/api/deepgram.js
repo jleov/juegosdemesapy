@@ -23,7 +23,7 @@ export async function onRequest({ request, env }) {
     headers: { 'Authorization': `Token ${env.DEEPGRAM_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ ttl_seconds: 60 }),
   });
-  if (!r.ok) return json({ error: 'Deepgram no dio el permiso', status: r.status }, 502);
+  if (!r.ok) return json({ error: 'Deepgram no dio el permiso', status: r.status, detalle: (await r.text()).slice(0, 300) }, 502);
   const d = await r.json();
   return json({ token: d.access_token, expires_in: d.expires_in }, 200);
 }
