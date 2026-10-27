@@ -40,10 +40,13 @@ export async function onRequest({ request, env }) {
     if (out) return json({ text: out, via: 'google' }, 200);
   } catch (e) { /* Google a veces bloquea: se prueba con MyMemory */ }
   try {
-    const r = await fetch('https://api.mymemory.translated.net/get?langpair=' + (lang || 'en') + '|es&q=' + encodeURIComponent(text.slice(0, 500)));
-    const d = await r.json();
+    const r = await fetch('https://api.mymemory.translated.net/get?langpair=' + (lang || 'en') + '%7Ces&q=' + encodeURIComponent(text.slice(0, 500)), { headers: { 'User-Agent': 'Mozilla/5.0 (salas de voz)' } });
+    const raw = await r.text();
+    let d = null; try { d = JSON.parse(raw); } catch (e) {}
     const out = d && d.responseData && d.responseData.translatedText;
     if (r.ok && out && d.responseStatus == 200) return json({ text: out, via: 'mymemory' }, 200);
-  } catch (e) {}
-  return json({ error: 'no se pudo traducir' }, 502);
+    return json({ error: 'no se pudo traducir', detalle: r.status + ' ' + raw.slice(0, 120) }, 502);
+  } catch (e) {
+    return json({ error: 'no se pudo traducir', detalle: String(e) }, 502);
+  }
 }
