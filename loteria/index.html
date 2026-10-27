@@ -228,11 +228,21 @@ function beep(f=660, d=.12, type='sine', vol=.15, delay=0){
 }
 const fanfare = () => [523,659,784,1046].forEach((f,i)=>beep(f,.25,'triangle',.18,i*.13));
 const buzz = () => { beep(140,.5,'sawtooth',.12); };
-// El cantor elegido puede ser una voz automática (PREF.cantor = 'don', 'dona'…) o uno grabado en este dispositivo ('rec:<id>').
+// El cantor elegido puede ser una voz automática (PREF.cantor = 'don', 'dona'…), uno grabado en este dispositivo ('rec:<id>')
+// o la voz de la casa ('casa'): cantos grabados que vienen con el juego (voz-casa/) y suenan por defecto para todos.
+const CASA_URL = 'voz-casa/';
+const cantorElegido = () => PREF.cantor || (UI.casa ? 'casa' : 'don');
+const esCasa = () => cantorElegido()==='casa' && !!UI.casa;
 const esGrabado = () => String(PREF.cantor||'').startsWith('rec:');
 const recId = () => esGrabado() ? PREF.cantor.slice(4) : null;
 const recInfo = id => (UI.grabados||[]).find(g=>g.id===(id||recId()));
-const baseTTS = () => esGrabado() ? (recInfo()||{}).base : PREF.cantor;
+const baseTTS = () => esGrabado() ? (recInfo()||{}).base : esCasa() ? UI.casa.base : cantorElegido()==='casa' ? 'don' : cantorElegido();
+const textosElegidos = () => esGrabado() ? (recInfo()||{}).textos : esCasa() ? UI.casa.textos : null;
+async function cargarCasa(){
+  try{ const r=await fetch(CASA_URL+'cantor.json', {cache:'no-cache'}); if(r.ok){ const c=await r.json(); if(c && c.archivos){ c.textos=limpiarTextos(c.textos); UI.casa=c; } } }catch(e){}
+}
+// toca la grabación de la voz de la casa para ese número (si la tiene)
+function tocarCasa(n){ const f=UI.casa && UI.casa.archivos[n]; return f ? tocarUrl(CASA_URL+f) : Promise.reject(new Error('sin grabación')); }
 function say(txt, forzar){ if(PREF.voz || forzar) hablarTTS(txt, baseTTS()); }
 async function cargarGrabados(){
   try{ const ls=await CantosDB.lista(); UI.grabados=await Promise.all(ls.map(async c=>({...c, cuantos:(await CantosDB.numeros(c.id)).length}))); }
@@ -243,12 +253,13 @@ async function cargarGrabados(){
     doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base, textos:g.textos});
 }
 // el dicho que se ve en pantalla: el texto propio del cantor grabado si tiene, si no el dicho de siempre
-const dichoMostrado = n => S && S.vozSala && P(S.vozSala.pid) ? dichoDe(n, S.vozSala.textos) : esGrabado() ? dichoDe(n, (recInfo()||{}).textos) : dicho(n);
+const dichoMostrado = n => S && S.vozSala && P(S.vozSala.pid) ? dichoDe(n, S.vozSala.textos) : dichoDe(n, textosElegidos());
 // canta con el cantor que elegí en este dispositivo (si es grabado y falta el número, usa su voz automática)
 async function cantarLocal(n){
   if(!PREF.voz) return;
   if(esGrabado()){ try{ const c=await CantosDB.clip(recId(), n); if(c){ await tocarBlob(c.blob); return; } }catch(e){} }
-  hablarTTS(textoCanto(n, (recInfo()||{}).textos), baseTTS());
+  if(esCasa()){ try{ await tocarCasa(n); return; }catch(e){} }
+  hablarTTS(textoCanto(n, textosElegidos()), baseTTS());
 }
 /* ---------- voz de la sala: el cantor comparte su voz grabada y todos la escuchan ---------- */
 function anunciarBolilla(n, idx){
@@ -1086,12 +1097,12 @@ function vozSalaHTML(){
   return filas.length ? `<div class="vozsala">${filas.join('')}</div>` : '';
 }
 function sonidoHTML(){
-  const sel=PREF.cantor||'don', hay=window.speechSynthesis && speechSynthesis.getVoices().some(v=>/^es/i.test(v.lang));
+  const sel=cantorElegido(), hay=window.speechSynthesis && speechSynthesis.getVoices().some(v=>/^es/i.test(v.lang));
   const vs=S && S.vozSala;
   return `<div class="box"><h3>🗣️ ¿Quién canta las bolillas?</h3>
     <div class="muted" style="margin-bottom:8px">Tocá un cantor para elegirlo y escucharlo. Cada jugador elige el suyo en su celular.</div>
     ${vs && vs.pid!==NET.myPid?`<div class="res ok" style="margin-bottom:8px">🎙️ En esta sala canta <b>«${esc(vs.nombre)}»</b> (voz grabada de ${esc((P(vs.pid)||{}).name||'')}). Tu cantor se usa cuando no haya voz de sala.</div>`:''}
-    <div class="voces">${CANTORES.map(c=>`<button class="voz ${PREF.voz&&c.id===sel?'on':''}" data-act="cantorSel" data-id="${c.id}"><b>${c.nombre}</b><span>${c.desc}</span></button>`).join('')}
+    <div class="voces">${UI.casa?`<button class="voz grab ${PREF.voz&&sel==='casa'?'on':''}" data-act="cantorSel" data-id="casa"><b>🏠 ${esc(UI.casa.nombre)}</b><span>Voz de la casa · grabada (${Object.keys(UI.casa.archivos).length} de 90)</span></button>`:''}${CANTORES.map(c=>`<button class="voz ${PREF.voz&&c.id===sel?'on':''}" data-act="cantorSel" data-id="${c.id}"><b>${c.nombre}</b><span>${c.desc}</span></button>`).join('')}
       ${UI.grabados.map(g=>`<button class="voz grab ${PREF.voz&&sel==='rec:'+g.id?'on':''}" data-act="cantorSel" data-id="rec:${g.id}"><b>🎙️ ${esc(g.nombre)}</b><span>Voz grabada · ${g.cuantos} de 90</span></button>`).join('')}
       <button class="voz ${!PREF.voz?'on':''}" data-act="sinVoz"><b>🤐 Sin voz</b><span>Solo se ve el número</span></button></div>
     ${S ? `<div style="margin-top:8px">${vozSalaHTML()}</div>`:''}
@@ -1248,7 +1259,8 @@ document.addEventListener('click', e=>{
         const id=recId(); CantosDB.clip(id,33).then(c=>c||CantosDB.clips(id).then(cs=>cs[0])).then(c=>c?tocarBlob(c.blob):hablarTTS(textoCanto(33, (recInfo()||{}).textos), baseTTS())).catch(()=>{});
         // si estoy compartiendo mi voz con la sala, paso a compartir este cantor
         const g=recInfo(); if(g && S && S.vozSala && S.vozSala.pid===NET.myPid){ PREF.vozSalaId=g.id; savePref(); doAct({t:'vozSala', on:true, nombre:g.nombre, base:g.base, textos:g.textos}); }
-      } else hablarTTS(textoCanto(33), PREF.cantor);
+      } else if(esCasa()){ tocarCasa(33).catch(()=>{ const ns=Object.keys(UI.casa.archivos); return ns.length?tocarCasa(+ns[0]):Promise.reject(); }).catch(()=>hablarTTS(textoCanto(33, UI.casa.textos), UI.casa.base)); }
+      else hablarTTS(textoCanto(33), PREF.cantor);
       renderOv(); $('#top').innerHTML=S?topHTML():''; break; }
     case 'sinVoz': PREF.voz=false; savePref(); if(window.speechSynthesis) speechSynthesis.cancel(); renderOv(); if(S) $('#top').innerHTML=topHTML(); break;
     case 'efectos': PREF.sound=!PREF.sound; savePref(); beep(880,.1); renderOv(); if(S) $('#top').innerHTML=topHTML(); break;
@@ -1277,6 +1289,7 @@ $('#chatForm').addEventListener('submit', e=>{ e.preventDefault(); const i=$('#c
 if(window.speechSynthesis) speechSynthesis.getVoices();
 render();
 cargarGrabados();
+cargarCasa().then(()=>{ if(UI.sonido) renderOv(); });
 // al volver de grabar (otra pestaña), se cargan los cambios del grabador
 window.addEventListener('focus', ()=>cargarGrabados().then(()=>{ if(UI.sonido) renderOv(); else if(S) render(); }));
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});

@@ -126,3 +126,10 @@ function tocarBlob(blob){
   const a=new Audio(URL.createObjectURL(blob)); audioActual=a;
   return a.play();
 }
+// igual que tocarBlob pero para un audio que está en el sitio (la voz de la casa)
+function tocarUrl(url){
+  try{ if(audioActual){ audioActual.pause(); if(String(audioActual.src).startsWith('blob:')) URL.revokeObjectURL(audioActual.src); } }catch(e){}
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  const a=new Audio(url); audioActual=a;
+  return a.play();
+}
