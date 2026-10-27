@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Odisea Paraguaya</title>
+<meta name="description" content="Sobrevivencia Nacional: Odisea Paraguaya. Corré por Asunción, Luque, San Lorenzo, Capiatá, Areguá, Ñemby, Ciudad del Este, Encarnación y Pedro Juan para llegar a la Nochebuena de la abuela.">
+<meta name="theme-color" content="#1a1030">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="../icon-192.png">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#120b22;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+body.portrait #wrap{align-items:flex-start;padding-top:env(safe-area-inset-top)}
+canvas{display:block;background:#000}
+/* controles táctiles */
+#ctl{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:space-between;align-items:flex-end;padding:8px max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));pointer-events:none;z-index:3}
+#ctl.on{display:flex}
+.pad{display:flex;gap:10px;align-items:flex-end}
+.col{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.row{display:flex;gap:10px;align-items:flex-end}
+.b{pointer-events:auto;width:62px;height:62px;border-radius:50%;background:rgba(20,10,40,.35);border:2px solid rgba(255,255,255,.55);color:#fff;font-size:25px;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;line-height:1;position:relative}
+.b small{font-size:9px;font-weight:800;margin-top:2px;letter-spacing:.3px;text-shadow:0 1px 2px #000}
+.b.on{background:rgba(255,255,255,.45)}
+.b.sm{width:48px;height:48px;font-size:19px}
+.b.sm small{font-size:8px}
+.b .n{position:absolute;top:-4px;right:-4px;background:#f2c14e;color:#3a1c10;border-radius:10px;font-size:11px;font-weight:900;padding:1px 5px}
+.b.off{opacity:.35}
+.b.hide{display:none}
+#giro{display:none;position:fixed;left:0;right:0;text-align:center;font-size:13px;color:#cfc8ea;z-index:2}
+body.portrait.jugando #giro{display:block}
+#pausa{position:fixed;top:max(6px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));z-index:4;display:none;border:0;border-radius:10px;background:rgba(0,0,0,.45);color:#fff;font-size:18px;padding:6px 10px;cursor:pointer}
+#pausa.on{display:block}
+/* pantallas */
+#scr{position:fixed;inset:0;z-index:5;display:none;overflow:auto;background:rgba(10,5,25,.72);padding:16px;touch-action:pan-y}
+#scr.on{display:block}
+.box{max-width:720px;margin:0 auto;background:#fff8e6;color:#222;border-radius:18px;padding:18px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.box h1{margin:0;font-size:clamp(24px,6vw,38px);line-height:1.05;font-weight:900;color:#1b2a5a}
+.box h1 span{color:#d52b1e}
+.box h2{margin:0 0 6px;font-size:22px;color:#1b2a5a}
+.box p{line-height:1.45;margin:8px 0}
+.box .sub{color:#666;font-size:14px}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font:inherit;font-weight:800;font-size:16px;background:#0038a8;color:#fff;cursor:pointer;margin-top:10px;text-align:center;text-decoration:none}
+.btn.r{background:#d52b1e}.btn.g{background:#2a9d3f}.btn.gr{background:#777}
+.btn:disabled{opacity:.4}
+.flex{display:flex;gap:10px}.flex .btn{flex:1}
+.chars{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:10px}
+.ch{border:3px solid transparent;border-radius:14px;background:#fff;padding:10px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.12);display:flex;gap:10px}
+.ch.sel{border-color:#0038a8;background:#eaf0ff}
+.ch canvas{background:linear-gradient(#bfe3ff,#eaf6ff);border-radius:10px;flex:none}
+.ch b{display:block;font-size:16px}
+.ch i{display:block;font-size:12px;color:#777;margin-bottom:4px}
+.ch div{font-size:12.5px;line-height:1.35}
+.st{font-size:12px;color:#444;margin-top:4px}
+.lv{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:10px 12px;margin:7px 0;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.1);border:0;width:100%;font:inherit;text-align:left;color:#222}
+.lv .num{width:34px;height:34px;border-radius:50%;background:#0038a8;color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none}
+.lv.lock{opacity:.45;cursor:default}
+.lv .t{flex:1}.lv .t b{display:block}.lv .t small{color:#777}
+.acto{font-weight:900;color:#d52b1e;margin:14px 0 2px;font-size:14px;letter-spacing:.5px}
+.wa{background:#0b141a;border-radius:16px;padding:12px;color:#e9edef}
+.wa .hd{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid #222d34}
+.wa .av{width:42px;height:42px;border-radius:50%;background:#f2c14e;display:flex;align-items:center;justify-content:center;font-size:24px}
+.wa .hd small{display:block;color:#8696a0}
+.bub{background:#202c33;border-radius:0 12px 12px 12px;padding:10px 12px;margin-top:12px;max-width:95%}
+.aud{display:flex;align-items:center;gap:10px}
+.aud button{border:0;background:#00a884;color:#fff;width:38px;height:38px;border-radius:50%;font-size:16px;cursor:pointer;flex:none}
+.wave{flex:1;height:26px;background:repeating-linear-gradient(90deg,#8696a0 0 2px,transparent 2px 5px);mask:linear-gradient(transparent 10%,#000 10% 90%,transparent 90%);opacity:.7;border-radius:4px}
+.tr{font-size:14.5px;line-height:1.45;margin-top:8px;color:#d1d7db;font-style:italic}
+.tip{background:#fff3c4;border-radius:10px;padding:10px;font-size:14px;margin-top:10px}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.res div{background:#fff;border-radius:10px;padding:10px;text-align:center}
+.res b{display:block;font-size:20px}
+ul.ay{padding-left:20px;margin:6px 0}ul.ay li{margin:5px 0;line-height:1.4}
+kbd{background:#eee;border:1px solid #ccc;border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:13px}
+.back{display:inline-block;margin-top:12px;color:#0038a8;font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<div id="giro">📱↻ Girá el celular para jugar más cómodo</div>
+<button id="pausa" aria-label="Pausa">⏸</button>
+<div id="ctl">
+  <div class="pad">
+    <div class="b" data-k="left">◀</div>
+    <div class="b" data-k="right">▶</div>
+  </div>
+  <div class="col">
+    <div class="row">
+      <div class="b sm" data-k="throw" id="bThrow">👡<small>CHANCLA</small></div>
+      <div class="b sm" data-k="eat" id="bEat">🥟<small>COMER</small><span class="n" id="nEat">0</span></div>
+      <div class="b sm" data-k="dash" id="bDash">💨<small>DASH</small><span class="n" id="nDash">0</span></div>
+    </div>
+    <div class="row">
+      <div class="b" data-k="down">⤵<small>ESCONDER</small></div>
+      <div class="b" data-k="run">🏃<small>CORRER</small></div>
+      <div class="b" data-k="jump">⤴<small>SALTAR</small></div>
+    </div>
+  </div>
+</div>
+<div id="scr"></div>
+<script src="game.js"></script>
+</body>
+</html>
