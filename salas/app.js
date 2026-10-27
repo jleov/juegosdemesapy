@@ -26,6 +26,7 @@ const ICON = {
   head: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>',
   headOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 15.4-6.4M21 12v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3zM2 2l20 20"/></svg>',
   full: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+  people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 11a3 3 0 1 0 0-6M22 21a6 6 0 0 0-4-5.6"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.9 4.2A10 10 0 0 1 12 4c7 0 10 8 10 8a17 17 0 0 1-3.2 4.2M6.6 6.6A17 17 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   focus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M7 21h10"/></svg>',
@@ -1027,6 +1028,24 @@ function renderMembers() {
   });
   $('#netState').title = S.reg ? 'Tenés la lista de la sala' : '';
   paintStats();
+  paintPeople();
+}
+
+// lista de personas que se ve sobre una pantalla en pantalla completa (brillo verde = está hablando)
+const PEOPLE_TIP = {
+  all: 'Personas: se ven todos (tocá para ver solo quien habla)',
+  talk: 'Personas: solo quien habla (tocá para ocultar)',
+  off: 'Personas: ocultas (tocá para ver a todos)',
+};
+function paintPeople() {
+  const list = [{ id: 'me', name: S.name, muted: S.muted }];
+  S.peers.forEach(p => list.push({ id: p.id, name: p.name, muted: p.muted }));
+  const html = list.map(m => `<div class="pchip${talking.get(m.id) ? ' talk' : ''}" data-talk="${esc(m.id)}">${avatar(m.name, '')}<span>${esc(m.name)}</span>${m.muted ? ICON.micOff : ''}</div>`).join('');
+  const mode = cfg.fsPeople || 'all';
+  document.querySelectorAll('.people').forEach(el => {
+    el.className = 'people' + (mode === 'off' ? ' off' : mode === 'talk' ? ' onlytalk' : '');
+    el.innerHTML = html;
+  });
 }
 
 function userTile(id, name, muted) {
@@ -1045,7 +1064,7 @@ function screenTile(key, stream, title, mine, ls, r) {
   v.muted = mine || S.deaf;
   if (r) { r.el = v; applyVolume(r); applySink(v); }
   t.appendChild(v);
-  t.insertAdjacentHTML('beforeend', `<div class="badge">EN VIVO</div><div class="subs" style="--subsize:${cfg.subSize}"></div><div class="tag"><span>${esc(title)}</span><small class="qinfo" data-q="${esc(key)}"></small></div><div class="tools"></div>`);
+  t.insertAdjacentHTML('beforeend', `<div class="badge">EN VIVO</div><div class="people"></div><div class="subs" style="--subsize:${cfg.subSize}"></div><div class="tag"><span>${esc(title)}</span><small class="qinfo" data-q="${esc(key)}"></small></div><div class="tools"></div>`);
   const tools = t.querySelector('.tools');
   const btn = (html, tip, fn, on) => { const b = document.createElement('button'); b.innerHTML = html; b.title = tip; if (on) b.classList.add('on'); b.onclick = e => { e.stopPropagation(); fn(); }; tools.appendChild(b); return b; };
   if (r && r.hasAudio) {
@@ -1060,6 +1079,14 @@ function screenTile(key, stream, title, mine, ls, r) {
   }
   if (r) btn(ICON.eyeOff, 'Ocultar esta pantalla (deja de llegarte y libera internet)', () => hideScreen(key, true));
   btn(ICON.focus, S.focus === key ? 'Achicar' : 'Ver en grande', () => { S.focus = S.focus === key ? '' : key; renderTiles(); }, S.focus === key);
+  // en pantalla completa: mostrar a todos, solo a quien habla, o a nadie
+  const pb = btn(ICON.people, PEOPLE_TIP[cfg.fsPeople] || PEOPLE_TIP.all, () => {
+    cfg.fsPeople = { all: 'talk', talk: 'off', off: 'all' }[cfg.fsPeople] || 'talk'; saveCfg();
+    document.querySelectorAll('.tools .pbtn').forEach(b => b.title = PEOPLE_TIP[cfg.fsPeople]);
+    paintPeople();
+    toast({ all: '👥 Se ven todos los de la sala', talk: '🎙️ Se ve solo quien está hablando', off: 'Lista de personas oculta' }[cfg.fsPeople], 2000);
+  });
+  pb.classList.add('pbtn');
   btn(ICON.full, 'Pantalla completa', () => { document.fullscreenElement ? document.exitFullscreen() : t.requestFullscreen && t.requestFullscreen().catch(() => {}); });
   if (mine) btn(ICON.stop, 'Dejar de compartir', () => stopShare(ls.sid));
   if (mine && ls.sub) t.insertAdjacentHTML('beforeend', '<div class="badge cc">CC subtitulando</div>');
@@ -1126,6 +1153,7 @@ function renderTiles() {
   big.style.gridAutoRows = `minmax(0,1fr)`;
   // los cuadros de pantalla se pueden tocar para agrandar
   S.tiles.forEach((t, k) => { t.onclick = () => { if (S.focus !== k) { S.focus = k; renderTiles(); } }; paintSubs(k); });
+  paintPeople();
 }
 window.addEventListener('resize', () => { clearTimeout(window._rt); window._rt = setTimeout(renderTiles, 150); });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) renderTiles(); });

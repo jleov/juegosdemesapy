@@ -107,6 +107,20 @@ input[type=text]:focus,select:focus{border-color:var(--accent)}
 .tile:fullscreen .subs span{font-size:calc(30px * var(--subsize,1))}
 .badge{position:absolute;top:8px;left:8px;background:var(--red);color:#fff;font-size:11px;font-weight:800;border-radius:4px;padding:2px 6px;z-index:2}
 .badge.cc{left:auto;right:8px;top:auto;bottom:8px;background:#000a;color:var(--muted)}
+/* quién habla, sobre una pantalla en pantalla completa */
+.people{position:absolute;left:10px;top:44px;display:none;flex-direction:column;gap:6px;z-index:3;pointer-events:none;max-height:calc(100% - 150px);overflow:hidden}
+.tile:fullscreen .people{display:flex}
+.people.off{display:none!important}
+.people.onlytalk .pchip:not(.talk){display:none}
+.pchip{display:flex;align-items:center;gap:8px;background:#000b;border-radius:20px;padding:3px 12px 3px 3px;font-size:15px;outline:2px solid transparent;outline-offset:-1px;transition:outline-color .1s;width:max-content;max-width:260px}
+.pchip.talk{outline-color:var(--green)}
+.pchip .av{width:30px;height:30px;font-size:14px}
+.pchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pchip svg{width:15px;height:15px;color:#ff8a8d}
+.tools .pbtn{display:none}
+.tile:fullscreen .tools .pbtn{display:grid}
+.tile:fullscreen .tools{opacity:0}
+.tile:fullscreen:hover .tools{opacity:1}
 .tile.hiddenscr{background:var(--panel)}
 .tile.hiddenscr .btn{display:flex;gap:6px;align-items:center;padding:7px 12px;font-size:13px}
 .tile.hiddenscr .btn svg{width:16px;height:16px}
