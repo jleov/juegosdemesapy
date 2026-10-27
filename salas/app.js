@@ -457,6 +457,8 @@ function removeRemote(key, quiet) {
    COMPARTIR PANTALLA (varias a la vez)
    ===================================================================== */
 async function shareScreen() {
+  // el traductor de Chrome necesita un toque del usuario para bajarse la primera vez
+  if (cfg.autoSub) chromeTranslator(cfg.subLang === 'multi' ? 'en' : cfg.subLang);
   let st;
   try {
     st = await navigator.mediaDevices.getDisplayMedia({
@@ -584,7 +586,19 @@ function onTranscript(ls, text, final, lg) {
   translate(text, lg).then(t => emitSub(ls.sid, seg, t || text, false)).catch(() => emitSub(ls.sid, seg, text, false));
 }
 
+// primero el traductor que trae Chrome (en la misma PC, gratis y sin límite); si no hay, el del sitio
+const chromeTr = {};
+function chromeTranslator(from) {
+  if (!('Translator' in self) || !/^[a-z]{2}$/.test(from) || from === 'es') return null;
+  if (!chromeTr[from]) chromeTr[from] = Translator.availability({ sourceLanguage: from, targetLanguage: 'es' })
+    .then(av => av === 'unavailable' ? null : Translator.create({ sourceLanguage: from, targetLanguage: 'es' }))
+    .catch(e => { console.warn('traductor de Chrome', e); delete chromeTr[from]; return null; });
+  return chromeTr[from];
+}
 async function translate(text, from) {
+  from = (from || '').slice(0, 2);
+  const tr = await chromeTranslator(from);
+  if (tr) { try { return await tr.translate(text); } catch (e) { console.warn('traductor de Chrome', e); } }
   const r = await fetch(API + 'traducir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, from: (from || '').slice(0, 2) }) });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || r.status);
