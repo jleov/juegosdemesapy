@@ -107,7 +107,7 @@ const LEVELS = [
     land: ['edificio', 'shopping', 'panteon', 'edificio', 'palacio', 'edificio', 'shopping'],
     feat: { limpia: 3, raudal: 2.2, bache: 1, plat: .7, small: .4 }, hides: ['parada', 'basurero'],
     boss: { k: 'ola', n: 'El Raudal de la Avenida' },
-    tip: 'Cuando empieza a llover tenés 3 segundos: subite a la vereda alta o escondete en una parada. Si un limpiavidrios te alcanza, le pagás ₲2.000 o te atrasa.',
+    tip: 'Cuando empieza a llover tenés 3 segundos: subite a la vereda alta o escondete en una parada. Para esquivar al limpiavidrios, saltalo por encima o escondete hasta que se vaya. Si te alcanza, le pagás ₲2.000 o te atrasa.',
     audio: 'Hola mi hijo, soy tu abuela. ¿Ya saliste? Hice sopa paraguaya y chipa guasu para la Nochebuena. Está nublado por Asunción, no te vayas a mojar que después te engripás. Te espero, eh.' },
   { id: 'luq', name: 'Luque', sub: 'La República Independiente', len: 4800, sky: ['#5aa9e6', '#e8f1ff'], mid: 'casas', blue: 1,
     land: ['estadio', 'casa', 'pasarela', 'estadio', 'casa'],
@@ -564,7 +564,12 @@ function stepEnt(e, dt) {
     case 'limpia':
       if (e.done) { e.vx = -150; e.face = -1; }
       else if (C.intimida) { e.vx = d < 260 ? 120 : 0; e.face = 1; if (d < 260 && !e.said) { e.said = 1; float(e.x, e.y - 60, '¡Perdón doña! 😰', '#fff'); } }
-      else if (Math.abs(d) < 380 && !P.hidden) { e.vx = d > 0 ? -115 : 115; e.face = d > 0 ? -1 : 1; } else e.vx = 0;
+      else if (P.hidden && d < 380) {   // si te escondés, al rato se aburre y se va
+        e.vx = 0; e.lost = (e.lost || 0) + dt;
+        if (e.lost > .8) { e.done = true; float(e.x, e.y - 60, 'Bueh… se fue 🤷', '#fff'); }
+      }
+      else if (d < -14) { e.done = true; float(e.x, e.y - 60, '¡Se me escapó! 😤', '#fff'); }   // ya lo pasaste (saltando): no te persigue
+      else if (d < 380) { e.vx = -115; e.face = -1; } else e.vx = 0;
       e.x += e.vx * dt;
       if (touch && !e.done) {
         e.done = true; const pz = price(2000);
