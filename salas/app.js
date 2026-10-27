@@ -131,23 +131,34 @@ function watchRooms() {
     el.classList.add('busy');
   };
   const pend = {};   // un solo reintento esperando por sala
-  const again = id => {
+  const again = (id, ms = 8000) => {
     if (pend[id]) return; pend[id] = true;
-    setTimeout(() => { pend[id] = false; if (S.watch === w && !w.destroyed) peek(id); }, 8000);
+    setTimeout(() => { pend[id] = false; if (S.watch === w && !w.destroyed) peek(id); }, ms);
   };
   const peek = id => {
     if (w.destroyed || w.disconnected) return again(id);
     const c = w.connect(PFX + id + '-reg', { reliable: true });
     if (!c) return again(id);
     let got = false;
+    let old = false;
     c.on('open', () => {
       c.send({ t: 'peek' });
-      // la abrió alguien con la página vieja (no contesta la lista): al menos se sabe que hay gente
-      setTimeout(() => { if (!got) { const el = document.querySelector(`.who[data-room="${id}"]`); if (el) { el.textContent = 'Hay gente'; el.classList.add('busy'); } } }, 5000);
+      // la lista la tiene alguien con la página vieja (no entiende «peek»): se pregunta como antes,
+      // presentándose un instante como «👀 mirando», y se corta apenas llega la lista
+      setTimeout(() => { if (!got && c.open) { old = true; c.send({ t: 'hello', name: '👀 mirando' }); } }, 3000);
     });
-    c.on('data', d => { if (d && d.t === 'list' && Array.isArray(d.list)) { got = true; show(id, d.list); } });
-    c.on('close', () => again(id));   // se fue quien tenía la lista: se vuelve a preguntar
-    setTimeout(() => { if (!got && c.open === false) { try { c.close(); } catch (e) {} } }, 9000);
+    c.on('data', d => {
+      if (!d || d.t !== 'list' || !Array.isArray(d.list)) return;
+      got = true;
+      show(id, d.list.filter(m => m.id !== w.id && !String(m.id).includes('-ver-')));
+      if (old) { try { c.close(); } catch (e) {} }   // al cerrar se vuelve a preguntar en unos segundos
+    });
+    c.on('close', () => again(id, old ? 15000 : 8000));   // se fue quien tenía la lista (o era la vieja): se vuelve a preguntar
+    setTimeout(() => {
+      if (got) return;
+      if (c.open) { const el = document.querySelector(`.who[data-room="${id}"]`); if (el) { el.textContent = 'Hay gente'; el.classList.add('busy'); } }
+      try { c.close(); } catch (e) {}
+    }, 9000);
   };
   w.on('open', () => ROOMS.forEach(([id]) => peek(id)));
   w.on('error', e => {
@@ -854,7 +865,7 @@ function renderMembers() {
   const list = [{ id: 'me', name: S.name + ' (vos)', muted: S.muted, deaf: S.deaf, live: [...S.local.values()].some(l => l.kind === 'screen'), me: true }];
   S.peers.forEach(p => list.push({ id: p.id, name: p.name, muted: p.muted, deaf: p.deaf, live: [...S.remote.values()].some(r => r.peer === p.id && r.kind === 'screen') }));
   // los de la lista que todavía no se conectaron
-  S.roster.forEach(m => { if (S.me && m.id !== S.me.id && !S.peers.has(m.id)) list.push({ id: m.id, name: m.name, wait: true }); });
+  S.roster.forEach(m => { if (S.me && m.id !== S.me.id && !S.peers.has(m.id) && !String(m.id).includes('-ver-')) list.push({ id: m.id, name: m.name, wait: true }); });
   box.innerHTML = list.map(m => `
     <div class="mem" data-id="${esc(m.id)}" ${m.wait ? 'style="opacity:.5" title="Conectando…"' : ''}>
       ${avatar(m.name, m.wait ? '' : m.id, talking.get(m.id) ? 'talk' : '')}
