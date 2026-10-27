@@ -608,7 +608,6 @@ function addRemote(key, call, md, st) {
     r.el.play().catch(() => toast('Tocá la pantalla para escuchar a los demás.'));
     try { const src = A.ctx.createMediaStreamSource(st); r.an = A.ctx.createAnalyser(); r.an.fftSize = 1024; src.connect(r.an); } catch (e) {}
   } else {
-    if (!S.focus) S.focus = key;
     sysMsg(`${p ? p.name : 'Alguien'} compartió ${r.label.toLowerCase()}.`);
   }
   S.remote.set(key, r);
@@ -634,15 +633,21 @@ async function shareScreen() {
   if (cfg.autoSub) chromeTranslator(cfg.subLang === 'multi' ? 'en' : cfg.subLang);
   let st;
   const qk = cfg.res, q = qual(qk);
+  // el sonido de toda la PC se puede capturar una sola vez: si otra pantalla mía ya lo manda, esta no lo pide
+  const sysAudioBusy = [...S.local.values()].some(l => l.kind === 'screen' && l.stream.getAudioTracks().length &&
+    (l.stream.getVideoTracks()[0] || { getSettings: () => ({}) }).getSettings().displaySurface === 'monitor');
+  const opts = audio => ({
+    video: { frameRate: { ideal: q.fps, max: q.fps }, width: { ideal: q.w, max: q.w }, height: { ideal: q.h, max: q.h } },
+    audio: audio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false, restrictOwnAudio: true } : false,
+    systemAudio: sysAudioBusy ? 'exclude' : 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
+  });
   try {
-    st = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: q.fps, max: q.fps }, width: { ideal: q.w, max: q.w }, height: { ideal: q.h, max: q.h } },
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false, restrictOwnAudio: true },
-      systemAudio: 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
-    });
+    st = await navigator.mediaDevices.getDisplayMedia(opts(true));
   } catch (e) {
-    if (e && e.name !== 'NotAllowedError') toast('No se pudo compartir: ' + e.message);
-    return;
+    if (!e || e.name === 'NotAllowedError') return;   // canceló el cuadro de Chrome
+    // a veces Chrome no deja capturar sonido otra vez: se comparte la imagen sin sonido
+    try { st = await navigator.mediaDevices.getDisplayMedia(opts(false)); toast('Esta pantalla se comparte sin sonido (el sonido ya lo manda otra pantalla tuya).', 6000); }
+    catch (e2) { if (e2 && e2.name !== 'NotAllowedError') toast('No se pudo compartir: ' + (e2.message || e.message) + '. Tocá de nuevo el botón de pantalla.', 7000); return; }
   }
   const v = st.getVideoTracks()[0];
   if (v) v.contentHint = cfg.quality === 'detail' ? 'detail' : 'motion';
@@ -653,9 +658,11 @@ async function shareScreen() {
   S.local.set(ls.sid, ls);
   if (v) v.addEventListener('ended', () => stopShare(ls.sid));
   S.peers.forEach((p, id) => callStream(id, ls));
-  S.focus = 'me|' + ls.sid;
+  S.focus = '';   // se ven todas las pantallas juntas en cuadrícula
+  const many = [...S.local.values()].filter(l => l.kind === 'screen').length;
   if (st.getAudioTracks().length) { if (cfg.autoSub) startSubs(ls); }
-  else toast('Se comparte sin sonido. Para compartir el sonido elegí una pestaña o «Toda la pantalla» y marcá «Compartir audio».', 7000);
+  else if (!sysAudioBusy) toast('Se comparte sin sonido. Para compartir el sonido elegí una pestaña o «Toda la pantalla» y marcá «Compartir audio».', 7000);
+  if (many === 1) setTimeout(() => toast('¿Querés compartir otra cosa a la vez? Tocá de nuevo el botón de pantalla (+).', 6000), st.getAudioTracks().length ? 0 : 7500);
   renderBar(); renderTiles(); renderMembers();
 }
 
@@ -911,8 +918,8 @@ function renderBar() {
   deaf.dataset.tip = S.deaf ? 'Volver a escuchar' : 'Ensordecer';
   const n = [...S.local.values()].filter(l => l.kind === 'screen').length;
   $('#btnShare').classList.toggle('act', n > 0);
-  $('#btnShare').dataset.tip = n ? 'Compartir otra pantalla' : 'Compartir pantalla';
-  const c = $('#shareCount'); c.textContent = n; c.classList.toggle('hidden', n < 2);
+  $('#btnShare').dataset.tip = n ? `Compartiendo ${n} — tocá para compartir otra a la vez` : 'Compartir pantalla';
+  const c = $('#shareCount'); c.textContent = n ? n + '+' : ''; c.classList.toggle('hidden', !n);
 }
 
 function avatar(name, talkId, extra = '') {
