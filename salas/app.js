@@ -85,7 +85,7 @@ function netState(txt, ok) { const n = $('#netState'); n.textContent = txt; n.cl
   const box = $('#roomPick');
   ROOMS.forEach(([id, name]) => {
     const b = document.createElement('button');
-    b.innerHTML = `<span style="color:var(--muted)">🔊</span>${esc(name)}`;
+    b.innerHTML = `<span style="color:var(--muted)">🔊</span><span class="rn"><b>${esc(name)}</b><small class="who" data-room="${id}">Mirando…</small></span>`;
     b.dataset.id = id;
     b.onclick = () => { pick = id; $('#inRoom').value = ''; mark(); };
     box.appendChild(b);
@@ -112,13 +112,53 @@ function netState(txt, ok) { const n = $('#netState'); n.textContent = txt; n.cl
   $('#btnEnter').onclick = go;
   $('#btnCreate').onclick = () => { $('#inCode').value = newCode(); $('#inRoom').value = ''; mark(); go(); };
   $('#inName').onkeydown = $('#inRoom').onkeydown = $('#inCode').onkeydown = e => { if (e.key === 'Enter') go(); };
+  setTimeout(watchRooms, 0);
   if (!navigator.mediaDevices || !window.RTCPeerConnection) {
     $('#homeErr').textContent = 'Este navegador no permite llamadas. Usá Chrome, Edge o Firefox actualizados.';
     $('#homeErr').classList.remove('hidden');
   }
 })();
 
+// desde la entrada: quién está en cada sala (pregunta a quien guarda la lista de cada una)
+function watchRooms() {
+  if (!window.Peer) return;
+  const w = S.watch = new Peer(PFX + 'ver-' + rand(10), peerOpts());
+  const show = (id, list) => {
+    const el = document.querySelector(`.who[data-room="${id}"]`); if (!el) return;
+    if (!list.length) { el.textContent = 'Vacía'; el.classList.remove('busy'); return; }
+    el.textContent = `${list.length} · ` + list.map(m => m.name).join(', ');
+    el.title = list.map(m => m.name).join('\n');
+    el.classList.add('busy');
+  };
+  const pend = {};   // un solo reintento esperando por sala
+  const again = id => {
+    if (pend[id]) return; pend[id] = true;
+    setTimeout(() => { pend[id] = false; if (S.watch === w && !w.destroyed) peek(id); }, 8000);
+  };
+  const peek = id => {
+    if (w.destroyed || w.disconnected) return again(id);
+    const c = w.connect(PFX + id + '-reg', { reliable: true });
+    if (!c) return again(id);
+    let got = false;
+    c.on('open', () => {
+      c.send({ t: 'peek' });
+      // la abrió alguien con la página vieja (no contesta la lista): al menos se sabe que hay gente
+      setTimeout(() => { if (!got) { const el = document.querySelector(`.who[data-room="${id}"]`); if (el) { el.textContent = 'Hay gente'; el.classList.add('busy'); } } }, 5000);
+    });
+    c.on('data', d => { if (d && d.t === 'list' && Array.isArray(d.list)) { got = true; show(id, d.list); } });
+    c.on('close', () => again(id));   // se fue quien tenía la lista: se vuelve a preguntar
+    setTimeout(() => { if (!got && c.open === false) { try { c.close(); } catch (e) {} } }, 9000);
+  };
+  w.on('open', () => ROOMS.forEach(([id]) => peek(id)));
+  w.on('error', e => {
+    const m = String(e.message || '').match(/salapy26-([a-z0-9-]+)-reg/);
+    if (e.type === 'peer-unavailable' && m) { show(m[1], []); again(m[1]); }
+  });
+  w.on('disconnected', () => { if (!w.destroyed) setTimeout(() => !w.destroyed && w.reconnect(), 2000); });
+}
+
 async function enter(name, room) {
+  if (S.watch) { try { S.watch.destroy(); } catch (e) {} S.watch = null; }
   S.name = name; S.room = room;
   $('#btnEnter').disabled = true;
   try { await audioStart(); }
@@ -312,9 +352,11 @@ function becomeRegistry() {
   if (S.reg && !S.reg.destroyed) return joinRegistry();
   const r = S.reg = new Peer(regId(), peerOpts());
   const members = new Map();
+  const watchers = new Set();   // los que miran desde la entrada quién está, sin entrar
   const send = () => {
     const list = [...members].map(([id, m]) => ({ id, name: m.name }));
     members.forEach(m => { try { m.conn.open && m.conn.send({ t: 'list', list }); } catch (e) {} });
+    watchers.forEach(c => { try { c.open && c.send({ t: 'list', list }); } catch (e) {} });
   };
   r.on('open', () => joinRegistry());
   r.on('error', e => {
@@ -328,9 +370,10 @@ function becomeRegistry() {
     c.on('data', d => {
       if (!d) return;
       if (d.t === 'hello') { members.set(c.peer, { name: String(d.name || '?').slice(0, 24), conn: c, seen: Date.now() }); send(); }
+      else if (d.t === 'peek') { watchers.add(c); c.send({ t: 'list', list: [...members].map(([id, m]) => ({ id, name: m.name })) }); }
       else { const m = members.get(c.peer); if (m) m.seen = Date.now(); }
     });
-    c.on('close', () => { const m = members.get(c.peer); if (m && m.conn === c) { members.delete(c.peer); send(); } });
+    c.on('close', () => { watchers.delete(c); const m = members.get(c.peer); if (m && m.conn === c) { members.delete(c.peer); send(); } });
   });
   r._iv = setInterval(() => {
     let ch = false;
@@ -685,6 +728,7 @@ function paintSubs(key) {
   box.innerHTML = '';
   if (!cfg.subs || !m) return;
   [...m.entries()].sort((a, b) => a[0] - b[0]).forEach(([, l]) => {
+    if (l.pend && cfg.subOnlyEs) return;   // texto en el idioma original mientras se traduce
     const s = document.createElement('span'); s.textContent = l.text; if (l.pend) s.className = 'pend'; box.appendChild(s);
   });
 }
@@ -950,6 +994,7 @@ function openSettings() {
   $('#setAutoSub').checked = cfg.autoSub;
   $('#setSubLang').value = cfg.subLang;
   $('#setSubs').checked = cfg.subs;
+  $('#setSubOnlyEs').checked = !!cfg.subOnlyEs;
   $('#setSubSize').value = cfg.subSize;
   $('#dlgSet').showModal(); dlgOpen = true;
 }
@@ -982,6 +1027,7 @@ $('#setSubLang').onchange = e => {
   S.local.forEach(ls => { if (ls.sub && ls.sub.on) { subClose(ls.sub); } });
 };
 $('#setSubs').onchange = e => { cfg.subs = e.target.checked; saveCfg(); S.tiles.forEach((t, k) => paintSubs(k)); };
+$('#setSubOnlyEs').onchange = e => { cfg.subOnlyEs = e.target.checked; saveCfg(); S.tiles.forEach((t, k) => paintSubs(k)); };
 $('#setSubSize').onchange = e => { cfg.subSize = e.target.value; saveCfg(); document.querySelectorAll('.subs').forEach(s => s.style.setProperty('--subsize', cfg.subSize)); };
 
 /* ---------------- botones ---------------- */

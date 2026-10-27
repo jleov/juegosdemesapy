@@ -32,6 +32,9 @@ input[type=text]:focus,select:focus{border-color:var(--accent)}
 .rooms button{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:left;display:flex;gap:8px;align-items:center}
 .rooms button:hover{background:var(--hover)}
 .rooms button.sel{border-color:var(--accent);background:#5865f222}
+.rooms .rn{display:flex;flex-direction:column;min-width:0}
+.rooms .who{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rooms .who.busy{color:var(--green)}
 .btn{background:var(--accent);border:0;border-radius:8px;padding:11px 16px;font-weight:600;color:#fff}
 .btn:hover{background:var(--accent2)}
 .btn.wide{width:100%;margin-top:18px}
@@ -254,6 +257,7 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
         <option value="ko">Coreano</option>
       </select></div>
     <div class="row"><label for="setSubs">Mostrar subtítulos</label><input type="checkbox" id="setSubs"></div>
+    <div class="row"><label for="setSubOnlyEs">Solo en español (ocultar el texto en inglés u otro idioma mientras se traduce)</label><input type="checkbox" id="setSubOnlyEs"></div>
     <div class="row"><label for="setSubSize">Tamaño de letra</label>
       <select id="setSubSize" style="width:auto"><option value="0.8">Chica</option><option value="1">Normal</option><option value="1.3">Grande</option><option value="1.7">Muy grande</option></select></div>
   </div>
