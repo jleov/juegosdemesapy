@@ -34,7 +34,7 @@ const ICON = {
 
 /* ---------------- ajustes guardados ---------------- */
 const cfg = Object.assign({
-  name: '', mic: '', ns: 'ia', gate: -58, quality: 'motion', autoSub: true, subLang: 'multi', subs: true, subSize: '1', vols: {},
+  name: '', mic: '', ns: 'ia', gate: -58, quality: 'motion', res: 'q1080', autoSub: true, subLang: 'multi', subs: true, subSize: '1', vols: {},
 }, (() => { try { return JSON.parse(localStorage.getItem('salas_cfg') || '{}'); } catch (e) { return {}; } })());
 const saveCfg = () => { try { localStorage.setItem('salas_cfg', JSON.stringify(cfg)); } catch (e) {} };
 
@@ -51,6 +51,21 @@ const S = {
   muted: false, deaf: false, shares: 0, unread: 0,
 };
 const regId = () => PFX + S.room + '-reg';
+
+// calidades para compartir pantalla: tamaño máximo, cuadros por segundo y velocidad (kbps) por cada amigo que mira
+const QUAL = {
+  q720: { w: 1280, h: 720, fps: 30, kbps: 2500 },
+  q1080: { w: 1920, h: 1080, fps: 30, kbps: 5000 },
+  'q1080-60': { w: 1920, h: 1080, fps: 60, kbps: 8000 },
+  q1440: { w: 2560, h: 1440, fps: 60, kbps: 12000 },
+  max: { w: 3840, h: 2160, fps: 60, kbps: 16000 },
+};
+const qual = k => QUAL[k] || QUAL.q1080;
+
+// salas privadas: el nombre de la sala es «priv-» + un código al azar
+const PRIV = 'priv-';
+const newCode = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = new Uint8Array(6); crypto.getRandomValues(b); return [...b].map(x => A[x % A.length]).join(''); };
+const codeOf = room => room.startsWith(PRIV) ? room.slice(PRIV.length).toUpperCase() : '';
 
 /* ---------------- avisos ---------------- */
 let toastT = 0;
@@ -75,15 +90,19 @@ function netState(txt, ok) { const n = $('#netState'); n.textContent = txt; n.cl
     b.onclick = () => { pick = id; $('#inRoom').value = ''; mark(); };
     box.appendChild(b);
   });
-  if (!ROOMS.some(r => r[0] === pick)) $('#inRoom').value = pick;
-  const mark = () => box.querySelectorAll('button').forEach(b => b.classList.toggle('sel', !$('#inRoom').value.trim() && b.dataset.id === pick));
-  $('#inRoom').oninput = mark;
+  if (codeOf(pick)) { $('#inCode').value = codeOf(pick); pick = 'general'; }
+  else if (!ROOMS.some(r => r[0] === pick)) $('#inRoom').value = pick;
+  const mark = () => box.querySelectorAll('button').forEach(b => b.classList.toggle('sel', !$('#inRoom').value.trim() && !$('#inCode').value.trim() && b.dataset.id === pick));
+  $('#inRoom').oninput = $('#inCode').oninput = mark;
   mark();
   const go = () => {
     const name = $('#inName').value.trim();
     const err = $('#homeErr');
     if (!name) { err.textContent = 'Escribí tu nombre.'; err.classList.remove('hidden'); $('#inName').focus(); return; }
-    const room = slug($('#inRoom').value) || pick;
+    const code = $('#inCode').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if ($('#inCode').value.trim() && code.length < 4) { err.textContent = 'El código tiene que tener al menos 4 letras o números.'; err.classList.remove('hidden'); return; }
+    let room = code ? PRIV + code.toLowerCase() : (slug($('#inRoom').value) || pick);
+    if (room.startsWith(PRIV) && !code) room = 'sala-' + room;   // nadie entra a una privada escribiendo el nombre
     cfg.name = name; saveCfg();
     enter(name, room).catch(e => {
       console.error(e);
@@ -91,7 +110,8 @@ function netState(txt, ok) { const n = $('#netState'); n.textContent = txt; n.cl
     });
   };
   $('#btnEnter').onclick = go;
-  $('#inName').onkeydown = $('#inRoom').onkeydown = e => { if (e.key === 'Enter') go(); };
+  $('#btnCreate').onclick = () => { $('#inCode').value = newCode(); $('#inRoom').value = ''; mark(); go(); };
+  $('#inName').onkeydown = $('#inRoom').onkeydown = $('#inCode').onkeydown = e => { if (e.key === 'Enter') go(); };
   if (!navigator.mediaDevices || !window.RTCPeerConnection) {
     $('#homeErr').textContent = 'Este navegador no permite llamadas. Usá Chrome, Edge o Firefox actualizados.';
     $('#homeErr').classList.remove('hidden');
@@ -110,8 +130,14 @@ async function enter(name, room) {
   history.replaceState(null, '', location.pathname + '?sala=' + room);
   $('#home').classList.add('hidden');
   $('#room').classList.remove('hidden');
-  const nice = (ROOMS.find(r => r[0] === room) || [0, room])[1];
+  const code = codeOf(room);
+  const nice = code ? 'Sala privada' : (ROOMS.find(r => r[0] === room) || [0, room])[1];
   $('#roomName').textContent = nice;
+  if (code) {
+    $('#roomCode').classList.remove('hidden');
+    $('#roomCode b').textContent = code;
+    $('#roomCode').onclick = () => navigator.clipboard.writeText(code).then(() => toast('Código copiado: ' + code)).catch(() => {});
+  }
   document.title = nice + ' · Salas de Voz';
   if (!navigator.mediaDevices.getDisplayMedia) $('#btnShare').classList.add('hidden');
   S.local.set('mic', { sid: 'mic', kind: 'mic', stream: A.dest.stream, label: 'voz', calls: new Map() });
@@ -185,10 +211,10 @@ function gateTick() {
   const now = performance.now();
   A.db = levelDb(A.an, gBuf);
   if (A.db > cfg.gate) { A.lastLoud = now; A.open = true; }
-  else if (A.open && now - A.lastLoud > 400) A.open = false;
+  else if (A.open && now - A.lastLoud > 700) A.open = false;   // espera un poco para no cortar el final de las palabras
   const on = A.open && !S.muted;
   const t = A.ctx.currentTime;
-  A.gate.gain.setTargetAtTime(on ? 1 : 0, t, on ? 0.008 : 0.06);
+  A.gate.gain.setTargetAtTime(on ? 1 : 0, t, on ? 0.004 : 0.12);
   if (dlgOpen) {
     const pct = v => Math.max(0, Math.min(100, (v + 90) / 70 * 100));
     $('#meter i').style.width = pct(A.db) + '%';
@@ -387,34 +413,65 @@ function onData(from, d) {
 function callStream(pid, ls) {
   if (!S.me || !ls.stream) return;
   const old = ls.calls.get(pid); if (old) { try { old.close(); } catch (e) {} }
-  const call = S.me.call(pid, ls.stream, { metadata: { kind: ls.kind, sid: ls.sid, label: ls.label, audio: ls.stream.getAudioTracks().length > 0 } });
+  const kbps = ls.kind === 'screen' ? qual(ls.q).kbps : 0;
+  const call = S.me.call(pid, ls.stream, {
+    metadata: { kind: ls.kind, sid: ls.sid, label: ls.label, audio: ls.stream.getAudioTracks().length > 0, kbps },
+    sdpTransform: sdp => sdpBoost(sdp, kbps, ls.kind === 'screen'),
+  });
   if (!call) return;
   ls.calls.set(pid, call);
   const pc = call.peerConnection;
-  if (pc) pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'connected') tune(pc, ls.kind); });
+  if (pc) pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'connected') tune(pc, ls); });
   call.on('close', () => { if (ls.calls.get(pid) === call) ls.calls.delete(pid); });
   call.on('error', e => console.warn('call', e));
 }
 
 // más calidad para las pantallas y su sonido
-function tune(pc, kind) {
+function tune(pc, ls) {
+  const q = qual(ls.q);
   pc.getSenders().forEach(s => {
     if (!s.track) return;
     const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}];
     if (s.track.kind === 'video') {
-      p.encodings[0].maxBitrate = cfg.quality === 'detail' ? 2_500_000 : 3_000_000;
-      p.encodings[0].maxFramerate = 30;
-      p.degradationPreference = cfg.quality === 'detail' ? 'maintain-resolution' : 'maintain-framerate';
-    } else p.encodings[0].maxBitrate = kind === 'screen' ? 128_000 : 64_000;
+      p.encodings[0].maxBitrate = q.kbps * 1000;
+      p.encodings[0].maxFramerate = q.fps;
+      p.encodings[0].scaleResolutionDownBy = 1;
+      p.degradationPreference = ls.hint === 'detail' ? 'maintain-resolution' : 'balanced';
+    } else p.encodings[0].maxBitrate = ls.kind === 'screen' ? 128_000 : 64_000;
     s.setParameters(p).catch(() => {});
   });
+}
+
+// arranca la imagen con buena velocidad desde el principio (si no, empieza borrosa unos segundos)
+// y manda el sonido de la pantalla en estéreo
+function sdpBoost(sdp, kbps, stereo) {
+  if (!kbps) return sdp;
+  const lines = sdp.split('\r\n'), pts = {}, out = [];
+  lines.forEach(l => { const m = l.match(/^a=rtpmap:(\d+) ([\w-]+)\//); if (m) pts[m[1]] = m[2].toUpperCase(); });
+  const hasFmtp = new Set(lines.filter(l => l.startsWith('a=fmtp:')).map(l => l.slice(7).split(' ')[0]));
+  const bw = `x-google-start-bitrate=${Math.round(kbps * 0.6)};x-google-min-bitrate=${Math.round(kbps * 0.15)};x-google-max-bitrate=${kbps}`;
+  const vid = ['VP8', 'VP9', 'H264', 'AV1'];
+  let sect = '';
+  for (const l of lines) {
+    if (l.startsWith('m=')) sect = l.slice(2).split(' ')[0];
+    let m = l.match(/^a=fmtp:(\d+) (.*)$/);
+    if (m && sect === 'video' && vid.includes(pts[m[1]]) && !/x-google-max-bitrate/.test(l)) { out.push(l + ';' + bw); continue; }
+    if (m && sect === 'audio' && stereo && pts[m[1]] === 'OPUS') {
+      out.push(l.replace(/;?(stereo|sprop-stereo|maxaveragebitrate)=\d+/g, '') + ';stereo=1;sprop-stereo=1;maxaveragebitrate=128000'); continue;
+    }
+    out.push(l);
+    m = l.match(/^a=rtpmap:(\d+) ([\w-]+)\//);
+    if (m && sect === 'video' && vid.includes(pts[m[1]]) && !hasFmtp.has(m[1])) out.push(`a=fmtp:${m[1]} ${bw}`);
+  }
+  return out.join('\r\n');
 }
 
 function onCall(call) {
   const md = call.metadata || {};
   const sid = String(md.sid || 'mic');
   const key = call.peer + '|' + sid;
-  call.answer();
+  const kbps = md.kind === 'screen' ? Math.min(20000, Math.max(0, md.kbps | 0)) : 0;
+  call.answer(undefined, { sdpTransform: sdp => sdpBoost(sdp, kbps, md.kind === 'screen') });
   let done = false;
   call.on('stream', st => {
     if (md.kind === 'screen' && !st.getVideoTracks().length) return;   // espera a que llegue la imagen
@@ -460,9 +517,10 @@ async function shareScreen() {
   // el traductor de Chrome necesita un toque del usuario para bajarse la primera vez
   if (cfg.autoSub) chromeTranslator(cfg.subLang === 'multi' ? 'en' : cfg.subLang);
   let st;
+  const qk = cfg.res, q = qual(qk);
   try {
     st = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: 30, max: 60 }, width: { max: 1920 }, height: { max: 1080 } },
+      video: { frameRate: { ideal: q.fps, max: q.fps }, width: { ideal: q.w, max: q.w }, height: { ideal: q.h, max: q.h } },
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false, restrictOwnAudio: true },
       systemAudio: 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
     });
@@ -475,7 +533,7 @@ async function shareScreen() {
   const surf = v && v.getSettings ? v.getSettings().displaySurface : '';
   S.shares++;
   const label = (surf === 'browser' ? 'Pestaña ' : surf === 'window' ? 'Ventana ' : 'Pantalla ') + S.shares;
-  const ls = { sid: 's' + rand(6), kind: 'screen', stream: st, label, calls: new Map(), sub: null };
+  const ls = { sid: 's' + rand(6), kind: 'screen', stream: st, label, calls: new Map(), sub: null, q: qk, hint: cfg.quality };
   S.local.set(ls.sid, ls);
   if (v) v.addEventListener('ended', () => stopShare(ls.sid));
   S.peers.forEach((p, id) => callStream(id, ls));
@@ -640,6 +698,87 @@ setInterval(() => {
 }, 1000);
 
 /* =====================================================================
+   MEDICIONES: ping de cada uno, pérdida de sonido y calidad de las pantallas
+   ===================================================================== */
+async function pairOf(pc) {
+  const st = await pc.getStats();
+  let pair = null;
+  st.forEach(s => { if (s.type === 'transport' && s.selectedCandidatePairId) pair = st.get(s.selectedCandidatePairId); });
+  if (!pair) st.forEach(s => { if (s.type === 'candidate-pair' && s.nominated && s.state === 'succeeded') pair = s; });
+  if (!pair) return { st };
+  const lc = st.get(pair.localCandidateId), rc = st.get(pair.remoteCandidateId);
+  return { st, rtt: pair.currentRoundTripTime != null ? pair.currentRoundTripTime * 1000 : null, relay: (lc && lc.candidateType === 'relay') || (rc && rc.candidateType === 'relay') };
+}
+
+// velocidad en Mbps a partir de los bytes contados la vez anterior
+const rate = (o, bytes, ts) => { const r = o.b != null && ts > o.t ? (bytes - o.b) * 8 / (ts - o.t) / 1000 : null; o.b = bytes; o.t = ts; return r; };
+const LIMIT = { bandwidth: 'limitado por internet', cpu: 'limitado por la PC' };
+
+async function statsTick() {
+  if (!S.me || S.left) return;
+  for (const p of S.peers.values()) {
+    try {
+      const pc = p.conn && p.conn.peerConnection; if (!pc) continue;
+      const r = await pairOf(pc);
+      p.rtt = r.rtt; p.relay = r.relay;
+      const mic = S.remote.get(p.id + '|mic');
+      const mpc = mic && mic.call && mic.call.peerConnection;
+      if (mpc) {
+        (await mpc.getStats()).forEach(s => {
+          if (s.type !== 'inbound-rtp' || s.kind !== 'audio') return;
+          const lost = s.packetsLost - (mic.pl ?? s.packetsLost), recv = s.packetsReceived - (mic.pr ?? s.packetsReceived);
+          mic.pl = s.packetsLost; mic.pr = s.packetsReceived;
+          p.loss = lost + recv > 0 ? Math.max(0, lost) / (lost + recv) * 100 : 0;
+          p.jitter = (s.jitter || 0) * 1000;
+        });
+      }
+    } catch (e) {}
+  }
+  // pantallas que recibo
+  for (const r of S.remote.values()) {
+    if (r.kind !== 'screen' || !r.call || !r.call.peerConnection) continue;
+    try {
+      (await r.call.peerConnection.getStats()).forEach(s => {
+        if (s.type !== 'inbound-rtp' || s.kind !== 'video') return;
+        r.qi = { w: s.frameWidth, h: s.frameHeight, fps: s.framesPerSecond, mbps: rate(r.qr || (r.qr = {}), s.bytesReceived, s.timestamp) };
+      });
+    } catch (e) {}
+  }
+  // pantallas que mando (se mide con el primer amigo)
+  for (const ls of S.local.values()) {
+    if (ls.kind !== 'screen') continue;
+    const call = ls.calls.values().next().value;
+    if (!call || !call.peerConnection) { ls.qi = null; continue; }
+    try {
+      (await call.peerConnection.getStats()).forEach(s => {
+        if (s.type !== 'outbound-rtp' || s.kind !== 'video') return;
+        ls.qi = { w: s.frameWidth, h: s.frameHeight, fps: s.framesPerSecond, mbps: rate(ls.qr || (ls.qr = {}), s.bytesSent, s.timestamp), lim: LIMIT[s.qualityLimitationReason] || '' };
+      });
+    } catch (e) {}
+  }
+  paintStats();
+}
+setInterval(statsTick, 2000);
+
+function paintStats() {
+  document.querySelectorAll('[data-ping]').forEach(el => {
+    const p = S.peers.get(el.dataset.ping);
+    if (!p || p.rtt == null) { el.textContent = ''; el.title = ''; return; }
+    const ms = Math.round(p.rtt), loss = p.loss || 0;
+    const bad = ms > 250 || loss > 5, mid = ms > 120 || loss > 1;
+    el.textContent = ms + ' ms' + (loss >= 1 ? ` · ${loss.toFixed(0)}% perdido` : '');
+    el.className = 'ping ' + (bad ? 'bad' : mid ? 'mid' : 'good');
+    el.title = `Ping: ${ms} ms\nSonido perdido: ${loss.toFixed(1)}%\nVariación (jitter): ${Math.round(p.jitter || 0)} ms\nConexión: ${p.relay ? 'por el servidor de respaldo (más lenta)' : 'directa'}`;
+  });
+  document.querySelectorAll('[data-q]').forEach(el => {
+    const key = el.dataset.q;
+    const o = key.startsWith('me|') ? (S.local.get(key.slice(3)) || {}).qi : (S.remote.get(key) || {}).qi;
+    if (!o || !o.w) { el.textContent = ''; return; }
+    el.textContent = `${o.w}×${o.h} · ${Math.round(o.fps || 0)} fps` + (o.mbps != null ? ` · ${o.mbps.toFixed(1)} Mbps` : '') + (o.lim ? ` · ${o.lim}` : '');
+  });
+}
+
+/* =====================================================================
    DIBUJO
    ===================================================================== */
 function render() { renderMembers(); renderTiles(); renderBar(); }
@@ -672,7 +811,7 @@ function renderMembers() {
   box.innerHTML = list.map(m => `
     <div class="mem" data-id="${esc(m.id)}" ${m.wait ? 'style="opacity:.5" title="Conectando…"' : ''}>
       ${avatar(m.name, m.wait ? '' : m.id, talking.get(m.id) ? 'talk' : '')}
-      <span class="nm">${esc(m.name)}${m.wait ? ' …' : ''}</span>
+      <span class="nm">${esc(m.name)}${m.wait ? ' …' : ''}${!m.me && !m.wait ? `<span class="ping" data-ping="${esc(m.id)}"></span>` : ''}</span>
       ${m.live ? '<span class="live">EN VIVO</span>' : ''}
       <span class="ic">${m.muted ? ICON.micOff : ''}${m.deaf ? ICON.headOff : ''}</span>
     </div>
@@ -683,13 +822,14 @@ function renderMembers() {
     S.remote.forEach(r => { if (r.kind === 'mic') applyVolume(r); });
   });
   $('#netState').title = S.reg ? 'Tenés la lista de la sala' : '';
+  paintStats();
 }
 
 function userTile(id, name, muted) {
   const t = document.createElement('div');
   t.className = 'tile' + (talking.get(id) ? ' talk' : '');
   t.dataset.talk = id;
-  t.innerHTML = `<div class="user">${avatar(name, '')}</div><div class="tag">${muted ? ICON.micOff : ''}<span>${esc(name)}</span></div>`;
+  t.innerHTML = `<div class="user">${avatar(name, '')}</div><div class="tag">${muted ? ICON.micOff : ''}<span>${esc(name)}</span>${id !== 'me' ? `<small class="ping" data-ping="${esc(id)}"></small>` : ''}</div>`;
   return t;
 }
 
@@ -701,7 +841,7 @@ function screenTile(key, stream, title, mine, ls, r) {
   v.muted = mine || S.deaf;
   if (r) { r.el = v; applyVolume(r); }
   t.appendChild(v);
-  t.insertAdjacentHTML('beforeend', `<div class="badge">EN VIVO</div><div class="subs" style="--subsize:${cfg.subSize}"></div><div class="tag"><span>${esc(title)}</span></div><div class="tools"></div>`);
+  t.insertAdjacentHTML('beforeend', `<div class="badge">EN VIVO</div><div class="subs" style="--subsize:${cfg.subSize}"></div><div class="tag"><span>${esc(title)}</span><small class="qinfo" data-q="${esc(key)}"></small></div><div class="tools"></div>`);
   const tools = t.querySelector('.tools');
   const btn = (html, tip, fn, on) => { const b = document.createElement('button'); b.innerHTML = html; b.title = tip; if (on) b.classList.add('on'); b.onclick = e => { e.stopPropagation(); fn(); }; tools.appendChild(b); return b; };
   if (r && r.hasAudio) {
@@ -806,6 +946,7 @@ function openSettings() {
   $('#setGate').value = cfg.gate;
   $('#setLoop').checked = A.loop;
   $('#setQuality').value = cfg.quality;
+  $('#setRes').value = QUAL[cfg.res] ? cfg.res : 'q1080';
   $('#setAutoSub').checked = cfg.autoSub;
   $('#setSubLang').value = cfg.subLang;
   $('#setSubs').checked = cfg.subs;
@@ -830,6 +971,10 @@ $('#setLoop').onchange = e => {
   try { A.loop ? A.gate.connect(A.ctx.destination) : A.gate.disconnect(A.ctx.destination); } catch (x) {}
 };
 $('#setQuality').onchange = e => { cfg.quality = e.target.value; saveCfg(); };
+$('#setRes').onchange = e => {
+  cfg.res = e.target.value; saveCfg();
+  if ([...S.local.values()].some(l => l.kind === 'screen')) toast('La calidad nueva se usa en la próxima pantalla que compartas.');
+};
 $('#setAutoSub').onchange = e => { cfg.autoSub = e.target.checked; saveCfg(); };
 $('#setSubLang').onchange = e => {
   cfg.subLang = e.target.value; saveCfg();

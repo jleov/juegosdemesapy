@@ -57,6 +57,15 @@ input[type=text]:focus,select:focus{border-color:var(--accent)}
 .mem .ic svg{width:16px;height:16px}
 .mem .live{background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:4px;padding:1px 4px}
 .mem input[type=range]{width:100%;margin-top:4px}
+.ping{display:block;font-size:11px;font-weight:600}
+.tag .ping{display:inline}
+.ping.good{color:var(--green)} .ping.mid{color:var(--yellow)} .ping.bad{color:#ff6b6e}
+.qinfo{color:#cfd2d8;font-size:11px}
+.row2{display:flex;gap:8px}
+.row2 input{flex:1;min-width:0}
+.row2 .btn{white-space:nowrap}
+#roomCode{margin-top:8px;width:100%;background:var(--bg);border:1px dashed var(--accent);border-radius:8px;padding:6px 8px;text-align:left;font-size:13px}
+#roomCode b{letter-spacing:.15em;font-size:15px}
 .memvol{padding:0 8px 6px 48px;font-size:12px;color:var(--muted)}
 #invite{margin:8px;display:flex;gap:6px}
 #invite button{flex:1}
@@ -156,6 +165,11 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
     <div class="rooms" id="roomPick"></div>
     <label class="f" for="inRoom">O escribí el nombre de otra sala</label>
     <input type="text" id="inRoom" maxlength="40" placeholder="Ej: cumple-de-ale">
+    <label class="f" for="inCode">🔒 Sala privada (solo entran los que tienen el código)</label>
+    <div class="row2">
+      <input type="text" id="inCode" maxlength="12" placeholder="Código, ej: K7Q2MX" autocomplete="off" style="text-transform:uppercase">
+      <button class="btn ghost" id="btnCreate" type="button">Crear sala privada</button>
+    </div>
     <button class="btn wide" id="btnEnter">Entrar a la sala</button>
     <div class="err hidden" id="homeErr"></div>
     <p class="note">Usá auriculares para que no se escuche el eco. Para compartir el sonido de la PC, elegí «Toda la pantalla» y marcá «Compartir audio del sistema».</p>
@@ -167,6 +181,7 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
     <header>
       <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg><span id="roomName"></span></h2>
       <div id="netState">Conectando…</div>
+      <button id="roomCode" class="hidden" title="Copiar el código">🔒 Código: <b></b></button>
     </header>
     <div id="members"></div>
     <div id="invite"><button class="btn ghost" id="btnInvite">Copiar invitación</button></div>
@@ -212,9 +227,17 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
     <div class="row"><small style="color:var(--muted);flex:1">Lo que queda debajo de la línea amarilla no se envía. Movela a la derecha si se cuelan ruidos.</small></div>
     <div class="row"><label for="setLoop">Escucharme para probar (con auriculares)</label><input type="checkbox" id="setLoop"></div>
     <h4>Pantalla compartida</h4>
-    <select id="setQuality">
-      <option value="motion">Fluida — para videos, películas y juegos</option>
-      <option value="detail">Nítida — para texto y documentos</option>
+    <select id="setRes">
+      <option value="q720">720p · 30 cuadros — liviana (2,5 Mbps por amigo)</option>
+      <option value="q1080">1080p · 30 cuadros — recomendada (5 Mbps por amigo)</option>
+      <option value="q1080-60">1080p · 60 cuadros — juegos (8 Mbps por amigo)</option>
+      <option value="q1440">1440p · 60 cuadros — alta (12 Mbps por amigo)</option>
+      <option value="max">Original de la pantalla · 60 cuadros — máxima (16 Mbps por amigo)</option>
+    </select>
+    <div class="row"><small style="color:var(--muted)">Tu internet tiene que <b>subir</b> esa velocidad por cada amigo que mira. Ejemplo: 1080p para 3 amigos = 15 Mbps de subida. Si se ve borroso o se traba, bajá la calidad. Sobre cada pantalla se ve con qué calidad llega de verdad.</small></div>
+    <select id="setQuality" style="margin-top:8px">
+      <option value="motion">Si falta internet: priorizar fluidez (videos, juegos)</option>
+      <option value="detail">Si falta internet: priorizar nitidez (texto, documentos)</option>
     </select>
     <h4>Subtítulos en español</h4>
     <div class="row"><label for="setAutoSub">Subtitular el sonido de lo que comparto</label><input type="checkbox" id="setAutoSub"></div>
