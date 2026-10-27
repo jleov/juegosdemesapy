@@ -597,8 +597,10 @@ function chromeTranslator(from) {
 }
 async function translate(text, from) {
   from = (from || '').slice(0, 2);
-  const tr = await chromeTranslator(from);
-  if (tr) { try { return await tr.translate(text); } catch (e) { console.warn('traductor de Chrome', e); } }
+  // si el traductor de Chrome no contesta en unos segundos, se sigue con el del sitio
+  const limit = (p, ms) => Promise.race([p, new Promise(ok => setTimeout(() => ok(null), ms))]);
+  const tr = await limit(chromeTranslator(from), 4000);
+  if (tr) { try { const out = await limit(tr.translate(text), 4000); if (out) return out; } catch (e) { console.warn('traductor de Chrome', e); } }
   const r = await fetch(API + 'traducir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, from: (from || '').slice(0, 2) }) });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || r.status);
