@@ -26,6 +26,8 @@ const ICON = {
   head: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>',
   headOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 15.4-6.4M21 12v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3zM2 2l20 20"/></svg>',
   full: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.9 4.2A10 10 0 0 1 12 4c7 0 10 8 10 8a17 17 0 0 1-3.2 4.2M6.6 6.6A17 17 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   focus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M7 21h10"/></svg>',
   stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
   vol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
@@ -49,6 +51,8 @@ const S = {
   tiles: new Map(),           // key -> elemento del cuadro
   focus: '',                  // cuadro agrandado
   muted: false, deaf: false, shares: 0, unread: 0,
+  vcap: {},                   // amigo -> cuánto bajo mis pantallas para cuidar la voz
+  hidden: new Set(),          // pantallas de otros que oculté ("peer|sid")
 };
 const regId = () => PFX + S.room + '-reg';
 
@@ -522,6 +526,13 @@ function onData(from, d) {
       showSub(from + '|' + d.sid, d.seg | 0, String(d.text || '').slice(0, 400), !!d.pend); break;
     case 'chat':
       addMsg(p ? p.name : '?', String(d.text || '').slice(0, 500)); break;
+    case 'pause': {
+      const ls = S.local.get(d.sid); if (!ls || ls.kind !== 'screen') break;
+      ls.paused = ls.paused || new Set();
+      if (d.on) ls.paused.add(from); else ls.paused.delete(from);
+      applyPause(ls, from);
+      break;
+    }
   }
 }
 
@@ -537,25 +548,80 @@ function callStream(pid, ls) {
   if (!call) return;
   ls.calls.set(pid, call);
   const pc = call.peerConnection;
-  if (pc) pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'connected') tune(pc, ls); });
+  if (pc) pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'connected') { tune(pc, ls, pid); applyPause(ls, pid); } });
   call.on('close', () => { if (ls.calls.get(pid) === call) ls.calls.delete(pid); });
   call.on('error', e => console.warn('call', e));
 }
 
-// más calidad para las pantallas y su sonido
-function tune(pc, ls) {
+// calidad de las pantallas y su sonido; la voz siempre con prioridad alta y la pantalla baja.
+// S.vcap[amigo] (0,1–1) baja la velocidad de mis pantallas para ese amigo cuando la voz se corta.
+function tune(pc, ls, pid) {
   const q = qual(ls.q);
+  const f = ls.kind === 'screen' ? (S.vcap[pid] ?? 1) : 1;
   pc.getSenders().forEach(s => {
-    if (!s.track) return;
+    const kind = s.track ? s.track.kind : (s._orig && s._orig.kind);
+    if (!kind) return;
     const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}];
-    if (s.track.kind === 'video') {
-      p.encodings[0].maxBitrate = q.kbps * 1000;
-      p.encodings[0].maxFramerate = q.fps;
-      p.encodings[0].scaleResolutionDownBy = 1;
+    const e = p.encodings[0];
+    if (kind === 'video') {
+      e.maxBitrate = Math.max(300, Math.round(q.kbps * f)) * 1000;
+      e.maxFramerate = f < 0.5 ? Math.min(q.fps, 30) : q.fps;
+      e.scaleResolutionDownBy = 1;
+      e.priority = e.networkPriority = 'low';
       p.degradationPreference = ls.hint === 'detail' ? 'maintain-resolution' : 'balanced';
-    } else p.encodings[0].maxBitrate = ls.kind === 'screen' ? 128_000 : 64_000;
+    } else if (ls.kind === 'screen') {
+      e.maxBitrate = (f < 0.5 ? 64 : 128) * 1000;
+      e.priority = e.networkPriority = 'low';
+    } else {
+      e.maxBitrate = 64_000;
+      e.priority = e.networkPriority = 'high';   // la voz primero
+    }
     s.setParameters(p).catch(() => {});
   });
+}
+
+// Si la voz con un amigo se corta (sonido perdido o con demoras) mientras comparto, bajo la calidad
+// de mis pantallas para ese amigo; cuando se normaliza la subo de a poco.
+const voiceBad = p => (p.loss || 0) > 2 || (p.jitter || 0) > 45 || (p.outLoss || 0) > 2 || (p.outJitter || 0) > 45;
+function voiceGuard() {
+  const sharing = [...S.local.values()].some(l => l.kind === 'screen');
+  if (!sharing || cfg.voiceFirst === false) { if (Object.keys(S.vcap).length) { S.vcap = {}; S.peers.forEach((p, id) => applyCaps(id)); } return; }
+  // si a mí me llega cortada la voz de cualquiera, puede ser que mi subida esté llena (Wi-Fi): bajo para todos
+  const mine = [...S.peers.values()].some(p => (p.loss || 0) > 2 || (p.jitter || 0) > 45);
+  S.peers.forEach((p, id) => {
+    const old = S.vcap[id] ?? 1;
+    const f = (voiceBad(p) || mine) ? Math.max(0.1, old * 0.6) : Math.min(1, old + 0.08);
+    if (Math.abs(f - old) > 0.02) { S.vcap[id] = f; applyCaps(id); }
+  });
+}
+function applyCaps(pid) {
+  S.local.forEach(ls => {
+    if (ls.kind !== 'screen') return;
+    const c = ls.calls.get(pid), pc = c && c.peerConnection;
+    if (pc && pc.connectionState === 'connected') tune(pc, ls, pid);
+  });
+}
+
+// un amigo ocultó una de mis pantallas: dejo de mandársela (imagen y sonido) hasta que la vuelva a mostrar
+function applyPause(ls, pid) {
+  const c = ls.calls.get(pid), pc = c && c.peerConnection; if (!pc) return;
+  const off = !!(ls.paused && ls.paused.has(pid));
+  pc.getSenders().forEach(s => {
+    if (s.track) s._orig = s.track;
+    if (!s._orig) return;
+    const want = off ? null : s._orig;
+    if (s.track !== want) s.replaceTrack(want).catch(() => {});
+  });
+}
+
+// ocultar / mostrar una pantalla de otro
+function hideScreen(key, on) {
+  if (on) S.hidden.add(key); else S.hidden.delete(key);
+  const [peer, sid] = key.split('|');
+  const p = S.peers.get(peer);
+  try { p && p.conn && p.conn.open && p.conn.send({ t: 'pause', sid, on }); } catch (e) {}
+  if (S.focus === key) S.focus = '';
+  renderTiles();
 }
 
 // arranca la imagen con buena velocidad desde el principio (si no, empieza borrosa unos segundos)
@@ -609,6 +675,8 @@ function addRemote(key, call, md, st) {
     try { const src = A.ctx.createMediaStreamSource(st); r.an = A.ctx.createAnalyser(); r.an.fftSize = 1024; src.connect(r.an); } catch (e) {}
   } else {
     sysMsg(`${p ? p.name : 'Alguien'} compartió ${r.label.toLowerCase()}.`);
+    // si la tenía oculta (por ejemplo, se reconectó), se le vuelve a pedir que no la mande
+    if (S.hidden.has(key)) try { p && p.conn.open && p.conn.send({ t: 'pause', sid, on: true }); } catch (e) {}
   }
   S.remote.set(key, r);
   applyVolume(r);
@@ -856,8 +924,18 @@ async function statsTick() {
           p.jitter = (s.jitter || 0) * 1000;
         });
       }
+      // cómo le llega MI voz a este amigo (lo informa su navegador)
+      const myMic = S.local.get('mic'), oc = myMic && myMic.calls.get(p.id), opc = oc && oc.peerConnection;
+      if (opc) {
+        (await opc.getStats()).forEach(s => {
+          if (s.type !== 'remote-inbound-rtp' || s.kind !== 'audio') return;
+          p.outLoss = (s.fractionLost || 0) * 100;
+          p.outJitter = (s.jitter || 0) * 1000;
+        });
+      }
     } catch (e) {}
   }
+  voiceGuard();
   // pantallas que recibo
   for (const r of S.remote.values()) {
     if (r.kind !== 'screen' || !r.call || !r.call.peerConnection) continue;
@@ -898,7 +976,9 @@ function paintStats() {
     const key = el.dataset.q;
     const o = key.startsWith('me|') ? (S.local.get(key.slice(3)) || {}).qi : (S.remote.get(key) || {}).qi;
     if (!o || !o.w) { el.textContent = ''; return; }
-    el.textContent = `${o.w}×${o.h} · ${Math.round(o.fps || 0)} fps` + (o.mbps != null ? ` · ${o.mbps.toFixed(1)} Mbps` : '') + (o.lim ? ` · ${o.lim}` : '');
+    const caps = Object.values(S.vcap), low = key.startsWith('me|') && caps.length ? Math.min(...caps) : 1;
+    el.textContent = `${o.w}×${o.h} · ${Math.round(o.fps || 0)} fps` + (o.mbps != null ? ` · ${o.mbps.toFixed(1)} Mbps` : '') + (o.lim ? ` · ${o.lim}` : '') +
+      (low < 0.95 ? ` · 🎙️ voz primero: calidad al ${Math.round(low * 100)}%` : '');
   });
 }
 
@@ -978,6 +1058,7 @@ function screenTile(key, stream, title, mine, ls, r) {
   if (mine && ls.stream.getAudioTracks().length) {
     btn(ICON.cc, ls.sub ? 'Apagar subtítulos' : 'Subtitular esta pantalla', () => ls.sub ? stopSubs(ls) : startSubs(ls), !!ls.sub);
   }
+  if (r) btn(ICON.eyeOff, 'Ocultar esta pantalla (deja de llegarte y libera internet)', () => hideScreen(key, true));
   btn(ICON.focus, S.focus === key ? 'Achicar' : 'Ver en grande', () => { S.focus = S.focus === key ? '' : key; renderTiles(); }, S.focus === key);
   btn(ICON.full, 'Pantalla completa', () => { document.fullscreenElement ? document.exitFullscreen() : t.requestFullscreen && t.requestFullscreen().catch(() => {}); });
   if (mine) btn(ICON.stop, 'Dejar de compartir', () => stopShare(ls.sid));
@@ -998,7 +1079,12 @@ function renderTiles() {
   S.tiles.clear();
   const screens = [];
   S.local.forEach(ls => { if (ls.kind === 'screen') screens.push({ key: 'me|' + ls.sid, title: `${ls.label} — vos`, mine: true, ls, stream: ls.stream }); });
-  S.remote.forEach(r => { if (r.kind === 'screen') { const p = S.peers.get(r.peer); screens.push({ key: r.key, title: `${r.label} — ${p ? p.name : '?'}`, r, stream: r.stream }); } });
+  const hidden = [];
+  S.remote.forEach(r => {
+    if (r.kind !== 'screen') return;
+    const p = S.peers.get(r.peer), s = { key: r.key, title: `${r.label} — ${p ? p.name : '?'}`, r, stream: r.stream };
+    (S.hidden.has(r.key) ? hidden : screens).push(s);
+  });
   if (S.focus && !screens.some(s => s.key === S.focus)) S.focus = '';
   const users = [{ id: 'me', name: S.name, muted: S.muted }];
   S.peers.forEach(p => users.push({ id: p.id, name: p.name, muted: p.muted }));
@@ -1023,6 +1109,14 @@ function renderTiles() {
   } else {
     users.forEach(u => big.appendChild(userTile(u.id, u.name, u.muted)));
   }
+  // pantallas ocultas: un cuadrito con el botón para volver a verlas
+  hidden.forEach(s => {
+    const t = document.createElement('div');
+    t.className = 'tile hiddenscr';
+    t.innerHTML = `<div class="user"><button class="btn ghost">${ICON.eye} Mostrar</button></div><div class="tag"><span>${esc(s.title)} (oculta)</span></div>`;
+    t.querySelector('button').onclick = () => hideScreen(s.key, false);
+    strip.prepend(t);
+  });
   // los cuadros que ya no están sueltan su video
   keep.forEach(t => { const v = t.querySelector('video'); if (v) v.srcObject = null; });
   const n = big.children.length;
@@ -1083,6 +1177,7 @@ function openSettings() {
   $('#setLoop').checked = A.loop;
   $('#setQuality').value = cfg.quality;
   $('#setRes').value = QUAL[cfg.res] ? cfg.res : 'q1080';
+  $('#setVoiceFirst').checked = cfg.voiceFirst !== false;
   $('#setAutoSub').checked = cfg.autoSub;
   $('#setSubLang').value = cfg.subLang;
   $('#setSubs').checked = cfg.subs;
@@ -1116,6 +1211,7 @@ $('#setLoop').onchange = e => {
   try { A.loop ? A.gate.connect(A.ctx.destination) : A.gate.disconnect(A.ctx.destination); } catch (x) {}
 };
 $('#setQuality').onchange = e => { cfg.quality = e.target.value; saveCfg(); };
+$('#setVoiceFirst').onchange = e => { cfg.voiceFirst = e.target.checked; saveCfg(); voiceGuard(); };
 $('#setRes').onchange = e => {
   cfg.res = e.target.value; saveCfg();
   if ([...S.local.values()].some(l => l.kind === 'screen')) toast('La calidad nueva se usa en la próxima pantalla que compartas.');
@@ -1239,4 +1335,4 @@ function mediaSession() {
 function mediaMic() { try { navigator.mediaSession && navigator.mediaSession.setMicrophoneActive && navigator.mediaSession.setMicrophoneActive(!S.muted); } catch (e) {} }
 
 // para revisar desde la consola
-window.SALA = { S, A, cfg };
+window.SALA = { S, A, cfg, voiceGuard };

@@ -107,6 +107,9 @@ input[type=text]:focus,select:focus{border-color:var(--accent)}
 .tile:fullscreen .subs span{font-size:calc(30px * var(--subsize,1))}
 .badge{position:absolute;top:8px;left:8px;background:var(--red);color:#fff;font-size:11px;font-weight:800;border-radius:4px;padding:2px 6px;z-index:2}
 .badge.cc{left:auto;right:8px;top:auto;bottom:8px;background:#000a;color:var(--muted)}
+.tile.hiddenscr{background:var(--panel)}
+.tile.hiddenscr .btn{display:flex;gap:6px;align-items:center;padding:7px 12px;font-size:13px}
+.tile.hiddenscr .btn svg{width:16px;height:16px}
 .empty{color:var(--muted);text-align:center;padding:20px}
 .playbtn{position:absolute;inset:0;margin:auto;width:max-content;height:max-content;z-index:4}
 
@@ -263,6 +266,7 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
       <option value="max">Original de la pantalla · 60 cuadros — máxima (16 Mbps por amigo)</option>
     </select>
     <div class="row"><small style="color:var(--muted)">Tu internet tiene que <b>subir</b> esa velocidad por cada amigo que mira. Ejemplo: 1080p para 3 amigos = 15 Mbps de subida. Si se ve borroso o se traba, bajá la calidad. Sobre cada pantalla se ve con qué calidad llega de verdad.</small></div>
+    <div class="row"><label for="setVoiceFirst"><b>Voz primero:</b> si la voz se corta, bajar sola la calidad de mi pantalla (recomendado)</label><input type="checkbox" id="setVoiceFirst"></div>
     <select id="setQuality" style="margin-top:8px">
       <option value="motion">Si falta internet: priorizar fluidez (videos, juegos)</option>
       <option value="detail">Si falta internet: priorizar nitidez (texto, documentos)</option>
