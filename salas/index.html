@@ -5,7 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Salas de Voz</title>
 <meta name="description" content="Salas de llamada con amigos: voz sin ruido, varias pantallas y subtítulos en español.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%235865f2'/%3E%3Cpath d='M12 5a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V8a3 3 0 0 0-3-3zm-5 7a5 5 0 0 0 10 0M12 17v2' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#1e1f22">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Salas de Voz">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <style>
 :root{
   --bg:#1e1f22; --panel:#2b2d31; --panel2:#313338; --hover:#3a3c42; --line:#3f4147;
@@ -142,6 +148,13 @@ input[type=range].full{width:100%;accent-color:var(--accent)}
 .row label{flex:1}
 dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;background:var(--panel2)}
 
+.install{display:flex;gap:12px;align-items:center;background:#23a55a22;border:1px solid #23a55a;border-radius:10px;padding:10px 12px;margin-bottom:6px}
+.install img{width:44px;height:44px;border-radius:10px;flex:none}
+.install div{flex:1;min-width:0}
+.install b{display:block;font-size:14px}
+.install small{display:block;color:var(--muted);font-size:12px}
+.install .btn{padding:9px 12px;background:var(--green)}
+#update{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:60;background:var(--accent);color:#fff;border:0;border-radius:20px;padding:10px 16px;font-weight:600;box-shadow:0 6px 20px #0008;max-width:calc(100% - 32px)}
 #toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:#111214;color:#fff;padding:10px 16px;border-radius:8px;z-index:99;box-shadow:0 6px 20px #0008;max-width:calc(100% - 32px);font-size:14px}
 
 @media (max-width:900px){
@@ -162,6 +175,11 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
   <div class="card">
     <h1>Salas de Voz</h1>
     <p class="sub">Hablá con tus amigos sin ruido de fondo, compartí varias pantallas y mirá subtítulos en español de lo que se reproduce.</p>
+    <div class="install hidden" id="installBox">
+      <img src="icon-192.png" alt="">
+      <div><b>Instalá Salas de Voz como app</b><small>Queda con su ícono, se abre sin el navegador y podés minimizarla y seguir hablando.</small></div>
+      <button class="btn" id="btnInstall" type="button">Instalar</button>
+    </div>
     <label class="f" for="inName">Tu nombre</label>
     <input type="text" id="inName" maxlength="24" placeholder="Ej: Leo" autocomplete="nickname">
     <label class="f">Sala</label>
@@ -265,6 +283,7 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
 </dialog>
 
 <div id="toast" class="hidden"></div>
+<button id="update" class="hidden" type="button">🔄 Hay una versión nueva — tocá para actualizar</button>
 
 <script src="vendor/peerjs.min.js"></script>
 <script src="../ice.js"></script>

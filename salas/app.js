@@ -183,6 +183,7 @@ async function enter(name, room) {
   S.local.set('mic', { sid: 'mic', kind: 'mic', stream: A.dest.stream, label: 'voz', calls: new Map() });
   renderBar(); render();
   netStart();
+  mediaSession();
   sysMsg('Entraste a la sala.');
 }
 
@@ -278,6 +279,8 @@ function talkTick() {
 function setMuted(v) {
   S.muted = v;
   A.dest.stream.getAudioTracks().forEach(t => t.enabled = !v);
+  if (bgRaw && A.raw) A.raw.getAudioTracks().forEach(t => t.enabled = !v);
+  mediaMic();
   broadcast({ t: 'state', muted: S.muted, deaf: S.deaf });
   renderBar(); renderMembers();
 }
@@ -1067,6 +1070,76 @@ document.addEventListener('keydown', e => {
   if (e.key === 'm' || e.key === 'M') $('#btnMic').click();
 });
 window.addEventListener('pagehide', () => { try { S.me && S.me.destroy(); S.reg && S.reg.destroy(); } catch (e) {} });
+
+/* =====================================================================
+   APP: instalar, avisar versión nueva y seguir hablando con el celular minimizado
+   ===================================================================== */
+const MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+const IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!standalone()) $('#installBox').classList.remove('hidden'); });
+window.addEventListener('appinstalled', () => { installEvt = null; $('#installBox').classList.add('hidden'); toast('¡Listo! Salas de Voz quedó instalada con su ícono.'); });
+if (MOBILE && !standalone()) $('#installBox').classList.remove('hidden');
+$('#btnInstall').onclick = async () => {
+  if (installEvt) {
+    installEvt.prompt();
+    await installEvt.userChoice.catch(() => {});
+    installEvt = null; return;
+  }
+  if (IOS) toast('En iPhone: abrí esta página en Safari, tocá Compartir ⬆️ y elegí «Agregar a pantalla de inicio».', 9000);
+  else toast('Abrí esta página en Chrome, tocá el menú ⋮ y elegí «Instalar app» o «Agregar a pantalla principal».', 9000);
+};
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// si se publica una versión nueva mientras la página está abierta, se avisa (no se recarga sola para no cortar la llamada)
+(function () {
+  let first = null;
+  const check = () => fetch('app.js', { method: 'HEAD', cache: 'no-store' }).then(r => {
+    const tag = r.headers.get('etag') || r.headers.get('last-modified'); if (!tag) return;
+    if (first === null) first = tag; else if (tag !== first) $('#update').classList.remove('hidden');
+  }).catch(() => {});
+  check(); setInterval(check, 3 * 60e3);
+})();
+$('#update').onclick = () => {
+  if (S.me && !S.left) $('#btnLeave').click();
+  else location.reload();
+};
+
+// En el celular, con la app minimizada el sistema puede frenar el procesamiento de sonido de la página:
+// mientras está minimizada se manda el micrófono directo (con el filtro del propio celular) y al volver
+// se pone de nuevo el quitado de ruido inteligente.
+let bgRaw = false;
+function micSenders() {
+  const ls = S.local.get('mic'); if (!ls) return [];
+  return [...ls.calls.values()].flatMap(c => c.peerConnection ? c.peerConnection.getSenders().filter(s => s.track && s.track.kind === 'audio') : []);
+}
+function bgVoice(hidden) {
+  if (!MOBILE || !A.raw || !A.dest || !S.me || S.left) return;
+  const raw = A.raw.getAudioTracks()[0], proc = A.dest.stream.getAudioTracks()[0];
+  if (!raw || !proc || bgRaw === hidden) return;
+  bgRaw = hidden;
+  raw.enabled = hidden ? !S.muted : true;
+  micSenders().forEach(s => s.replaceTrack(hidden ? raw : proc).catch(() => {}));
+  if (!hidden && A.ctx.state === 'suspended') A.ctx.resume().catch(() => {});
+}
+document.addEventListener('visibilitychange', () => bgVoice(document.hidden));
+
+// controles en la notificación del celular / teclas multimedia
+function mediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: 'Salas de Voz', artist: $('#roomName').textContent, artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }] });
+    navigator.mediaSession.playbackState = 'playing';
+  } catch (e) {}
+  const set = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch (e) {} };
+  set('togglemicrophone', () => $('#btnMic').click());
+  set('hangup', () => $('#btnLeave').click());
+  set('pause', () => {});   // que «pausa» no corte el sonido de los amigos
+  set('play', () => {});
+}
+function mediaMic() { try { navigator.mediaSession && navigator.mediaSession.setMicrophoneActive && navigator.mediaSession.setMicrophoneActive(!S.muted); } catch (e) {} }
 
 // para revisar desde la consola
 window.SALA = { S, A, cfg };
