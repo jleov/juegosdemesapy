@@ -1913,7 +1913,7 @@ let SPR_ON = store.get('kdc_spr', true);
 const SPRITES = { musculoso: { src: 'sprites/luchador-infiniteloop77.png', cell: 240, counts: [13, 9, 6, 9, 4], k: 1.18,
   // los colores del dibujo original: 4 tonos de piel, 5 del calzoncillo y el contorno
   skin: [[238, 195, 154], [191, 157, 125], [151, 123, 97], [112, 91, 71]], shorts: [[159, 149, 139], [96, 89, 83], [80, 74, 69], [80, 75, 70], [64, 59, 55]], line: [24, 23, 22],
-  idleRow: 2, faceOff: [-4, 3], lean: true, frame: framesMusculo },
+  idleRow: 2, faceOff: [-4, 3], lean: true, frame: framesMusculo, headFix: { '4,3': [171, 64] } },
   /* "Male Realistic Pixel Art Template" de Pixel Moon Studio (uso libre, crédito no obligatorio): un muñeco con cada parte
      de un color (cabeza magenta, torso naranja, cadera amarilla, brazos y piernas verdes del lado de cerca y azules del de lejos),
      así cada parte se pinta con la ropa del peleador. Filas: 0 en guardia, 1 avanza, 2 retrocede, 3 jab, 4 piña recta,
@@ -2056,14 +2056,28 @@ function loadSprite(key) {
         for (let yy = 0; yy < n && top < 0; yy++) for (let xx = 0; xx < n; xx++) if (body(((y0 + yy) * W2 + x0 + xx) * 4)) { top = yy; break; }
         let sx = 0, cntp = 0;
         for (let yy = top; yy < top + 26 && yy < n; yy++) for (let xx = 0; xx < n; xx++) if (body(((y0 + yy) * W2 + x0 + xx) * 4)) { sx += xx; cntp++; }
-        const hx = cntp ? sx / cntp : n / 2, hy = top + 16;
+        let hx = cntp ? sx / cntp : n / 2, hy = top + 16;
+        if (S.headFix && S.headFix[row + ',' + col]) [hx, hy] = S.headFix[row + ',' + col]; // cuadros donde se busca mal
         S.heads[row][col] = [hx, hy];
         // se borra la cabeza (y la barba) del sprite
         x.save(); x.beginPath(); x.rect(x0, y0, n, n); x.clip(); x.globalCompositeOperation = 'destination-out';
-        x.beginPath(); x.ellipse(x0 + hx - 3, y0 + hy + 1, 20, 22, 0, 0, 7); x.fill(); x.restore();
+        x.beginPath(); x.ellipse(x0 + hx - 3, y0 + hy + 1, 23, 24, 0, 0, 7); x.fill(); x.restore();
         // la colita de pelo que cuelga atrás de la cabeza y la punta de la barba
         const hd = x.getImageData(x0, y0, n, n), q = hd.data;
         for (let yy = Math.max(0, Math.round(hy - 24)); yy < Math.min(n, hy + 30); yy++) for (let xx = Math.max(0, Math.round(hx - 40)); xx < Math.min(n, hx + 30); xx++) { const i = (yy * n + xx) * 4; if (q[i + 3] > 60 && q[i] + q[i + 1] + q[i + 2] < 120 && (xx < hx ? yy < hy + 16 : Math.hypot(xx - hx, yy - hy) < 32)) q[i + 3] = 0; }
+        // los pedacitos sueltos que quedan cerca de la cabeza (oreja, barba): con las caras recortadas se verían
+        const seen = new Uint8Array(n * n), stack = [];
+        for (let s0 = 0; s0 < n * n; s0++) {
+          if (seen[s0] || q[s0 * 4 + 3] <= 60) continue;
+          const comp = []; stack.push(s0); seen[s0] = 1;
+          while (stack.length) {
+            const s = stack.pop(), sx2 = s % n, sy2 = (s - sx2) / n; comp.push(s);
+            for (const t of [sx2 > 0 ? s - 1 : -1, sx2 < n - 1 ? s + 1 : -1, s - n, s + n]) if (t >= 0 && t < n * n && !seen[t] && q[t * 4 + 3] > 60) { seen[t] = 1; stack.push(t); }
+          }
+          if (comp.length > 160) continue;
+          let mx2 = 0, my2 = 0; for (const s of comp) { mx2 += s % n; my2 += Math.floor(s / n); }
+          if (Math.hypot(mx2 / comp.length - hx, my2 / comp.length - hy) < 48) for (const s of comp) q[s * 4 + 3] = 0;
+        }
         x.putImageData(hd, x0, y0);
         if (row === 2 && col === 0) { // dónde pisa: la fila más baja con cuerpo
           let bot = 0, fx = 0, fc = 0;
