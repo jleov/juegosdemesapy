@@ -1912,7 +1912,14 @@ function drawFighter(c, f, sx, sy, sc = 1) {
 let SPR_ON = store.get('kdc_spr', true);
 const SPRITES = { musculoso: { src: 'sprites/luchador-infiniteloop77.png', cell: 240, counts: [13, 9, 6, 9, 4], k: 1.18,
   // los colores del dibujo original: 4 tonos de piel, 5 del calzoncillo y el contorno
-  skin: [[238, 195, 154], [191, 157, 125], [151, 123, 97], [112, 91, 71]], shorts: [[159, 149, 139], [96, 89, 83], [80, 74, 69], [80, 75, 70], [64, 59, 55]], line: [24, 23, 22] } };
+  skin: [[238, 195, 154], [191, 157, 125], [151, 123, 97], [112, 91, 71]], shorts: [[159, 149, 139], [96, 89, 83], [80, 74, 69], [80, 75, 70], [64, 59, 55]], line: [24, 23, 22],
+  idleRow: 2, faceOff: [-4, 3], lean: true, frame: framesMusculo },
+  /* "Male Realistic Pixel Art Template" de Pixel Moon Studio (uso libre, crédito no obligatorio): un muñeco con cada parte
+     de un color (cabeza magenta, torso naranja, cadera amarilla, brazos y piernas verdes del lado de cerca y azules del de lejos),
+     así cada parte se pinta con la ropa del peleador. Filas: 0 en guardia, 1 avanza, 2 retrocede, 3 jab, 4 piña recta,
+     5 patada alta, 6 patada baja, 7 agachado, 8 salto, 9 en el aire, 10 cae noqueado, 11 recibe el golpe, 12 patada giratoria */
+  hombre: { kind: 'parts', src: 'sprites/hombre-pixelmoon.png', cell: 128, counts: [10, 9, 10, 10, 10, 10, 10, 5, 10, 5, 12, 8, 12], k: 2.3,
+  idleRow: 0, faceOff: [0, 1], frame: framesHombre } };
 /* el mismo cuerpo pintado de otro color sirve para varios peleadores (como hacían las máquinas de los 90):
    piel y calzoncillo de cada uno */
 const SPR_LOOK = {
@@ -1922,12 +1929,16 @@ const SPR_LOOK = {
   muralla: { sheet: 'musculoso', skin: '#8f98a3', shorts: '#4a5058' },
   terere: { sheet: 'musculoso', skin: '#b77b52', shorts: '#0038a8' },
   luchador: { sheet: 'musculoso', skin: '#e0a37a', shorts: '#ff4fa3' },
-  latigo: { sheet: 'musculoso', skin: '#8a5a3a', shorts: '#3b5998' }
+  latigo: { sheet: 'musculoso', skin: '#8a5a3a', shorts: '#3b5998' },
+  // los flacos usan el muñeco con su propia ropa (remera, mangas, pantalón y zapatos de cada uno)
+  rayo: { sheet: 'hombre' }, sombra: { sheet: 'hombre' }, escarcha: { sheet: 'hombre' }, tornado: { sheet: 'hombre' }, meteoro: { sheet: 'hombre' },
+  halcon: { sheet: 'hombre' }, sonico: { sheet: 'hombre' }, bumeran: { sheet: 'hombre' }, bombita: { sheet: 'hombre' }
 };
 const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; };
 // arma (una sola vez) la hoja pintada con los colores de ese peleador
 function spriteSheet(S, look, key) {
   S.paint = S.paint || new Map(); let cv3 = S.paint.get(key); if (cv3) return cv3;
+  if (S.kind === 'parts') { cv3 = paintParts(S, look); S.paint.set(key, cv3); return cv3; }
   const sk = [.28, 0, -.22, -.42].map(q => hexRGB(shade(look.skin, q))), sh = [.4, 0, -.15, -.15, -.3].map(q => hexRGB(shade(look.shorts, q)));
   const map = new Map(); const put = (a, b) => map.set((a[0] << 16) | (a[1] << 8) | a[2], b);
   S.skin.forEach((a, i) => put(a, sk[i])); S.shorts.forEach((a, i) => put(a, sh[i])); if (look.line) put(S.line, hexRGB(look.line));
@@ -1936,10 +1947,77 @@ function spriteSheet(S, look, key) {
   for (let i = 0; i < d.length; i += 4) { if (!d[i + 3]) continue; const to = map.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]); if (to) { d[i] = to[0]; d[i + 1] = to[1]; d[i + 2] = to[2]; } }
   x.putImageData(id, 0, 0); S.paint.set(key, cv3); return cv3;
 }
+/* muñeco por partes: al cargar se anota qué parte es cada píxel (y qué tan claro es) y dónde está la cabeza */
+const PART = { torso: 1, arm: 2, leg: 3, shoe: 4, line: 5 };
+function prepParts(S, im) {
+  const n = S.cell, w = im.width, h = im.height, cv2 = mkCanvas(w, h), x = cv2.getContext('2d', { willReadFrequently: true });
+  x.drawImage(im, 0, 0);
+  const d = x.getImageData(0, 0, w, h).data, cls = new Uint8Array(w * h), lum = new Uint8Array(w * h), far = new Uint8Array(w * h);
+  // 1 cabeza, 2 torso, 3 cadera, 4 verde (cerca), 5 azul (lejos), 6 contorno
+  const hue = i => {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    if (d[i + 3] < 60) return 0;
+    if (Math.max(r, g, b) < 45) return 6;
+    if (r > 110 && b > 110 && g < Math.min(r, b) - 30) return 1;
+    if (g > r + 20 && g > b + 10) return 4;
+    if (b > r + 25 && b > g + 20) return 5;
+    if (r > b + 35 && g > b + 35 && Math.abs(r - g) < 45) return 3;
+    return 2;
+  };
+  S.heads = []; S.foot = null;
+  S.counts.forEach((cnt, row) => {
+    S.heads[row] = [];
+    for (let col = 0; col < cnt; col++) {
+      const x0 = col * n, y0 = row * n; let hipY = n, bot = 0, hx = 0, hy = 0, hc = 0;
+      const hu = new Uint8Array(n * n);
+      for (let yy = 0; yy < n; yy++) for (let xx = 0; xx < n; xx++) {
+        const v = hue(((y0 + yy) * w + x0 + xx) * 4); hu[yy * n + xx] = v;
+        if (v) bot = Math.max(bot, yy);
+        if (v === 3) hipY = Math.min(hipY, yy);
+        if (v === 1) { hx += xx; hy += yy; hc++; }
+      }
+      hx = hc ? hx / hc : n / 2; hy = hc ? hy / hc : 20;
+      const hr = Math.sqrt(hc / Math.PI) + 2.5;
+      S.heads[row][col] = [hx, hy];
+      for (let yy = 0; yy < n; yy++) for (let xx = 0; xx < n; xx++) {
+        const v = hu[yy * n + xx]; if (!v) continue;
+        const p = (y0 + yy) * w + x0 + xx, i = p * 4;
+        // la cabeza (y su contorno) se borra: ahí va la foto
+        if (v === 1 || (v === 6 && Math.hypot(xx - hx, yy - hy) < hr)) { d[i + 3] = 0; continue; }
+        lum[p] = Math.max(d[i], d[i + 1], d[i + 2]);
+        if (v === 6) cls[p] = PART.line;
+        else if (v === 2) cls[p] = PART.torso;
+        else if (v === 3) cls[p] = PART.leg;
+        else { far[p] = v === 5 ? 1 : 0; cls[p] = yy >= hipY - 1 ? (yy > bot - 5 ? PART.shoe : PART.leg) : PART.arm; }
+      }
+      if (row === S.idleRow && col === 0) {
+        let fx = 0, fc = 0;
+        for (let yy = bot - 8; yy <= bot; yy++) for (let xx = 0; xx < n; xx++) if (hu[yy * n + xx]) { fx += xx; fc++; }
+        S.foot = [fc ? fx / fc : n / 2, bot];
+      }
+    }
+  });
+  S.cls = cls; S.lum = lum; S.far = far; S.alpha = d; S.w = w; S.h = h;
+}
+// pinta el muñeco con la ropa del peleador, conservando las luces y sombras del dibujo
+function paintParts(S, c) {
+  const cols = [null, c.shirt, c.arm, c.pants, c.shoe, c.line].map(v => v ? hexRGB(v) : null);
+  const cv3 = mkCanvas(S.w, S.h), x = cv3.getContext('2d'), id = x.createImageData(S.w, S.h), o = id.data;
+  for (let p = 0; p < S.cls.length; p++) {
+    const k = S.cls[p]; if (!k || !S.alpha[p * 4 + 3]) continue;
+    const t = cols[k], i = p * 4;
+    if (k === PART.line) { o[i] = t[0] * .4; o[i + 1] = t[1] * .4; o[i + 2] = t[2] * .4; o[i + 3] = 255; continue; }
+    let q = S.lum[p] / 185 * (S.far[p] ? .78 : 1); q = Math.max(.3, Math.min(1.35, q));
+    for (let j = 0; j < 3; j++) o[i + j] = q <= 1 ? t[j] * q : t[j] + (255 - t[j]) * (q - 1) * .8;
+    o[i + 3] = 255;
+  }
+  x.putImageData(id, 0, 0); return cv3;
+}
 function loadSprite(key) {
   const S = SPRITES[key]; if (S.state) return; S.state = 'loading';
   const im = new Image();
   im.onload = () => {
+    if (S.kind === 'parts') { prepParts(S, im); S.sheet = true; S.state = 'ready'; return; }
     const n = S.cell, cv2 = mkCanvas(im.width, im.height), x = cv2.getContext('2d', { willReadFrequently: true });
     x.drawImage(im, 0, 0);
     const data = x.getImageData(0, 0, im.width, im.height).data, W2 = im.width;
@@ -1980,11 +2058,36 @@ function useSprite(f) {
   if (!S.state) loadSprite(L.sheet);
   if (S.state !== 'ready') return null;
   // en los remates (electrocutado, quemado, congelado) se pinta con esos colores
-  const look = f.pal ? (p => ({ skin: p.arm, shorts: p.pants, line: f.pal === 1 ? p.line : null }))(palette(f.ch, f.pal).c) : L;
+  const pc = f.pal ? palette(f.ch, f.pal).c : null;
+  const look = S.kind === 'parts' ? (pc || f.ch.c) : pc ? { skin: pc.arm, shorts: pc.pants, line: f.pal === 1 ? pc.line : null } : L;
   return { S, sheet: spriteSheet(S, look, f.key + (f.pal || '')) };
 }
 // qué cuadro mostrar según lo que está haciendo
-function spriteFrame(f, S) {
+function framesHombre(f, S) {
+  const T = G.time, st = f.st, a = f.atk, C = S.counts;
+  if (st === 'walk') { const back = Math.sign(f.vx) * f.face < 0, r = back ? 2 : 1; return [r, Math.floor(T / 4) % C[r]]; }
+  if (st === 'jump' || st === 'fall') return f.vy > 3 ? [8, 3] : f.vy > -3 ? [8, 4] : [9, Math.floor(T / 6) % C[9]];
+  if (st === 'crouch') return [7, 2 + Math.floor(T / 14) % 3];
+  if (st === 'land' || st === 'getup') return [7, 1];
+  if (st === 'attack' && a) {
+    const ph = f.sf < a.su ? 0 : f.sf < a.su + a.ac ? 1 : 2, t = ph === 0 ? f.sf / a.su : ph === 2 ? (f.sf - a.su - a.ac) / a.rc : 0;
+    const pick = (r, s0, s1, hit, r0, r1) => [r, ph === 0 ? Math.round(s0 + (s1 - s0) * t) : ph === 1 ? hit : Math.round(r0 + (r1 - r0) * Math.min(1, t))];
+    if (f.an === 'p') return pick(3, 2, 5, 6, 7, 9);
+    if (f.an === 'cp') return [7, 4];
+    if (f.an === 'jp') return pick(4, 3, 5, 6, 7, 7);
+    if (f.an === 'ck') return pick(6, 1, 3, 4, 5, 8);
+    if (f.an === 'jk') return [6, 4];
+    if (f.an === 'tk') return pick(12, 2, 4, 6, 8, 11);
+    return pick(5, 1, 3, 4, 5, 8); // patada alta
+  }
+  if (st === 'special') return [12, Math.floor(f.sf / 3) % C[12]];
+  if (st === 'hit') return [11, Math.min(2, Math.floor(f.sf / 3))];
+  if (st === 'block') return [11, 0];
+  if (st === 'ko' || st === 'fly' || st === 'down' || st === 'flat' || st === 'zapped') return [10, st === 'down' || st === 'flat' ? 11 : Math.min(11, 1 + Math.floor(f.sf / 3))];
+  if (st === 'dizzy') return [11, 0];
+  return [0, Math.floor(T / 7) % C[0]]; // en guardia
+}
+function framesMusculo(f, S) {
   const T = G.time, st = f.st, a = f.atk, prog = a ? f.sf / (a.su + a.ac + a.rc) : 0;
   if (st === 'walk') { const n = S.counts[3], k = Math.floor(T / 4) % n; return [3, Math.sign(f.vx) * f.face < 0 ? n - 1 - k : k]; }
   if (st === 'jump') return [4, f.vy > 2 ? 2 : 1];
@@ -1999,14 +2102,14 @@ function spriteFrame(f, S) {
 }
 function drawSpriteBody(c, f, SP, vfx, T) {
   const S = SP.S;
-  const [row, col] = spriteFrame(f, S), n = S.cell, k = S.k, [ax, ay] = S.foot;
-  const lean = f.st === 'hit' || f.st === 'block' ? -.18 : 0; // se echa para atrás cuando le pegan
+  const [row, col] = S.frame(f, S), n = S.cell, k = S.k, [ax, ay] = S.foot;
+  const lean = S.lean && (f.st === 'hit' || f.st === 'block') ? -.18 : 0; // se echa para atrás cuando le pegan
   if (lean) c.rotate(lean);
   c.imageSmoothingEnabled = false;
   c.drawImage(SP.sheet, col * n, row * n, n, n, -ax * k, -ay * k, n * k, n * k);
   c.imageSmoothingEnabled = true;
   // la cara de la foto donde estaba la cabeza del sprite
-  const [hx, hy] = S.heads[row][col], R = 31, hcx = (hx - ax - 4) * k, hcy = (hy - ay + 3) * k;
+  const [hx, hy] = S.heads[row][col], R = 31, hcx = (hx - ax + S.faceOff[0]) * k, hcy = (hy - ay + S.faceOff[1]) * k;
   c.save(); c.translate(hcx, hcy); c.scale(vfx, 1);
   if (f.flash > 0) { const q = Math.sin(f.flash * 1.3) * .12; c.scale(1 + q, 1 - q); }
   drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, vfx, f.yaw, f);
@@ -3168,7 +3271,7 @@ const pixLabel = () => $('#mPix').textContent = PIX ? '🕹️ Estilo: arcade (p
 $('#mPix').onclick = () => { PIX = !PIX; store.set('kdc_pix', PIX); pixLabel(); toast(PIX ? '🕹️ Estilo arcade: como las máquinas de los 90' : '🖌️ Estilo liso, sin píxeles'); };
 pixLabel();
 const sprLabel = () => $('#mSpr').textContent = SPR_ON ? '🧍 Cuerpos: pixel art' : '🧍 Cuerpos: dibujados';
-$('#mSpr').onclick = () => { SPR_ON = !SPR_ON; store.set('kdc_spr', SPR_ON); sprLabel(); toast(SPR_ON ? '🧍 Toro, Tanque, Dragón, Muralla, Tereré, Luchador y Látigo con cuerpo de pixel art' : '🧍 Todos vuelven al cuerpo dibujado'); };
+$('#mSpr').onclick = () => { SPR_ON = !SPR_ON; store.set('kdc_spr', SPR_ON); sprLabel(); toast(SPR_ON ? '🧍 Todos los peleadores con cuerpo de pixel art' : '🧍 Todos vuelven al cuerpo dibujado'); };
 sprLabel();
 function openOnline(code) {
   $('#onA').style.display = 'block'; $('#onB').style.display = 'none'; oMsg('');
