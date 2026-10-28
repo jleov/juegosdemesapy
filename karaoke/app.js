@@ -32,7 +32,7 @@ const ytId = s => { const m = String(s).match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|
 /* ---------------- ajustes guardados ---------------- */
 const cfg = Object.assign({
   name: '', mic: '', phones: false, fx: 'karaoke', echo: 35, rev: 30, pitch: 0, vvol: 100, monitor: false,
-  music: 80, voices: 100, align: true, onlyK: true, vols: {},
+  music: 80, voices: 100, align: true, onlyK: true, vols: {}, tune: 'off',
 }, (() => { try { return JSON.parse(localStorage.getItem('karaoke_cfg') || '{}'); } catch (e) { return {}; } })());
 const saveCfg = () => { try { localStorage.setItem('karaoke_cfg', JSON.stringify(cfg)); } catch (e) {} };
 
@@ -172,7 +172,16 @@ const PRESETS = {
   estadio: { n: 'Estadio', echo: 40, rev: 50, size: 4.2, delay: 0.42 },
   radio: { n: 'Radio', echo: 0, rev: 10, size: 0.8, radio: true },
 };
+// afinación automática: cuánto corrige hacia la nota más cercana y en cuánto tiempo (s)
+const TUNES = {
+  off: { n: 'Apagada', tune: 0, speed: 0.05 },
+  suave: { n: 'Suave', tune: 0.5, speed: 0.12 },
+  natural: { n: 'Natural', tune: 0.85, speed: 0.045 },
+  robot: { n: 'Robot', tune: 1, speed: 0.002 },
+};
 const A = { ctx: null, irSize: 0, open: false, lastLoud: 0, db: -100 };
+// efectos prendidos: cantando, o probándolos en silencio con «Escucharme» (nadie más oye)
+const fxOn = () => S.mode === 'sing' || (S.mode === 'mute' && cfg.monitor);
 
 async function audioStart() {
   const ctx = A.ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive', sampleRate: 48000 });
@@ -240,7 +249,7 @@ function makeIR(sec) {
 // aplica el efecto: con «Cantar» todo; con «Hablar» la voz limpia
 function applyFx() {
   if (!A.ctx) return;
-  const p = PRESETS[cfg.fx] || PRESETS.karaoke, sing = S.mode === 'sing', t = A.ctx.currentTime;
+  const p = PRESETS[cfg.fx] || PRESETS.karaoke, sing = fxOn(), t = A.ctx.currentTime;
   const echo = sing ? cfg.echo / 100 : 0, rev = sing ? cfg.rev / 100 : 0;
   if (sing && A.irSize !== p.size) { A.conv.buffer = makeIR(p.size); A.irSize = p.size; }
   A.rev.gain.setTargetAtTime(rev * 0.8, t, 0.05);
@@ -252,7 +261,12 @@ function applyFx() {
   A.lp.frequency.setTargetAtTime(radio ? 3400 : 16000, t, 0.05);
   A.pres.gain.setTargetAtTime(radio ? 6 : sing ? 2.5 : 0, t, 0.05);
   A.comp.ratio.value = sing ? 4 : 3;
-  if (A.pitch) A.pitch.parameters.get('ratio').setValueAtTime(sing ? Math.pow(2, cfg.pitch / 12) : 1, t);
+  if (A.pitch) {
+    const tu = TUNES[cfg.tune] || TUNES.off;
+    A.pitch.parameters.get('ratio').setValueAtTime(sing ? Math.pow(2, cfg.pitch / 12) : 1, t);
+    A.pitch.parameters.get('tune').setValueAtTime(sing ? tu.tune : 0, t);
+    A.pitch.parameters.get('speed').setValueAtTime(tu.speed, t);
+  }
   A.vvol.gain.setTargetAtTime(cfg.vvol / 100, t, 0.05);
   A.mon.gain.setTargetAtTime(cfg.monitor ? 1 : 0, t, 0.05);
 }
@@ -264,11 +278,11 @@ const levelDb = (an, buf) => {
 };
 const gBuf = new Float32Array(1024);
 function gateTick() {
-  const n = now(), sing = S.mode === 'sing';
+  const n = now(), sing = fxOn();
   A.db = levelDb(A.an, gBuf);
   if (A.db > (sing ? -62 : -55)) { A.lastLoud = n; A.open = true; }
   else if (A.open && n - A.lastLoud > (sing ? 1000 : 650)) A.open = false;
-  const on = A.open && S.mode !== 'mute';
+  const on = A.open && (S.mode !== 'mute' || cfg.monitor);
   A.gate.gain.setTargetAtTime(on ? 1 : 0, A.ctx.currentTime, on ? 0.004 : 0.15);
   if (S.tab === 'voice') {
     $('#meter i').style.width = clamp((A.db + 80) / 65 * 100, 0, 100) + '%';
@@ -833,7 +847,16 @@ function roomUI() {
   slider('#volMusic', 'music', v => v + '%', () => { try { yt.setVolume(cfg.music); } catch (e) {} });
   slider('#volVoices', 'voices', v => v + '%', () => S.remote.forEach(applyVolume));
   const toggle = (id, key, after) => { const el = $(id); el.checked = !!cfg[key]; el.onchange = () => { cfg[key] = el.checked; saveCfg(); after && after(); }; };
-  toggle('#monitor', 'monitor', () => { applyFx(); if (cfg.monitor && !cfg.phones) toast('Usá auriculares, si no se acopla (chillido).', 5000); });
+  $('#monitor').onchange = () => setMonitor($('#monitor').checked);
+  $('#bMon').onclick = () => setMonitor(!cfg.monitor);
+  const tb = $('#tunes');
+  if (!A.pitch) tb.parentElement.querySelectorAll('#tunes, #tunes + .note').forEach(el => el.classList.add('hidden'));
+  Object.entries(TUNES).forEach(([k, p]) => {
+    const b = document.createElement('button'); b.textContent = p.n; b.dataset.k = k;
+    b.onclick = () => { cfg.tune = k; saveCfg(); paintVoice(); applyFx(); if (k !== 'off' && S.mode !== 'sing' && !cfg.monitor) toast('La afinación se aplica cuando tocás «🎤 Cantar». Con 🎧 la podés escuchar.', 5000); };
+    tb.appendChild(b);
+  });
+  setMonitor(cfg.monitor, true);
   toggle('#phones', 'phones', () => setMode(S.mode));
   toggle('#align', 'align');
   $('#micSel').onchange = async () => {
@@ -846,8 +869,26 @@ function roomUI() {
   window.addEventListener('pagehide', () => { try { S.me && S.me.destroy(); S.reg && S.reg.destroy(); } catch (e) {} });
 }
 
+// escucharse a uno mismo: va directo del micrófono a los auriculares con la menor demora que permite el aparato
+function setMonitor(v, quiet) {
+  cfg.monitor = !!v; saveCfg();
+  $('#monitor').checked = cfg.monitor;
+  $('#bMon').classList.toggle('on', cfg.monitor);
+  applyFx();
+  const ms = Math.round(((A.ctx.baseLatency || 0.01) + (A.ctx.outputLatency || 0)) * 1000 + 12);
+  $('#monLat').textContent = `Demora al escucharte: unos ${ms} ms` + (ms <= 40 ? ' ✅ casi no se nota.' : ms <= 90 ? ' — se nota un poquito, como un eco corto.'
+    : ' — se nota como eco. Con auriculares con cable baja mucho (los Bluetooth tardan bastante).');
+  if (quiet) return;
+  if (cfg.monitor) {
+    if (A.noMic) toast('No hay micrófono para escucharte.');
+    else toast(`🎧 Te escuchás (demora ~${ms} ms).` + (cfg.phones ? '' : ' Usá auriculares, con parlante se acopla.') + (S.mode === 'mute' ? ' En Silencio solo vos te oís: probá los efectos.' : ''), 6000);
+  }
+  renderSingers();
+}
+
 function paintVoice() {
   document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('sel', b.dataset.k === cfg.fx));
+  document.querySelectorAll('#tunes button').forEach(b => b.classList.toggle('sel', b.dataset.k === (cfg.tune || 'off')));
   [['#fxEcho', 'echo', v => v + '%'], ['#fxRev', 'rev', v => v + '%']].forEach(([id, k, show]) => {
     const el = $(id); el.value = cfg[k]; el.parentElement.querySelector('output').textContent = show(cfg[k]);
   });

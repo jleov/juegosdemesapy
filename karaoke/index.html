@@ -144,6 +144,8 @@ h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04e
 .modes button[data-m=mute].on{background:#4a3a66}
 .modes button[data-m=talk].on{background:var(--violet)}
 .modes button[data-m=sing].on{background:linear-gradient(90deg,var(--pink),var(--violet));box-shadow:0 0 14px #ff3ea588}
+#bMon{flex:none;font-size:18px;padding:6px 10px}
+#bMon.on{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 12px #22d3ee88}
 .reacts{display:flex;gap:2px;flex:none}
 .reacts button{background:none;border:0;font-size:22px;padding:4px;border-radius:8px}
 .reacts button:hover{background:var(--panel2)}
@@ -253,8 +255,12 @@ h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04e
       <div class="sl"><span>Reverberación</span><input type="range" id="fxRev" min="0" max="100"><output></output></div>
       <div class="sl"><span>Tono</span><input type="range" id="fxPitch" min="-6" max="6" step="1"><output></output></div>
       <div class="sl"><span>Mi voz</span><input type="range" id="fxVol" min="0" max="200"><output></output></div>
+      <h4>Afinación automática (Auto-Tune)</h4>
+      <div class="presets" id="tunes" style="grid-template-columns:repeat(4,1fr)"></div>
+      <p class="note" style="margin:6px 0 0">Corrige tu voz a la nota más cercana mientras cantás. «Suave» y «Natural» disimulan las desafinadas; «Robot» es el efecto que usan en el reguetón y el trap.</p>
       <div id="meter"><i></i></div>
-      <label class="tg"><input type="checkbox" id="monitor"><span>Escucharme con los efectos<small>Solo con auriculares (con parlante se acopla).</small></span></label>
+      <label class="tg"><input type="checkbox" id="monitor"><span>🎧 Escucharme mientras canto<small>Oís tu voz con los efectos y la afinación. Usalo con auriculares (con parlante se acopla). En «Silencio» sirve para probar los efectos sin que nadie te escuche.</small></span></label>
+      <div class="note" id="monLat" style="margin:-4px 0 6px 26px"></div>
       <h4>Sonido</h4>
       <div class="sl"><span>Música</span><input type="range" id="volMusic" min="0" max="100"><output></output></div>
       <div class="sl"><span>Voces</span><input type="range" id="volVoices" min="0" max="100"><output></output></div>
@@ -271,6 +277,7 @@ h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04e
       <button data-m="talk">💬 Hablar</button>
       <button data-m="sing">🎤 Cantar</button>
     </div>
+    <button class="ibtn" id="bMon" title="Escucharme mientras canto (con auriculares)">🎧</button>
     <div class="reacts" id="reacts">
       <button>👏</button><button>🔥</button><button>❤️</button><button>😂</button><button>🎉</button><button>🍺</button>
     </div>
