@@ -1919,20 +1919,23 @@ const SPRITES = { musculoso: { src: 'sprites/luchador-infiniteloop77.png', cell:
      así cada parte se pinta con la ropa del peleador. Filas: 0 en guardia, 1 avanza, 2 retrocede, 3 jab, 4 piña recta,
      5 patada alta, 6 patada baja, 7 agachado, 8 salto, 9 en el aire, 10 cae noqueado, 11 recibe el golpe, 12 patada giratoria */
   hombre: { kind: 'parts', src: 'sprites/hombre-pixelmoon.png', cell: 128, counts: [10, 9, 10, 10, 10, 10, 10, 5, 10, 5, 12, 8, 12], k: 2.3,
-  idleRow: 0, faceOff: [0, 1], frame: framesHombre } };
+  idleRow: 0, faceOff: [0, 1], frame: framesHombre },
+  // el gordo: el mismo muñeco con la panza inflada (cuánto se estira adelante y atrás) y un poco más ancho
+  gordo: { kind: 'parts', src: 'sprites/hombre-pixelmoon.png', cell: 128, counts: [10, 9, 10, 10, 10, 10, 10, 5, 10, 5, 12, 8, 12], k: 2.4, kx: 1.08, fat: [.34, .14],
+  idleRow: 0, faceOff: [1, 2], frame: framesHombre } };
 /* el mismo cuerpo pintado de otro color sirve para varios peleadores (como hacían las máquinas de los 90):
    piel y calzoncillo de cada uno */
 const SPR_LOOK = {
   toro: { sheet: 'musculoso', skin: '#c98a5f', shorts: '#d0322a' },
-  tanque: { sheet: 'musculoso', skin: '#a06c46', shorts: '#4e6b2f' },
+  tanque: { sheet: 'gordo' },
   dragon: { sheet: 'musculoso', skin: '#d9a273', shorts: '#ff8a1e' },
-  muralla: { sheet: 'musculoso', skin: '#8f98a3', shorts: '#4a5058' },
-  terere: { sheet: 'musculoso', skin: '#b77b52', shorts: '#0038a8' },
-  luchador: { sheet: 'musculoso', skin: '#e0a37a', shorts: '#ff4fa3' },
+  muralla: { sheet: 'gordo' },
+  terere: { sheet: 'gordo' },
+  luchador: { sheet: 'gordo' },
   latigo: { sheet: 'musculoso', skin: '#8a5a3a', shorts: '#3b5998' },
   // los flacos usan el muñeco con su propia ropa (remera, mangas, pantalón y zapatos de cada uno)
   rayo: { sheet: 'hombre' }, sombra: { sheet: 'hombre' }, escarcha: { sheet: 'hombre' }, tornado: { sheet: 'hombre' }, meteoro: { sheet: 'hombre' },
-  halcon: { sheet: 'hombre' }, sonico: { sheet: 'hombre' }, bumeran: { sheet: 'hombre' }, bombita: { sheet: 'hombre' }
+  halcon: { sheet: 'hombre' }, sonico: { sheet: 'hombre' }, bumeran: { sheet: 'hombre' }, bombita: { sheet: 'gordo' }
 };
 const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; };
 // arma (una sola vez) la hoja pintada con los colores de ese peleador
@@ -1968,12 +1971,12 @@ function prepParts(S, im) {
   S.counts.forEach((cnt, row) => {
     S.heads[row] = [];
     for (let col = 0; col < cnt; col++) {
-      const x0 = col * n, y0 = row * n; let hipY = n, bot = 0, hx = 0, hy = 0, hc = 0;
+      const x0 = col * n, y0 = row * n; let hipY = n, hipBot = 0, bot = 0, hx = 0, hy = 0, hc = 0;
       const hu = new Uint8Array(n * n);
       for (let yy = 0; yy < n; yy++) for (let xx = 0; xx < n; xx++) {
         const v = hue(((y0 + yy) * w + x0 + xx) * 4); hu[yy * n + xx] = v;
         if (v) bot = Math.max(bot, yy);
-        if (v === 3) hipY = Math.min(hipY, yy);
+        if (v === 3) { hipY = Math.min(hipY, yy); hipBot = Math.max(hipBot, yy); }
         if (v === 1) { hx += xx; hy += yy; hc++; }
       }
       hx = hc ? hx / hc : n / 2; hy = hc ? hy / hc : 20;
@@ -1987,9 +1990,10 @@ function prepParts(S, im) {
         lum[p] = Math.max(d[i], d[i + 1], d[i + 2]);
         if (v === 6) cls[p] = PART.line;
         else if (v === 2) cls[p] = PART.torso;
-        else if (v === 3) cls[p] = PART.leg;
+        else if (v === 3) cls[p] = yy < hipY + (hipBot - hipY) * .45 ? PART.torso : PART.leg; // la parte de arriba de la cadera es panza (remera)
         else { far[p] = v === 5 ? 1 : 0; cls[p] = yy >= hipY - 1 ? (yy > bot - 5 ? PART.shoe : PART.leg) : PART.arm; }
       }
+      if (S.fat) fatten(S, hu, x0, y0, w, cls, lum, far, d);
       if (row === S.idleRow && col === 0) {
         let fx = 0, fc = 0;
         for (let yy = bot - 8; yy <= bot; yy++) for (let xx = 0; xx < n; xx++) if (hu[yy * n + xx]) { fx += xx; fc++; }
@@ -1998,6 +2002,27 @@ function prepParts(S, im) {
     }
   });
   S.cls = cls; S.lum = lum; S.far = far; S.alpha = d; S.w = w; S.h = h;
+}
+/* el gordo: al mismo muñeco se le dibuja una panza redonda (con luz arriba adelante, sombra abajo y su contorno)
+   sobre el torso; queda delante de las piernas y detrás del brazo de cerca */
+function fatten(S, hu, x0, y0, w, cls, lum, far, d) {
+  const n = S.cell, [kr, kf] = S.fat;
+  let top = n, bot = -1, sx = 0, sy = 0, sc = 0;
+  for (let yy = 0; yy < n; yy++) for (let xx = 0; xx < n; xx++) {
+    const v = hu[yy * n + xx]; if (v !== 2 && v !== 3) continue;
+    if (v === 2 && yy < top) top = yy; if (v === 3 && yy > bot) bot = yy; sx += xx; sy += yy; sc++;
+  }
+  if (bot <= top || !sc) return;
+  const th = Math.min(bot - top, 36), bx = sx / sc + th * kf, by = sy / sc + th * .17, rx = th * kr, ry = th * kr * .9;
+  for (let yy = Math.max(0, Math.floor(by - ry - 1)); yy <= Math.min(n - 1, Math.ceil(by + ry + 1)); yy++)
+    for (let xx = Math.max(0, Math.floor(bx - rx - 1)); xx <= Math.min(n - 1, Math.ceil(bx + rx + 1)); xx++) {
+      const ex = (xx - bx) / rx, ey = (yy - by) / ry, r = Math.hypot(ex, ey); if (r > 1) continue;
+      const p = (y0 + yy) * w + x0 + xx;
+      if (cls[p] === PART.arm && !far[p]) continue; // el brazo de adelante tapa la panza
+      far[p] = 0; d[p * 4 + 3] = 255;
+      if (r > .9) { cls[p] = PART.line; lum[p] = 0; continue; }
+      cls[p] = PART.torso; lum[p] = Math.round(Math.max(90, Math.min(235, 205 - Math.hypot(ex - .35, ey + .45) * 70)));
+    }
 }
 // pinta el muñeco con la ropa del peleador, conservando las luces y sombras del dibujo
 function paintParts(S, c) {
@@ -2106,10 +2131,11 @@ function drawSpriteBody(c, f, SP, vfx, T) {
   const lean = S.lean && (f.st === 'hit' || f.st === 'block') ? -.18 : 0; // se echa para atrás cuando le pegan
   if (lean) c.rotate(lean);
   c.imageSmoothingEnabled = false;
-  c.drawImage(SP.sheet, col * n, row * n, n, n, -ax * k, -ay * k, n * k, n * k);
+  const kx = k * (S.kx || 1);
+  c.drawImage(SP.sheet, col * n, row * n, n, n, -ax * kx, -ay * k, n * kx, n * k);
   c.imageSmoothingEnabled = true;
   // la cara de la foto donde estaba la cabeza del sprite
-  const [hx, hy] = S.heads[row][col], R = 31, hcx = (hx - ax + S.faceOff[0]) * k, hcy = (hy - ay + S.faceOff[1]) * k;
+  const [hx, hy] = S.heads[row][col], R = 31, hcx = (hx - ax + S.faceOff[0]) * kx, hcy = (hy - ay + S.faceOff[1]) * k;
   c.save(); c.translate(hcx, hcy); c.scale(vfx, 1);
   if (f.flash > 0) { const q = Math.sin(f.flash * 1.3) * .12; c.scale(1 + q, 1 - q); }
   drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, vfx, f.yaw, f);
