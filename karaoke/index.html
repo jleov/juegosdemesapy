@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sala de Karaoke</title>
+<meta name="description" content="Karaoke con amigos: videos de YouTube sincronizados para todos, voz con eco y reverberación como en los karaokes de verdad.">
+<meta name="theme-color" content="#120a1f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+<style>
+:root{
+  --bg:#120a1f; --panel:#1d1230; --panel2:#271a40; --hover:#33224f; --line:#3a2a58;
+  --text:#f6f1ff; --muted:#b3a6cc; --pink:#ff3ea5; --pink2:#d92a88; --violet:#7c4dff; --cyan:#22d3ee;
+  --green:#2fd27a; --red:#ff4d5e; --yellow:#ffc53d; --radius:12px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+a{color:var(--cyan)}
+
+/* ---------- entrada ---------- */
+#home{height:100%;overflow:auto;padding:16px;display:flex;justify-content:center;
+  background:radial-gradient(ellipse at 20% 0%,#3b1660 0,transparent 60%),radial-gradient(ellipse at 90% 100%,#5a0f45 0,transparent 55%),var(--bg)}
+.card{background:#1d1230e6;border:1px solid var(--line);border-radius:18px;padding:22px;width:100%;max-width:480px;margin:auto 0;box-shadow:0 10px 40px #0008}
+.card h1{margin:0 0 4px;font-size:26px;background:linear-gradient(90deg,var(--pink),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.card p.sub{margin:0 0 16px;color:var(--muted);font-size:14px}
+label.f{display:block;font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;letter-spacing:.04em}
+input[type=text],input[type=search],select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none}
+input[type=text]:focus,input[type=search]:focus,select:focus{border-color:var(--pink)}
+.rooms{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rooms button{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:left;display:flex;gap:8px;align-items:flex-start;min-width:0}
+.rooms button:hover{background:var(--hover)}
+.rooms button.sel{border-color:var(--pink);background:#ff3ea522}
+.rooms .em{font-size:22px;line-height:1}
+.rooms .rn{display:flex;flex-direction:column;min-width:0}
+.rooms .who{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rooms .who.busy{color:var(--green)}
+.rooms .np{font-size:11px;color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn{background:linear-gradient(90deg,var(--pink),var(--violet));border:0;border-radius:10px;padding:11px 16px;font-weight:700;color:#fff}
+.btn:hover{filter:brightness(1.1)}
+.btn.wide{width:100%;margin-top:16px}
+.btn.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--text)}
+.row2{display:flex;gap:8px}
+.row2>*{flex:1}
+.note{font-size:12px;color:var(--muted);margin-top:12px}
+.err{color:#ff8a95;font-size:13px;margin-top:10px}
+.back{display:inline-block;margin-top:14px;font-size:13px;color:var(--muted);text-decoration:none}
+
+/* ---------- sala ---------- */
+#room{height:100%;display:grid;grid-template-columns:1fr 380px;grid-template-rows:auto 1fr auto;grid-template-areas:"top top" "stage panel" "bar bar"}
+#top{grid-area:top;display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+#top h2{margin:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#netState{font-size:12px;color:var(--muted)}
+#netState.ok{color:var(--green)}
+#roomCode{background:var(--panel2);border:1px dashed var(--pink);border-radius:8px;padding:4px 8px;font-size:12px;white-space:nowrap}
+#roomCode b{letter-spacing:.1em;color:var(--pink)}
+.sp{flex:1}
+.ibtn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 10px;white-space:nowrap}
+.ibtn:hover{background:var(--hover)}
+.ibtn.red{background:var(--red);border-color:var(--red);color:#fff}
+
+#stageWrap{grid-area:stage;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:auto;padding:12px;gap:10px}
+#stage{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:var(--radius);overflow:hidden;box-shadow:0 0 0 1px var(--line),0 0 40px #ff3ea522;max-height:calc(100vh - 240px)}
+#stage.fs{max-height:none;border-radius:0}
+#stage:fullscreen{max-height:none;border-radius:0;aspect-ratio:auto}
+#yt,#stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:20px;
+  background:radial-gradient(circle at 50% 40%,#3b1660,#120a1f 70%);z-index:2}
+#empty .big{font-size:56px}
+#tapPlay{position:absolute;inset:0;z-index:4;background:#000a;border:0;color:#fff;font-size:20px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+#tapPlay small{font-size:13px;font-weight:400;color:var(--muted)}
+#unmute{position:absolute;left:10px;bottom:10px;z-index:4}
+#singers{position:absolute;left:10px;top:10px;z-index:3;background:#000b;border-radius:20px;padding:5px 12px;font-size:13px;pointer-events:none}
+#singers b{color:var(--pink)}
+#floats{position:absolute;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+.flt{position:absolute;bottom:-40px;font-size:34px;animation:up 2.6s ease-out forwards}
+.flt small{display:block;font-size:11px;text-align:center;color:#fff;text-shadow:0 1px 3px #000}
+@keyframes up{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1;transform:translateY(-60px) scale(1.1)}100%{transform:translateY(-320px) scale(1);opacity:0}}
+
+#ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#ctrl .ibtn{font-size:18px;padding:6px 12px}
+#seek{flex:1;min-width:120px;accent-color:var(--pink)}
+#time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);white-space:nowrap}
+#syncBadge{font-size:12px;padding:3px 8px;border-radius:20px;background:var(--panel2);white-space:nowrap}
+#syncBadge.ok{color:var(--green)}
+#syncBadge.warn{color:var(--yellow)}
+#nowInfo{font-size:14px;min-width:0}
+#nowInfo b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#nowInfo small{color:var(--muted)}
+
+#panel{grid-area:panel;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+#tabs{display:flex;border-bottom:1px solid var(--line)}
+#tabs button{flex:1;background:none;border:0;border-bottom:3px solid transparent;padding:10px 4px;color:var(--muted);font-weight:600;font-size:14px;position:relative}
+#tabs button.on{color:var(--text);border-bottom-color:var(--pink)}
+#tabs .dot{position:absolute;top:6px;right:8px;background:var(--pink);color:#fff;border-radius:10px;font-size:10px;padding:0 5px}
+.tab{flex:1;overflow:auto;padding:12px;min-height:0}
+.srch{display:flex;gap:6px}
+.srch input{flex:1}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:8px 0}
+.res,.q{display:flex;gap:8px;align-items:center;padding:6px;border-radius:10px}
+.res:hover,.q:hover{background:var(--panel2)}
+.res img,.q img{width:96px;height:54px;object-fit:cover;border-radius:6px;flex:none;background:#000}
+.res .t,.q .t{flex:1;min-width:0;font-size:13px}
+.res .t b,.q .t b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:600}
+.res .t small,.q .t small{color:var(--muted)}
+.res .acts,.q .acts{display:flex;flex-direction:column;gap:4px}
+.mini{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12px;white-space:nowrap}
+.mini:hover{background:var(--hover)}
+.mini.go{background:var(--pink);border-color:var(--pink);color:#fff}
+h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.empty{color:var(--muted);font-size:13px;padding:8px}
+.mem{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px}
+.mem:hover{background:var(--panel2)}
+.av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;box-shadow:0 0 0 2px transparent;transition:box-shadow .15s}
+.av.talk{box-shadow:0 0 0 3px var(--green)}
+.mem .nm{flex:1;min-width:0}
+.mem .nm small{display:block;color:var(--muted);font-size:12px}
+.mem input[type=range]{width:90px;accent-color:var(--pink)}
+#msgs{display:flex;flex-direction:column;gap:6px}
+.msg{font-size:14px;word-wrap:break-word}
+.msg b{color:var(--cyan)}
+.msg.sys{color:var(--muted);font-size:12px;font-style:italic}
+#chatForm{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line)}
+#chatForm input{flex:1}
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.presets button{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 4px;font-size:13px}
+.presets button.sel{border-color:var(--pink);background:#ff3ea522}
+.sl{display:grid;grid-template-columns:110px 1fr 44px;align-items:center;gap:8px;margin:8px 0;font-size:13px}
+.sl input{accent-color:var(--pink);width:100%}
+.sl output{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.tg{display:flex;align-items:flex-start;gap:8px;margin:10px 0;font-size:14px}
+.tg input{margin-top:3px;accent-color:var(--pink)}
+.tg small{display:block;color:var(--muted);font-size:12px}
+#meter{height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin:6px 0}
+#meter i{display:block;height:100%;width:0;background:var(--green);transition:width .05s}
+
+#bar{grid-area:bar;display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:calc(8px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line);overflow-x:auto}
+.modes{display:flex;background:var(--bg);border-radius:12px;padding:3px;gap:3px;flex:none}
+.modes button{background:none;border:0;border-radius:9px;padding:8px 12px;font-weight:700;white-space:nowrap;color:var(--muted)}
+.modes button.on{color:#fff}
+.modes button[data-m=mute].on{background:#4a3a66}
+.modes button[data-m=talk].on{background:var(--violet)}
+.modes button[data-m=sing].on{background:linear-gradient(90deg,var(--pink),var(--violet));box-shadow:0 0 14px #ff3ea588}
+.reacts{display:flex;gap:2px;flex:none}
+.reacts button{background:none;border:0;font-size:22px;padding:4px;border-radius:8px}
+.reacts button:hover{background:var(--panel2)}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#000e;color:#fff;padding:10px 16px;border-radius:12px;z-index:50;max-width:calc(100% - 32px);font-size:14px;text-align:center;border:1px solid var(--line)}
+
+@media (max-width:860px){
+  body{overflow:auto}
+  #room{grid-template-columns:1fr;grid-template-rows:auto auto 1fr auto;grid-template-areas:"top" "stage" "panel" "bar";height:100dvh}
+  #stageWrap{padding:0 0 8px;overflow:visible}
+  #stage{border-radius:0;max-height:none}
+  #ctrl,#nowRow{padding:0 10px}
+  #panel{border-left:0;min-height:0}
+  #top .hideS{display:none}
+  .reacts button{font-size:20px;padding:2px}
+  .modes button{padding:8px 9px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ ENTRADA ============ -->
+<div id="home">
+  <div class="card">
+    <h1>🎤 Sala de Karaoke</h1>
+    <p class="sub">Elegí canciones de YouTube, todos ven el video al mismo tiempo y cantás con eco y reverberación como en un karaoke de verdad.</p>
+    <label class="f" for="inName">Tu nombre</label>
+    <input type="text" id="inName" maxlength="24" placeholder="¿Cómo te llamás?" autocomplete="nickname">
+    <label class="f">Salas abiertas</label>
+    <div class="rooms" id="roomPick"></div>
+    <label class="f" for="inCode">Sala privada con amigos</label>
+    <div class="row2">
+      <input type="text" id="inCode" maxlength="10" placeholder="Código (ej: K7P2QX)" autocomplete="off" style="text-transform:uppercase">
+      <button class="btn ghost" id="btnCreate" style="flex:none">➕ Crear mi sala</button>
+    </div>
+    <button class="btn wide" id="btnEnter">Entrar a cantar</button>
+    <div class="err hidden" id="homeErr"></div>
+    <p class="note">🎧 Para cantar mejor usá auriculares: así no se escucha la música dos veces. Funciona en el celular y en la PC (Chrome, Edge, Safari o Firefox).</p>
+    <a class="back" href="../">← Volver a Juegos de Mesa</a>
+  </div>
+</div>
+
+<!-- ============ SALA ============ -->
+<div id="room" class="hidden">
+  <div id="top">
+    <h2 id="roomName">Karaoke</h2>
+    <span id="roomCode" class="hidden" title="Tocá para copiar el enlace">Código <b></b> 🔗</span>
+    <span id="netState">Conectando…</span>
+    <span class="sp"></span>
+    <button class="ibtn" id="btnInvite" title="Copiar enlace para invitar">🔗 <span class="hideS">Invitar</span></button>
+    <button class="ibtn red" id="btnLeave">Salir</button>
+  </div>
+
+  <div id="stageWrap">
+    <div id="stage">
+      <div id="yt"></div>
+      <div id="empty"><div class="big">🎤</div><b>No hay ninguna canción sonando</b><small style="color:var(--muted)">Buscá una en «Canciones» y tocá ▶ o «+ Cola».</small></div>
+      <div id="singers" class="hidden"></div>
+      <button id="tapPlay" class="hidden">▶ Tocá para empezar<small>El navegador pide un toque antes de reproducir con sonido.</small></button>
+      <button id="unmute" class="ibtn hidden">🔊 Activar sonido</button>
+      <div id="floats"></div>
+    </div>
+    <div id="nowRow" style="display:flex;gap:10px;align-items:center">
+      <div id="nowInfo" style="flex:1"><b>—</b><small></small></div>
+      <span id="syncBadge" title="Diferencia con el resto de la sala">● —</span>
+    </div>
+    <div id="ctrl">
+      <button class="ibtn" id="bPlay" title="Reproducir / pausar para todos">▶</button>
+      <button class="ibtn" id="bRestart" title="Volver al principio">⏮</button>
+      <button class="ibtn" id="bNext" title="Siguiente canción">⏭</button>
+      <input type="range" id="seek" min="0" max="100" step="0.1" value="0">
+      <span id="time">0:00 / 0:00</span>
+      <button class="ibtn" id="bFull" title="Pantalla completa">⛶</button>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div id="tabs">
+      <button data-tab="songs" class="on">🎵 Canciones</button>
+      <button data-tab="people">👥 <span id="nPeople">1</span></button>
+      <button data-tab="chat">💬 Chat<span class="dot hidden" id="unread"></span></button>
+      <button data-tab="voice">🎚️ Voz</button>
+    </div>
+    <div class="tab" id="tab-songs">
+      <form class="srch" id="srchForm">
+        <input type="search" id="srchIn" placeholder="Buscar canción o pegar link de YouTube" autocomplete="off" enterkeyhint="search">
+        <button class="btn" style="padding:10px 14px">🔎</button>
+      </form>
+      <label class="chk"><input type="checkbox" id="onlyK"> Agregar «karaoke» a la búsqueda</label>
+      <div id="results"></div>
+      <h4>En cola</h4>
+      <div id="queue"><div class="empty">La cola está vacía.</div></div>
+    </div>
+    <div class="tab hidden" id="tab-people"><div id="members"></div></div>
+    <div class="tab hidden" id="tab-chat" style="display:flex;flex-direction:column;padding:0">
+      <div style="flex:1;overflow:auto;padding:12px" id="msgBox"><div id="msgs"></div></div>
+      <form id="chatForm"><input type="text" id="chatIn" maxlength="300" placeholder="Escribí un mensaje…" autocomplete="off"><button class="btn" style="padding:8px 14px">➤</button></form>
+    </div>
+    <div class="tab hidden" id="tab-voice">
+      <h4 style="margin-top:0">Efecto al cantar</h4>
+      <div class="presets" id="presets"></div>
+      <div class="sl"><span>Eco</span><input type="range" id="fxEcho" min="0" max="100"><output></output></div>
+      <div class="sl"><span>Reverberación</span><input type="range" id="fxRev" min="0" max="100"><output></output></div>
+      <div class="sl"><span>Tono</span><input type="range" id="fxPitch" min="-6" max="6" step="1"><output></output></div>
+      <div class="sl"><span>Mi voz</span><input type="range" id="fxVol" min="0" max="200"><output></output></div>
+      <div id="meter"><i></i></div>
+      <label class="tg"><input type="checkbox" id="monitor"><span>Escucharme con los efectos<small>Solo con auriculares (con parlante se acopla).</small></span></label>
+      <h4>Sonido</h4>
+      <div class="sl"><span>Música</span><input type="range" id="volMusic" min="0" max="100"><output></output></div>
+      <div class="sl"><span>Voces</span><input type="range" id="volVoices" min="0" max="100"><output></output></div>
+      <label class="tg"><input type="checkbox" id="phones"><span>Tengo auriculares<small>Mejor calidad de voz al cantar (apaga la cancelación de eco del micrófono).</small></span></label>
+      <label class="tg"><input type="checkbox" id="align"><span>Juntar la música con quien canta<small>Atrasa un poquito tu video lo mismo que tarda en llegarte su voz, así la voz cae justo con la música.</small></span></label>
+      <h4>Micrófono</h4>
+      <select id="micSel"></select>
+    </div>
+  </div>
+
+  <div id="bar">
+    <div class="modes" id="modes">
+      <button data-m="mute">🔇 <span class="hideS">Silencio</span></button>
+      <button data-m="talk">💬 Hablar</button>
+      <button data-m="sing">🎤 Cantar</button>
+    </div>
+    <div class="reacts" id="reacts">
+      <button>👏</button><button>🔥</button><button>❤️</button><button>😂</button><button>🎉</button><button>🍺</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script src="../salas/vendor/peerjs.min.js"></script>
+<script src="../ice.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
