@@ -1811,13 +1811,17 @@ function drawFighter(c, f, sx, sy, sc = 1) {
     c.fillStyle = C.cape; c.fill(); c.lineWidth = 3; c.strokeStyle = OL; c.stroke();
   }
   // brazo y pierna de atrás
-  limb(shx, shy, bex, bey, lw, D.arm); limb(bex, bey, bhx, bhy, lw * .92, D.arm); boxGlove(c, bhx, bhy, P.b2, glove, D.glove, OL, C.belt);
+  drawArm(c, shx, shy, bex, bey, bhx, bhy, lw, D.arm, OL); boxGlove(c, bhx, bhy, P.b2, glove, D.glove, OL, C.belt);
   drawLeg(c, hx, hy, bkx, bky, bfx, bfy, lw, D.pants, OL); drawShoe(c, bfx, bfy, P.m2, lw, D.shoe, shoeType, OL, shade(C.belt, -.2));
   // torso
   c.beginPath();
   c.moveTo(hx + px * B.ww, hy + py * B.ww); c.lineTo(nx + px * B.tw, ny + py * B.tw + 6);
   c.quadraticCurveTo(nx, ny - 6, nx - px * B.tw, ny - py * B.tw + 6); c.lineTo(hx - px * B.ww, hy - py * B.ww); c.closePath();
-  c.fillStyle = C.shirt; c.fill();
+  { // el cuerpo con sombra: más claro adelante, más oscuro atrás
+    const tg = c.createLinearGradient(hx - px * B.tw * 1.1, hy - py * B.tw * 1.1, hx + px * B.tw * 1.1, hy + py * B.tw * 1.1);
+    tg.addColorStop(0, shade(C.shirt, -.34)); tg.addColorStop(.45, C.shirt); tg.addColorStop(.82, shade(C.shirt, .14)); tg.addColorStop(1, shade(C.shirt, -.06));
+    c.fillStyle = tg; c.fill();
+  }
   if (C.camo) { c.save(); c.clip(); c.fillStyle = C.camo; for (let k = 0; k < 6; k++) { c.beginPath(); c.ellipse(hx + ux * L * (k / 6) + px * ((k % 3) - 1) * 12, hy + uy * L * (k / 6) + py * ((k % 3) - 1) * 12, 10, 6, k, 0, 7); c.fill(); } c.restore(); }
   if (ch.special === 'fire') { // rayo en el pecho
     const mx = lerp(hx, nx, .55), my = lerp(hy, ny, .55);
@@ -1825,7 +1829,7 @@ function drawFighter(c, f, sx, sy, sc = 1) {
     c.beginPath(); c.moveTo(4, -16); c.lineTo(-8, 2); c.lineTo(0, 2); c.lineTo(-4, 16); c.lineTo(9, -3); c.lineTo(1, -3); c.closePath(); c.fill(); c.restore();
   }
   if (ch.special === 'charge') { // musculosa: hombros al aire
-    c.fillStyle = C.arm; c.beginPath(); c.arc(shx, shy + 2, lw * .7, 0, 7); c.fill();
+    c.fillStyle = shade(C.arm, .06); c.beginPath(); c.arc(shx, shy + 2, lw * .7, 0, 7); c.fill();
   }
   if (C.stripes) { // camiseta a rayas (la albirroja)
     c.save(); c.clip(); c.translate(hx, hy); c.rotate(P.t); c.fillStyle = C.stripes;
@@ -1843,7 +1847,7 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   drawLeg(c, hx, hy, fkx, fky, ffx, ffy, lw, C.pants, OL); drawShoe(c, ffx, ffy, P.l2, lw, C.shoe, shoeType, OL, C.belt);
   // cuello y cara
   const R = 31, hcx = nx + ux * R * .78, hcy = ny + uy * R * .78;
-  limb(nx, ny + 4, lerp(nx, hcx, .5), lerp(ny, hcy, .5), lw * .9, C.neck);
+  legSeg(c, nx, ny + 4, lerp(nx, hcx, .5), lerp(ny, hcy, .5), lw * .95, lw * .85, 0, 0, C.neck, OL);
   c.save(); c.translate(hcx, hcy); c.scale(vfx, 1); c.rotate(vfx * P.t * .45);
   if (f.flash > 0) { const q = Math.sin(f.flash * 1.3) * .12; c.scale(1 + q, 1 - q); }
   drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, vfx, f.yaw, f);
@@ -1858,7 +1862,7 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   }
   c.restore();
   // brazo de adelante
-  limb(shx, shy, fex, fey, lw, C.arm); limb(fex, fey, fhx, fhy, lw * .92, C.arm); boxGlove(c, fhx, fhy, P.a2, glove, C.glove, OL, C.belt);
+  drawArm(c, shx, shy, fex, fey, fhx, fhy, lw, C.arm, OL); boxGlove(c, fhx, fhy, P.a2, glove, C.glove, OL, C.belt);
   // bola cargándose en las manos
   if (f.st === 'special' && f.spec === 'fire' && f.sf < 14) { c.globalAlpha = f.alpha * .9; glow(c, (fhx + bhx) / 2, (fhy + bhy) / 2, 10 + f.sf * 1.6, 'rgba(120,220,255,.9)'); }
   if (f.st === 'special' && f.spec === 'ice' && f.sf < 15) { c.globalAlpha = f.alpha * .9; glow(c, (fhx + bhx) / 2, (fhy + bhy) / 2, 10 + f.sf * 1.5, 'rgba(210,245,255,.95)'); }
@@ -1912,6 +1916,13 @@ function drawLeg(c, hx, hy, kx, ky, fx, fy, lw, col, OL) {
   // botamanga: una franja un poco más oscura en el tobillo
   c.strokeStyle = shade(col, -.25); c.lineWidth = 3;
   c.beginPath(); c.moveTo(fx + nx * lw * .42 - dx / len * 4, fy + ny * lw * .42 - dy / len * 4); c.lineTo(fx - nx * lw * .42 - dx / len * 4, fy - ny * lw * .42 - dy / len * 4); c.stroke();
+}
+// brazo entero: el de arriba con el bíceps marcado y el antebrazo que se angosta hacia la muñeca
+function drawArm(c, sx, sy, ex, ey, hx, hy, lw, col, OL) {
+  legSeg(c, sx, sy, ex, ey, lw * 1.18, lw * .9, .18, .32, col, OL);
+  legSeg(c, ex, ey, hx, hy, lw * .95, lw * .74, .22, .14, col, OL);
+  // el codo: una sombrita donde dobla
+  c.fillStyle = 'rgba(0,0,0,.14)'; c.beginPath(); c.arc(ex, ey, lw * .3, 0, 7); c.fill();
 }
 // qué calza cada uno
 const SHOE_TYPE = {
