@@ -50,7 +50,7 @@ input[type=text]:focus,input[type=search]:focus,select:focus{border-color:var(--
 .back{display:inline-block;margin-top:14px;font-size:13px;color:var(--muted);text-decoration:none}
 
 /* ---------- sala ---------- */
-#room{height:100%;display:grid;grid-template-columns:1fr 380px;grid-template-rows:auto 1fr auto;grid-template-areas:"top top" "stage panel" "bar bar"}
+#room{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:auto 1fr auto;grid-template-areas:"top top" "stage panel" "bar bar"}
 #top{grid-area:top;display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
 #top h2{margin:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #netState{font-size:12px;color:var(--muted)}
@@ -151,12 +151,17 @@ h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04e
 
 @media (max-width:860px){
   body{overflow:auto}
-  #room{grid-template-columns:1fr;grid-template-rows:auto auto 1fr auto;grid-template-areas:"top" "stage" "panel" "bar";height:100dvh}
+  #room{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr auto;grid-template-areas:"top" "stage" "panel" "bar";height:100dvh}
   #stageWrap{padding:0 0 8px;overflow:visible}
   #stage{border-radius:0;max-height:none}
   #ctrl,#nowRow{padding:0 10px}
   #panel{border-left:0;min-height:0}
-  #top .hideS{display:none}
+  #top .hideS,#netState{display:none}
+  #top{gap:6px;padding:6px 8px}
+  #top h2{font-size:14px;min-width:0;flex:0 1 auto}
+  #roomCode{font-size:11px;padding:3px 6px}
+  #ctrl .ibtn{padding:5px 10px}
+  #seek{min-width:0}
   .reacts button{font-size:20px;padding:2px}
   .modes button{padding:8px 9px}
 }
