@@ -2163,16 +2163,54 @@ function drawShadow(c, f, cx) {
   const s = f.ch.b.s, k = 1 - Math.min(.6, f.y / 300);
   c.fillStyle = `rgba(0,0,0,${.32 * k * f.alpha})`; c.beginPath(); c.ellipse(f.x - cx, GROUND + 3, (f.rot < -1 ? 70 : 40) * s * k, 9 * k, 0, 0, 7); c.fill();
 }
+/* ---------- estilo arcade (pixelado como las máquinas de los 90) ----------
+   La escena se dibuja en un lienzo chico, se reducen los colores con un tramado de puntitos (como las
+   consolas viejas) y se agranda sin suavizar, así se ven los píxeles. Las caras quedan "digitalizadas". */
+let PIX = store.get('kdc_pix', true);
+const PIXK = .34;
+const pixCv = mkCanvas(2, 2), pixCx = pixCv.getContext('2d');
+// tramado de puntitos (matriz de Bayer 4×4) que se mezcla encima: da las sombras "por escalones" de las consolas viejas
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+let pixPat = null, scanPat = null, scanH = 0;
+function pixPattern() {
+  if (pixPat) return pixPat;
+  const p = mkCanvas(4, 4), x = p.getContext('2d'), id = x.createImageData(4, 4);
+  BAYER.forEach((v, i) => { const g = 128 + (v / 16 - .5) * 70; id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = g; id.data[i * 4 + 3] = 255; });
+  x.putImageData(id, 0, 0); return pixPat = pixCx.createPattern(p, 'repeat');
+}
+// rayitas de pantalla de tubo, del alto de un píxel agrandado
+function scanPattern(h) {
+  if (scanPat && scanH === h) return scanPat;
+  const p = mkCanvas(1, Math.max(2, h)), x = p.getContext('2d');
+  x.fillStyle = 'rgba(0,0,0,.16)'; x.fillRect(0, p.height - Math.max(1, Math.round(h * .35)), 1, Math.max(1, Math.round(h * .35)));
+  scanH = h; return scanPat = ctx.createPattern(p, 'repeat');
+}
+function pixBegin() {
+  const lw = Math.round(W * PIXK), lh = Math.round(H * PIXK);
+  if (pixCv.width !== lw || pixCv.height !== lh) { pixCv.width = lw; pixCv.height = lh; }
+  pixCx.setTransform(lw / W, 0, 0, lh / H, 0, 0); pixCx.fillStyle = '#000'; pixCx.fillRect(0, 0, W, H);
+  return pixCx;
+}
+function pixEnd() {
+  const w = pixCv.width, h = pixCv.height;
+  pixCx.setTransform(1, 0, 0, 1, 0, 0);
+  pixCx.globalCompositeOperation = 'overlay'; pixCx.fillStyle = pixPattern(); pixCx.fillRect(0, 0, w, h);
+  pixCx.globalCompositeOperation = 'source-over';
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(pixCv, 0, 0, cv.width, cv.height); ctx.imageSmoothingEnabled = true;
+  ctx.fillStyle = scanPattern(Math.round(cv.height / h)); ctx.fillRect(0, 0, cv.width, cv.height);
+}
 function render() {
-  const c = ctx;
-  c.setTransform(RK, 0, 0, RK, 0, 0);
+  // estilo arcade: la escena se dibuja chiquita y se agranda en píxeles (el marcador queda nítido)
+  let c = PIX ? pixBegin() : ctx;
+  if (!PIX) c.setTransform(RK, 0, 0, RK, 0, 0);
   c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
   G.shake *= .88;
   const sh = G.shake > .6 ? G.shake : 0;
   c.save(); if (sh) c.translate(rnd(-sh, sh), rnd(-sh, sh) * .6);
   const cx = G.cam.x;
   drawStage(c, G.stage, cx, G.time);
-  if (!G.f.length) { c.restore(); return; }
+  if (!G.f.length) { c.restore(); if (PIX) { pixEnd(); } return; }
   for (const f of G.f) drawShadow(c, f, cx);
   for (const w of G.waves) {
     const a = Math.min(1, w.life / 15), x = w.x - cx;
@@ -2226,6 +2264,7 @@ function render() {
   }
   c.globalAlpha = 1;
   c.restore();
+  if (PIX) { pixEnd(); c = ctx; c.setTransform(RK, 0, 0, RK, 0, 0); }
   if (G.mode === 'demo') { c.fillStyle = 'rgba(10,4,14,.45)'; c.fillRect(0, 0, W, H); return; }
   if (G.scrFlash > 0) { c.fillStyle = `rgba(230,245,255,${G.scrFlash * .12})`; c.fillRect(0, 0, W, H); }
   drawHUD(c);
@@ -3008,6 +3047,9 @@ $('#mBots').onclick = () => { audio(); openSelect('bots'); };
 $('#mOnline').onclick = () => { audio(); openOnline(); };
 $('#mHelp').onclick = () => $('#scrHelp').classList.add('on');
 $('#mFull').onclick = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); else goFull(); };
+const pixLabel = () => $('#mPix').textContent = PIX ? '🕹️ Estilo: arcade (pixelado)' : '🖌️ Estilo: liso';
+$('#mPix').onclick = () => { PIX = !PIX; store.set('kdc_pix', PIX); pixLabel(); toast(PIX ? '🕹️ Estilo arcade: como las máquinas de los 90' : '🖌️ Estilo liso, sin píxeles'); };
+pixLabel();
 function openOnline(code) {
   $('#onA').style.display = 'block'; $('#onB').style.display = 'none'; oMsg('');
   $('#oCode').value = code || ''; $('#scrOnline').classList.add('on');
