@@ -1813,16 +1813,21 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   // brazo y pierna de atrás
   drawArm(c, shx, shy, bex, bey, bhx, bhy, lw, D.arm, OL); boxGlove(c, bhx, bhy, P.b2, glove, D.glove, OL, C.belt);
   drawLeg(c, hx, hy, bkx, bky, bfx, bfy, lw, D.pants, OL); drawShoe(c, bfx, bfy, P.m2, lw, D.shoe, shoeType, OL, shade(C.belt, -.2));
-  // torso
-  c.beginPath();
-  c.moveTo(hx + px * B.ww, hy + py * B.ww); c.lineTo(nx + px * B.tw, ny + py * B.tw + 6);
-  c.quadraticCurveTo(nx, ny - 6, nx - px * B.tw, ny - py * B.tw + 6); c.lineTo(hx - px * B.ww, hy - py * B.ww); c.closePath();
+  // torso: la silueta depende del tipo de cuerpo (de costado se nota en el pecho, la espalda y la panza)
+  const bt = BODY_SHAPE[BODY_TYPE[f.key] || 'normal'], hd = B.tw * .9;
+  const TP = (t, x) => [hx + ux * L * t + px * x, hy + uy * L * t + py * x]; // t: 0 cadera → 1 hombros; x: + adelante, − atrás
+  const front = bt.f.map((v, k) => TP(BODY_T[k], hd * v)), back = bt.b.map((v, k) => TP(BODY_T[k], -hd * v));
+  const torso = new Path2D();
+  torso.moveTo(...back[0]); smoothThrough(torso, back);
+  { const top = TP(1.1, (bt.f[3] - bt.b[3]) * hd * .3); torso.quadraticCurveTo(top[0], top[1], ...front[3]); } // hombros redondeados
+  smoothThrough(torso, [...front].reverse());
+  torso.closePath();
   { // el cuerpo con sombra: más claro adelante, más oscuro atrás
-    const tg = c.createLinearGradient(hx - px * B.tw * 1.1, hy - py * B.tw * 1.1, hx + px * B.tw * 1.1, hy + py * B.tw * 1.1);
+    const tg = c.createLinearGradient(hx - px * hd * 1.5, hy - py * hd * 1.5, hx + px * hd * 1.5, hy + py * hd * 1.5);
     tg.addColorStop(0, shade(C.shirt, -.34)); tg.addColorStop(.45, C.shirt); tg.addColorStop(.82, shade(C.shirt, .14)); tg.addColorStop(1, shade(C.shirt, -.06));
-    c.fillStyle = tg; c.fill();
+    c.fillStyle = tg; c.fill(torso);
   }
-  if (C.camo) { c.save(); c.clip(); c.fillStyle = C.camo; for (let k = 0; k < 6; k++) { c.beginPath(); c.ellipse(hx + ux * L * (k / 6) + px * ((k % 3) - 1) * 12, hy + uy * L * (k / 6) + py * ((k % 3) - 1) * 12, 10, 6, k, 0, 7); c.fill(); } c.restore(); }
+  if (C.camo) { c.save(); c.clip(torso); c.fillStyle = C.camo; for (let k = 0; k < 6; k++) { c.beginPath(); c.ellipse(hx + ux * L * (k / 6) + px * ((k % 3) - 1) * 12, hy + uy * L * (k / 6) + py * ((k % 3) - 1) * 12, 10, 6, k, 0, 7); c.fill(); } c.restore(); }
   if (ch.special === 'fire') { // rayo en el pecho
     const mx = lerp(hx, nx, .55), my = lerp(hy, ny, .55);
     c.save(); c.translate(mx, my); c.rotate(P.t); c.fillStyle = '#1f4fd0';
@@ -1832,7 +1837,7 @@ function drawFighter(c, f, sx, sy, sc = 1) {
     c.fillStyle = shade(C.arm, .06); c.beginPath(); c.arc(shx, shy + 2, lw * .7, 0, 7); c.fill();
   }
   if (C.stripes) { // camiseta a rayas (la albirroja)
-    c.save(); c.clip(); c.translate(hx, hy); c.rotate(P.t); c.fillStyle = C.stripes;
+    c.save(); c.clip(torso); c.translate(hx, hy); c.rotate(P.t); c.fillStyle = C.stripes;
     for (let k = -3; k <= 3; k += 2) c.fillRect(k * 7 - 3.5, -L - 10, 7, L + 14);
     c.restore();
   }
@@ -1840,9 +1845,18 @@ function drawFighter(c, f, sx, sy, sc = 1) {
     const mx = lerp(hx, nx, .55), my = lerp(hy, ny, .55);
     c.save(); c.translate(mx, my); c.rotate(P.t); c.font = `${Math.round(B.tw * .8)}px system-ui`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(C.emblem, 0, 1); c.restore();
   }
-  c.lineWidth = 4; c.strokeStyle = OL; c.stroke();
-  c.beginPath(); c.moveTo(hx + px * B.ww * 1.05, hy + py * B.ww * 1.05 - uy * 3); c.lineTo(hx - px * B.ww * 1.05, hy - py * B.ww * 1.05 - uy * 3);
-  c.lineWidth = ch.special === 'charge' ? 10 : 7; c.strokeStyle = C.belt; c.stroke();
+  // detalles del cuerpo: pectorales del musculoso, panza y pliegue del panzón
+  c.save(); c.clip(torso); c.lineCap = 'round';
+  if (bt.pecs) { const a = TP(.72, hd * bt.f[2] * .95), b0 = TP(.56, hd * .2); c.strokeStyle = shade(C.shirt, -.32); c.lineWidth = 2.2; c.beginPath(); c.moveTo(...TP(.86, hd * .35)); c.quadraticCurveTo(a[0], a[1], b0[0], b0[1]); c.stroke(); }
+  if (bt.belly) {
+    const bc = TP(.3, hd * bt.f[1] * .55);
+    c.fillStyle = 'rgba(255,255,255,.12)'; c.beginPath(); c.ellipse(bc[0], bc[1], hd * .55, L * .2, P.t, 0, 7); c.fill(); // brillo de la panza
+    const k1 = TP(.12, hd * bt.f[1] * .9), k2 = TP(.15, hd * .25); c.strokeStyle = shade(C.shirt, -.35); c.lineWidth = 2; c.beginPath(); c.moveTo(...k1); c.quadraticCurveTo(...TP(.1, hd * .55), ...k2); c.stroke();
+  }
+  c.restore();
+  c.lineWidth = 4; c.strokeStyle = OL; c.stroke(torso);
+  // cinturón: sigue el ancho de la cintura de cada uno
+  { const bf = TP(.06, hd * bt.f[0] * .94), bb = TP(.06, -hd * bt.b[0] * .94); c.beginPath(); c.moveTo(...bf); c.lineTo(...bb); c.lineWidth = ch.special === 'charge' ? 10 : 7; c.strokeStyle = C.belt; c.stroke(); }
   // pierna de adelante
   drawLeg(c, hx, hy, fkx, fky, ffx, ffy, lw, C.pants, OL); drawShoe(c, ffx, ffy, P.l2, lw, C.shoe, shoeType, OL, C.belt);
   // cuello y cara
@@ -1916,6 +1930,26 @@ function drawLeg(c, hx, hy, kx, ky, fx, fy, lw, col, OL) {
   // botamanga: una franja un poco más oscura en el tobillo
   c.strokeStyle = shade(col, -.25); c.lineWidth = 3;
   c.beginPath(); c.moveTo(fx + nx * lw * .42 - dx / len * 4, fy + ny * lw * .42 - dy / len * 4); c.lineTo(fx - nx * lw * .42 - dx / len * 4, fy - ny * lw * .42 - dy / len * 4); c.stroke();
+}
+/* tipos de cuerpo: cuánto sale el frente (f) y la espalda (b) a la altura de la cadera, la panza, el pecho
+   y los hombros (en BODY_T), en relación al ancho de cada peleador */
+const BODY_T = [0, .32, .7, 1];
+const BODY_SHAPE = {
+  normal: { f: [.85, .82, .95, .85], b: [.88, .78, .9, .85] },
+  athletic: { f: [.82, .74, 1.05, .88], b: [.88, .72, .98, .9] },
+  muscle: { f: [.82, .66, 1.48, .96], b: [.88, .7, 1.3, 1.02], pecs: true },
+  slim: { f: [.6, .52, .64, .6], b: [.62, .5, .62, .6] },
+  fat: { f: [1.05, 2.0, 1.2, .86], b: [1.0, .95, 1.0, .86], belly: true },
+  big: { f: [1.1, 1.2, 1.32, 1.08], b: [1.1, 1.02, 1.22, 1.08] }
+};
+const BODY_TYPE = {
+  toro: 'muscle', rayo: 'slim', sombra: 'athletic', tanque: 'big', escarcha: 'slim', latigo: 'normal', dragon: 'muscle', tornado: 'slim',
+  muralla: 'big', terere: 'fat', meteoro: 'slim', luchador: 'fat', halcon: 'slim', sonico: 'slim', bumeran: 'normal', bombita: 'fat'
+};
+// curva suave que pasa por los puntos (el primero ya tiene que estar en el camino)
+function smoothThrough(path, pts) {
+  for (let k = 1; k < pts.length - 1; k++) { const m = [(pts[k][0] + pts[k + 1][0]) / 2, (pts[k][1] + pts[k + 1][1]) / 2]; path.quadraticCurveTo(pts[k][0], pts[k][1], m[0], m[1]); }
+  const l = pts[pts.length - 1]; path.lineTo(l[0], l[1]);
 }
 // brazo entero: el de arriba con el bíceps marcado y el antebrazo que se angosta hacia la muñeca
 function drawArm(c, sx, sy, ex, ey, hx, hy, lw, col, OL) {
