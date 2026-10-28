@@ -1786,6 +1786,9 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   if (f.inflate > .01) c.scale(1 + f.inflate, 1 + f.inflate * .85); // inflado como globo
   if (f.thin > .01) c.scale(1 - f.thin * .86, 1); // finito como un papel
   c.rotate(f.rot);
+  // prueba: cuerpo de pixel art de verdad (sprite) en vez del dibujado, con la cara de la foto encima
+  const SP = useSprite(f);
+  if (SP) { drawSpriteBody(c, f, SP, vfx, T); c.restore(); return; }
   const hipH = Math.max(Math.cos(P.l1) * SEG.T + Math.cos(P.l2) * SEG.S, Math.cos(P.m1) * SEG.T + Math.cos(P.m2) * SEG.S);
   const hx = 0, hy = -hipH, L = B.torso;
   const ux = Math.sin(P.t), uy = -Math.cos(P.t), px = Math.cos(P.t), py = Math.sin(P.t);
@@ -1902,6 +1905,87 @@ function drawFighter(c, f, sx, sy, sc = 1) {
   c.restore();
 }
 // sombreros y vinchas arriba de la cara (mirando a la derecha)
+/* ---------- prueba: cuerpos de pixel art ----------
+   "Animated Pixel art fighter" de InfiniteLoop77 (https://infiniteloop77.itch.io/animated-fighter, uso libre, se agradece el crédito).
+   Hoja de 13×5 cuadros de 240 px: fila 0 combinación de piñas, 1 golpe fuerte, 2 parado, 3 corriendo, 4 salto.
+   Al cargar, se busca la cabeza en cada cuadro, se borra, y ahí va la cara de la foto. */
+let SPR_ON = store.get('kdc_spr', true);
+const SPRITES = { toro: { src: 'sprites/luchador-infiniteloop77.png', cell: 240, counts: [13, 9, 6, 9, 4], k: 1.18 } };
+function loadSprite(key) {
+  const S = SPRITES[key]; if (S.state) return; S.state = 'loading';
+  const im = new Image();
+  im.onload = () => {
+    const n = S.cell, cv2 = mkCanvas(im.width, im.height), x = cv2.getContext('2d', { willReadFrequently: true });
+    x.drawImage(im, 0, 0);
+    const data = x.getImageData(0, 0, im.width, im.height).data, W2 = im.width;
+    // ¿es piel o pelo? (las rayitas blancas de los efectos no cuentan)
+    const body = i => { const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3]; if (a < 60) return false; if (r + g + b < 200) return true; return r > g && g > b && r - b > 30; };
+    S.heads = []; S.foot = null;
+    S.counts.forEach((cnt, row) => {
+      S.heads[row] = [];
+      for (let col = 0; col < cnt; col++) {
+        const x0 = col * n, y0 = row * n; let top = -1;
+        for (let yy = 0; yy < n && top < 0; yy++) for (let xx = 0; xx < n; xx++) if (body(((y0 + yy) * W2 + x0 + xx) * 4)) { top = yy; break; }
+        let sx = 0, cntp = 0;
+        for (let yy = top; yy < top + 26 && yy < n; yy++) for (let xx = 0; xx < n; xx++) if (body(((y0 + yy) * W2 + x0 + xx) * 4)) { sx += xx; cntp++; }
+        const hx = cntp ? sx / cntp : n / 2, hy = top + 16;
+        S.heads[row][col] = [hx, hy];
+        // se borra la cabeza (y la barba) del sprite
+        x.save(); x.beginPath(); x.rect(x0, y0, n, n); x.clip(); x.globalCompositeOperation = 'destination-out';
+        x.beginPath(); x.ellipse(x0 + hx, y0 + hy + 2, 17, 21, 0, 0, 7); x.fill(); x.restore();
+        if (row === 2 && col === 0) { // dónde pisa: la fila más baja con cuerpo
+          let bot = 0, fx = 0, fc = 0;
+          for (let yy = n - 1; yy >= 0 && !bot; yy--) for (let xx = 0; xx < n; xx++) if (data[((y0 + yy) * W2 + x0 + xx) * 4 + 3] > 60) { bot = yy; break; }
+          for (let yy = bot - 30; yy <= bot; yy++) for (let xx = 0; xx < n; xx++) if (data[((y0 + yy) * W2 + x0 + xx) * 4 + 3] > 60) { fx += xx; fc++; }
+          S.foot = [fc ? fx / fc : n / 2, bot];
+        }
+      }
+    });
+    S.sheet = cv2; S.state = 'ready';
+  };
+  im.onerror = () => { S.state = 'error'; };
+  im.src = S.src;
+}
+function useSprite(f) {
+  const S = SPR_ON && SPRITES[f.key]; if (!S || f.pal) return null;
+  if (!S.state) loadSprite(f.key);
+  return S.state === 'ready' ? S : null;
+}
+// qué cuadro mostrar según lo que está haciendo
+function spriteFrame(f, S) {
+  const T = G.time, st = f.st, a = f.atk, prog = a ? f.sf / (a.su + a.ac + a.rc) : 0;
+  if (st === 'walk') { const n = S.counts[3], k = Math.floor(T / 4) % n; return [3, Math.sign(f.vx) * f.face < 0 ? n - 1 - k : k]; }
+  if (st === 'jump') return [4, f.vy > 2 ? 2 : 1];
+  if (st === 'crouch' || st === 'land' || st === 'getup') return [4, 3];
+  if (st === 'attack' && a) {
+    if (f.an[1] === 'p' || f.an === 'p') return [0, f.sf < a.su ? 1 : f.sf < a.su + a.ac ? 3 : 4]; // piñas
+    return [1, Math.min(8, 2 + Math.floor(prog * 7))]; // patadas: el golpe fuerte
+  }
+  if (st === 'special') return [1, Math.min(8, Math.floor(f.sf / 4) % 9)];
+  if (st === 'win') return [4, Math.floor(T / 10) % 2 ? 2 : 0];
+  return [2, Math.floor(T / 8) % S.counts[2]]; // parado (también para golpes recibidos, caídas, etc.)
+}
+function drawSpriteBody(c, f, S, vfx, T) {
+  const [row, col] = spriteFrame(f, S), n = S.cell, k = S.k, [ax, ay] = S.foot;
+  const lean = f.st === 'hit' || f.st === 'block' ? -.18 : 0; // se echa para atrás cuando le pegan
+  if (lean) c.rotate(lean);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(S.sheet, col * n, row * n, n, n, -ax * k, -ay * k, n * k, n * k);
+  c.imageSmoothingEnabled = true;
+  // la cara de la foto donde estaba la cabeza del sprite
+  const [hx, hy] = S.heads[row][col], R = 31, hcx = (hx - ax) * k, hcy = (hy - ay) * k - 6;
+  c.save(); c.translate(hcx, hcy); c.scale(vfx, 1);
+  if (f.flash > 0) { const q = Math.sin(f.flash * 1.3) * .12; c.scale(1 + q, 1 - q); }
+  drawFace(c, f.img, R, RING[f.i] || '#fff', f.flash, vfx, f.yaw, f);
+  if (((f.st === 'ko' || f.st === 'down') && f.y <= 2) || f.st === 'dizzy') { // estrellitas mareado
+    for (let q = 0; q < 3; q++) {
+      const an = T * .12 + q * 2.09; c.save(); c.translate(Math.cos(an) * R * 1.1, -R * .9 + Math.sin(an) * R * .3); c.rotate(an); c.fillStyle = q % 2 ? '#fff3a0' : '#ffc83d'; c.beginPath();
+      for (let p = 0; p < 10; p++) { const rr2 = p % 2 ? 4 : 10, aa = p * Math.PI / 5; c.lineTo(Math.cos(aa) * rr2, Math.sin(aa) * rr2); }
+      c.fill(); c.restore();
+    }
+  }
+  c.restore();
+}
 /* ---------- piernas y calzado con volumen ----------
    Cada tramo de pierna es una forma que se angosta (con la pantorrilla o el muslo marcados) y lleva sombra:
    más clara adelante (de donde viene la luz) y más oscura atrás, así no se ve como un palito pintado. */
@@ -3050,6 +3134,9 @@ $('#mFull').onclick = () => { if (document.fullscreenElement) document.exitFulls
 const pixLabel = () => $('#mPix').textContent = PIX ? '🕹️ Estilo: arcade (pixelado)' : '🖌️ Estilo: liso';
 $('#mPix').onclick = () => { PIX = !PIX; store.set('kdc_pix', PIX); pixLabel(); toast(PIX ? '🕹️ Estilo arcade: como las máquinas de los 90' : '🖌️ Estilo liso, sin píxeles'); };
 pixLabel();
+const sprLabel = () => $('#mSpr').textContent = SPR_ON ? '🧍 Toro: cuerpo pixel (prueba)' : '🧍 Toro: cuerpo dibujado';
+$('#mSpr').onclick = () => { SPR_ON = !SPR_ON; store.set('kdc_spr', SPR_ON); sprLabel(); toast(SPR_ON ? '🧍 Toro usa el cuerpo de pixel art' : '🧍 Toro vuelve al cuerpo dibujado'); };
+sprLabel();
 function openOnline(code) {
   $('#onA').style.display = 'block'; $('#onB').style.display = 'none'; oMsg('');
   $('#oCode').value = code || ''; $('#scrOnline').classList.add('on');
