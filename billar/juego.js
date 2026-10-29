@@ -635,7 +635,7 @@ function optsHTML(host){
     <label>Cómo se juega</label>${sel('fmt', Object.keys(FORMATS).map(k=>({v:k, t:FORMATS[k]})))}
     ${o.mode!=='libre'?`<label>Duración</label>${sel('race', RACES)}`:''}
     ${o.mode==='rot'?`<label>Puntos para ganar</label>${sel('rotTarget', [{v:61,t:'61 puntos (oficial)'},{v:31,t:'31 puntos (corta)'},{v:91,t:'91 puntos (larga)'}])}`:''}
-    <label>Línea de ayuda para apuntar</label>${sel('aim', AIMS)}
+    <label>🎯 Dificultad (ayuda para apuntar)</label>${sel('aim', AIMS)}
     <label>Nivel de los bots</label>${sel('bot', BOTLV)}
     <label>Reglas de la casa</label>`
     + (HOUSE.filter(h=>h.modes.includes(o.mode)).map(h=>`<label class="opt" style="margin:0 0 6px;font-weight:400"><input type="checkbox" ${o[h.k]?'checked':''} ${dis} onchange="doAct({type:'opt',k:'${h.k}',v:this.checked})"><span><b>${h.t}</b><small>${h.d}</small></span></label>`).join('') || '<p class="muted">Este modo no tiene reglas para elegir.</p>');
@@ -1006,18 +1006,19 @@ function aimGuide(balls, cue, ang){
   return {t:wall, gx, gy, hit:null, refl: wn==='x' ? [-dx,dy] : [dx,-dy]};
 }
 function drawGuide2D(c, balls, cue, ang){
-  const help=V.opts.aim, g=aimGuide(balls, cue, ang);
+  const help=V.opts.aim;
+  if(help==='nada') return; // experto: sin ninguna ayuda
+  const g=aimGuide(balls, cue, ang), reach = help==='larga' || g.t<=AIM_MEDIO;
   c.save(); c.strokeStyle='rgba(255,255,255,.75)'; c.lineWidth=.35;
-  const maxL = help==='nada' ? 30 : g.t;
-  c.beginPath(); c.moveTo(cue.x, cue.y); c.lineTo(cue.x+Math.cos(ang)*Math.min(maxL,g.t), cue.y+Math.sin(ang)*Math.min(maxL,g.t)); c.stroke();
-  if(help!=='nada'){
+  const maxL = help==='larga' ? g.t : Math.min(AIM_MEDIO, g.t);
+  c.beginPath(); c.moveTo(cue.x, cue.y); c.lineTo(cue.x+Math.cos(ang)*maxL, cue.y+Math.sin(ang)*maxL); c.stroke();
+  if(reach){
     c.strokeStyle='rgba(255,255,255,.8)'; c.beginPath(); c.arc(g.gx, g.gy, BR, 0, 7); c.stroke();
     if(g.hit){
       const ok=legalFirstV().includes(g.hit.n) || V.opts.mode==='libre';
       if(!ok){ c.strokeStyle='#ff5252'; c.lineWidth=.6; c.beginPath(); c.moveTo(g.gx-2,g.gy-2); c.lineTo(g.gx+2,g.gy+2); c.moveTo(g.gx+2,g.gy-2); c.lineTo(g.gx-2,g.gy+2); c.stroke(); }
-      const L1 = help==='larga' ? 70 : 14;
       c.strokeStyle = ok ? 'rgba(255,240,150,.9)' : 'rgba(255,90,90,.8)'; c.lineWidth=.45;
-      c.beginPath(); c.moveTo(g.hit.x, g.hit.y); c.lineTo(g.hit.x+g.obj[0]*L1*Math.max(.25,g.cut), g.hit.y+g.obj[1]*L1*Math.max(.25,g.cut)); c.stroke();
+      if(help==='larga'){ c.beginPath(); c.moveTo(g.hit.x, g.hit.y); c.lineTo(g.hit.x+g.obj[0]*70*Math.max(.25,g.cut), g.hit.y+g.obj[1]*70*Math.max(.25,g.cut)); c.stroke(); }
       if(help==='larga' && g.cueOut){ c.strokeStyle='rgba(255,255,255,.45)'; c.setLineDash([1.2,1.2]); c.beginPath(); c.moveTo(g.gx,g.gy); c.lineTo(g.gx+g.cueOut[0]*30*(1-Math.abs(g.cut)), g.gy+g.cueOut[1]*30*(1-Math.abs(g.cut))); c.stroke(); }
     } else if(help==='larga' && g.refl){ c.setLineDash([1.2,1.2]); c.strokeStyle='rgba(255,255,255,.45)'; c.beginPath(); c.moveTo(g.gx,g.gy); c.lineTo(g.gx+g.refl[0]*30, g.gy+g.refl[1]*30); c.stroke(); }
   }
@@ -1234,16 +1235,16 @@ function draw3D(){
     const dx=Math.cos(aim.ang), dz=Math.sin(aim.ang), el=.09, back=BR+1+aim.pow*28;
     R3.cue.position.set(cue.x-TL/2-dx*back*Math.cos(el), BR+back*Math.sin(el), cue.y-TW/2-dz*back*Math.cos(el));
     R3.cue.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), new T.Vector3(dx*Math.cos(el), -Math.sin(el), dz*Math.cos(el)).normalize());
-    if(mine(curShooter())){
+    if(mine(curShooter()) && V.opts.aim!=='nada'){ // experto: sin ninguna ayuda
       const g=aimGuide(balls, cue, aim.ang), help=V.opts.aim, yL=.25;
       const setL=(l,pts)=>{ const a=l.geometry.attributes.position; a.setXYZ(0,pts[0]-TL/2,yL,pts[1]-TW/2); a.setXYZ(1,pts[2]-TL/2,yL,pts[3]-TW/2); a.needsUpdate=true; l.geometry.computeBoundingSphere(); l.visible=true; };
-      const L0 = help==='nada' ? Math.min(30,g.t) : g.t;
+      const L0 = help==='larga' ? g.t : Math.min(AIM_MEDIO, g.t);
       setL(R3.lines[0], [cue.x, cue.y, cue.x+dx*L0, cue.y+dz*L0]);
-      if(help!=='nada'){
+      if(help==='larga' || g.t<=AIM_MEDIO){
         R3.ghost.position.set(g.gx-TL/2, BR, g.gy-TW/2); R3.ghost.visible=true;
-        if(g.hit){ const L1=(help==='larga'?70:14)*Math.max(.25,g.cut); setL(R3.lines[1], [g.hit.x, g.hit.y, g.hit.x+g.obj[0]*L1, g.hit.y+g.obj[1]*L1]);
+        if(g.hit && help==='larga'){ const L1=70*Math.max(.25,g.cut); setL(R3.lines[1], [g.hit.x, g.hit.y, g.hit.x+g.obj[0]*L1, g.hit.y+g.obj[1]*L1]);
           R3.lines[1].material.color.set(legalFirstV().includes(g.hit.n)||V.opts.mode==='libre' ? 0xfff096 : 0xff5a5a);
-          if(help==='larga' && g.cueOut){ const L2=30*(1-Math.abs(g.cut)); setL(R3.lines[2], [g.gx, g.gy, g.gx+g.cueOut[0]*L2, g.gy+g.cueOut[1]*L2]); } }
+          if(g.cueOut){ const L2=30*(1-Math.abs(g.cut)); setL(R3.lines[2], [g.gx, g.gy, g.gx+g.cueOut[0]*L2, g.gy+g.cueOut[1]*L2]); } }
         else if(help==='larga' && g.refl) setL(R3.lines[2], [g.gx, g.gy, g.gx+g.refl[0]*30, g.gy+g.refl[1]*30]);
       }
     }

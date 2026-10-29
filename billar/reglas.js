@@ -214,9 +214,10 @@ const HOUSE=[
   {k:'railRule',  def:true,  modes:['8','9','10','rot','kelly'], t:'🧱 Banda después del choque', d:'Si no metés ninguna bola, alguna tiene que tocar una banda después del choque. Si no, es falta.'},
 ];
 const RACES=[{v:1,t:'Una sola partida'},{v:2,t:'Al mejor de 3 (gana 2)'},{v:3,t:'Al mejor de 5 (gana 3)'},{v:5,t:'Al mejor de 9 (gana 5)'}];
-const AIMS=[{v:'larga',t:'📏 Larga (muestra a dónde van las dos bolas)'},{v:'corta',t:'📐 Corta (solo el choque)'},{v:'nada',t:'🙈 Sin ayuda (para cracks)'}];
+const AIMS=[{v:'larga',t:'🟢 Fácil (línea larga: muestra a dónde van las dos bolas)'},{v:'corta',t:'🟡 Medio (línea corta, no muestra a dónde van)'},{v:'nada',t:'🔴 Experto (sin ninguna ayuda)'}];
+const AIM_MEDIO=40; // hasta dónde llega la línea en el nivel medio (cm)
 const BOTLV=[{v:'facil',t:'🙂 Fácil'},{v:'normal',t:'😎 Normal'},{v:'crack',t:'🔥 Crack'}];
-function defaultOpts(){ const o={mode:'8', fmt:'ind', race:1, aim:'larga', bot:'normal', rotTarget:61}; HOUSE.forEach(h=>o[h.k]=h.def); return o; }
+function defaultOpts(){ const o={mode:'8', fmt:'ind', race:1, aim:'corta', bot:'normal', rotTarget:61}; HOUSE.forEach(h=>o[h.k]=h.def); return o; }
 
 let S=null;
 const EMOJIS=['🎱','🧉','🥯','🐆','🌸','🎻','⚽','🐂','🌽','🦜','🐊','🦩','🍖','🌵','🎸','🐎','🦋','🌞','🍉','🦉'];
