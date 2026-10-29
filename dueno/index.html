@@ -79,6 +79,7 @@ const GAMES = {
   kombate: {n:'Face Punch',        ico:'../kombate/icon-192.png',  phase:{}},
   uno:     {n:'UNO Paraguayo',     ico:'../uno/icon-192.png',      phase:{lobby:'⏳ En la sala de espera', play:'🃏 Jugando', roundEnd:'🏆 Entre manos', over:'🏁 Terminada'}},
   billar:  {n:'Billar PY',         ico:'../billar/icon-192.png',   phase:{lobby:'⏳ En la sala de espera', play:'🎱 Jugando', rackEnd:'🏆 Entre partidas', over:'🏁 Terminada'}},
+  adivina: {n:'Adivina Quién PY',  ico:'../adivina/icon-192.png',  phase:{lobby:'⏳ En la sala de espera', pick:'🤫 Eligiendo personajes', play:'🕵️ Jugando', roundEnd:'🏆 Entre rondas', over:'🏁 Terminada'}},
 };
 const KIND = {duel:'🥊 Pelea entre dos', bots:'🤖 Sala de bots (con público)', tour:'🏆 Torneo'};
 const A={key:null, peer:null, rooms:{}, err:'', pending:{}};
@@ -140,8 +141,8 @@ function tokenOf(key){ let t=load(key); if(!t){ t=Math.random().toString(36).sli
 // entrar como dueño (a la vista de todos): la sala anota este aparato y después se abre el juego
 function enter(k){
   const r=A.rooms[k]; if(!r || !r.conn.open) return toast('Esa sala ya no responde.');
-  const tok = r.game==='uno' ? tokenOf('uno_token') : r.game==='billar' ? tokenOf('billar_token') : tokenOf('bnq_token');
-  const url = r.game==='uno' || r.game==='billar' ? `../${r.game}/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
+  const tok = r.game==='uno' ? tokenOf('uno_token') : r.game==='billar' ? tokenOf('billar_token') : r.game==='adivina' ? tokenOf('adivina_token') : tokenOf('bnq_token');
+  const url = r.game==='uno' || r.game==='billar' || r.game==='adivina' ? `../${r.game}/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
   const tab = window.open('about:blank', '_blank');
   A.pending[k]={url, tab};
   try{ r.conn.send({t:'iam', token:tok}); }catch(e){}
@@ -166,7 +167,7 @@ function roomHTML(k, r){
   if(r.game==='banquero'){
     if(!i.local) btns+=`<button class="btn sm green" onclick="enter('${k}')">👑 Entrar a la vista</button>`;
     btns+=`<a class="btn sm gray" href="../banquero/#panel-dueno" target="_blank" rel="noopener">🕵️ Mirar sin que me vean (panel del Banquero)</a>`;
-  } else if(r.game==='uno' || r.game==='billar'){
+  } else if(r.game==='uno' || r.game==='billar' || r.game==='adivina'){
     if(!i.local) btns+=`<button class="btn sm green" onclick="enter('${k}')">👑 Entrar a mirar</button>`;
   } else if(r.game==='loteria'){
     btns+=`<a class="btn sm" href="../loteria/?sala=${encodeURIComponent(r.code)}" target="_blank" rel="noopener">👀 Abrir la sala</a><span class="muted" style="align-self:center">(ahí tocá “Entrar solo a mirar”)</span>`;

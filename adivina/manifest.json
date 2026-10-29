@@ -1,0 +1,16 @@
+{
+  "name": "Adivina Quién PY",
+  "short_name": "Adivina Quién",
+  "description": "Adivina Quién con personajes de Paraguay en caricatura, en línea con amigos, en 2D o 3D.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14243b",
+  "theme_color": "#14243b",
+  "lang": "es-PY",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
