@@ -1364,3 +1364,15 @@ function mediaMic() { try { navigator.mediaSession && navigator.mediaSession.set
 
 // para revisar desde la consola
 window.SALA = { S, A, cfg, voiceGuard };
+
+// botón 🏠 de todos los juegos (../inicio.js): si estás en una sala, primero se sale bien
+window.INICIO = {
+  enJuego: () => !!S.me && !S.left,
+  pregunta: '¿Salir de la sala de voz y volver a todos los juegos?',
+  salir() {
+    S.left = true;
+    S.local.forEach(ls => { if (ls.kind === 'screen') stopShare(ls.sid); });
+    try { S.me && S.me.destroy(); } catch (e) {}
+    try { S.reg && (clearInterval(S.reg._iv), S.reg.destroy()); } catch (e) {}
+  },
+};

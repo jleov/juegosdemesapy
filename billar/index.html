@@ -58,7 +58,7 @@ textarea{resize:vertical;min-height:70px}
 .mb i{font-style:normal;font-weight:900;font-size:calc(var(--s) * .44);color:#111;background:#fbfaf5;border-radius:50%;width:56%;height:56%;display:flex;align-items:center;justify-content:center;line-height:1}
 .logo .mb{--s:46px}
 /* ---------- sala de espera ---------- */
-.lobbywrap{max-width:1100px;margin:0 auto;padding:14px 12px 30px;display:flex;gap:14px;align-items:flex-start}
+.lobbywrap{max-width:1100px;margin:0 auto;padding:56px 12px 30px;display:flex;gap:14px;align-items:flex-start}
 .lobbywrap>.lmain{flex:1;min-width:0}
 #lobbySide{width:360px;flex:none;position:sticky;top:10px}
 @media (max-width:860px){.lobbywrap{flex-direction:column}#lobbySide{width:100%;position:static}}
@@ -80,7 +80,7 @@ body>.side{display:none}
 /* ======================= JUEGO ======================= */
 #game.on{display:flex}
 #game{height:100vh;height:100dvh;flex-direction:column;overflow:hidden;background:radial-gradient(circle at 50% 30%,#2a1c12,#0e0906 80%)}
-.topbar{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px;color:#fff;background:rgba(0,0,0,.45);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.topbar{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px 6px 56px;color:#fff;background:rgba(0,0,0,.45);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
 .topbar::-webkit-scrollbar{display:none}
 .topbar .ttl{font-weight:900;letter-spacing:1px;white-space:nowrap}
 .topbar .ttl small{font-weight:600;color:#f6d79a;letter-spacing:2px;margin-left:4px}
@@ -211,7 +211,6 @@ body>.side{display:none}
 
 <!-- ======================= MENÚ ======================= -->
 <div class="screen on" id="menu"><div class="menu">
-  <a class="back" href="../">← Juegos de Mesa Digital PY</a>
   <div class="logo">
     <div class="balls"><span class="mb" style="--bc:#f4c20d"><i>1</i></span><span class="mb st" style="--bc:#1f4fbf"><i>10</i></span><span class="mb" style="--bc:#111"><i>8</i></span><span class="mb st" style="--bc:#d32f2f"><i>11</i></span><span class="mb" style="--bc:#2e7d32"><i>6</i></span></div>
     <h1>BILLAR<span>POOL · PARAGUAY</span></h1>
@@ -252,7 +251,7 @@ body>.side{display:none}
 <div class="screen" id="lobby"><div class="lobbywrap">
   <div class="lmain">
     <div class="box">
-      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1" id="lobbyTitle">🎱 Sala de espera</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música de fondo">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🏠 Salir</button></div>
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1" id="lobbyTitle">🎱 Sala de espera</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música de fondo">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🚪 Salir</button></div>
       <div id="lobbyCodeBox"><p class="muted" style="text-align:center;margin:8px 0 0">Código de la sala</p><div class="code" id="lobbyCode">—</div>
         <div class="row"><button class="btn sm" onclick="shareRoom()">📤 Compartir enlace</button><button class="btn sm gray" onclick="copyCode()">📋 Copiar código</button></div></div>
       <div id="lobbyObs"></div>
@@ -292,7 +291,7 @@ body>.side{display:none}
     <button class="btn sm dark btnMusic hidem" onclick="toggleMusic()" title="Música de fondo">🎶</button>
     <button class="btn sm dark hidem" onclick="showRules()">📜</button>
     <button class="btn sm dark" id="btnSide" onclick="toggleSide()">💬<span class="badge" id="unread" style="display:none">0</span></button>
-    <button class="btn sm red" onclick="leaveClick()">🏠</button>
+    <button class="btn sm red" onclick="leaveClick()" title="Salir de la partida">🚪</button>
   </div>
   <div id="obsbar" class="obsbar" style="display:none"></div>
   <div class="gmain">
@@ -365,6 +364,8 @@ body>.side{display:none}
 <script src="reglas.js?v=2"></script>
 <script src="juego.js?v=2"></script>
 <script src="../dueno-link.js"></script>
+<script src="../inicio.js"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu'};</script>
 <script>
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida en un aparato)
 if(window.DuenoLink) DuenoLink.start({game:"billar",

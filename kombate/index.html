@@ -19,7 +19,7 @@
 html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;overscroll-behavior:none}
 #cv{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:block;background:#000}
 button{font:inherit;cursor:pointer}
-.scr{position:fixed;inset:0;display:none;z-index:5;overflow:auto;touch-action:pan-y;padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-area-inset-left))}
+.scr{position:fixed;inset:0;display:none;z-index:5;overflow:auto;touch-action:pan-y;padding:max(56px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-area-inset-left))}
 .scr.on{display:block}
 .modal{background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
 .modal.on{display:flex}
@@ -374,6 +374,8 @@ kbd{background:#ffffff22;border-radius:5px;padding:1px 6px;font-family:inherit;f
 <script src="../ice.js"></script>
 <script src="game.js"></script>
 <script src="../dueno-link.js"></script>
+<script src="../inicio.js"></script>
+<script>window.INICIO={enJuego:()=>document.body.classList.contains('playing') || !!NET.role, salida:'goMenu', suave:true};</script>
 <script>
 // le cuenta al panel del dueño de todos los juegos (juegosdemesapy/dueno/) qué sala de pelea está abierta (solo el que la creó)
 if(window.DuenoLink) DuenoLink.start({game:'kombate',

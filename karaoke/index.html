@@ -22,7 +22,7 @@ button{cursor:pointer}
 a{color:var(--cyan)}
 
 /* ---------- entrada ---------- */
-#home{height:100%;overflow:auto;padding:16px;display:flex;justify-content:center;
+#home{height:100%;overflow:auto;padding:60px 16px 16px;display:flex;justify-content:center;
   background:radial-gradient(ellipse at 20% 0%,#3b1660 0,transparent 60%),radial-gradient(ellipse at 90% 100%,#5a0f45 0,transparent 55%),var(--bg)}
 .card{background:#1d1230e6;border:1px solid var(--line);border-radius:18px;padding:22px;width:100%;max-width:480px;margin:auto 0;box-shadow:0 10px 40px #0008}
 .card h1{margin:0 0 4px;font-size:26px;background:linear-gradient(90deg,var(--pink),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -51,7 +51,7 @@ input[type=text]:focus,input[type=search]:focus,select:focus{border-color:var(--
 
 /* ---------- sala ---------- */
 #room{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:auto 1fr auto;grid-template-areas:"top top" "stage panel" "bar bar"}
-#top{grid-area:top;display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+#top{grid-area:top;display:flex;align-items:center;gap:10px;padding:8px 12px 8px 58px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
 #top h2{margin:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #netState{font-size:12px;color:var(--muted)}
 #netState.ok{color:var(--green)}
@@ -188,7 +188,6 @@ h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04e
     <button class="btn wide" id="btnEnter">Entrar a cantar</button>
     <div class="err hidden" id="homeErr"></div>
     <p class="note">🎧 Para cantar mejor usá auriculares: así no se escucha la música dos veces. Funciona en el celular y en la PC (Chrome, Edge, Safari o Firefox).</p>
-    <a class="back" href="../">← Volver a Juegos de Mesa</a>
   </div>
 </div>
 
@@ -288,6 +287,7 @@ h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04e
 
 <script src="../salas/vendor/peerjs.min.js"></script>
 <script src="../ice.js"></script>
+<script src="../inicio.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

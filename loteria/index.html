@@ -43,7 +43,7 @@ input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1p
 .emojis button{font-size:22px;background:#fff;border:2px solid transparent;border-radius:10px;width:42px;height:42px;cursor:pointer}
 .emojis button.on{border-color:var(--blue);background:#e6eeff}
 /* barra superior */
-#top{position:sticky;top:0;z-index:20;background:rgba(20,6,38,.92);backdrop-filter:blur(6px);color:#fff;display:flex;align-items:center;gap:6px;padding:8px 10px}
+#top{position:sticky;top:0;z-index:20;background:rgba(20,6,38,.92);backdrop-filter:blur(6px);color:#fff;display:flex;align-items:center;gap:6px;padding:8px 10px 8px 56px}
 #top .saldo,#top .code{white-space:nowrap;font-size:14px}
 #top .code{font-weight:900;letter-spacing:2px;background:var(--gold);color:#222;border-radius:8px;padding:3px 8px;cursor:pointer}
 #top .saldo{font-weight:800}
@@ -1295,6 +1295,12 @@ window.addEventListener('focus', ()=>cargarGrabados().then(()=>{ if(UI.sonido) r
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 <script src="../dueno-link.js"></script>
+<script src="../inicio.js"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, salida:'leave', preguntar(){
+  if(NET.mode==='host' && !confirm('Sos el anfitrión: si salís, la sala se cierra para todos. ¿Salir?')) return;
+  if(NET.mode==='client' && !confirm('¿Salir de la sala?')) return;
+  leave(true);
+}};</script>
 <script>
 // le cuenta al panel del dueño de todos los juegos (juegosdemesapy/dueno/) cómo va esta sala (solo el anfitrión)
 if(window.DuenoLink) DuenoLink.start({game:'loteria',

@@ -27,7 +27,8 @@ button{cursor:pointer}
 svg{width:20px;height:20px;flex:none}
 
 /* ---------- entrada ---------- */
-#home{height:100%;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+#home{height:100%;display:flex;justify-content:center;padding:60px 16px 16px;overflow:auto}
+#home>.card{margin:auto}
 .card{background:var(--panel);border-radius:14px;padding:24px;width:100%;max-width:440px;box-shadow:0 10px 40px #0006}
 .card h1{margin:0 0 4px;font-size:24px}
 .card p.sub{margin:0 0 18px;color:var(--muted);font-size:14px}
@@ -52,7 +53,7 @@ input[type=text]:focus,select:focus{border-color:var(--accent)}
 /* ---------- sala ---------- */
 #room{height:100%;display:grid;grid-template-columns:240px 1fr auto;grid-template-rows:1fr}
 #side{background:var(--panel);display:flex;flex-direction:column;min-width:0}
-#side header{padding:14px 14px 10px;border-bottom:1px solid #0003}
+#side header{padding:14px 14px 10px 58px;border-bottom:1px solid #0003}
 #side header h2{margin:0;font-size:16px;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #netState{font-size:12px;color:var(--muted);margin-top:2px}
 #netState.ok{color:var(--green)}
@@ -312,6 +313,7 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
 
 <script src="vendor/peerjs.min.js"></script>
 <script src="../ice.js"></script>
+<script src="../inicio.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

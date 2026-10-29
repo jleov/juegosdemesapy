@@ -34,7 +34,7 @@ body.portrait.jugando #giro{display:block}
 #pausa{position:fixed;top:max(6px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));z-index:4;display:none;border:0;border-radius:10px;background:rgba(0,0,0,.45);color:#fff;font-size:18px;padding:6px 10px;cursor:pointer}
 #pausa.on{display:block}
 /* pantallas */
-#scr{position:fixed;inset:0;z-index:5;display:none;overflow:auto;background:rgba(10,5,25,.72);padding:16px;touch-action:pan-y}
+#scr{position:fixed;inset:0;z-index:5;display:none;overflow:auto;background:rgba(10,5,25,.72);padding:56px 16px 16px;touch-action:pan-y}
 #scr.on{display:block}
 .box{max-width:720px;margin:0 auto;background:#fff8e6;color:#222;border-radius:18px;padding:18px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
 .box h1{margin:0;font-size:clamp(24px,6vw,38px);line-height:1.05;font-weight:900;color:#1b2a5a}
@@ -101,5 +101,7 @@ kbd{background:#eee;border:1px solid #ccc;border-bottom-width:2px;border-radius:
 </div>
 <div id="scr"></div>
 <script src="game.js"></script>
+<script src="../inicio.js"></script>
+<script>window.INICIO={suave:true, enJuego:()=>!!G && G.state==='play', pregunta:'¿Dejar el viaje y volver a todos los juegos? Lo que guardaste en el mapa queda.'};</script>
 </body>
 </html>

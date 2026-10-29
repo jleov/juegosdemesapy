@@ -1031,3 +1031,14 @@ function leave() {
   try { S.reg && S.reg.destroy(); } catch (e) {}
   location.href = location.pathname;
 }
+
+// botón 🏠 de todos los juegos (../inicio.js): si estás en una sala, primero se sale bien
+window.INICIO = {
+  enJuego: () => !!S.me && !S.left,
+  pregunta: '¿Salir de la sala de karaoke y volver a todos los juegos?',
+  salir() {
+    S.left = true;
+    try { S.me && S.me.destroy(); } catch (e) {}
+    try { S.reg && S.reg.destroy(); } catch (e) {}
+  },
+};
