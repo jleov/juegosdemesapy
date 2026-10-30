@@ -1229,8 +1229,7 @@ function showTitle() {
       <p class="sub">Es 24 de diciembre. Estás en el centro de Asunción, te queda 12% de batería y la abuela te espera en Pedro Juan para la Nochebuena. Cruzá 9 ciudades corriendo, saltando baches y escondiéndote de motochorros.</p>
     </div>
     <button class="btn r" onclick="showChars()">▶ Jugar</button>
-    <div class="flex"><button class="btn" onclick="showHelp()">📖 Cómo se juega</button><button class="btn gr" onclick="toggleSound()">${S.sound ? '🔊 Sonido: sí' : '🔇 Sonido: no'}</button></div>
-    <div style="text-align:center"><a class="back" href="../">← Volver a Juegos Paraguay Digitales</a></div>`);
+    <div class="flex"><button class="btn" onclick="showHelp()">📖 Cómo se juega</button><button class="btn gr" onclick="toggleSound()">${S.sound ? '🔊 Sonido: sí' : '🔇 Sonido: no'}</button></div>`);
 }
 function toggleSound() { S.sound = !S.sound; save(); showTitle(); }
 

@@ -416,21 +416,6 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <p class="muted" style="margin-top:0">Para las partidas en este dispositivo y contra bots. En una sala en línea las elige el anfitrión antes de empezar.</p>
       <div id="menuRules"></div>
     </div>
-    <div class="box">
-      <h3>🔗 Enlaces del juego</h3>
-      <p class="muted" style="margin-top:0">Si un enlace no abre, usá el otro. Es el mismo juego: las salas y los códigos sirven en los dos, así que pueden jugar juntos aunque cada uno entre por un enlace distinto.</p>
-      <div id="gameLinks"></div>
-    </div>
-    <div class="box">
-      <h3>🎱 Nuevo: Lotería</h3>
-      <p class="muted" style="margin-top:0">Bingo de 90 bolillas con amigos: elegí tus cartones, anotá lo que sale y cantá línea o bingo.</p>
-      <a class="btn gold wide" href="../loteria/" style="display:block;text-align:center;text-decoration:none">🎱 Jugar a la Lotería</a>
-    </div>
-    <div class="box" id="installBox">
-      <h3>📲 Instalar el juego</h3>
-      <p class="muted" style="margin-top:0">Instalalo como app en tu celular o PC: queda con su ícono, se abre en pantalla completa y sin buscar el enlace.</p>
-      <button class="btn green wide" id="btnInstall">📲 Instalar en este dispositivo</button>
-    </div>
     <button class="btn gray wide" onclick="showRules()">📜 Reglas del juego</button>
     <button class="btn wide" id="btnOwner" style="display:none;margin-top:8px;background:#4a2f7a" onclick="openOwnerPanel()">👑 Panel del dueño</button>
     <p class="muted" id="musicCredit" style="color:#cfe8d5;text-align:center;font-size:11px;margin-top:14px"></p>
@@ -3376,21 +3361,10 @@ $('#btnJoin').onclick=()=>{
 };
 $('#btnStart').onclick=()=>doAct({type:'start'});
 $('#btnAddBot').onclick=()=>doAct({type:'addBot'});
-// los dos lugares donde está publicado el juego (si uno se cae, se usa el otro)
-const GAME_LINKS=[{n:'Principal', u:'https://juegospy.com/banquero/'}, {n:'Respaldo (Cloudflare)', u:'https://juegosdemesapy.pages.dev/banquero/'}, {n:'Respaldo (GitHub)', u:'https://jleov.github.io/juegosdemesapy/banquero/'}];
-const sameSite = u => location.href.startsWith(u) || (location.origin+location.pathname)===u;
-function renderGameLinks(){
-  $('#gameLinks').innerHTML=GAME_LINKS.map(l=>`<div class="prow" style="justify-content:space-between">
-    <span class="pn">${sameSite(l.u)?'✅ ':''}${l.n}<br><a href="${l.u}" style="font-weight:600;word-break:break-all">${l.u.replace('https://','')}</a></span>
-    <button class="btn sm gray" style="flex:0 0 auto" onclick="navigator.clipboard.writeText('${l.u}').then(()=>toast('Enlace copiado.'),()=>toast('${l.u}'))">📋 Copiar</button></div>`).join('')
-    + `<p class="muted" style="margin:6px 0 0">${GAME_LINKS.some(l=>sameSite(l.u))?'✅ = el enlace que estás usando ahora.':''}</p>`;
-}
-renderGameLinks();
 const shareUrl=()=>location.origin+location.pathname+'#'+NET.code;
-const otherLink=()=>{ const o=GAME_LINKS.find(l=>!sameSite(l.u)); return o ? o.u+'#'+NET.code : ''; };
 $('#btnCopy').onclick=()=>{ navigator.clipboard.writeText(shareUrl()).then(()=>toast('Enlace copiado.'),()=>toast(shareUrl())); };
 $('#btnShare').onclick=()=>{
-  const text=`¡Vení a jugar al Banquero Paraguayo! Código de sala: ${NET.code}${otherLink()?` (si el enlace no abre, probá este otro: ${otherLink()})`:''}`;
+  const text=`¡Vení a jugar al Banquero Paraguayo! Código de sala: ${NET.code}`;
   if(navigator.share) navigator.share({title:'Banquero Paraguayo', text, url:shareUrl()}).catch(()=>{});
   else window.open('https://wa.me/?text='+encodeURIComponent(text+' '+shareUrl()));
 };
@@ -3415,32 +3389,6 @@ const lastClient=load('bnq_client');
 if(lastClient && lastClient.code===hashCode && Date.now()-lastClient.at < 12*3600e3 && $('#myName').value.trim()) clientJoin(hashCode);
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 
-/* ====================== INSTALAR COMO APP ====================== */
-let installPrompt=null;
-const isInstalled = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone===true;
-function refreshInstall(){ $('#installBox').style.display = isInstalled() ? 'none' : 'block'; }
-// Chrome y Edge (Android y PC) avisan que se puede instalar: guardamos ese aviso para usarlo con nuestro botón
-window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; refreshInstall(); });
-window.addEventListener('appinstalled', ()=>{ installPrompt=null; refreshInstall(); toast('✅ ¡Listo! El Banquero quedó instalado. Buscalo con su ícono.'); });
-$('#btnInstall').onclick=async()=>{
-  if(installPrompt){
-    installPrompt.prompt();
-    const r=await installPrompt.userChoice.catch(()=>({outcome:'dismissed'}));
-    if(r.outcome==='accepted') toast('📲 Instalando el Banquero…');
-    installPrompt=null; return;
-  }
-  // el navegador no ofrece el botón automático: explicamos cómo hacerlo a mano según el dispositivo
-  const ua=navigator.userAgent, ios=/iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document), android=/Android/i.test(ua);
-  const safari=/Safari/i.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS/i.test(ua);
-  let pasos;
-  if(ios) pasos = safari
-    ? `<ol><li>Tocá el botón <b>Compartir</b> <span style="font-size:20px">⬆️</span> (abajo en el iPhone, arriba en el iPad).</li><li>Deslizá y elegí <b>“Agregar a pantalla de inicio”</b>.</li><li>Tocá <b>“Agregar”</b>. Va a aparecer el ícono del Banquero.</li></ol>`
-    : `<p>En iPhone y iPad solo se puede instalar desde <b>Safari</b>. Copiá el enlace, abrilo en Safari y seguí estos pasos:</p><ol><li>Botón <b>Compartir</b> ⬆️</li><li><b>“Agregar a pantalla de inicio”</b></li></ol>`;
-  else if(android) pasos = `<ol><li>Abrí el juego en <b>Chrome</b>.</li><li>Tocá el menú <b>⋮</b> (arriba a la derecha).</li><li>Elegí <b>“Instalar app”</b> o <b>“Agregar a pantalla principal”</b>.</li></ol><p class="muted">Si no aparece, recargá la página y esperá unos segundos: Chrome la ofrece cuando terminó de cargar.</p>`;
-  else pasos = `<ol><li>Abrí el juego en <b>Chrome</b> o <b>Edge</b>.</li><li>En la barra de direcciones, a la derecha, tocá el ícono de <b>instalar</b> (una pantallita con una flecha ⊕).</li><li>O en el menú <b>⋮</b> → <b>“Instalar Banquero Paraguayo”</b> (en Edge: <b>Aplicaciones → Instalar este sitio como aplicación</b>).</li></ol>`;
-  modal(`<h3>📲 Cómo instalar el Banquero</h3>${pasos}<p class="muted">El juego queda con su ícono 🟡₲ y se abre como una app, en pantalla completa.</p>`,'install');
-};
-refreshInstall();
 </script>
 <script src="../dueno-link.js"></script>
 <script src="../inicio.js"></script>
