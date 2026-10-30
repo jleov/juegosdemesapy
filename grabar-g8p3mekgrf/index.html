@@ -8,6 +8,19 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="../loteria/icon-192.png">
 <script src="../loteria/voces.js"></script>
+<script>
+// En GitHub no se puede pedir contraseña: el grabador se usa en juegospy.com (con contraseña).
+// Acá solo sigue abriendo en el aparato que ya tiene cantores grabados en esta dirección, para poder exportarlos.
+if(/github\.io$/.test(location.hostname)){
+  const ir=()=>location.replace('https://juegospy.com/grabar-g8p3mekgrf/');
+  document.documentElement.style.visibility='hidden';
+  CantosDB.lista().then(l=>{
+    if(!l || !l.length) return ir();
+    document.documentElement.style.visibility='';
+    setTimeout(()=>alert('⚠️ El grabador se mudó a juegospy.com/grabar-g8p3mekgrf/ (con contraseña). Exportá tus cantores con ⬇️ Archivo y subilos allá.'), 600);
+  }).catch(ir);
+}
+</script>
 <style>
 :root{--cream:#fff8e6;--ink:#1d1d1d;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f;--muted:#6b6b6b}
 *{box-sizing:border-box}
