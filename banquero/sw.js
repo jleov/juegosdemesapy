@@ -1,7 +1,7 @@
 // Service worker mÃ­nimo: permite instalar el juego como app en Android.
 // Guarda el juego en cachÃ© para que abra rÃ¡pido; la partida en lÃ­nea siempre necesita internet.
-const CACHE = 'banquero-v26';
-const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './dados.mp3', './contadora.mp3', './caja.mp3', './musica.mp3'];
+const CACHE = 'banquero-v27';
+const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './dados.mp3', './contadora.mp3', './caja.mp3', './musica.mp3', './ciudades.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

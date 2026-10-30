@@ -25,6 +25,7 @@
 <script src="peerjs.min.js"></script>
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
 <script src="../ice.js"></script>
+<script src="ciudades.js"></script>
 <style>
 :root{--felt:#0b3d2e;--cream:#f6f1e1;--ink:#1d1d1d;--red:#d52b1e;--blue:#0038a8;--gold:#e9b949;--muted:#6b6b6b;--line:#2a2a2a}
 *{box-sizing:border-box}
@@ -417,7 +418,7 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <div class="row" style="margin-top:8px"><button class="btn gray" id="btnAddLocal">+ Jugador</button><button class="btn gold" id="btnLocal">Empezar</button></div>
     </div>
     <div class="box">
-      <h3>⚙️ Reglas especiales</h3>
+      <h3>🏙️ Ciudad y reglas especiales</h3>
       <p class="muted" style="margin-top:0">Para las partidas en este dispositivo y contra bots. En una sala en línea las elige el anfitrión antes de empezar.</p>
       <div id="menuRules"></div>
     </div>
@@ -596,13 +597,35 @@ const B = [
   {t:'tax',n:'Impuesto Inmobiliario',s:'Imp. Inmobiliario',ic:'🏛️',a:100},
   {t:'st',g:'az',n:'Avda. Costanera',s:'Costanera',p:400,r:[50,200,600,1400,1700,2000]}
 ];
+/* ====================== CIUDADES ======================
+   El anfitrión elige la ciudad antes de empezar. Cada ciudad cambia solo los nombres de las 22 calles,
+   de la más barata (marrón) a la más cara (azul); transportes, servicios, impuestos y esquinas son iguales.
+   Calles sacadas de OpenStreetMap: [nombre completo, nombre corto para el casillero]. */
+const CALLES_IDX = B.map((x,i)=>x.t==='st'?i:-1).filter(i=>i>=0);
+const CIUDAD_BASE = CALLES_IDX.map(i=>[B[i].n, B[i].s]);
+const CIUDADES = { asuncion:{n:'Asunción', calles:null}, ...(window.CIUDADES_PY||{}) };
+let ciudadAplicada='asuncion';
+function aplicarCiudad(id){
+  if(!CIUDADES[id]) id='asuncion';
+  const lista=CIUDADES[id].calles||CIUDAD_BASE;
+  CALLES_IDX.forEach((i,k)=>{ B[i].n=lista[k][0]; B[i].s=lista[k][1]; });
+  if(ciudadAplicada!==id){ ciudadAplicada=id; const b=document.getElementById('board'); if(b) b.innerHTML=''; }   // se vuelve a dibujar el tablero
+}
+const myCity = () => { const c=load('bnq_ciudad'); return CIUDADES[c] ? c : 'asuncion'; };
+const ciudadNombre = id => (CIUDADES[id]||CIUDADES.asuncion).n;
+function ciudadSelect(sel, editable, fn){
+  return `<select ${editable?'':'disabled'} onchange="${fn}(this.value)">${Object.entries(CIUDADES).sort((a,b)=>a[0]==='asuncion'?-1:b[0]==='asuncion'?1:a[1].n.localeCompare(b[1].n,'es'))
+    .map(([k,c])=>`<option value="${k}" ${k===sel?'selected':''}>${c.n}${k==='asuncion'?' (la clásica)':''}</option>`).join('')}</select>`;
+}
+function setMyCity(id){ store('bnq_ciudad', id); }
+function setRoomCity(id){ setMyCity(id); doAct({type:'city', city:id}); }
 // k: money | goto | back | jail | free | repairs | each | nearest   (valores en unidades de ₲1.000)
 const CARDS = {
   cc:[
     {k:'goto',to:0,x:'Avance hasta la SALIDA y cobre ₲ 200.000.'},
-    {k:'goto',to:29,x:'Avance hasta la Avda. Mariscal López. Si pasa por la Salida, cobre ₲ 200.000.'},
-    {k:'goto',to:39,x:'Salga a pasear por la Avda. Costanera. Avance hasta allí.'},
-    {k:'goto',to:11,x:'Avance hasta la Avda. Artigas. Si pasa por la Salida, cobre ₲ 200.000.'},
+    {k:'goto',to:29,x:'Avance hasta {calle}. Si pasa por la Salida, cobre ₲ 200.000.'},
+    {k:'goto',to:39,x:'Salga a pasear por {calle}. Avance hasta allí.'},
+    {k:'goto',to:11,x:'Avance hasta {calle}. Si pasa por la Salida, cobre ₲ 200.000.'},
     {k:'nearest',type:'tr',x:'Avance hasta el transporte más cercano. Si tiene dueño, pague el doble del alquiler. Si no, puede comprarlo.'},
     {k:'nearest',type:'tr',x:'Avance hasta el transporte más cercano. Si tiene dueño, pague el doble del alquiler. Si no, puede comprarlo.'},
     {k:'nearest',type:'ut',x:'Avance hasta el servicio más cercano (ANDE o ESSAP). Si tiene dueño, pague 10 veces lo que sacó en los dados.'},
@@ -838,7 +861,7 @@ function showBuyTitle(refresh){
 }
 
 /* ====================== MOTOR (sólo anfitrión) ====================== */
-function lobbyState(){ return {phase:'lobby', players:[], seq:0, hostPid:null, log:[], logSeq:0, rules:myRules()}; }
+function lobbyState(){ return {phase:'lobby', players:[], seq:0, hostPid:null, log:[], logSeq:0, rules:myRules(), city:myCity()}; }
 // reglas opcionales: las elige el anfitrión en la sala (o este dispositivo para las partidas sin internet)
 const RULES_DEF={
   pozo:{t:'🧉 Pozo del Descanso', d:'Lo que se paga en Impuesto a la Renta e Impuesto Inmobiliario no va al Banco: se junta en el centro del tablero, y el que cae en el Descanso se lleva todo.'},
@@ -869,15 +892,16 @@ function startGame(){
   S = {phase:'play', players, seq:S.seq, hostPid:S.hostPid, props:{}, turn:0, tp:'roll', dbl:0, rolledDbl:false,
        roll:[1,1], rollId:0, card:null, cardId:0, pendingBuy:null, decks:{cc:shuffle(range(CARDS.cc.length)), ca:shuffle(range(CARDS.ca.length))},
        trades:[], tradeSeq:0, log:[], logSeq:0, winner:null, rent:null, rentSeq:0, rolled:{}, observers:S.observers||[], ownerTok:S.ownerTok, ver:2, turnAt:Date.now(), startedAt:Date.now(),
-       rules:S.rules||myRules(), pot:0, auction:null, aucSeq:0, mv:null, drawDeck:null};
+       rules:S.rules||myRules(), city:CIUDADES[S.city]?S.city:'asuncion', pot:0, auction:null, aucSeq:0, mv:null, drawDeck:null};
   log('¡Empieza la partida! El Banquero reparte a cada jugador '+fmt(START_MONEY)+': 10 billetes de ₲ 100.000, 6 de ₲ 50.000, 6 de ₲ 20.000, 5 de ₲ 10.000, 4 de ₲ 5.000, 4 de ₲ 2.000 y 2 monedas de ₲ 1.000.');
+  log(`🏙️ Se juega con las calles de ${ciudadNombre(S.city)}.`);
   const on=Object.keys(RULES_DEF).filter(k=>S.rules[k]).map(k=>RULES_DEF[k].t);
   if(on.length) log('Reglas especiales de esta partida: '+on.join(' · ')+'.');
   log('Turno de '+cur().name+'.');
 }
 function backToLobby(){
-  const players=S.players.filter(p=>p.conn || NET.mode==='local'), observers=(S.observers||[]).filter(o=>o.conn), rules=S.rules;
-  S = lobbyState(); S.players=players; S.observers=observers; if(rules) S.rules=rules; S.seq=players.reduce((m,p)=>Math.max(m,+p.id.slice(1)),0);
+  const players=S.players.filter(p=>p.conn || NET.mode==='local'), observers=(S.observers||[]).filter(o=>o.conn), rules=S.rules, city=S.city;
+  S = lobbyState(); S.players=players; S.observers=observers; if(rules) S.rules=rules; if(city) S.city=city; S.seq=players.reduce((m,p)=>Math.max(m,+p.id.slice(1)),0);
   S.hostPid=NET.myPid;
 }
 
@@ -993,8 +1017,9 @@ function stepMove(p, steps){
 function drawCard(p, deck, flip){
   const d=S.decks[deck], id=d.shift(), c=CARDS[deck][id];
   if(c.k!=='free') d.push(id);
-  S.card={deck, x:c.x, e:c.e||null, id:++S.cardId, who:p.name, pid:p.id, open:true, at:Date.now(), flip:!!flip};
-  log(`${p.name} saca ${DECK_NAME[deck]}: “${c.x}”`);
+  const cx = c.x.replace('{calle}', c.to!=null ? B[c.to].n : '');   // las tarjetas que nombran una calle usan la de la ciudad elegida
+  S.card={deck, x:cx, e:c.e||null, id:++S.cardId, who:p.name, pid:p.id, open:true, at:Date.now(), flip:!!flip};
+  log(`${p.name} saca ${DECK_NAME[deck]}: “${cx}”`);
   switch(c.k){
     case 'money': if(c.v>=0){ p.money+=c.v*K; } else pay(p,-c.v*K,null,'tarjeta'); break;
     case 'goto':
@@ -1157,6 +1182,10 @@ function act(pid, a){
     }
     if(a.type==='rules' && pid===S.hostPid){
       const r=a.rules||{}; S.rules=Object.fromEntries(Object.keys(RULES_DEF).map(k=>[k,!!r[k]])); commit(); return;
+    }
+    if(a.type==='city' && pid===S.hostPid){   // ciudad del tablero (la elige el anfitrión antes de empezar)
+      if(!CIUDADES[a.city]) return 'Esa ciudad no está.';
+      S.city=a.city; sysChat(`🏙️ El tablero va a ser de ${ciudadNombre(S.city)}.`); commit(); return;
     }
     if(a.type==='start' && pid===S.hostPid){
       if(S.players.length<2) return 'Se necesitan al menos 2 jugadores.';
@@ -2061,6 +2090,7 @@ function renderTokenPicker(){
 
 function render(){
   if(!S) return;
+  aplicarCiudad(S.city || 'asuncion');   // nombres de las calles de la ciudad elegida (si cambió, se redibuja el tablero)
   if(S.phase==='lobby'){ show('lobby'); renderLobby(); placeComm('#lobbyComm'); }
   else { show('game'); if(!$('#board').children.length) buildBoard(); placeComm('#gameComm'); renderGame(); }
   renderLog(); renderVoice(); voiceSync(); musicSync(); renderHandoff(); renderHandBtn(); syncHandPref();
@@ -2073,7 +2103,9 @@ function renderLobby(){
   const isHost = NET.mode==='host';
   $('#lobbyPlayers').innerHTML=S.players.map(p=>`<li><span class="dot" style="background:${p.color}"></span><span style="font-size:22px">${p.emoji}</span><b style="flex:1">${p.bot?'🤖 ':''}${esc(p.name)}${p.id===NET.myPid?' (vos)':''}</b>${p.id===S.hostPid?'<span class="muted">anfitrión</span>':''}${p.mic?' 🎤':''}${muteBtn(p)}${p.bot&&isHost?`<button class="btn sm gray" onclick="doAct({type:'removeBot',id:'${p.id}'})">✕</button>`:''}</li>`).join('')
     + ((S.observers||[]).length ? `<li style="background:#eef3ff">👀 <span style="flex:1">Mirando: ${S.observers.map(obsName).join(', ')}</span></li>` : '');
-  $('#lobbyRules').innerHTML=`<h4 style="margin:0 0 4px">⚙️ Reglas especiales${isHost?'':' <span class="muted">(las elige el anfitrión)</span>'}</h4>`+rulesHTML(S.rules, isHost, 'setRoomRule');
+  $('#lobbyRules').innerHTML=`<h4 style="margin:0 0 4px">🏙️ Ciudad del tablero${isHost?'':' <span class="muted">(la elige el anfitrión)</span>'}</h4>`+ciudadSelect(S.city, isHost, 'setRoomCity')
+    + `<p class="muted" style="margin:4px 0 10px">${S.city&&S.city!=='asuncion'?`Las calles son de <b>${ciudadNombre(S.city)}</b>; el resto del tablero es igual.`:'Las calles clásicas de Asunción.'}</p>`
+    + `<h4 style="margin:0 0 4px">⚙️ Reglas especiales${isHost?'':' <span class="muted">(las elige el anfitrión)</span>'}</h4>`+rulesHTML(S.rules, isHost, 'setRoomRule');
   $('#btnAddBot').style.display = isHost ? 'block' : 'none';
   $('#btnAddBot').disabled = S.players.length>=6;
   $('#btnStart').style.display = isHost ? 'block' : 'none';
@@ -2783,7 +2815,7 @@ function renderCenterInner(){
   // los dos mazos sobre el tablero, en diagonal como en el juego de verdad; el que toca sacar brilla
   const drawMine = S.phase==='play' && S.tp==='draw' && S.drawDeck && canAct(cur().id);
   const deckEl = d => `<div class="bdeck ${d}${S.phase==='play'&&S.tp==='draw'&&S.drawDeck===d?' glow':''}" ${drawMine&&S.drawDeck===d?`onclick="doAct({type:'draw'})" title="Tocá para sacar tu tarjeta"`:`title="Mazo de ${DECK_NAME[d]}"`}><span class="ci">${d==='cc'?'💳':'🏦'}</span><b>${DECK_NAME[d].toUpperCase()}</b></div>`;
-  let h=`${deckEl('cc')}${deckEl('ca')}<div class="clogo">BANQUERO<small>PARAGUAYO</small></div>${pot}<div class="dice" id="diceSpot" style="visibility:${animating?'hidden':'visible'}">${dieV(r[0],0)}${dieV(r[1],1)}</div><!--HUD-->`;
+  let h=`${deckEl('cc')}${deckEl('ca')}<div class="clogo">BANQUERO<small>${S.city&&S.city!=='asuncion'?esc(ciudadNombre(S.city).toUpperCase()):'PARAGUAYO'}</small></div>${pot}<div class="dice" id="diceSpot" style="visibility:${animating?'hidden':'visible'}">${dieV(r[0],0)}${dieV(r[1],1)}</div><!--HUD-->`;
   if(busy){
     c.innerHTML=h+`<div class="status">${Date.now()<diceEndAt?'🎲 Tirando los dados…':`${r[0]} + ${r[1]} = ${r[0]+r[1]}${r[0]===r[1]?' · ¡Dobles!':''} — avanzando…`}</div>`;
     return;
@@ -3353,7 +3385,7 @@ $('#myName').value = load('bnq_name') || '';
 $('#myName').oninput = e=>store('bnq_name', e.target.value);
 renderTokenPicker();
 localNames.push({n:'Jugador 1',bot:false},{n:'Jugador 2',bot:false}); renderLocalNames();
-$('#menuRules').innerHTML=rulesHTML(myRules(), true, 'setMyRule');
+$('#menuRules').innerHTML=`<label style="font-size:13px;font-weight:700">🏙️ Ciudad del tablero</label>`+ciudadSelect(myCity(), true, 'setMyCity')+`<div style="height:10px"></div>`+rulesHTML(myRules(), true, 'setMyRule');
 $('#btnAddLocal').onclick=()=>{ if(localNames.length<6){ localNames.push({n:'Jugador '+(localNames.length+1),bot:false}); renderLocalNames(); } };
 $('#btnVsBots').onclick=startVsBots;
 $('#btnLocal').onclick=startLocal;
