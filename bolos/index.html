@@ -400,8 +400,8 @@ body>.side{display:none}
 <script src="reglas.js?v=1"></script>
 <script src="juego.js?v=1"></script>
 <script src="../dueno-link.js"></script>
-<script src="../inicio.js"></script>
-<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu'};</script>
+<script src="../inicio.js?v=2"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', sonidos:['#btnSnd','.btnMusic'], ocultar:['[onclick="leaveClick()"]'], barra:'.topbar'};</script>
 <script>
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida en un aparato)
 if(window.DuenoLink) DuenoLink.start({game:"bolos",

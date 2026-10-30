@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Billar PY como app.
-const CACHE = 'billar-v2';
+const CACHE = 'billar-v3';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './reglas.js', './juego.js'];
 
 self.addEventListener('install', e => {

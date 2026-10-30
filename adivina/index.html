@@ -383,8 +383,8 @@ input[type=range]{width:100%}
 <script src="juego.js?v=1"></script>
 <script src="tablero.js?v=1"></script>
 <script src="../dueno-link.js"></script>
-<script src="../inicio.js"></script>
-<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu'};</script>
+<script src="../inicio.js?v=2"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', sonidos:['#btnSnd','.btnMusic'], ocultar:['[onclick="leaveClick()"]'], barra:'.topbar'};</script>
 <script>
 $('#catList').innerHTML = CAT_ORDER.filter(c=>c!=='mio').map(c=>`<div style="--cc:${CATS[c].c}"><b>${CATS[c].e} ${CATS[c].n}</b>${PERSONAJES.filter(p=>p.cat===c).length} personajes</div>`).join('');
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida en un aparato)
