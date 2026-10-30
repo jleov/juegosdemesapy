@@ -11,7 +11,7 @@
 import { RnnoiseWorkletNode, loadRnnoise } from './vendor/ns.js';
 
 const PFX = 'salapy26-';
-const API = 'https://juegosdemesapy.pages.dev/api/';
+const API = (/(^|\.)juegospy\.com$|\.pages\.dev$/.test(location.hostname) ? '/api/' : 'https://juegosdemesapy.pages.dev/api/');   // el servidor del mismo sitio (desde GitHub, el de Cloudflare)
 const ROOMS = [['general', 'General'], ['peliculas', 'Películas'], ['juegos', 'Juegos'], ['charla', 'Charla']];
 const $ = s => document.querySelector(s);
 const rand = n => Math.random().toString(36).slice(2, 2 + n).padEnd(n, '0');

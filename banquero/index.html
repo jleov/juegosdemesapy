@@ -3366,7 +3366,7 @@ $('#btnJoin').onclick=()=>{
 $('#btnStart').onclick=()=>doAct({type:'start'});
 $('#btnAddBot').onclick=()=>doAct({type:'addBot'});
 // los dos lugares donde está publicado el juego (si uno se cae, se usa el otro)
-const GAME_LINKS=[{n:'Principal (GitHub)', u:'https://jleov.github.io/juegosdemesapy/banquero/'}, {n:'Alternativo (Cloudflare)', u:'https://juegosdemesapy.pages.dev/banquero/'}];
+const GAME_LINKS=[{n:'Principal', u:'https://juegospy.com/banquero/'}, {n:'Respaldo (Cloudflare)', u:'https://juegosdemesapy.pages.dev/banquero/'}, {n:'Respaldo (GitHub)', u:'https://jleov.github.io/juegosdemesapy/banquero/'}];
 const sameSite = u => location.href.startsWith(u) || (location.origin+location.pathname)===u;
 function renderGameLinks(){
   $('#gameLinks').innerHTML=GAME_LINKS.map(l=>`<div class="prow" style="justify-content:space-between">

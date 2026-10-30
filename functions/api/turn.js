@@ -2,7 +2,7 @@
 // Entrega a los juegos permisos temporales para usar el servidor de respaldo (TURN) de Cloudflare.
 // Sirve cuando dos aparatos no se pueden conectar directo (datos móviles, algunos routers).
 // Necesita en el proyecto de Cloudflare Pages las variables TURN_KEY_ID y TURN_KEY_API_TOKEN.
-const ALLOWED = [/^https:\/\/juegosdemesapy\.pages\.dev$/, /^https:\/\/[a-z0-9-]+\.juegosdemesapy\.pages\.dev$/, /^https:\/\/jleov\.github\.io$/, /^https?:\/\/localhost(:\d+)?$/];
+const ALLOWED = [/^https:\/\/(www\.)?juegospy\.com$/, /^https:\/\/juegosdemesapy\.pages\.dev$/, /^https:\/\/[a-z0-9-]+\.juegosdemesapy\.pages\.dev$/, /^https:\/\/jleov\.github\.io$/, /^https?:\/\/localhost(:\d+)?$/];
 
 export async function onRequest({ request, env }) {
   const origin = request.headers.get('Origin') || '';

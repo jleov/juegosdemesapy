@@ -14,7 +14,7 @@
    - Voz: filtro, compresor, eco, reverberación y cambio de tono (Web Audio).
    ===================================================================== */
 const PFX = 'karapy26-';
-const API = 'https://juegosdemesapy.pages.dev/api/';
+const API = (/(^|\.)juegospy\.com$|\.pages\.dev$/.test(location.hostname) ? '/api/' : 'https://juegosdemesapy.pages.dev/api/');   // el servidor del mismo sitio (desde GitHub, el de Cloudflare)
 const ROOMS = [['karaoke', 'Karaoke General', '🎤'], ['clasicos', 'Clásicos y Baladas', '💿'], ['cumbia', 'Cumbia y Polca', '🪗'], ['rock', 'Rock y Pop', '🎸']];
 const $ = s => document.querySelector(s);
 const rand = n => Math.random().toString(36).slice(2, 2 + n).padEnd(n, '0');

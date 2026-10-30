@@ -1,0 +1,20 @@
+# Cabeceras de seguridad de Cloudflare Pages (juegospy.com y juegosdemesapy.pages.dev)
+# - HSTS: el navegador siempre entra por https (candado), nunca por http.
+# - nosniff: el navegador no adivina el tipo de archivo (evita que un archivo se ejecute como código).
+# - SAMEORIGIN / frame-ancestors: ningún otro sitio puede meter los juegos dentro de su página para engañar a la gente.
+# - Referrer: a otros sitios solo se les dice el dominio, no la página ni el código de la sala.
+# - Permissions-Policy: micrófono y cámara solo para los juegos de este sitio; ubicación, pagos, USB, etc. bloqueados.
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), hid=(), midi=()
+  Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+
+# páginas privadas: que los buscadores no las muestren
+/dueno/*
+  X-Robots-Tag: noindex, nofollow
+/grabar-g8p3mekgrf/*
+  X-Robots-Tag: noindex, nofollow

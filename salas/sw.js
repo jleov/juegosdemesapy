@@ -1,7 +1,7 @@
 // Service worker de las Salas de Voz: permite instalarlas como app.
 // Siempre busca primero la versión nueva en internet; la copia guardada es solo para abrir sin conexión.
 // No toca /api/ ni otros sitios (Deepgram, PeerJS, traductor).
-const CACHE = 'salas-v1';
+const CACHE = 'salas-v2';
 const FILES = ['./', './index.html', './app.js', './manifest.json', './icon-192.png', './icon-512.png',
   './vendor/peerjs.min.js', './vendor/ns.js', './vendor/rnnoise-worklet.js', './vendor/rnnoise.wasm', './vendor/rnnoise_simd.wasm', '../ice.js'];
 

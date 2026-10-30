@@ -2,7 +2,7 @@
 // Traduce al español las frases de los subtítulos de las Salas.
 // Si el proyecto tiene el enlace de Workers AI llamado "AI" usa el traductor de Cloudflare;
 // si no, usa el traductor público de Google. Las dos opciones son gratis.
-const ALLOWED = [/^https:\/\/juegosdemesapy\.pages\.dev$/, /^https:\/\/[a-z0-9-]+\.juegosdemesapy\.pages\.dev$/, /^https:\/\/jleov\.github\.io$/, /^https?:\/\/localhost(:\d+)?$/];
+const ALLOWED = [/^https:\/\/(www\.)?juegospy\.com$/, /^https:\/\/juegosdemesapy\.pages\.dev$/, /^https:\/\/[a-z0-9-]+\.juegosdemesapy\.pages\.dev$/, /^https:\/\/jleov\.github\.io$/, /^https?:\/\/localhost(:\d+)?$/];
 
 export async function onRequest({ request, env }) {
   const origin = request.headers.get('Origin') || '';

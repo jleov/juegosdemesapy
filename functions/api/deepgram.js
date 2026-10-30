@@ -3,7 +3,7 @@
 // así la clave de Deepgram nunca llega al navegador.
 // Necesita en el proyecto de Cloudflare Pages la variable secreta DEEPGRAM_KEY, con una clave
 // de Deepgram de permiso «Member» (DEEPGRAM_API_KEY quedó con una clave sin ese permiso).
-const ALLOWED = [/^https:\/\/juegosdemesapy\.pages\.dev$/, /^https:\/\/[a-z0-9-]+\.juegosdemesapy\.pages\.dev$/, /^https:\/\/jleov\.github\.io$/, /^https?:\/\/localhost(:\d+)?$/];
+const ALLOWED = [/^https:\/\/(www\.)?juegospy\.com$/, /^https:\/\/juegosdemesapy\.pages\.dev$/, /^https:\/\/[a-z0-9-]+\.juegosdemesapy\.pages\.dev$/, /^https:\/\/jleov\.github\.io$/, /^https?:\/\/localhost(:\d+)?$/];
 
 export async function onRequest({ request, env }) {
   const origin = request.headers.get('Origin') || '';
