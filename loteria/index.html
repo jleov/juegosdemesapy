@@ -245,7 +245,8 @@ async function cargarCasa(){
 function tocarCasa(n){ const f=UI.casa && UI.casa.archivos[n]; return f ? tocarUrl(CASA_URL+f) : Promise.reject(new Error('sin grabación')); }
 function say(txt, forzar){ if(PREF.voz || forzar) hablarTTS(txt, baseTTS()); }
 async function cargarGrabados(){
-  try{ const ls=await CantosDB.lista(); UI.grabados=await Promise.all(ls.map(async c=>({...c, cuantos:(await CantosDB.numeros(c.id)).length}))); }
+  try{ const ls=(await CantosDB.lista()).filter(c=>!(c.casa && UI.casa));   // la copia de la voz de la casa del grabador no se repite
+    UI.grabados=await Promise.all(ls.map(async c=>({...c, cuantos:(await CantosDB.numeros(c.id)).length}))); }
   catch(e){ UI.grabados=[]; }
   // si comparto mi voz con la sala y cambié textos en el grabador, se actualizan para todos
   const g=S && S.vozSala && S.vozSala.pid===NET.myPid && recInfo(PREF.vozSalaId);   // (también si la ofrecí y todavía no la aceptaron)

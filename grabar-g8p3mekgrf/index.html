@@ -96,6 +96,21 @@ let VISTA='lista', LISTA=[], ED=null, REC=null, STREAM=null;
 const AUTO_SIG_KEY='cantos_autosig';
 let autoSig=false; try{ autoSig=localStorage.getItem(AUTO_SIG_KEY)==='1'; }catch(e){}
 
+// la voz de la casa (la que escuchan todos en la Lotería) se trae del sitio a este navegador para poder verla y editarla
+const CASA='../loteria/voz-casa/', CASA_QUITADA='cantos_casa_quitada';
+async function traerCasa(){
+  const r=await fetch(CASA+'cantor.json', {cache:'no-cache'}); if(!r.ok) throw new Error('No se encontró la voz de la casa.');
+  const c=await r.json(), id='casa';
+  await CantosDB.guardarCantor({id, nombre:String(c.nombre||'Voz de la casa').slice(0,30), base:cantorTTS(c.base).id, textos:limpiarTextos(c.textos), creado:Date.now(), casa:true});
+  let ctx=null; try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  for(const [n,f] of Object.entries(c.archivos||{})){
+    const blob=await fetch(CASA+f).then(x=>x.blob());
+    let dur=0; try{ if(ctx) dur=(await ctx.decodeAudioData(await blob.arrayBuffer())).duration; }catch(e){}
+    await CantosDB.guardarClip(id, +n, blob, Math.min(MAX_SEG, dur||0));
+  }
+  try{ ctx && ctx.close(); localStorage.removeItem(CASA_QUITADA); }catch(e){}
+  return id;
+}
 async function cargarLista(){
   const ls=await CantosDB.lista();
   LISTA=await Promise.all(ls.sort((a,b)=>(b.cambiado||b.creado)-(a.cambiado||a.creado)).map(async c=>({...c, cuantos:(await CantosDB.numeros(c.id)).length})));
@@ -126,10 +141,13 @@ function listaHTML(){
     ${LISTA.length?LISTA.map(c=>`<div class="cantor"><div class="grow" style="min-width:180px"><b>🎙️ ${esc(c.nombre)}</b>
         <div class="muted">${c.cuantos} de 90 números grabados${c.cuantos<90?` · el resto: ${esc(cantorTTS(c.base).nombre)}`:' · ¡completo!'}</div>
         <div class="prog"><div style="width:${c.cuantos/90*100}%"></div></div></div>
+        ${c.casa?'<div class="muted">🏠 Voz de la casa: suena por defecto para todos en la Lotería</div>':''}
         <div class="flex"><button class="btn" data-act="editar" data-id="${c.id}">✏️ Grabar / editar</button>
         <button class="btn sm gray" data-act="bajar" data-id="${c.id}" title="Bajar como archivo para pasarlo a otro celular">⬇️ Archivo</button>
         <button class="btn sm red" data-act="borrar" data-id="${c.id}">🗑</button></div></div>`).join('')
       :'<div class="muted">Todavía no grabaste ningún cantor.</div>'}
+    ${LISTA.some(c=>c.casa)?'<div class="muted" style="margin-top:8px">🏠 La <b>voz de la casa</b> es la que escuchan todos en la Lotería. Si la cambiás acá, bajá el ⬇️ Archivo y pasáselo a Claude para que la actualice en el juego.</div>'
+      :'<button class="btn gray" style="width:100%;margin-top:10px" data-act="traerCasa">🏠 Traer la voz de la casa (la que suena en la Lotería)</button>'}
     <label style="margin-top:14px">📂 ¿Tenés un archivo de cantos de otro celular?</label>
     <input type="file" id="archivo" accept=".json,application/json">
   </div>
@@ -297,7 +315,13 @@ document.addEventListener('click', async e=>{
     case 'borrar': {
       const c=LISTA.find(x=>x.id===el.dataset.id); if(!c) return;
       if(!confirm(`¿Borrar el cantor «${c.nombre}» y sus ${c.cuantos} grabaciones? No se puede deshacer.`)) return;
-      await CantosDB.borrarCantor(c.id); await cargarLista(); render(); toast('Cantor borrado.'); break; }
+      await CantosDB.borrarCantor(c.id); if(c.casa) try{ localStorage.setItem(CASA_QUITADA,'1'); }catch(e){}
+      await cargarLista(); render(); toast(c.casa ? 'Quitado de este navegador. En la Lotería la voz de la casa sigue sonando igual.' : 'Cantor borrado.'); break; }
+    case 'traerCasa': {
+      el.disabled=true; el.textContent='⏳ Trayendo los 90 cantos…';
+      try{ await traerCasa(); await cargarLista(); render(); toast('🏠 Voz de la casa lista para escuchar o editar.'); }
+      catch(err){ toast(err.message||'No se pudo traer la voz de la casa.'); render(); }
+      break; }
     case 'bajar': {
       const c=LISTA.find(x=>x.id===el.dataset.id); if(!c) return;
       const blob=await exportarCantor(c.id), u=URL.createObjectURL(blob), link=document.createElement('a');
@@ -349,6 +373,11 @@ if(window.speechSynthesis) speechSynthesis.getVoices();
   if(!window.indexedDB){ $('#app').innerHTML='<div class="box">Este navegador no permite guardar grabaciones. Probá con Chrome.</div>'; return; }
   try{ await cargarLista(); }catch(e){ LISTA=[]; toast('No se pudo abrir el lugar donde se guardan los cantos.'); }
   render();
+  // la voz de la casa aparece sola (salvo que la hayas quitado de este navegador)
+  let quitada=false; try{ quitada=localStorage.getItem(CASA_QUITADA)==='1'; }catch(e){}
+  if(!quitada && !LISTA.some(c=>c.casa)){
+    try{ toast('⏳ Trayendo la voz de la casa…'); await traerCasa(); await cargarLista(); render(); }catch(e){}
+  }
 })();
 </script>
 </body>
