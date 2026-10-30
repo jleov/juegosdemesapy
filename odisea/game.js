@@ -1230,7 +1230,7 @@ function showTitle() {
     </div>
     <button class="btn r" onclick="showChars()">▶ Jugar</button>
     <div class="flex"><button class="btn" onclick="showHelp()">📖 Cómo se juega</button><button class="btn gr" onclick="toggleSound()">${S.sound ? '🔊 Sonido: sí' : '🔇 Sonido: no'}</button></div>
-    <div style="text-align:center"><a class="back" href="../">← Volver a Juegos de Mesa PY</a></div>`);
+    <div style="text-align:center"><a class="back" href="../">← Volver a Juegos Paraguay Digitales</a></div>`);
 }
 function toggleSound() { S.sound = !S.sound; save(); showTitle(); }
 

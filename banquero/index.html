@@ -418,7 +418,6 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <p class="muted" style="margin-top:0">Instalalo como app en tu celular o PC: queda con su ícono, se abre en pantalla completa y sin buscar el enlace.</p>
       <button class="btn green wide" id="btnInstall">📲 Instalar en este dispositivo</button>
     </div>
-    <a class="btn gray wide" href="../" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px">🏠 Todos los juegos</a>
     <button class="btn gray wide" onclick="showRules()">📜 Reglas del juego</button>
     <button class="btn wide" id="btnOwner" style="display:none;margin-top:8px;background:#4a2f7a" onclick="openOwnerPanel()">👑 Panel del dueño</button>
     <p class="muted" id="musicCredit" style="color:#cfe8d5;text-align:center;font-size:11px;margin-top:14px"></p>
@@ -432,7 +431,7 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
     <div class="box">
       <h3>👑 Panel del dueño</h3>
       <div id="ownerBody"></div>
-      <button class="btn gray wide" style="margin-top:8px" onclick="history.replaceState(null,'',location.pathname);show('menu')">🏠 Volver al inicio</button>
+      <button class="btn gray wide" style="margin-top:8px" onclick="history.replaceState(null,'',location.pathname);show('menu')">⬅️ Volver al menú del Banquero</button>
     </div>
   </div>
 </div>
@@ -449,13 +448,12 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <div class="row"><button class="btn gray" id="btnCopy">📋 Copiar enlace</button><button class="btn green" id="btnShare">📤 Compartir</button></div>
     </div>
     <div class="box">
-      <h3>Jugadores (<span id="lobbyCount">0</span>/6)</h3>
+      <div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0;flex:1">Jugadores (<span id="lobbyCount">0</span>/6)</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música de fondo">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="confirmLeave()">🚪 Salir</button></div>
       <ul class="plist" id="lobbyPlayers"></ul>
       <button class="btn gray wide" id="btnAddBot" style="margin-bottom:8px">🤖 Agregar un bot</button>
       <button class="btn red wide" id="btnStart">🎲 Empezar partida</button>
       <div id="lobbyRules" style="margin-top:10px"></div>
       <p class="muted" id="lobbyWait" style="text-align:center"></p>
-      <div class="row" style="margin-top:8px"><button class="btn gray" onclick="confirmLeave()">🏠 Volver al inicio</button><button class="btn gray btnMusic" style="flex:0 0 auto" onclick="toggleMusic()" title="Música de fondo">🎶</button></div>
     </div>
     <div class="box" id="lobbyComm" style="height:380px;display:flex;flex-direction:column"></div>
   </div>
@@ -481,13 +479,13 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <div class="panel">
         <div class="players" id="players"></div>
         <div class="tools" style="margin-top:8px">
-          <button class="btn sm" onclick="showMyProps()">🏠 Propiedades</button>
+          <button class="btn sm" onclick="showMyProps()">🏘️ Propiedades</button>
           <button class="btn sm" style="background:#2a9d3f" onclick="showTitles()">🃏 Títulos</button>
           <button class="btn sm gold" onclick="showTrade()">🤝 Negociar</button>
           <button class="btn sm gray" onclick="showRules()">📜 Reglas</button>
           <button class="btn sm gray" id="btnSfx" style="flex:0 0 auto" onclick="toggleSfx()" title="Sonidos del juego">🎵</button>
           <button class="btn sm gray btnMusic" style="flex:0 0 auto" onclick="toggleMusic()" title="Música de fondo">🎶</button>
-          <button class="btn sm red" style="flex:0 0 auto" onclick="confirmLeave()" title="Salir de la partida">🚪 Salir</button>
+          <button class="btn sm red" style="flex:0 0 auto" onclick="confirmLeave()" title="Salir de la partida">🚪</button>
           <button class="btn sm" id="btnView" style="background:#4a2f7a" onclick="toggleView()" title="Cambiar entre tablero plano y 3D">🧊 Vista 3D</button>
           <button class="btn sm" id="btnHand" style="background:#0f6e6e" onclick="toggleHand()" title="Elegí cómo jugar: automático o moviendo vos la ficha y sacando las tarjetas">🎲 Modo: automático</button>
         </div>
@@ -1550,7 +1548,7 @@ function ownerReport(){
 // --- lado del panel del dueño ---
 const ADMIN={peer:null, key:null, rooms:{}, watching:null, joining:null, err:''};
 function openOwnerPanel(){
-  if(NET.mode && NET.mode!=='spy') return toast('Primero salí de la partida con 🏠 Inicio.');
+  if(NET.mode && NET.mode!=='spy') return toast('Primero salí de la partida con 🚪.');
   if(location.hash!=='#panel-dueno') history.replaceState(null,'','#panel-dueno');
   show('dueno'); renderOwner();
   const saved=load('bnq_owner');
@@ -2822,7 +2820,7 @@ function renderCenterInner(){
   if(mine){
     if(p.money<0){
       h+=`<div style="color:var(--red);font-weight:700">Saldo negativo: ${fmt(p.money)}. Hipotecá o vendé construcciones para seguir.</div>`;
-      acts.push(`<button class="btn" onclick="showMyProps()">🏠 Mis propiedades</button>`,
+      acts.push(`<button class="btn" onclick="showMyProps()">🏘️ Mis propiedades</button>`,
                 `<button class="btn red" onclick="confirmBankrupt()">Declararme en quiebra</button>`);
     } else if(S.tp==='roll'){
       if(p.jail){
@@ -2889,13 +2887,13 @@ function renderWallet(){
   if(p && p.bk && S.phase==='play'){   // quebró o se retiró: sigue mirando como observador
     w.style.display='block';
     w.innerHTML=`<div class="observer">👀 <b>Estás mirando como observador.</b><br>${p.kicked?'El anfitrión te sacó de la partida porque te habías ido':p.retired?'Te retiraste de la partida':'Quedaste en bancarrota'}: ya no jugás, pero podés seguir viendo el tablero y usar el chat.
-      <button class="btn sm gray wide" style="margin-top:8px" onclick="confirmLeave()">🏠 Salir al inicio</button></div>`;
+      <button class="btn sm gray wide" style="margin-top:8px" onclick="confirmLeave()">🚪 Salir de la sala</button></div>`;
     return;
   }
   if(!p && NET.obs){   // entró a mirar (sala llena o partida avanzada)
     w.style.display='block';
     w.innerHTML=`<div class="observer">👀 <b>Estás mirando como observador.</b><br>La partida ya estaba llena o avanzada: ves el tablero y podés usar el chat, pero no jugás.
-      <button class="btn sm gray wide" style="margin-top:8px" onclick="confirmLeave()">🏠 Salir al inicio</button></div>`;
+      <button class="btn sm gray wide" style="margin-top:8px" onclick="confirmLeave()">🚪 Salir de la sala</button></div>`;
     return;
   }
   if(!p || p.bk){ w.innerHTML=''; w.style.display='none'; return; }
@@ -3084,7 +3082,7 @@ function showMyProps(refresh){
   if(refresh && $('#modalRoot').dataset.kind!=='props') return;
   const pid=meId(); if(!pid || S.phase!=='play'){ return; }
   const p=P(pid), list=ownedList(pid);
-  let h=`<h3>🏠 Propiedades de ${esc(p.emoji+' '+p.name)}</h3><p>Dinero: <b style="color:${p.money<0?'var(--red)':'inherit'}">${fmt(p.money)}</b>${p.jcards.length?` · 🎫 ${p.jcards.length} tarjeta(s) “Salga libre”`:''}</p>${walletHTML(p)}<div style="height:10px"></div>`;
+  let h=`<h3>🏘️ Propiedades de ${esc(p.emoji+' '+p.name)}</h3><p>Dinero: <b style="color:${p.money<0?'var(--red)':'inherit'}">${fmt(p.money)}</b>${p.jcards.length?` · 🎫 ${p.jcards.length} tarjeta(s) “Salga libre”`:''}</p>${walletHTML(p)}<div style="height:10px"></div>`;
   if(!list.length) h+='<p class="muted">Todavía no tenés propiedades.</p>';
   for(const i of list){
     const o=S.props[i], sp=B[i], b=[];
@@ -3301,8 +3299,8 @@ function confirmLeave(){
     : NET.mode==='client' ? (me&&me.bk ?'Salís de la sala. Si volvés con “Volver a la sala”, entrás como observador.' : 'Salís de la sala un rato. Podés volver con “Volver a la sala” y recuperás tu lugar.')
     : 'La partida queda guardada. Podés seguirla con “Continuar partida”.';
   let h = nextHost
-    ? `<h3>🏠 ¿Volver al inicio?</h3><p>${msg}</p><button class="btn red wide" onclick="closeModal();hostHandover()">👑 Salir y dejar a ${esc(nextHost.name)} de anfitrión</button>`
-    : `<h3>🏠 ¿Volver al inicio?</h3><p>${msg}</p><button class="btn red wide" onclick="closeModal();leaveToMenu()">${playing?'Salir un rato (sigo jugando después)':'Sí, volver al inicio'}</button>`;
+    ? `<h3>🚪 ¿Salir de la ${NET.mode==='local'?'partida':'sala'}?</h3><p>${msg}</p><button class="btn red wide" onclick="closeModal();hostHandover()">👑 Salir y dejar a ${esc(nextHost.name)} de anfitrión</button>`
+    : `<h3>🚪 ¿Salir de la ${NET.mode==='local'?'partida':'sala'}?</h3><p>${msg}</p><button class="btn red wide" onclick="closeModal();leaveToMenu()">${playing?'Salir un rato (sigo jugando después)':'Sí, salir'}</button>`;
   const obsOn=(S.observers||[]).filter(o=>o.conn);
   if(playing && NET.mode==='client' && obsOn.length) h+=`<div class="observer" style="margin-top:14px"><b>🔁 ¿Querés que alguien siga tu partida?</b><br>Le podés ceder tu lugar a un observador: sigue jugando con tu ficha, tu plata y tus propiedades, y vos te quedás mirando.
     <button class="btn green wide" style="margin-top:8px" onclick="showHandoff()">🔁 Ceder mi lugar a un observador</button></div>`;
@@ -3339,13 +3337,13 @@ function confirmRetire(){
     <p>${NET.mode==='local'?`<b>${esc(me.name)}</b> se declara`:'Te declarás'} en <b>bancarrota voluntaria</b>:</p>
     <ul style="font-size:14px;line-height:1.5"><li>Tus propiedades, casas y hoteles vuelven al Banco.</li><li>Tu dinero se devuelve al Banco.</li><li>Ya no jugás más esta partida, ni podés volver a jugarla.</li>
       ${NET.mode==='local'?'':`<li>Si volvés antes de que termine, entrás como <b>observador 👀</b>: ves el tablero y podés chatear.</li>`}</ul>
-    ${isHost?'<p class="observer"><b>⚠️ Sos el anfitrión:</b> si te retirás podés quedarte mirando; y si después salís con 🏠 Inicio, el mando pasa al siguiente jugador y la partida sigue.</p>':''}
+    ${isHost?'<p class="observer"><b>⚠️ Sos el anfitrión:</b> si te retirás podés quedarte mirando; y si después salís con 🚪, el mando pasa al siguiente jugador y la partida sigue.</p>':''}
     <button class="btn red wide" onclick="doRetire()">Sí, me retiro</button>`,'retire');
 }
 function doRetire(){
   closeModal(); doAct({type:'retire'});
   if(NET.mode==='client') setTimeout(()=>modal(`<h3>🏳️ Te retiraste</h3><p>Gracias por jugar. ¿Querés quedarte mirando cómo termina la partida?</p>
-    <div class="row"><button class="btn green" onclick="closeModal()">👀 Quedarme mirando</button><button class="btn gray" onclick="closeModal();leaveToMenu()">🏠 Salir al inicio</button></div>`,'retired'), 700);
+    <div class="row"><button class="btn green" onclick="closeModal()">👀 Quedarme mirando</button><button class="btn gray" onclick="closeModal();leaveToMenu()">🚪 Salir de la sala</button></div>`,'retired'), 700);
 }
 
 $('#myName').value = load('bnq_name') || '';

@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Juegos de Mesa Digital PY</title>
-<meta name="description" content="Juegos de mesa paraguayos para jugar en línea con amigos: Banquero, Lotería, Face Punch, UNO, Billar, Bolos, Adivina Quién, Odisea Paraguaya y Salas de Voz.">
+<title>Juegos Paraguay Digitales</title>
+<meta name="description" content="Juegos paraguayos para jugar en línea con amigos: Banquero, Lotería, Face Punch, UNO, Billar, Bolos, Adivina Quién, Odisea Paraguaya y Salas de Voz.">
 <meta name="theme-color" content="#1c1240">
 <!-- vista previa al compartir el link (WhatsApp, Facebook, Telegram) -->
 <link rel="canonical" href="https://juegospy.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Juegos PY">
-<meta property="og:title" content="Juegos de Mesa Digital PY">
+<meta property="og:title" content="Juegos Paraguay Digitales">
 <meta property="og:description" content="Banquero, Lotería, UNO, Billar, Bolos, Adivina Quién y más: juegos paraguayos para jugar en línea con amigos, con chat y voz.">
 <meta property="og:url" content="https://juegospy.com/">
 <meta property="og:image" content="https://juegospy.com/icon-512.png">
@@ -93,7 +93,7 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Juegos de Mesa<br><span>Digital PY</span></h1>
+    <h1>Juegos Paraguay<br><span>Digitales</span></h1>
     <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
     <div class="sub">Los juegos de siempre, para jugar en línea con la familia y los amigos.</div>
   </header>
@@ -164,7 +164,7 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
         <span class="btn karbtn">Entrar a cantar</span></div>
     </a>
   </div>
-  <div class="foot">Juegos de Mesa Digital PY · un proyecto de <b>jleovgames</b><br>
+  <div class="foot">Juegos Paraguay Digitales · un proyecto de <b>jleovgames</b><br>
     <b>juegospy.com</b></div>
 </div>
 <div id="ov"><div class="box" id="ovBox"></div></div>
@@ -178,12 +178,12 @@ const isInstalled = () => matchMedia('(display-mode: standalone)').matches || ma
 function refreshInstall(){ $('#installBox').style.display = isInstalled() ? 'none' : 'flex'; }
 // Chrome y Edge (Android y PC) avisan que se puede instalar: guardamos ese aviso para usarlo con nuestro botón
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; refreshInstall(); });
-window.addEventListener('appinstalled', ()=>{ installPrompt=null; refreshInstall(); toast('✅ ¡Listo! Juegos de Mesa quedó instalado. Buscalo con su ícono 🎲.'); });
+window.addEventListener('appinstalled', ()=>{ installPrompt=null; refreshInstall(); toast('✅ ¡Listo! Juegos PY quedó instalado. Buscalo con su ícono 🎲.'); });
 $('#btnInstall').onclick=async()=>{
   if(installPrompt){
     installPrompt.prompt();
     const r=await installPrompt.userChoice.catch(()=>({outcome:'dismissed'}));
-    if(r.outcome==='accepted') toast('📲 Instalando Juegos de Mesa…');
+    if(r.outcome==='accepted') toast('📲 Instalando Juegos PY…');
     installPrompt=null; return;
   }
   // el navegador no ofrece el botón automático: explicamos cómo hacerlo a mano según el dispositivo
@@ -195,7 +195,7 @@ $('#btnInstall').onclick=async()=>{
     : `<p>En iPhone y iPad solo se puede instalar desde <b>Safari</b>. Copiá el enlace, abrilo en Safari y seguí estos pasos:</p><ol><li>Botón <b>Compartir</b> ⬆️</li><li><b>“Agregar a pantalla de inicio”</b></li></ol>`;
   else if(android) pasos = `<ol><li>Abrí esta página en <b>Chrome</b>.</li><li>Tocá el menú <b>⋮</b> (arriba a la derecha).</li><li>Elegí <b>“Instalar app”</b> o <b>“Agregar a pantalla principal”</b>.</li></ol><p style="font-size:13px;color:#666">Si no aparece, recargá la página y esperá unos segundos.</p>`;
   else pasos = `<ol><li>Abrí esta página en <b>Chrome</b> o <b>Edge</b>.</li><li>En la barra de direcciones, a la derecha, tocá el ícono de <b>instalar</b> (una pantallita con una flecha).</li><li>O en el menú <b>⋮</b> → <b>“Instalar Juegos de Mesa Digital PY”</b>.</li></ol>`;
-  $('#ovBox').innerHTML=`<h3>📲 Cómo instalar Juegos de Mesa</h3>${pasos}<p style="font-size:13px;color:#666">Queda con el ícono 🎲 y se abre como una app, con el Banquero y la Lotería adentro.</p><button onclick="document.getElementById('ov').classList.remove('on')">Entendido</button>`;
+  $('#ovBox').innerHTML=`<h3>📲 Cómo instalar Juegos PY</h3>${pasos}<p style="font-size:13px;color:#666">Queda con el ícono 🎲 y se abre como una app, con el Banquero y la Lotería adentro.</p><button onclick="document.getElementById('ov').classList.remove('on')">Entendido</button>`;
   $('#ov').classList.add('on');
 };
 if(location.hash==="#panel-dueno") location.replace("dueno/");   // panel del dueño de todos los juegos

@@ -1,6 +1,6 @@
-// Service worker de la portada: permite instalar "Juegos de Mesa Digital PY" como app.
+// Service worker de la portada: permite instalar "Juegos Paraguay Digitales" como app.
 // Solo atiende la portada; el Banquero y la Lotería tienen el suyo propio.
-const CACHE = 'portal-v7';
+const CACHE = 'portal-v8';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

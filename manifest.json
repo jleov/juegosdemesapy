@@ -1,7 +1,7 @@
 {
-  "name": "Juegos de Mesa Digital PY",
+  "name": "Juegos Paraguay Digitales",
   "short_name": "Juegos PY",
-  "description": "Juegos de mesa paraguayos para jugar en línea con amigos: Banquero y Lotería.",
+  "description": "Juegos paraguayos para jugar en línea con amigos: Banquero, Lotería, UNO, Billar, Bolos, Adivina Quién y más.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
