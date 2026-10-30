@@ -1,0 +1,7 @@
+# Juegos Paraguay Digitales (juegospy.com)
+User-agent: *
+Allow: /
+Disallow: /dueno/
+Disallow: /api/
+
+Sitemap: https://juegospy.com/sitemap.xml
