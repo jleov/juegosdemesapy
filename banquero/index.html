@@ -246,6 +246,28 @@ body > #comm{display:none !important}   /* el chat solo se muestra dentro de la 
 @keyframes floatup{0%{opacity:0;transform:translateY(8px)}15%{opacity:1}75%{opacity:1}100%{opacity:0;transform:translateY(-22px)}}
 .trade{background:#fff;border-radius:10px;padding:8px;margin-top:6px;font-size:13px;border:2px solid var(--gold)}
 .comm{flex:1;min-height:0;display:flex;flex-direction:column}
+/* jugadores achicados: solo las fichas en una fila */
+.plhead{display:flex;align-items:center;justify-content:space-between;font-size:13px;margin:-2px 0 1px}
+.plbtn{border:0;background:#e2dcc6;border-radius:8px;padding:5px 9px;font-weight:700;font-size:12.5px;cursor:pointer;color:#333}
+.players.min{flex-direction:row;flex-wrap:wrap;align-items:center;gap:5px}
+.pl.mini{gap:4px;padding:4px 8px;border-left:0;border:2px solid;border-radius:20px}
+.pl.mini .em{font-size:20px}.pl.mini .mo{font-size:12.5px}
+.pl.mini.turn{box-shadow:0 0 0 3px var(--gold)}
+.players.min .plbtn{margin-left:auto}
+/* chat achicado: las últimas jugadas y aviso de mensajes nuevos */
+.tabsrow{display:flex;gap:4px;align-items:flex-start}.tabsrow .tabs{flex:1}
+.minbtn{border:0;background:#e2dcc6;border-radius:8px;padding:7px 11px;font-weight:900;cursor:pointer}
+#commMini{display:none}
+#comm.min #commMini{display:flex;align-items:center;gap:8px;background:#fff;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:13px}
+#comm.min .tabsrow,#comm.min .feed,#comm.min .chatin{display:none!important}
+#commMini .mtxt{flex:1;min-width:0}
+#commMini .ml,#commMini .mc{overflow:hidden;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#commMini .ml{color:#555}#commMini .mc{color:#111}
+#commMini .ml+.ml{border-top:1px dashed #eee;margin-top:2px;padding-top:2px}
+#commMini .mopen{flex:0 0 auto;background:var(--blue);color:#fff;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12.5px;position:relative}
+#commMini .mopen i{position:absolute;top:-7px;right:-6px;background:var(--red);color:#fff;border-radius:10px;font-style:normal;font-size:11px;padding:0 6px}
+.panel.comm.min,.side .comm.min{flex:0 0 auto;height:auto!important;min-height:0}
+#comm.min{flex:0 0 auto}
 .tabs{display:flex;gap:4px;margin-bottom:6px}
 .tabs button{flex:1;border:0;padding:7px;border-radius:8px;background:#e2dcc6;font-weight:700;cursor:pointer}
 .tabs button.on{background:var(--blue);color:#fff}
@@ -504,7 +526,10 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
     <button class="btn sm gray" id="btnMic">🎤 Activar micrófono</button>
     <button class="btn sm gray" id="btnSpk" style="flex:0 0 auto">🔊</button>
   </div>
-  <div class="tabs"><button class="on" data-tab="chat">💬 Chat</button><button data-tab="log">📒 Historial</button></div>
+  <!-- chat achicado (en la partida): las últimas jugadas importantes y aviso de mensajes nuevos -->
+  <div id="commMini" onclick="toggleMini('chat')" title="Tocá para ver todo el chat y el historial"></div>
+  <div class="tabsrow"><div class="tabs"><button class="on" data-tab="chat">💬 Chat</button><button data-tab="log">📒 Historial</button></div>
+    <button class="minbtn" id="btnChatMin" onclick="toggleMini('chat')" title="Achicar el chat (muestra solo lo importante)">▾</button></div>
   <div class="feed" id="feedChat"></div>
   <div class="feed" id="feedLog" style="display:none"></div>
   <div class="chatin"><input type="text" id="chatText" maxlength="300" placeholder="Escribí un mensaje…"><button class="btn sm" id="btnSend">Enviar</button></div>
@@ -2095,7 +2120,7 @@ function render(){
   else { show('game'); if(!$('#board').children.length) buildBoard(); placeComm('#gameComm'); renderGame(); }
   renderLog(); renderVoice(); voiceSync(); musicSync(); renderHandoff(); renderHandBtn(); syncHandPref();
 }
-function placeComm(sel){ const c=$('#comm'), t=$(sel); if(c.parentElement!==t) t.appendChild(c); }
+function placeComm(sel){ const c=$('#comm'), t=$(sel); if(c.parentElement!==t){ t.appendChild(c); commMode(); } }
 
 function renderLobby(){
   $('#lobbyCode').textContent=NET.code||'';
@@ -2939,15 +2964,27 @@ function renderWallet(){
   if(prevWallet.pid===pid && prevWallet.bills) w.querySelectorAll('.bill').forEach(el=>{ if(now[el.dataset.v]!==prevWallet.bills[el.dataset.v]) el.classList.add('pop'); });
   prevWallet={pid, bills:now};
 }
+// panel achicado o completo (jugadores y chat): cada aparato lo recuerda
+const MINI = Object.assign({pl:true, chat:true}, (()=>{ try{ return JSON.parse(localStorage.getItem('bnq_mini'))||{}; }catch(e){ return {}; } })());
+function toggleMini(k){
+  MINI[k]=!MINI[k]; try{ localStorage.setItem('bnq_mini', JSON.stringify(MINI)); }catch(e){}
+  if(k==='pl' && S) renderPlayers();
+  if(k==='chat'){ if(!MINI.chat) chatUnread=0; commMode(); }
+}
 function renderPlayers(){
-  $('#players').innerHTML=S.players.map(p=>{
+  const box=$('#players'); box.classList.toggle('min', MINI.pl);
+  if(MINI.pl){   // solo las fichas (con la plata propia y quién juega): tocar una muestra todo de ese jugador
+    box.innerHTML = S.players.map(p=>`<div class="pl mini ${S.phase==='play'&&cur().id===p.id?'turn':''} ${p.bk?'bk':''}" data-pid="${p.id}" style="border-color:${p.color}" title="${esc(p.name)}" onclick="showPlayer('${p.id}')">
+        <span class="em">${p.emoji}</span>${seesMoney(p)&&!p.bk?`<span class="mo ${isNeg(p)?'neg':''}">${fmtS(p.money)}</span>`:''}${!p.conn&&NET.mode!=='local'&&!p.bot?'<span>⚠️</span>':''}${p.jail?'<span>🚔</span>':''}</div>`).join('')
+      + `<button class="plbtn" onclick="toggleMini('pl')" title="Ver los nombres y la plata de todos">👥 Ver nombres</button>`;
+  } else box.innerHTML=`<div class="plhead"><b>👥 Jugadores</b><button class="plbtn" onclick="toggleMini('pl')" title="Achicar la lista">▴ Achicar</button></div>` + S.players.map(p=>{
     const n=Object.values(S.props).filter(o=>o.o===p.id).length;
     return `<div class="pl ${S.phase==='play'&&cur().id===p.id?'turn':''} ${p.bk?'bk':''}" data-pid="${p.id}" style="border-left-color:${p.color}" onclick="showPlayer('${p.id}')">
       <span class="em">${p.emoji}</span>
       <span class="nm2">${p.bot?'🤖 ':''}${esc(p.name)}${p.id===NET.myPid&&NET.mode!=='local'?' (vos)':''}<br><span class="muted">${n} prop.${p.jail?' · 🚔 preso':''}${p.jcards.length?' · 🎫':''}${p.mic?' · 🎤 hablando':''}${muteBtn(p)}${!p.conn&&NET.mode!=='local'?' · ⚠️ desconectado':''}${p.bk?(p.kicked?' · 🚪 lo sacaron':p.retired?' · 🏳️ se retiró':' · en quiebra'):''}${!p.bk&&!p.conn&&!p.bot&&NET.mode!=='local'?' '+offAgo(p):''}${p.bk&&p.conn&&!p.bot&&NET.mode!=='local'?' · 👀 mirando':''}</span></span>
       <span class="mo ${isNeg(p)?'neg':''}">${moneyText(p)}</span></div>`;
   }).join('');
-  if((S.observers||[]).length) $('#players').insertAdjacentHTML('beforeend', `<div class="muted" style="padding:2px 6px">👀 Mirando: ${S.observers.map(obsName).join(', ')}</div>`);
+  if((S.observers||[]).length && !MINI.pl) $('#players').insertAdjacentHTML('beforeend', `<div class="muted" style="padding:2px 6px">👀 Mirando: ${S.observers.map(obsName).join(', ')}</div>`);
   // cartelito +/− cuando cambia la plata
   for(const p of S.players){
     if(!seesMoney(p)){ delete prevMoney[p.id]; continue; }
@@ -2984,12 +3021,29 @@ function renderChat(m){
   if(m) f.insertAdjacentHTML('beforeend', one(m)); else f.innerHTML=CHAT.map(one).join('');
   f.scrollTop=f.scrollHeight;
   if(m && !m.sys && $('#feedChat').style.display==='none') document.querySelector('[data-tab=chat]').textContent='💬 Chat •';
+  if(m && !m.sys && miniOn()){ chatUnread++; lastChatMsg=m; }
+  renderMini();
 }
 let lastLogSeq=-1;
 function renderLog(){
   if(!S || !S.log) return;
   if(S.logSeq===lastLogSeq) return; lastLogSeq=S.logSeq;
   const f=$('#feedLog'); f.innerHTML=S.log.map(l=>`<div class="m sys">${esc(l.m)}</div>`).join(''); f.scrollTop=f.scrollHeight;
+  renderMini();
+}
+// chat achicado: solo en la partida (en la sala de espera el chat se ve entero)
+var chatUnread=0, lastChatMsg=null;
+const miniOn = () => MINI.chat && $('#comm').parentElement && $('#comm').parentElement.id==='gameComm';
+function commMode(){
+  const on=miniOn(); $('#comm').classList.toggle('min', on); $('#gameComm').classList.toggle('min', on);
+  if(!on){ chatUnread=0; const f=$('#feedChat'); f.scrollTop=f.scrollHeight; }
+  renderMini();
+}
+function renderMini(){
+  const el=$('#commMini'); if(!el || !miniOn()) return;
+  const ult = S && S.log ? S.log.slice(-2).map(l=>`<div class="ml">${esc(l.m)}</div>`).join('') : '';
+  const chat = chatUnread && lastChatMsg ? `<div class="mc"><b>💬 ${chatUnread>1?chatUnread+' nuevos · ':''}${esc(lastChatMsg.e+' '+lastChatMsg.n)}:</b> ${esc(lastChatMsg.x)}</div>` : '';
+  el.innerHTML = `<div class="mtxt">${chat}${ult||'<div class="ml">Acá aparecen las jugadas importantes.</div>'}</div><span class="mopen">${chatUnread?`<i>${chatUnread}</i>`:''}💬 Ver todo ▴</span>`;
 }
 function sendChat(){
   const t=$('#chatText'), x=t.value.trim(); if(!x) return; t.value='';
