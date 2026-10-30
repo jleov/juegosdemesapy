@@ -63,11 +63,15 @@ window.ICE_SERVERS = [
   window.limpiarRed = clean;
 })();
 
-/* Micrófono con opción de supresor de ruido (microfono.js): se carga en todos los juegos */
+/* Micrófono con opción de supresor de ruido (microfono.js) y modo transmisión para ocultar
+   el código de la sala (transmision.js): se cargan en todos los juegos */
 (function(){
-  try{
-    const s = document.createElement('script');
-    s.src = new URL('microfono.js', (document.currentScript && document.currentScript.src) || location.href).href;
-    (document.head || document.documentElement).appendChild(s);
-  }catch(e){}
+  const base = (document.currentScript && document.currentScript.src) || location.href;
+  for(const f of ['microfono.js', 'transmision.js']){
+    try{
+      const s = document.createElement('script');
+      s.src = new URL(f, base).href;
+      (document.head || document.documentElement).appendChild(s);
+    }catch(e){}
+  }
 })();
