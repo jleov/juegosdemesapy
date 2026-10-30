@@ -507,9 +507,9 @@ window.addEventListener('resize', ()=>{ clearTimeout(resizeStage.t); resizeStage
 const R3={ok:false, pcs:{}, pos:null, theme:null, camKey:''};
 const CAM3=Object.assign({yaw:0, pitch:48, zoom:1}, load('ajedrez_cam3')||{});
 const PROF={   // perfiles de las fichas (radio, altura) que se tornean
-  P:[[0,0],[.34,0],[.34,.06],[.29,.09],[.28,.12],[.19,.16],[.13,.32],[.11,.40],[.19,.42],[.19,.45],[.09,.47]],
+  P:[[0,0],[.32,0],[.32,.06],[.27,.09],[.26,.11],[.17,.14],[.11,.27],[.10,.33],[.18,.35],[.18,.38],[.08,.40]],
   R:[[0,0],[.38,0],[.38,.07],[.32,.11],[.29,.15],[.25,.50],[.29,.53],[.31,.58],[.31,.72],[.22,.72],[.22,.66],[0,.66]],
-  B:[[0,0],[.36,0],[.36,.07],[.30,.10],[.26,.15],[.15,.42],[.13,.50],[.21,.53],[.21,.56],[.13,.58],[.19,.66],[.20,.75],[.15,.86],[.08,.92],[0,.95]],
+  B:[[0,0],[.36,0],[.36,.07],[.30,.10],[.26,.15],[.14,.48],[.12,.58],[.23,.61],[.23,.65],[.12,.67],[.16,.72],[.21,.80],[.22,.88],[.19,.97],[.13,1.05],[.06,1.11],[0,1.13]],
   Q:[[0,0],[.39,0],[.39,.07],[.32,.11],[.28,.16],[.15,.56],[.14,.70],[.24,.73],[.24,.76],[.15,.78],[.23,.99],[.17,1.01],[.08,1.0],[0,1.02]],
   K:[[0,0],[.40,0],[.40,.07],[.33,.11],[.29,.16],[.16,.60],[.15,.76],[.26,.79],[.26,.82],[.16,.84],[.22,1.03],[.10,1.06],[0,1.06]],
   N:[[0,0],[.38,0],[.38,.07],[.31,.11],[.29,.17],[.26,.24],[0,.24]],
@@ -535,7 +535,13 @@ function makePiece3D(code){
   const th=R3.th, mat=R3.mats[code[0]], t=code[1], grp=new THREE.Group();
   const m=new THREE.Mesh(geo(t==='N'?'N':t), mat); m.castShadow=true; grp.add(m);
   if(t==='N'){ const b=new THREE.Mesh(new THREE.LatheGeometry(PROF.N.map(([r,y])=>new THREE.Vector2(r,y)),32), mat); b.castShadow=true; grp.add(b); }
-  if(t==='P'){ const h=new THREE.Mesh(new THREE.SphereGeometry(.16,24,16), mat); h.position.y=.58; h.castShadow=true; grp.add(h); }
+  if(t==='P'){ const h=new THREE.Mesh(new THREE.SphereGeometry(.15,24,16), mat); h.position.y=.51; h.castShadow=true; grp.add(h); }
+  if(t==='B'){   // el alfil: bolita arriba y el corte en diagonal de la mitra, para no confundirlo con el peón
+    const ball=new THREE.Mesh(new THREE.SphereGeometry(.065,16,12), mat); ball.position.y=1.17; ball.castShadow=true; grp.add(ball);
+    const cut=new THREE.Mesh(new THREE.BoxGeometry(.04,.26,.5), new THREE.MeshStandardMaterial({color:lineCol(code[0]==='w'?th.pb:th.pn), roughness:.6}));
+    cut.position.y=.92; cut.rotation.z=.6; grp.add(cut);
+    const col=new THREE.Mesh(new THREE.TorusGeometry(.2,.03,8,32), mat); col.rotation.x=Math.PI/2; col.position.y=.63; grp.add(col);
+  }
   if(t==='Q'){ const h=new THREE.Mesh(new THREE.SphereGeometry(.08,16,12), mat); h.position.y=1.08; grp.add(h); }
   if(t==='K'){ const a=new THREE.Mesh(new THREE.BoxGeometry(.07,.26,.07), mat), b=new THREE.Mesh(new THREE.BoxGeometry(.2,.07,.07), mat); a.position.y=1.18; b.position.y=1.2; grp.add(a,b); }
   if(t==='R'){ for(let i=0;i<4;i++){ const c=new THREE.Mesh(new THREE.BoxGeometry(.11,.1,.11), mat); const a=i*Math.PI/2+Math.PI/4; c.position.set(Math.cos(a)*.24,.77,Math.sin(a)*.24); grp.add(c); } }
