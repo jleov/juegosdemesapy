@@ -1,7 +1,7 @@
 {
-  "name": "Adivina Quién PY",
-  "short_name": "Adivina Quién",
-  "description": "Adivina Quién con personajes de Paraguay en caricatura, en línea con amigos, en 2D o 3D.",
+  "name": "¿Mávapa?",
+  "short_name": "Mávapa",
+  "description": "¿Mávapa? (¿quién es?): adiviná personajes de Paraguay en caricatura, en línea con amigos, en 2D o 3D.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

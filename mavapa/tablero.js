@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   Adivina Quién PY — pantallas: sala de espera, tablero 2D (cartas) y
+   ¿Mávapa? — pantallas: sala de espera, tablero 2D (cartas) y
    3D (las fichas se bajan como en el juego de mesa), preguntas, arriesgar,
    fin de ronda y el editor de personajes propios (foto → caricatura).
    ===================================================================== */
@@ -568,8 +568,8 @@ function closeModal(){ $('#modal').classList.remove('on'); }
 function roomLink(){ return location.origin+location.pathname+'#'+NET.code; }
 function copyCode(){ navigator.clipboard && navigator.clipboard.writeText(NET.code).then(()=>toast('Código copiado: '+NET.code)); }
 function shareRoom(){
-  const url=roomLink(), text=`¡Vení a jugar al Adivina Quién paraguayo! 🕵️🇵🇾 Sala ${NET.code}`;
-  if(navigator.share) return navigator.share({title:'Adivina Quién PY', text, url}).catch(()=>{});
+  const url=roomLink(), text=`¡Vení a jugar al ¿Mávapa? conmigo! 🕵️🇵🇾 Sala ${NET.code}`;
+  if(navigator.share) return navigator.share({title:'¿Mávapa?', text, url}).catch(()=>{});
   modal(`<h2>📤 Invitar a la sala ${NET.code}</h2><p style="word-break:break-all;user-select:all;background:#fff;padding:8px;border-radius:8px">${esc(url)}</p>
     <a class="btn green wide" style="display:block;text-align:center;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(text+' '+url)}">💬 Mandar por WhatsApp</a>
     <button class="btn wide" style="margin-top:6px" onclick="navigator.clipboard.writeText('${url}').then(()=>toast('Enlace copiado'))">📋 Copiar enlace</button>

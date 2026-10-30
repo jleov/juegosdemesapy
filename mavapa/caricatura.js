@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   Adivina Quién PY — pasa una foto a caricatura (cabeza agrandada,
+   ¿Mávapa? — pasa una foto a caricatura (cabeza agrandada,
    colores planos y contorno negro). Lo usan las fotos del juego y
    también las que sube cada uno al agregar personajes.
    Uso: Caricatura.hacer(img, {cx, cy, s}) → canvas de 240×240

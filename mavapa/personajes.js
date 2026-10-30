@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   Adivina Quién PY — los personajes.
+   ¿Mávapa? — los personajes.
    Para agregar uno: copiá una línea, poné la foto (240×240, ya en
    caricatura) en fotos/<id>.jpg y elegí sus rasgos de la lista RASGOS.
    También se pueden agregar desde el juego (botón "Mis personajes") y

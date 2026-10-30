@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   Adivina Quién PY — estado de la partida, turnos, preguntas y bots.
+   ¿Mávapa? — estado de la partida, turnos, preguntas y bots.
    Todo lo decide el anfitrión; a cada aparato le manda solo lo que puede
    ver (nadie ve el personaje secreto del otro, tampoco los que miran).
    ===================================================================== */

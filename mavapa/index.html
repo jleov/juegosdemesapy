@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- SEO (buscadores y vista previa al compartir) -->
+<title>¿Mávapa?: adiviná el personaje paraguayo en caricatura | Juegos PY</title>
+<meta name="description" content="¿Mávapa? (¿quién es?, en guaraní): adiviná el personaje de Paraguay en caricatura haciendo preguntas de sí o no: futbolistas, próceres, políticos, farándula e influencers. Gratis en línea con amigos, con chat y voz.">
+<link rel="canonical" href="https://juegospy.com/mavapa/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Juegos Paraguay Digitales">
+<meta property="og:title" content="¿Mávapa?: adiviná el personaje paraguayo en caricatura | Juegos PY">
+<meta property="og:description" content="¿Mávapa? (¿quién es?, en guaraní): adiviná el personaje de Paraguay en caricatura haciendo preguntas de sí o no: futbolistas, próceres, políticos, farándula e influencers. Gratis en línea con amigos, con chat y voz.">
+<meta property="og:url" content="https://juegospy.com/mavapa/">
+<meta property="og:image" content="https://juegospy.com/mavapa/icon-512.png">
+<meta property="og:locale" content="es_PY">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "¿Mávapa?", "url": "https://juegospy.com/mavapa/", "description": "¿Mávapa? (¿quién es?, en guaraní): adiviná el personaje de Paraguay en caricatura: futbolistas, próceres, políticos, farándula e influencers. Gratis en línea con amigos, con chat y voz.", "image": "https://juegospy.com/mavapa/icon-512.png", "inLanguage": "es", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "jleovgames", "url": "https://juegospy.com/"}, "isPartOf": {"@type": "WebSite", "name": "Juegos Paraguay Digitales", "url": "https://juegospy.com/"}, "genre": ["Juego de mesa", "Adivinanzas"], "gamePlatform": ["Navegador web", "Android", "PC"], "playMode": "MultiPlayer", "applicationCategory": "Game", "operatingSystem": "Cualquiera (navegador)"}</script>
+<!-- /SEO -->
+<meta name="theme-color" content="#14243b">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!-- librería de conexión entre jugadores (PeerJS 1.5.4) y la de 3D (three.js r128), guardadas junto al juego -->
+<script src="peerjs.min.js"></script>
+<script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="three.min.js"></script>
+<script src="../ice.js"></script>
+<style>
+:root{--cream:#fbf4e4;--ink:#1d1d1d;--muted:#6b6b6b;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;overflow-x:clip}
+body{background:radial-gradient(circle at 30% 15%,#284a78,#0b1424 75%) fixed;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+.screen{display:none}.screen.on{display:block}
+input,button,select,textarea{font:inherit}
+input[type=text],select,textarea{width:100%;padding:10px 12px;border:1px solid #cbbf9f;border-radius:10px;background:#fff;color:var(--ink)}
+textarea{resize:vertical;min-height:70px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff;touch-action:manipulation}
+.btn.red{background:var(--red)}.btn.gray{background:#7a7a7a}.btn.gold{background:var(--gold);color:#222}.btn.green{background:var(--green)}.btn.dark{background:#1f2a3a}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.wide{width:100%}
+.btn.big{font-size:17px;padding:12px 18px}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.muted{color:var(--muted);font-size:13px}
+.box{background:var(--cream);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:14px}
+.box h3{margin:0 0 10px;font-size:17px}
+.box label{display:block;font-size:13px;font-weight:800;margin:10px 0 4px}
+/* ---------- menú ---------- */
+.menu{max-width:470px;margin:0 auto;padding:18px 16px 40px}
+.back{display:inline-block;color:#cfe0f5;text-decoration:none;font-size:14px;margin-bottom:6px}
+.logo{text-align:center;color:#fff;margin:6px 0 18px}
+.logo .faces{display:flex;justify-content:center;gap:6px;margin-bottom:10px}
+.logo .faces img{width:58px;height:58px;border-radius:12px;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.5);object-fit:cover}
+.logo .faces img:nth-child(odd){transform:rotate(-6deg)}.logo .faces img:nth-child(even){transform:rotate(5deg) translateY(4px)}
+.logo h1{margin:0;font-size:44px;letter-spacing:2px;font-weight:900;text-shadow:0 3px 0 #000;line-height:1}
+.logo h1 span{color:var(--gold);font-size:.5em;letter-spacing:3px;display:block;margin-top:4px}
+.bandera{display:inline-block;margin-top:10px;border-radius:5px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.45);line-height:1}
+.bandera i{display:block;height:7px}.bandera i.rojo{background:#d52b1e}.bandera i.azul{background:#0038a8}
+.bandera b{display:block;background:#fff;color:#1b2a5a;font-weight:900;letter-spacing:5px;font-size:14px;padding:5px 11px 5px 16px}
+.tokens{display:flex;flex-wrap:wrap;gap:6px}
+.tok{font-size:24px;width:46px;height:46px;border-radius:50%;border:3px solid transparent;background:#fff;cursor:pointer;padding:0}
+.tok.sel{border-color:var(--red);transform:scale(1.08)}
+.code{font-size:38px;font-weight:900;letter-spacing:6px;text-align:center;color:var(--blue);margin:4px 0}
+.catlist{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px}
+.catlist div{background:#fff;border-radius:10px;padding:7px 9px;border-left:5px solid var(--cc)}
+.catlist b{display:block;font-size:13.5px}
+/* ---------- sala de espera ---------- */
+.lobbywrap{max-width:1100px;margin:0 auto;padding:56px 12px 30px;display:flex;gap:14px;align-items:flex-start}
+.lobbywrap>.lmain{flex:1;min-width:0}
+#lobbySide{width:360px;flex:none;position:sticky;top:10px}
+@media (max-width:860px){.lobbywrap{flex-direction:column}#lobbySide{width:100%;position:static}}
+.plist{list-style:none;padding:0;margin:8px 0}
+.plist li{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#fff;margin-bottom:6px}
+.plist li .nm{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
+body>.side{display:none}
+.box label.opt,.opt{display:flex;gap:10px;align-items:flex-start;background:#fff;border-radius:10px;padding:9px 10px;margin-bottom:6px}
+.opt input{margin-top:3px;width:20px;height:20px;flex:none}
+.opt b{display:block;font-size:14px}.opt small{color:#555;font-size:12.5px;line-height:1.35}
+.cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.box label.catb{display:inline-flex;align-items:center;gap:5px;margin:0;background:#fff;border:2px solid #ddd;border-radius:20px;padding:6px 11px;font-size:14px;cursor:pointer}
+.box label.catb.on{border-color:var(--cc);background:color-mix(in srgb,var(--cc) 14%,#fff)}
+.catb input{width:16px;height:16px;margin:0}
+.catb small{color:#777;font-weight:600}
+.sug{display:flex;gap:8px;align-items:flex-start;background:#fff;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:14px}
+.sug .t{flex:1}.sug .t small{display:block;color:#777;font-size:12px}
+.vote{border:1px solid #ccc;background:#f4f4f4;border-radius:20px;padding:4px 9px;cursor:pointer;font-weight:800;white-space:nowrap}
+.vote.on{background:#ffe8a3;border-color:#e2b23c}
+.grules{white-space:pre-wrap;background:#fff;border-radius:10px;padding:10px;font-size:14px;border-left:4px solid var(--gold)}
+
+/* ======================= JUEGO ======================= */
+#game.on{display:flex}
+#game{height:100vh;height:100dvh;flex-direction:column;overflow:hidden;background:radial-gradient(circle at 50% 30%,#22406a,#0a1322 80%)}
+.topbar{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px 6px 56px;color:#fff;background:rgba(0,0,0,.45);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.topbar::-webkit-scrollbar{display:none}
+.topbar .ttl{font-weight:900;letter-spacing:1px;white-space:nowrap}
+.topbar .ttl small{font-weight:600;color:var(--gold);letter-spacing:2px;margin-left:4px}
+.topbar .sp{flex:1}
+.topbar .btn{white-space:nowrap}
+.badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:3px}
+.gmain{flex:1;display:flex;min-height:0}
+.area{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+#score{flex:none;display:flex;gap:6px;padding:6px}
+.sc{flex:1 1 0;min-width:0;background:rgba(10,18,32,.85);color:#fff;border-radius:12px;padding:5px 9px;box-shadow:inset 4px 0 0 var(--pc);font-size:13px;transition:box-shadow .2s}
+.sc.on{box-shadow:inset 4px 0 0 var(--pc),0 0 0 2px var(--gold),0 0 16px rgba(242,193,78,.6)}
+.sc .nms{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:800}
+.sc .ex{display:flex;align-items:center;gap:6px;justify-content:space-between;color:#cfd8e6}
+.sc .ex b{color:var(--gold)}
+.stage{flex:1;position:relative;min-height:0;overflow:hidden}
+.stage canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block;touch-action:none}
+/* tablero 2D */
+#board2d{position:absolute;inset:0;padding:6px;display:grid;gap:6px;grid-template-columns:repeat(var(--cols,6),var(--cw,90px));justify-content:center;align-content:center;overflow:auto}
+.card{width:var(--cw);position:relative;cursor:pointer;perspective:600px;user-select:none;-webkit-user-select:none}
+.card .in{position:relative;transition:transform .45s;transform-style:preserve-3d;transform-origin:50% 100%}
+.card.down .in{transform:rotateX(-180deg)}
+.card .fr,.card .bk{backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:9px;overflow:hidden}
+.card .fr{background:#fffaf0;box-shadow:0 3px 8px rgba(0,0,0,.45);border:2px solid #fff}
+.card img{width:100%;aspect-ratio:1;display:block;object-fit:cover;background:#ddd}
+.card .nm{font-size:max(9px,calc(var(--cw) * .098));font-weight:800;text-align:center;line-height:1.08;height:calc(var(--cw) * .25);display:flex;align-items:center;justify-content:center;padding:0 3px;overflow:hidden}
+.card .bk{position:absolute;inset:0;transform:rotateX(180deg);background:repeating-linear-gradient(45deg,rgba(255,255,255,.1) 0 8px,transparent 8px 16px),var(--pc,#555);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,.4)}
+.card .bk span{color:#fff;font-weight:900;font-size:calc(var(--cw) * .5);opacity:.8}
+.card .inf{position:absolute;right:3px;top:3px;width:max(20px,calc(var(--cw) * .2));height:max(20px,calc(var(--cw) * .2));border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-weight:900;font-style:italic;font-family:Georgia,serif;font-size:max(11px,calc(var(--cw) * .12));cursor:pointer;padding:0;z-index:2}
+.card.down .inf{display:none}
+@media (hover:hover){.card:not(.down):hover .fr{border-color:var(--gold)}}
+#board2d.picking .card .fr,#board2d.guessing .card:not(.down) .fr{border-color:var(--gold);animation:brilla 1.2s infinite}
+@keyframes brilla{50%{box-shadow:0 0 0 3px var(--gold),0 0 14px rgba(242,193,78,.8)}}
+.cam3d{position:absolute;left:8px;top:8px;display:none;flex-direction:column;gap:4px;z-index:6}
+.v3d .cam3d{display:flex}
+.cam3d button{width:38px;height:38px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:16px;cursor:pointer}
+#bubbles{position:absolute;left:8px;bottom:8px;right:8px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none;z-index:4}
+.bub{background:rgba(255,255,255,.92);color:#111;border-radius:12px;padding:4px 9px;font-size:13px;max-width:min(360px,80%);box-shadow:0 3px 10px rgba(0,0,0,.4);animation:bubin .25s;transition:opacity .5s}
+.bub.out{opacity:0}
+@keyframes bubin{from{transform:translateY(8px);opacity:0}}
+.banner{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:rgba(10,10,10,.88);color:#fff;font-weight:800;padding:8px 16px;border-radius:20px;z-index:7;display:none;max-width:92%;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.5);animation:bubin .3s}
+.banner.si{background:rgba(30,130,50,.95)}.banner.no{background:rgba(190,30,30,.95)}
+/* controles de abajo */
+#ctrl{flex:none;background:rgba(0,0,0,.5);padding:6px 8px 8px;color:#fff;display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow-y:auto}
+#ctrl .btns{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
+#ctrl .msgline{text-align:center;font-size:14px}
+#ctrl .guessline{color:var(--gold)}
+.mini{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:3px 8px 3px 3px;color:#fff;cursor:pointer;text-align:left;max-width:260px}
+.mini img{width:42px;height:42px;border-radius:7px;object-fit:cover}
+.mini small{display:block;font-size:11px;color:var(--gold)}
+.mini b{font-size:13px;display:block;line-height:1.15}
+.lq{background:rgba(255,255,255,.1);border-radius:10px;padding:6px 10px;font-size:14px;max-width:560px}
+.lq small{color:#cfd8e6}
+.lq.big{font-size:16px}
+.ans{display:inline-block;border-radius:12px;padding:1px 8px;font-weight:900;font-size:13px;white-space:nowrap}
+.ans.si{background:#2a9d3f;color:#fff}.ans.no{background:#d52b1e;color:#fff}.ans.nose{background:#888;color:#fff}.ans.wait{background:#555;color:#fff}
+/* ---------- panel lateral ---------- */
+.side{width:350px;flex:none;display:flex;flex-direction:column;background:var(--cream);min-height:0;box-shadow:-4px 0 18px rgba(0,0,0,.35)}
+#lobbySide .side{width:100%;height:min(640px,80vh);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);overflow:hidden}
+#gameSide{display:flex;min-height:0}
+@media (min-width:1000px){.only-mobile{display:none}}
+#lobbySide .only-mobile{display:none}
+@media (max-width:999px){
+  #game .side{position:fixed;right:0;top:0;bottom:0;width:min(380px,94vw);transform:translateX(105%);transition:transform .25s;z-index:60}
+  #game .side.open{transform:none}
+}
+.voice{display:flex;gap:6px;padding:8px;border-bottom:1px solid #e3d8bd}
+.voice .btn{flex:1}.voice .btn.on{background:#d52b1e;animation:pulso2 1.4s infinite}
+@keyframes pulso2{50%{opacity:.75}}
+.tabs{display:flex;border-bottom:1px solid #e3d8bd}
+.tabs button{flex:1;border:0;background:none;padding:9px 2px;font-weight:800;font-size:13px;cursor:pointer;color:#7b6a4c;border-bottom:3px solid transparent}
+.tabs button.on{color:#1d1d1d;border-bottom-color:var(--red)}
+.tabp{display:none;flex:1;min-height:0;flex-direction:column}
+.tabp.on{display:flex}
+.scroll{flex:1;overflow-y:auto;padding:8px 10px;min-height:0}
+.msg{margin:0 0 6px;font-size:14px;line-height:1.35;word-wrap:break-word}
+.msg .who{font-weight:800}
+.msg.sys{color:#7b6a4c;font-size:12.5px;font-style:italic}
+.msg.priv{background:#2b1d3f;color:#fff;border-radius:10px;padding:6px 9px}
+.msg.priv .who{color:#ffd77a}
+.msg.priv small{color:#cdbbe9;display:block;font-size:11.5px}
+.msg .at{background:#ffe9a8;border-radius:4px;padding:0 3px;font-weight:700}
+.quick{padding:6px 8px;border-top:1px solid #e3d8bd;display:flex;flex-wrap:wrap;gap:4px}
+.quick button{border:0;border-radius:14px;padding:4px 9px;cursor:pointer;font-weight:700;font-size:12.5px;background:#eee}
+.chatin{display:flex;gap:6px;padding:8px;border-top:1px solid #e3d8bd;position:relative;flex-wrap:wrap}
+.chatin select{width:auto;flex:0 0 auto;max-width:42%;padding:8px 6px;font-size:13px}
+.chatin input{flex:1;min-width:120px}
+.chatin.priv input{background:#f1eaff;border-color:#8e6bd0}
+.atpop{position:absolute;left:8px;right:8px;bottom:100%;background:#fff;border-radius:10px;box-shadow:0 -4px 16px rgba(0,0,0,.25);overflow:hidden;display:none;z-index:5}
+.atpop.on{display:block}
+.atpop div{padding:8px 10px;cursor:pointer;font-weight:700}
+.atpop div:hover,.atpop div.sel{background:#f1eaff}
+.hline{font-size:13.5px;margin-bottom:6px;line-height:1.3}
+.prow{display:flex;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:7px 8px;margin-bottom:6px;font-size:14px}
+.prow .nm{flex:1;min-width:0}
+.prow .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .nm small{color:#777}
+/* ---------- avisos y ventanas ---------- */
+#toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:100;text-align:center;max-width:92%;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+#netbar{position:fixed;left:0;right:0;top:0;background:#b8860b;color:#fff;text-align:center;padding:6px;font-weight:700;z-index:99;display:none}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:14px;z-index:80}
+#modal.on{display:flex}
+#modal .mbox{background:var(--cream);border-radius:16px;padding:18px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#modal h2{margin:0 0 10px;font-size:21px}
+#modal h3{margin:12px 0 6px;font-size:15px}
+.score{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
+.score td{padding:6px 4px;border-bottom:1px solid #e3d8bd}
+.rules h3{margin:14px 0 6px}
+.rules p,.rules li{font-size:14.5px;line-height:1.45}
+.info{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.info img.big{width:min(170px,40vw);aspect-ratio:1;border-radius:14px;box-shadow:0 4px 12px rgba(0,0,0,.35);flex:none;object-fit:cover}
+.info p{margin:8px 0;font-size:14.5px;line-height:1.4}
+@media (max-width:480px){.info{flex-direction:column;align-items:center;text-align:center}.info .tags{justify-content:center}}
+.chip{display:inline-block;color:#fff;border-radius:12px;padding:2px 9px;font-size:12.5px;font-weight:800}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tags span,.tags label{background:#fff;border:1px solid #ddd;border-radius:12px;padding:2px 8px;font-size:12.5px}
+.edtags label{display:inline-flex;gap:4px;align-items:center;cursor:pointer;padding:5px 9px;font-size:13.5px}
+.qgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+@media (max-width:480px){.qgrid{grid-template-columns:1fr}}
+.qb{border:1px solid #d8cdb0;background:#fff;border-radius:10px;padding:9px 10px;text-align:left;cursor:pointer;font-weight:700;font-size:14px}
+.qb:hover{border-color:var(--blue)}
+.qb.done{opacity:.6}.qb i{font-style:normal;font-size:12px}
+.reveals{display:flex;gap:10px;justify-content:center;margin:8px 0}
+.reveal{flex:1;max-width:200px;background:#fff;border-radius:12px;padding:8px;text-align:center;border-top:5px solid var(--pc)}
+.reveal img{width:100%;aspect-ratio:1;border-radius:10px;display:block;margin:4px 0}
+.reveal small{color:#555}
+.yourturn{position:fixed;left:50%;top:24%;transform:translateX(-50%);background:var(--gold);color:#3a1c10;font-weight:900;padding:10px 22px;border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,.5);z-index:85;pointer-events:none;animation:turnpop 1.6s forwards;white-space:nowrap}
+@keyframes turnpop{0%{opacity:0;transform:translate(-50%,10px)}15%{opacity:1;transform:translate(-50%,0)}80%{opacity:1}100%{opacity:0}}
+.obsbar{background:#2b1d3f;color:#fff;text-align:center;font-size:13px;padding:5px;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+/* editor de personajes */
+.mios{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin:10px 0}
+.mio{background:#fff;border-radius:10px;padding:6px;text-align:center;font-size:13px}
+.mio img{width:100%;aspect-ratio:1;border-radius:8px;display:block}
+.mio b{display:block;margin-top:4px}.mio small{color:#777;display:block;margin-bottom:4px}
+.lb{display:block;font-size:13px;font-weight:800;margin:10px 0 4px}
+.edfoto{display:flex;gap:8px;margin-bottom:6px}
+.edfoto>div{flex:1;text-align:center}
+.edfoto canvas{width:100%;max-width:240px;aspect-ratio:1;border-radius:10px;background:#222;touch-action:none;display:block;margin:0 auto}
+.edfoto small{color:#666;font-size:12px}
+input[type=range]{width:100%}
+@media (max-width:600px){
+  .topbar .hidem{display:none}
+  .sc{font-size:12px}
+  .btn.big{font-size:15px;padding:10px 14px}
+}
+</style>
+</head>
+<body>
+<div id="netbar"></div>
+
+<!-- ======================= MENÚ ======================= -->
+<div class="screen on" id="menu"><div class="menu">
+  <div class="logo">
+    <div class="faces"><img src="fotos/chilavert.jpg" alt=""><img src="fotos/lynch.jpg" alt=""><img src="fotos/mangore.jpg" alt=""><img src="fotos/nadia.jpg" alt=""><img src="fotos/lugo.jpg" alt=""></div>
+    <h1>¿MÁVAPA?<span>¿QUIÉN ES? · EDICIÓN PARAGUAY</span></h1>
+    <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
+  </div>
+  <div class="box">
+    <label for="myName" style="margin-top:0">Tu nombre</label>
+    <input type="text" id="myName" maxlength="16" placeholder="Ej.: Juan" autocomplete="nickname">
+    <label>Tu ficha</label>
+    <div class="tokens" id="tokens"></div>
+  </div>
+  <div class="box">
+    <h3>🌐 Jugar en línea con un amigo</h3>
+    <button class="btn green wide" onclick="hostStart(false)">➕ Crear sala</button>
+    <label for="joinCode">o entrá con el código de la sala</label>
+    <div class="row"><input type="text" id="joinCode" maxlength="6" placeholder="Código" style="text-transform:uppercase;letter-spacing:3px;font-weight:800"><button class="btn" style="flex:0 0 auto" onclick="joinClick()">Entrar</button></div>
+    <button class="btn gold wide" id="btnResume" style="margin-top:10px;display:none" onclick="resumeClick()">↩️ Volver a la sala</button>
+    <p class="muted" style="margin-bottom:0">Juegan 2. Los que entren después miran 👀 con chat y voz, pero no ven los personajes secretos.</p>
+  </div>
+  <div class="box">
+    <h3>🤖 Practicar</h3>
+    <button class="btn wide" onclick="localStart()">🕵️ Jugar contra el bot</button>
+  </div>
+  <div class="box">
+    <h3>🃏 Personajes</h3>
+    <div class="catlist" id="catList"></div>
+    <button class="btn gold wide" style="margin-top:10px" onclick="openMios()">⭐ Mis personajes (agregar con foto)</button>
+  </div>
+  <button class="btn dark wide" onclick="showRules()">📜 Cómo se juega</button>
+  <p class="muted" id="musicCredit" style="color:#b9c8dc;text-align:center;font-size:11px;margin-top:14px"></p>
+  <p class="muted" style="color:#b9c8dc;text-align:center;font-size:11px">Caricaturas hechas a partir de fotos de Wikipedia / Wikimedia Commons y de los perfiles públicos de cada influencer.</p>
+</div></div>
+
+<!-- ======================= SALA DE ESPERA ======================= -->
+<div class="screen" id="lobby"><div class="lobbywrap">
+  <div class="lmain">
+    <div class="box">
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1" id="lobbyTitle">🕵️ Sala de espera</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música de fondo">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🚪 Salir</button></div>
+      <div id="lobbyCodeBox"><p class="muted" style="text-align:center;margin:8px 0 0">Código de la sala</p><div class="code" id="lobbyCode">—</div>
+        <div class="row"><button class="btn sm" onclick="shareRoom()">📤 Compartir enlace</button><button class="btn sm gray" onclick="copyCode()">📋 Copiar código</button></div></div>
+      <div id="lobbyObs"></div>
+      <h3 style="margin-top:14px">Jugadores <span class="muted" id="pcount"></span></h3>
+      <ul class="plist" id="plist"></ul>
+      <div id="lobbyHostBtns"></div>
+    </div>
+    <div class="box">
+      <h3>⚙️ Reglas de esta mesa</h3>
+      <div id="optsBox"></div>
+    </div>
+    <div class="box">
+      <h3>📝 Reglas propias del grupo</h3>
+      <div id="grulesBox"></div>
+    </div>
+    <div class="box">
+      <h3>💡 Sugerencias de reglas</h3>
+      <p class="muted" style="margin-top:0">Cualquiera (también los que miran) puede proponer una regla y votar las de los demás 👍.</p>
+      <div id="sugBox"></div>
+      <div class="row" style="margin-top:6px"><input type="text" id="sugIn" maxlength="240" placeholder="Ej.: no vale preguntar por la categoría" onkeydown="if(event.key==='Enter')sendSug('sugIn')"><button class="btn sm" style="flex:0 0 auto" onclick="sendSug('sugIn')">Sugerir</button></div>
+    </div>
+  </div>
+  <div id="lobbySide"></div>
+</div></div>
+
+<!-- ======================= PARTIDA ======================= -->
+<div class="screen" id="game">
+  <div class="topbar">
+    <span class="ttl">¿MÁVAPA?<small>PY</small></span>
+    <span class="btn sm dark" id="roomTag" style="cursor:default" title="Código de la sala"></span>
+    <span class="sp"></span>
+    <button class="btn sm dark" id="btnView" onclick="toggleView()">🧊 3D</button>
+    <button class="btn sm dark" id="btnSnd" onclick="toggleSound()">🔊</button>
+    <button class="btn sm dark btnMusic hidem" onclick="toggleMusic()" title="Música de fondo">🎶</button>
+    <button class="btn sm dark hidem" onclick="showRules()">📜</button>
+    <button class="btn sm dark" id="btnSide" onclick="toggleSide()">💬<span class="badge" id="unread" style="display:none">0</span></button>
+    <button class="btn sm red" onclick="leaveClick()" title="Salir de la partida">🚪</button>
+  </div>
+  <div id="obsbar" class="obsbar" style="display:none"></div>
+  <div class="gmain">
+    <div class="area">
+      <div id="score"></div>
+      <div class="stage" id="stage">
+        <div id="board2d"></div>
+        <canvas id="c3d" style="display:none"></canvas>
+        <div class="cam3d">
+          <button onclick="cam3('reset')" title="Vista normal">🎯</button>
+          <button onclick="cam3('top')" title="Ver desde arriba">🔭</button>
+          <button onclick="cam3('zoom',1)" title="Acercar">＋</button>
+          <button onclick="cam3('zoom',-1)" title="Alejar">－</button>
+        </div>
+        <div id="bubbles"></div>
+        <div id="banner" class="banner"></div>
+      </div>
+      <div id="ctrl"></div>
+    </div>
+    <div id="gameSide"></div>
+  </div>
+</div>
+
+<!-- ======================= PANEL (se mueve entre la sala y la partida) ======================= -->
+<div class="side" id="side">
+  <div class="voice" id="voiceBar">
+    <button class="btn sm gray" id="btnMic" onclick="toggleMic()">🎤 Activar micrófono</button>
+    <button class="btn sm gray" id="btnSpk" style="flex:0 0 46px" onclick="toggleSpk()" title="Escuchar a los demás">🔊</button>
+    <button class="btn sm gray only-mobile" style="flex:0 0 46px" onclick="toggleSide(false)">✕</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="chat" class="on">💬 Chat</button>
+    <button data-tab="hist">❓ Preguntas</button>
+    <button data-tab="mesa">👥 Mesa</button>
+    <button data-tab="reglas">🏠 Reglas</button>
+  </div>
+  <div class="tabp on" id="tab-chat">
+    <div class="scroll" id="chatList"></div>
+    <div class="quick">
+      <button onclick="quick('¡Uhh, me la complicaste! 😅')">😅 Difícil</button><button onclick="quick('¡Ya sé quién es! 😏')">😏 Ya sé</button>
+      <button onclick="quick('Dale, preguntá nomás 🕵️')">🕵️ Preguntá</button><button onclick="quick('¡Buena pregunta! 👏')">👏</button><button onclick="quick('Pasame el tereré 🧉')">🧉</button>
+    </div>
+    <div class="chatin" id="chatIn">
+      <div class="atpop" id="atpop"></div>
+      <select id="chatTo" title="Para quién es el mensaje" onchange="chatToChanged()"></select>
+      <input type="text" id="chatText" maxlength="300" placeholder="Escribí… (@nombre = privado)" autocomplete="off">
+      <button class="btn sm" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+  <div class="tabp" id="tab-hist"><div class="scroll" id="histList"></div></div>
+  <div class="tabp" id="tab-mesa"><div class="scroll" id="mesaList"></div></div>
+  <div class="tabp" id="tab-reglas"><div class="scroll" id="reglasList"></div></div>
+</div>
+
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast"></div>
+
+<script src="caricatura.js?v=1"></script>
+<script src="personajes.js?v=1"></script>
+<script src="reglas.js?v=1"></script>
+<script src="juego.js?v=1"></script>
+<script src="tablero.js?v=1"></script>
+<script src="../dueno-link.js"></script>
+<script src="../inicio.js?v=2"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', sonidos:['#btnSnd','.btnMusic'], ocultar:['[onclick="leaveClick()"]'], barra:'.topbar'};</script>
+<script>
+$('#catList').innerHTML = CAT_ORDER.filter(c=>c!=='mio').map(c=>`<div style="--cc:${CATS[c].c}"><b>${CATS[c].e} ${CATS[c].n}</b>${PERSONAJES.filter(p=>p.cat===c).length} personajes</div>`).join('');
+// le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida en un aparato)
+if(window.DuenoLink) DuenoLink.start({game:"adivina",
+  info(){
+    if(!S || (NET.mode!=="host" && NET.mode!=="local")) return null;
+    const local=NET.mode==="local"; if(local && !S.localCode) S.localCode="L"+genCode();
+    return {code: local ? S.localCode : NET.code, local, phase:S.phase, round:S.round, started:S.startedAt||null,
+      host:(P(S.hostPid)||{}).name||"", turn:S.phase==="play" ? (P(S.cur)||{}).name : null, opts:S.opts,
+      players:S.players.map(p=>({n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot})),
+      obs:(S.observers||[]).filter(o=>o.conn).map(o=>({n:o.name, owner:!!o.owner}))};
+  },
+  onIam(tok){ if(NET.mode!=="host") return; S.ownerTok=[...new Set([...(S.ownerTok||[]), tok])].slice(-4); commit(); }
+});
+if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>

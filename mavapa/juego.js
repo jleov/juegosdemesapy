@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   Adivina Quién PY — red (PeerJS), chat con privados, voz, sala de espera,
+   ¿Mávapa? — red (PeerJS), chat con privados, voz, sala de espera,
    tablero en 2D (cartas) y en 3D (fichas que se bajan), personajes propios.
    ===================================================================== */
 const $ = s => document.querySelector(s);
