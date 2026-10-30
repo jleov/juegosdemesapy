@@ -569,7 +569,7 @@ const MUSIC = { on: load('bolos_music')===true, buf:null, src:null, gain:null, l
 function musicLoad(){
   if(MUSIC.buf || MUSIC.loading) return Promise.resolve(); MUSIC.loading=true;
   const c=actx(); if(!c){ MUSIC.loading=false; return Promise.resolve(); }
-  return fetch('../uno/musica.mp3').then(r=>r.arrayBuffer()).then(b=>c.decodeAudioData(b)).then(buf=>{ MUSIC.buf=buf; }).catch(()=>{ MUSIC.loading=false; });
+  return fetch('../petei/musica.mp3').then(r=>r.arrayBuffer()).then(b=>c.decodeAudioData(b)).then(buf=>{ MUSIC.buf=buf; }).catch(()=>{ MUSIC.loading=false; });
 }
 function musicStart(){
   if(!MUSIC.on || MUSIC.src) return;

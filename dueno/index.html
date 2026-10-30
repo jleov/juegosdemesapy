@@ -48,7 +48,7 @@ input[type=password]{width:100%;padding:11px 12px;border:1px solid #c9c2a8;borde
 <body>
 <div class="wrap">
   <h1>👑 Panel del <span>dueño</span></h1>
-  <div class="sub">Todas las salas abiertas de Juegos Paraguay Digitales: Banquero, Lotería, Face Punch y UNO.</div>
+  <div class="sub">Todas las salas abiertas de Juegos Paraguay Digitales: Banquero, Lotería, Face Punch, Peteĩ y los demás.</div>
   <div id="body"></div>
 </div>
 <div id="toast"></div>
@@ -77,7 +77,7 @@ const GAMES = {
   banquero:{n:'Banquero Paraguayo', ico:'../banquero/icon-192.png', phase:{lobby:'⏳ En la sala de espera', play:'🎲 Jugando', over:'🏁 Terminada'}},
   loteria: {n:'Lotería',           ico:'../loteria/icon-192.png',  phase:{lobby:'⏳ En la sala de espera', venta:'🎟️ Vendiendo cartones', juego:'🎱 Cantando', fin:'🏁 Ronda terminada'}},
   kombate: {n:'Face Punch',        ico:'../kombate/icon-192.png',  phase:{}},
-  uno:     {n:'UNO Paraguayo',     ico:'../uno/icon-192.png',      phase:{lobby:'⏳ En la sala de espera', play:'🃏 Jugando', roundEnd:'🏆 Entre manos', over:'🏁 Terminada'}},
+  uno:     {n:'Peteĩ',             ico:'../petei/icon-192.png',      phase:{lobby:'⏳ En la sala de espera', play:'🃏 Jugando', roundEnd:'🏆 Entre manos', over:'🏁 Terminada'}},
   billar:  {n:'Billar PY',         ico:'../billar/icon-192.png',   phase:{lobby:'⏳ En la sala de espera', play:'🎱 Jugando', rackEnd:'🏆 Entre partidas', over:'🏁 Terminada'}},
   bolos:   {n:'Bolos PY',          ico:'../bolos/icon-192.png',    phase:{lobby:'⏳ En la sala de espera', play:'🎳 Jugando', lineEnd:'🏆 Entre líneas', over:'🏁 Terminada'}},
   ajedrez: {n:'Ajedrez y Damas PY', ico:'../ajedrez/icon-192.png',  phase:{lobby:'⏳ En la sala de espera', play:'♟️ Jugando', gameEnd:'🏆 Entre partidas', over:'🏁 Terminada'}},
@@ -144,7 +144,7 @@ function tokenOf(key){ let t=load(key); if(!t){ t=Math.random().toString(36).sli
 function enter(k){
   const r=A.rooms[k]; if(!r || !r.conn.open) return toast('Esa sala ya no responde.');
   const tok = r.game==='uno' ? tokenOf('uno_token') : r.game==='billar' ? tokenOf('billar_token') : r.game==='bolos' ? tokenOf('bolos_token') : r.game==='adivina' ? tokenOf('adivina_token') : r.game==='ajedrez' ? tokenOf('ajedrez_token') : tokenOf('bnq_token');
-  const url = r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='adivina' || r.game==='ajedrez' ? `../${r.game}/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
+  const url = r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='adivina' || r.game==='ajedrez' ? `../${r.game==='uno'?'petei':r.game}/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
   const tab = window.open('about:blank', '_blank');
   A.pending[k]={url, tab};
   try{ r.conn.send({t:'iam', token:tok}); }catch(e){}

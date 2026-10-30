@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   UNO Paraguayo — red (PeerJS), chat con privados, voz, mesa 2D/3D,
+   Peteĩ — red (PeerJS), chat con privados, voz, mesa 2D/3D,
    la mano del jugador, animaciones y sonidos.
    ===================================================================== */
 const $ = s => document.querySelector(s);
@@ -590,7 +590,7 @@ function cardHTML(c, cls, style){
     + `<span class="ico">${vi.ico}</span><span class="ref">${esc(vi.ref)}</span></div></div>`;
 }
 function backHTML(cls, style){
-  return `<div class="card back ${cls||''}"${style?` style="${style}"`:''}><div class="in"><span class="py">PARAGUAY</span><div class="oval"></div><div class="big">UNO</div><span class="flag"></span></div></div>`;
+  return `<div class="card back ${cls||''}"${style?` style="${style}"`:''}><div class="in"><span class="py">PARAGUAY</span><div class="oval"></div><div class="big">PETEĨ</div><span class="flag"></span></div></div>`;
 }
 const hashRot = id => ((id*37)%28)-14;
 const hashOff = id => [((id*13)%9)-4, ((id*7)%7)-3];
@@ -627,7 +627,7 @@ function renderLobby(){
   $('#optsBox').innerHTML = optsHTML(host);
   const g=$('#grulesBox');
   if(host){
-    if(!g.querySelector('textarea')) g.innerHTML=`<textarea id="grulesIn" maxlength="1200" placeholder="Ej.: el que se olvida de cantar UNO paga el tereré 🧉&#10;No vale tirar +4 al que tiene 1 carta…"></textarea><p class="muted" style="margin:4px 0 0">Se guarda solo y lo ven todos.</p>`;
+    if(!g.querySelector('textarea')) g.innerHTML=`<textarea id="grulesIn" maxlength="1200" placeholder="Ej.: el que se olvida de cantar Peteĩ paga el tereré 🧉&#10;No vale tirar +4 al que tiene 1 carta…"></textarea><p class="muted" style="margin:4px 0 0">Se guarda solo y lo ven todos.</p>`;
     const ta=$('#grulesIn'); if(document.activeElement!==ta) ta.value=V.grules||'';
     ta.oninput=()=>{ clearTimeout(ta.t); ta.t=setTimeout(()=>doAct({type:'grules', text:ta.value}), 600); };
   } else g.innerHTML = V.grules ? `<div class="grules">${esc(V.grules)}</div>` : `<p class="muted">El anfitrión todavía no escribió reglas propias.</p>`;
@@ -686,7 +686,7 @@ function renderSeats(){
     h+=`<div class="seat ${p.id===curId&&V.phase==='play'?'turn':''} ${offline?'off':''} ${isMe?'me':''}" data-pid="${p.id}" style="left:${x}%;top:${y}%">
       ${isMe?'':`<div class="fan" style="--rot:${ang-90}deg;--rot3:${rot3(ang-90)}deg">${fan}</div>`}
       ${isMe?"":headHTML(p)}<div class="tag" style="--pc:${p.color}"><span class="av">${esc(p.emoji)}</span><span><b>${esc(p.name)}${isMe?' (vos)':''}</b><small>🂠 ${cnt}${V.opts.target?` · ${p.score} pts`:''}${p.bot?' · 🤖':''}${p.mic?' · 🎙️':''}${offline?' · ⚠️ sin conexión':''}${p.id===V.hostPid&&NET.mode!=='local'?' · 👑':''}</small></span>
-      ${cnt===1&&V.phase==='play'?'<span class="unob">¡UNO!</span>':''}</div>${bub}</div>`;
+      ${cnt===1&&V.phase==='play'?'<span class="unob">¡Peteĩ!</span>':''}</div>${bub}</div>`;
   });
   $('#seats').innerHTML=h;
   headsAfterRender();
@@ -807,14 +807,14 @@ function renderActions(){
       s = V.pending4 ? `👹 ${esc(VP(V.pending4.victim).name)} decide si acepta el +4 o reta…` : V.pickColor ? `🕸️ ${esc(VP(V.pickColor.pid).name)} elige el color de salida…` : `⏳ Turno de <b>${esc(cp.emoji)} ${esc(cp.name)}</b>${cp.bot?' 🤖':''} · color ${col}`;
     }
     const n=(p.hand||[]).length, mustUno=!!(V.unoWatch && V.unoWatch.pid===me());
-    if(mustUno){ h+=`<button class="btn uno hot" onclick="doAct({type:'uno'})">📣 ¡UNO!</button>`; s=`📣 <b>¡Te queda una carta!</b> Tocá ¡UNO! rápido, antes que otro te lo cante (si no, robás 1).`; }
-    else if(n===1) h+=`<button class="btn uno" disabled>✅ UNO</button>`;
+    if(mustUno){ h+=`<button class="btn uno hot" onclick="doAct({type:'uno'})">📣 ¡Peteĩ!</button>`; s=`📣 <b>¡Te queda una carta!</b> Tocá ¡Peteĩ! rápido, antes que otro te lo cante (si no, robás 1).`; }
+    else if(n===1) h+=`<button class="btn uno" disabled>✅ Peteĩ</button>`;
   } else {
     s = `👀 Turno de <b>${esc(cp.emoji)} ${esc(cp.name)}</b> · color ${col}`;
   }
   if(V.unoWatch && V.unoWatch.pid!==me() && p){
     const w=VP(V.unoWatch.pid);
-    h+=`<button class="btn catch" onclick="doAct({type:'catch'})">📣 ¡UNO! a ${esc(w?w.name:'')}</button>`;
+    h+=`<button class="btn catch" onclick="doAct({type:'catch'})">📣 ¡Peteĩ! a ${esc(w?w.name:'')}</button>`;
   }
   A.innerHTML=h; st.innerHTML=s;
 }
@@ -872,9 +872,9 @@ function processEvents(before){
       targets.slice(k).forEach(t=>{ t.style.visibility='hidden'; setTimeout(()=>t.style.visibility='', delay+k*90+450); });
       setTimeout(()=>sfx.draw(e.n), delay); delay+=k*90+120;
     } else if(e.k==='uno'){
-      const p=VP(e.pid); setTimeout(()=>{ bigText('¡UNO!', p?p.name+' · ¡Peteĩ!':''); sfx.uno(); say('¡Uno!'); }, delay);
+      const p=VP(e.pid); setTimeout(()=>{ bigText('¡Peteĩ!', p?p.name+' · ¡le queda una!':''); sfx.uno(); say('¡Peteí!'); }, delay);
     } else if(e.k==='catch'){
-      const p=VP(e.pid), by=VP(e.by); setTimeout(()=>{ bigText('📣 ¡Te canté UNO!', `${by?by.name:''} → ${p?p.name:''} roba 1`); sfx.catch(); }, delay);
+      const p=VP(e.pid), by=VP(e.by); setTimeout(()=>{ bigText('📣 ¡Te canté Peteĩ!', `${by?by.name:''} → ${p?p.name:''} roba 1`); sfx.catch(); }, delay);
     } else if(e.k==='challenge'){
       setTimeout(()=>{ bigText(e.ok?'🕵️ ¡Era trampa!':'🕵️ Era legal', e.ok?'El del +4 roba 4':'El que retó roba 6'); sfx.catch(); }, delay);
     } else if(e.k==='jump'){ const p=VP(e.pid); setTimeout(()=>{ bigText('⚡ ¡Cortó!', p?p.name:''); }, delay); }
@@ -959,7 +959,7 @@ function renderReglasTab(){
   const host=amHost(), localEdit = NET.mode==='local';
   $('#reglasList').innerHTML = `<p style="margin-top:0"><b>${(TARGETS.find(t=>t.v==o.target)||{}).t||''}</b></p>`
     + (localEdit ? `<p class="muted">Lo que cambies acá vale para la próxima partida de práctica.</p>`+HOUSE.map(h=>`<label class="opt" style="font-weight:400"><input type="checkbox" ${(load('uno_localopts')||defaultOpts())[h.k]?'checked':''} onchange="setLocalOpt('${h.k}',this.checked)"><span><b>${h.t}</b><small>${h.d}</small></span></label>`).join('')
-      : `<b>Reglas de la casa activas</b>` + (on.length ? on.map(h=>`<div class="opt"><span><b>${h.t}</b><small>${h.d}</small></span></div>`).join('') : '<p class="muted">Ninguna: UNO oficial puro.</p>'))
+      : `<b>Reglas de la casa activas</b>` + (on.length ? on.map(h=>`<div class="opt"><span><b>${h.t}</b><small>${h.d}</small></span></div>`).join('') : '<p class="muted">Ninguna: reglas clásicas puras.</p>'))
     + `<b>📝 Reglas propias del grupo</b>` + (V.grules?`<div class="grules" style="margin:6px 0 10px">${esc(V.grules)}</div>`:`<p class="muted">${host&&!localEdit?'Las podés escribir en la sala de espera.':'No hay.'}</p>`)
     + `<b>💡 Sugerencias</b><div style="margin-top:6px">${sugsHTML(host)}</div>
        <div class="row"><input type="text" id="sugIn2" maxlength="240" placeholder="Proponé una regla…" onkeydown="if(event.key==='Enter')sendSug('sugIn2')"><button class="btn sm" style="flex:0 0 auto" onclick="sendSug('sugIn2')">Sugerir</button></div>
@@ -971,8 +971,8 @@ function setLocalOpt(k, v){ const o=Object.assign(defaultOpts(), load('uno_local
 function roomLink(){ return location.origin+location.pathname+'#'+NET.code; }
 function copyCode(){ navigator.clipboard && navigator.clipboard.writeText(NET.code).then(()=>toast('Código copiado: '+NET.code)); }
 function shareRoom(){
-  const url=roomLink(), text=`¡Vení a jugar UNO Paraguayo conmigo! 🃏🇵🇾 Sala ${NET.code}`;
-  if(navigator.share) return navigator.share({title:'UNO Paraguayo', text, url}).catch(()=>{});
+  const url=roomLink(), text=`¡Vení a jugar Peteĩ conmigo! 🃏🇵🇾 Sala ${NET.code}`;
+  if(navigator.share) return navigator.share({title:'Peteĩ', text, url}).catch(()=>{});
   modal(`<h2>📤 Invitar a la sala ${NET.code}</h2><p style="word-break:break-all;user-select:all;background:#fff;padding:8px;border-radius:8px">${esc(url)}</p>
     <a class="btn green wide" style="display:block;text-align:center;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(text+' '+url)}">💬 Mandar por WhatsApp</a>
     <button class="btn wide" style="margin-top:6px" onclick="navigator.clipboard.writeText('${url}').then(()=>toast('Enlace copiado'))">📋 Copiar enlace</button>
@@ -1016,8 +1016,8 @@ window.addEventListener('resize', ()=>{ if(V && V.phase!=='lobby') renderHand();
 /* ====================== REGLAS ====================== */
 function showRules(){
   const ex=(v,c)=>cardHTML({id:900+Math.random()*99|0, c:c||'r', v});
-  modal(`<div class="rules"><h2>📜 Reglas del UNO Paraguayo</h2>
-  <p>Son las <b>reglas oficiales del UNO</b>, con cartas que tienen cosas nuestras. Juegan de <b>2 a 10 personas</b>. Gana la mano el primero que se queda sin cartas.</p>
+  modal(`<div class="rules"><h2>📜 Reglas del Peteĩ</h2>
+  <p>Son las <b>reglas clásicas</b> de este juego de cartas de colores, con cartas que tienen cosas nuestras. <b>Peteĩ</b> quiere decir “uno” en guaraní. Juegan de <b>2 a 10 personas</b>. Gana la mano el primero que se queda sin cartas.</p>
   <h3>🃏 Las cartas (108)</h3>
   <p>Cuatro colores: 🟥 rojo y 🟦 azul de la bandera, 🟩 verde yerba mate y 🟨 amarillo lapacho. Cada número tiene su dibujo:</p>
   <div class="cardrow">${['0','1','2','3','4','5','6','7','8','9'].map((v,i)=>ex(v,COLORS[i%4])).join('')}</div>
@@ -1037,8 +1037,8 @@ function showRules(){
     <li>Si no tenés (o no querés), <b>robás una</b>. Si esa sirve, la podés tirar enseguida; si no, pasa el turno.</li>
     <li>Si se acaba el mazo, se mezclan las tiradas (menos la de arriba).</li>
   </ul>
-  <h3>📣 ¡UNO!</h3>
-  <p>Cuando te queda <b>una sola carta</b> tenés que cantar <b>¡UNO!</b> (tocá el botón amarillo). Si otro jugador te canta el UNO antes que vos (con el botón “📣 ¡UNO! a …”), <b>robás 1 carta del mazo</b>. Hay tiempo hasta que juegue el siguiente.</p>
+  <h3>📣 ¡Peteĩ!</h3>
+  <p>Cuando te queda <b>una sola carta</b> tenés que cantar <b>¡Peteĩ!</b> (tocá el botón amarillo). Si otro jugador te canta el Peteĩ antes que vos (con el botón “📣 ¡Peteĩ! a …”), <b>robás 1 carta del mazo</b>. Hay tiempo hasta que juegue el siguiente.</p>
   <h3>🕵️ Retar el +4</h3>
   <p>El que recibe un +4 puede retar. Si el que lo tiró tenía una carta del color de la mesa, roba 4 él (y el que retó ve sus cartas). Si era legal, el que retó roba 6.</p>
   <h3>🏆 Puntos</h3>

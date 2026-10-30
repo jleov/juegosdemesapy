@@ -1,7 +1,7 @@
 {
-  "name": "UNO Paraguayo",
-  "short_name": "UNO PY",
-  "description": "UNO con toque paraguayo para jugar en línea con amigos: hasta 10 jugadores, chat, voz y bots.",
+  "name": "Peteĩ",
+  "short_name": "Peteĩ",
+  "description": "Juego de cartas con toque paraguayo para jugar en línea con amigos: hasta 10 jugadores, chat, voz y bots.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

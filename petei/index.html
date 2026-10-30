@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- SEO (buscadores y vista previa al compartir) -->
+<title>Peteĩ: juego de cartas paraguayo online gratis, hasta 10 jugadores | Juegos PY</title>
+<meta name="description" content="El clásico juego de cartas de colores con toque paraguayo (chipa, tereré, el Pombero +4) para jugar en línea gratis con amigos: hasta 10 jugadores, chat, voz, bots y mesa 3D.">
+<link rel="canonical" href="https://juegospy.com/petei/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Juegos Paraguay Digitales">
+<meta property="og:title" content="Peteĩ: juego de cartas paraguayo online gratis, hasta 10 jugadores | Juegos PY">
+<meta property="og:description" content="El clásico juego de cartas de colores con toque paraguayo (chipa, tereré, el Pombero +4) para jugar en línea gratis con amigos: hasta 10 jugadores, chat, voz, bots y mesa 3D.">
+<meta property="og:url" content="https://juegospy.com/petei/">
+<meta property="og:image" content="https://juegospy.com/petei/icon-512.png">
+<meta property="og:locale" content="es_PY">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Peteĩ", "url": "https://juegospy.com/petei/", "description": "El clásico juego de cartas de colores con toque paraguayo (chipa, tereré, el Pombero +4) para jugar en línea gratis con amigos: hasta 10 jugadores, chat, voz, bots y mesa 3D.", "image": "https://juegospy.com/petei/icon-512.png", "inLanguage": "es", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "jleovgames", "url": "https://juegospy.com/"}, "isPartOf": {"@type": "WebSite", "name": "Juegos Paraguay Digitales", "url": "https://juegospy.com/"}, "genre": ["Juego de cartas"], "gamePlatform": ["Navegador web", "Android", "PC"], "playMode": "MultiPlayer", "applicationCategory": "Game", "operatingSystem": "Cualquiera (navegador)"}</script>
+<!-- /SEO -->
+<meta name="theme-color" content="#3a1c10">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!-- librería de conexión entre jugadores (PeerJS 1.5.4), guardada junto al juego para no depender de otro sitio -->
+<script src="peerjs.min.js"></script>
+<script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="../ice.js"></script>
+<style>
+:root{--cream:#fbf4e4;--ink:#1d1d1d;--muted:#6b6b6b;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f;
+  --cr:#d52b1e;--cy:#f2b705;--cg:#1f9e4a;--cb:#0038a8;--felt:#0e5c3a;--wood:#5a2e17}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(circle at 30% 15%,#6b3a1f,#2a140a 75%) fixed;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+.screen{display:none}.screen.on{display:block}
+input,button,select,textarea{font:inherit}
+input[type=text],select,textarea{width:100%;padding:10px 12px;border:1px solid #cbbf9f;border-radius:10px;background:#fff;color:var(--ink)}
+textarea{resize:vertical;min-height:70px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff;touch-action:manipulation}
+.btn.red{background:var(--red)}.btn.gray{background:#7a7a7a}.btn.gold{background:var(--gold);color:#222}.btn.green{background:var(--green)}.btn.dark{background:#3a2a22}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.wide{width:100%}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.muted{color:var(--muted);font-size:13px}
+.box{background:var(--cream);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:14px}
+.box h3{margin:0 0 10px;font-size:17px}
+.box label{display:block;font-size:13px;font-weight:800;margin:10px 0 4px}
+/* ---------- menú ---------- */
+.menu{max-width:470px;margin:0 auto;padding:18px 16px 40px}
+.back{display:inline-block;color:#f6dcb8;text-decoration:none;font-size:14px;margin-bottom:6px}
+.logo{text-align:center;color:#fff;margin:6px 0 18px}
+.logo .cards{display:flex;justify-content:center;gap:0;margin-bottom:8px;height:96px}
+.logo .cards .card{--w:58px;margin:0 -8px}
+.logo h1{margin:0;font-size:46px;letter-spacing:3px;font-weight:900;text-shadow:0 3px 0 #000;line-height:1}
+.logo h1 span{color:var(--gold);font-size:.55em;letter-spacing:2px;display:block}
+.bandera{display:inline-block;margin-top:8px;border-radius:5px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.45);line-height:1}
+.bandera i{display:block;height:7px}.bandera i.rojo{background:#d52b1e}.bandera i.azul{background:#0038a8}
+.bandera b{display:block;background:#fff;color:#1b2a5a;font-weight:900;letter-spacing:5px;font-size:14px;padding:5px 11px 5px 16px}
+.tokens{display:flex;flex-wrap:wrap;gap:6px}
+.tok{font-size:24px;width:46px;height:46px;border-radius:50%;border:3px solid transparent;background:#fff;cursor:pointer;padding:0}
+.tok.sel{border-color:var(--red);transform:scale(1.08)}
+.tok.taken{opacity:.3;cursor:not-allowed}
+.code{font-size:38px;font-weight:900;letter-spacing:6px;text-align:center;color:var(--blue);margin:4px 0}
+/* ---------- sala de espera ---------- */
+.lobbywrap{max-width:1100px;margin:0 auto;padding:56px 12px 30px;display:flex;gap:14px;align-items:flex-start}
+.lobbywrap>.lmain{flex:1;min-width:0}
+#lobbySide{width:360px;flex:none;position:sticky;top:10px}
+@media (max-width:860px){.lobbywrap{flex-direction:column}#lobbySide{width:100%;position:static}}
+.plist{list-style:none;padding:0;margin:8px 0}
+.plist li{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#fff;margin-bottom:6px}
+.plist li .nm{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
+body>.side{display:none}
+html,body{overflow-x:clip}
+.box label.opt,.opt{display:flex;gap:10px;align-items:flex-start;background:#fff;border-radius:10px;padding:9px 10px;margin-bottom:6px}
+.opt input{margin-top:3px;width:20px;height:20px;flex:none}
+.opt b{display:block;font-size:14px}.opt small{color:#555;font-size:12.5px;line-height:1.35}
+.sug{display:flex;gap:8px;align-items:flex-start;background:#fff;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:14px}
+.sug .t{flex:1}.sug .t small{display:block;color:#777;font-size:12px}
+.vote{border:1px solid #ccc;background:#f4f4f4;border-radius:20px;padding:4px 9px;cursor:pointer;font-weight:800;white-space:nowrap}
+.vote.on{background:#ffe8a3;border-color:#e2b23c}
+.grules{white-space:pre-wrap;background:#fff;border-radius:10px;padding:10px;font-size:14px;border-left:4px solid var(--gold)}
+
+/* ======================= CARTAS ======================= */
+.card{--w:74px;--cc:#333;width:var(--w);height:calc(var(--w) * 1.5);border-radius:calc(var(--w) * .12);background:#fff;position:relative;flex:none;
+  box-shadow:0 2px 5px rgba(0,0,0,.45);user-select:none;-webkit-user-select:none;font-family:"Arial Black","Segoe UI",system-ui,sans-serif}
+.card .in{position:absolute;inset:calc(var(--w) * .055);border-radius:calc(var(--w) * .085);background:var(--cc);overflow:hidden}
+.card.c-r{--cc:var(--cr)}.card.c-y{--cc:var(--cy)}.card.c-g{--cc:var(--cg)}.card.c-b{--cc:var(--cb)}.card.c-w{--cc:#111}
+/* centro de la carta: un medallón redondo con borde de ñandutí (diseño propio) */
+.card .oval{position:absolute;left:50%;top:50%;width:82%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,#fff 0 60%,transparent 61%),repeating-conic-gradient(#fff 0 5deg,rgba(255,255,255,.4) 5deg 10deg);box-shadow:0 0 0 calc(var(--w) * .014) #fff}
+.card .big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:calc(var(--w) * .56);color:var(--cc);
+  -webkit-text-stroke:calc(var(--w) * .012) #000;text-shadow:calc(var(--w) * .025) calc(var(--w) * .025) 0 #000;letter-spacing:-.04em;line-height:1}
+.card .big.sym{font-size:calc(var(--w) * .5)}
+.card .big.plus{font-size:calc(var(--w) * .4)}
+.card .cor{position:absolute;color:#fff;font-weight:900;font-size:calc(var(--w) * .2);line-height:1;-webkit-text-stroke:calc(var(--w) * .006) #000;text-shadow:1px 1px 0 #000}
+.card .tl{top:5%;left:8%}.card .br{bottom:5%;right:8%;transform:rotate(180deg)}
+.card .ico{position:absolute;top:4%;right:7%;font-size:calc(var(--w) * .17);line-height:1;filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
+.card .ref{position:absolute;bottom:4.5%;left:6%;right:26%;font-family:system-ui,sans-serif;font-size:calc(var(--w) * .095);font-weight:800;color:#fff;line-height:1.05;text-shadow:0 1px 1px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card.mini .ref,.card.mini .ico{display:none}
+.card.v-6 .big,.card.v-9 .big,.card.v-6 .cor,.card.v-9 .cor{text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.06em}
+#gameSide{display:flex;min-height:0}
+@media (min-width:1000px){.only-mobile{display:none}}
+#lobbySide .only-mobile{display:none}
+/* comodín: un ñandutí de los cuatro colores */
+.card .nandu{position:absolute;left:50%;top:50%;width:86%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,#fff 0 7%,transparent 8% 21%,rgba(255,255,255,.85) 22% 24%,transparent 25% 41%,rgba(255,255,255,.85) 42% 44%,transparent 45% 62%,rgba(255,255,255,.9) 63% 66%,transparent 67%),
+    repeating-conic-gradient(rgba(255,255,255,.75) 0 1.6deg,transparent 1.6deg 15deg),
+    conic-gradient(var(--cr) 0 25%,var(--cy) 0 50%,var(--cg) 0 75%,var(--cb) 0);box-shadow:0 0 0 calc(var(--w) * .02) #fff}
+.card.c-w .big{color:#fff}
+.card.c-w.v-d4 .big{-webkit-text-stroke:calc(var(--w) * .016) #000}
+/* dorso: la bandera con un ñandutí y PETEĨ */
+.card.back .in{background:linear-gradient(160deg,#d52b1e 0 33%,#f4f4f4 33% 67%,#0038a8 67%)}
+.card.back .oval{width:80%;background:radial-gradient(circle,#fff 0 56%,transparent 57%),repeating-conic-gradient(#1b2a5a 0 2deg,#fff 2deg 10deg);box-shadow:0 0 0 calc(var(--w) * .02) #1b2a5a}
+.card.back .big{color:#c8231a;font-size:calc(var(--w) * .17);-webkit-text-stroke:0;text-shadow:none;letter-spacing:.02em}
+.card.back .flag{display:none}
+.card.back .py{position:absolute;top:6%;left:0;right:0;text-align:center;color:#fff;font:800 calc(var(--w) * .08)/1 system-ui,sans-serif;letter-spacing:.2em}
+.card.mini.back .py,.card.mini.back .flag{display:none}
+
+/* ======================= JUEGO ======================= */
+#game.on{display:flex}
+#game{height:100vh;height:100dvh;flex-direction:column;overflow:hidden}
+.topbar{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px 6px 56px;color:#fff;background:rgba(0,0,0,.4);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.topbar::-webkit-scrollbar{display:none}
+.topbar .ttl{font-weight:900;letter-spacing:1px;white-space:nowrap}
+.topbar .ttl small{font-weight:600;color:#f6d79a;letter-spacing:2px;margin-left:4px}
+.topbar .sp{flex:1}
+.topbar .btn{white-space:nowrap}
+.badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:3px}
+.gmain{flex:1;display:flex;min-height:0}
+.area{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.stage{flex:1;position:relative;min-height:0;overflow:hidden;touch-action:none}
+.mesa{--tilt:52deg;--spin:0deg;--zoom:.86;position:absolute;inset:7% 5% 6%;border-radius:50%;
+  background:radial-gradient(ellipse at 50% 45%,#177a4e,var(--felt) 60%,#073b24);
+  box-shadow:0 0 0 12px #6b3a1d,0 0 0 15px #3b1d0d,0 18px 40px rgba(0,0,0,.6),inset 0 0 60px rgba(0,0,0,.45)}
+/* ñandutí grande dibujado en el paño */
+.mesa::before{content:"";position:absolute;left:50%;top:50%;width:min(56%,56vh);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;opacity:.13;pointer-events:none;
+  background:radial-gradient(circle,transparent 0 18%,#fff 18.5% 19.5%,transparent 20% 38%,#fff 38.5% 39.5%,transparent 40% 60%,#fff 60.5% 61.5%,transparent 62% 69%,#fff 69.5% 70.5%,transparent 71%),repeating-conic-gradient(#fff 0 .8deg,transparent .8deg 10deg)}
+.mesa .marca{position:absolute;left:50%;bottom:9%;transform:translateX(-50%);color:rgba(255,255,255,.18);font-weight:900;letter-spacing:4px;font-size:clamp(11px,1.6vw,16px);white-space:nowrap;pointer-events:none}
+.centro{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;gap:clamp(12px,3vw,30px);align-items:center;--w:clamp(52px,8.5vmin,86px)}
+.pila{position:relative;cursor:pointer}
+.pila .card{--w:inherit}
+.pila .stack{box-shadow:1px 1px 0 #222,2px 2px 0 #444,3px 3px 0 #222,4px 4px 0 #444,5px 5px 0 #222,6px 7px 8px rgba(0,0,0,.5)}
+.pila .n{position:absolute;left:50%;top:-20px;transform:translateX(-50%);color:#fff;font-size:12px;font-weight:700;white-space:nowrap;text-shadow:0 1px 2px #000}
+.pila.can .stack{animation:latido 1.1s infinite}
+@keyframes latido{50%{box-shadow:1px 1px 0 #222,2px 2px 0 #444,3px 3px 0 #222,0 0 0 4px var(--gold),0 0 22px var(--gold)}}
+.descarte{position:relative;width:var(--w);height:calc(var(--w) * 1.5)}
+.descarte .card{position:absolute;left:0;top:0;--w:inherit}
+.descarte .glow{position:absolute;inset:-12px;border-radius:16px;box-shadow:0 0 0 5px var(--col,#fff),0 0 26px 6px var(--col,#fff);opacity:.9;transition:box-shadow .3s}
+.colchip{position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);white-space:nowrap;color:#fff;font-size:12px;font-weight:800;background:rgba(0,0,0,.45);padding:2px 8px;border-radius:10px}
+.colchip i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px;background:var(--col)}
+.pend{position:absolute;right:-14px;top:-14px;background:var(--red);color:#fff;font-weight:900;border-radius:20px;padding:3px 9px;box-shadow:0 2px 6px rgba(0,0,0,.5);z-index:5}
+.dirring{position:absolute;left:50%;top:50%;width:min(44%,44vh);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:3px dashed rgba(255,255,255,.22);pointer-events:none;animation:gira 14s linear infinite}
+.dirring.rev{animation-direction:reverse}
+.dirring::before,.dirring::after{content:"➤";position:absolute;color:rgba(255,236,170,.75);font-size:22px;line-height:1}
+.dirring::before{top:-13px;left:50%;transform:translateX(-50%) rotate(0deg)}
+.dirring::after{bottom:-13px;left:50%;transform:translateX(-50%) rotate(180deg)}
+.dirring.rev::before{transform:translateX(-50%) rotate(180deg)}.dirring.rev::after{transform:translateX(-50%) rotate(0deg)}
+@keyframes gira{to{transform:translate(-50%,-50%) rotate(360deg)}}
+/* asientos alrededor de la mesa */
+.seat{position:absolute;width:0;height:0}
+.seat .fan{position:absolute;left:0;top:0;width:0;height:0;transform:rotate(var(--rot)) translateY(calc(var(--sw) * -.55));--sw:clamp(22px,4vmin,40px)}
+.seat .fan .card{--w:var(--sw);position:absolute;bottom:0;transform-origin:50% 135%}
+.seat .tag{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;background:rgba(20,10,5,.82);color:#fff;border-radius:22px;padding:3px 10px 3px 3px;
+  box-shadow:0 0 0 2px var(--pc),0 3px 10px rgba(0,0,0,.5);white-space:nowrap;font-size:12.5px;transition:box-shadow .25s,transform .25s;z-index:3}
+.seat .tag .av{width:30px;height:30px;border-radius:50%;background:var(--pc);display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+.seat .tag b{display:block;max-width:96px;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.seat .tag small{color:#f3d9a7;font-size:11px}
+.seat.turn .tag{box-shadow:0 0 0 3px var(--gold),0 0 22px 4px var(--gold);animation:pulso 1.2s infinite}
+@keyframes pulso{50%{box-shadow:0 0 0 3px #fff,0 0 30px 8px var(--gold)}}
+.seat .tag .unob{position:absolute;top:-18px;right:-8px;background:var(--red);color:#fff;font-weight:900;border-radius:10px;padding:1px 7px;font-size:11px;box-shadow:0 0 0 2px #fff;animation:salta .6s infinite alternate}
+@keyframes salta{to{transform:translateY(-3px)}}
+.seat.off .tag{opacity:.6}
+.seat .bub{position:absolute;left:0;top:0;transform:translate(-50%,calc(-100% - 22px));background:#fff;color:#111;border-radius:12px;padding:5px 9px;font-size:13px;font-weight:700;max-width:180px;white-space:normal;box-shadow:0 3px 10px rgba(0,0,0,.45);z-index:6;animation:bubin .25s}
+@keyframes bubin{from{transform:translate(-50%,calc(-100% - 10px)) scale(.6);opacity:0}}
+/* ---------- vista 3D ---------- */
+.v3d .stage{perspective:820px;perspective-origin:50% 0%}
+.v3d .mesa{transform-style:preserve-3d;transform:translateY(3%) rotateX(var(--tilt)) rotateZ(var(--spin)) scale(var(--zoom));transition:transform .5s}
+.v3d .mesa.dragging{transition:none}
+.v3d #seats{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
+.v3d #seats .seat{pointer-events:auto}
+.v3d .seat,.v3d .centro,.v3d .descarte,.v3d .pila{transform-style:preserve-3d}
+/* en 3D cada uno sostiene sus cartas parado, como en una ronda de verdad: el abanico se abre hacia arriba, con el dorso hacia el centro de la mesa */
+.v3d .seat .fan{--sw:clamp(30px,5.6vmin,54px);transform-style:preserve-3d;transform:rotate(var(--rot)) translateY(calc(var(--sw) * -.35)) rotate(calc(var(--rot3) - var(--rot))) rotateX(-100deg) rotateY(180deg)}
+.v3d .seat .tag{transform:translate(-50%,-50%) translateZ(calc(clamp(30px,5.6vmin,54px) * 1.9)) rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1))}
+.v3d .seat .bub{transform:translate(-50%,-50%) translateZ(calc(clamp(30px,5.6vmin,54px) * 4.2)) rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1)) translateY(-40px)}
+.v3d .pila .layers{position:absolute;inset:0}
+.v3d .pila .layers i{position:absolute;inset:0;border-radius:calc(var(--w) * .12);background:#1b1b1b;border:1px solid #444}
+.v3d .colchip,.v3d .pila .n{transform:translateX(-50%) rotateX(calc(var(--tilt) * -1));transform-origin:50% 0}
+.v3d .dirring{transform:translate(-50%,-50%) translateZ(1px)}
+.cam3d{position:absolute;right:8px;top:8px;display:none;flex-direction:column;gap:4px;z-index:8}
+.v3d .cam3d{display:flex}
+.cam3d button{width:38px;height:38px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:17px;cursor:pointer}
+/* ---------- barra de la mano ---------- */
+.handbar{flex:none;position:relative;padding:0 6px 6px;background:linear-gradient(transparent,rgba(0,0,0,.35) 30%)}
+.status{color:#fff;text-align:center;font-weight:700;font-size:14px;min-height:22px;padding:4px 8px;text-shadow:0 1px 2px #000}
+.status b{color:var(--gold)}
+.actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:2px 0 4px}
+.actions .btn{padding:8px 12px;font-size:14px}
+.btn.uno{background:linear-gradient(#ffd54a,#e6a400);color:#5a0b00;font-size:16px;letter-spacing:1px;box-shadow:0 0 0 2px #fff,0 3px 10px rgba(0,0,0,.5)}
+.btn.uno.hot{animation:unohot .7s infinite alternate}
+@keyframes unohot{to{transform:scale(1.08);box-shadow:0 0 0 3px #fff,0 0 22px #ffd54a}}
+.btn.catch{background:#ff3d00}
+.hand{--hw:clamp(62px,11vmin,104px);position:relative;height:calc(var(--hw) * 1.5 + 38px);margin:0 auto;max-width:1100px;overflow:visible}
+.hand .card{--w:var(--hw);position:absolute;bottom:14px;transform-origin:50% 160%;transition:transform .18s,filter .2s,box-shadow .2s;cursor:pointer}
+.hand .card.ok{box-shadow:0 0 0 3px var(--gold),0 4px 12px rgba(0,0,0,.5)}
+.hand .card.no{filter:brightness(.62) saturate(.7)}
+.hand .card.ok:hover,.hand .card.ok.focus{z-index:50!important}
+.hand.v3dh{perspective:700px}
+.v3d .hand .card{transform-origin:50% 160%}
+.hand .empty{color:#fff;text-align:center;padding-top:40px;opacity:.7}
+.hhead{display:flex;align-items:center;gap:6px;padding:0 4px}.hhead .actions{flex:1}#mineTag{flex:0 0 auto}
+@media (max-width:600px){.hhead{flex-wrap:wrap}.hhead .actions{order:3;flex-basis:100%}#btnSort{margin-left:auto}}
+.mine{display:flex;align-items:center;gap:6px;color:#fff;font-size:13px;background:rgba(20,10,5,.8);border-radius:20px;padding:3px 10px 3px 3px;box-shadow:0 0 0 2px var(--pc)}
+.mine .av{width:28px;height:28px;border-radius:50%;background:var(--pc);display:flex;align-items:center;justify-content:center;font-size:17px}
+.mine.turn{box-shadow:0 0 0 3px var(--gold),0 0 18px var(--gold)}
+/* ---------- panel lateral ---------- */
+.side{width:350px;flex:none;display:flex;flex-direction:column;background:var(--cream);min-height:0;box-shadow:-4px 0 18px rgba(0,0,0,.35)}
+#lobbySide .side{width:100%;height:min(640px,80vh);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);overflow:hidden}
+@media (max-width:999px){
+  #game .side{position:fixed;right:0;top:0;bottom:0;width:min(380px,94vw);transform:translateX(105%);transition:transform .25s;z-index:60}
+  #game .side.open{transform:none}
+}
+.voice{display:flex;gap:6px;padding:8px;border-bottom:1px solid #e3d8bd}
+.voice .btn{flex:1}.voice .btn.on{background:#d52b1e;animation:pulso2 1.4s infinite}
+@keyframes pulso2{50%{opacity:.75}}
+.tabs{display:flex;border-bottom:1px solid #e3d8bd}
+.tabs button{flex:1;border:0;background:none;padding:9px 2px;font-weight:800;font-size:13px;cursor:pointer;color:#7b6a4c;border-bottom:3px solid transparent}
+.tabs button.on{color:#1d1d1d;border-bottom-color:var(--red)}
+.tabp{display:none;flex:1;min-height:0;flex-direction:column}
+.tabp.on{display:flex}
+.scroll{flex:1;overflow-y:auto;padding:8px 10px;min-height:0}
+.msg{margin:0 0 6px;font-size:14px;line-height:1.35;word-wrap:break-word}
+.msg .who{font-weight:800}
+.msg.sys{color:#7b6a4c;font-size:12.5px;font-style:italic}
+.msg.priv{background:#2b1d3f;color:#fff;border-radius:10px;padding:6px 9px}
+.msg.priv .who{color:#ffd77a}
+.msg.priv small{color:#cdbbe9;display:block;font-size:11.5px}
+.msg .at{background:#ffe9a8;border-radius:4px;padding:0 3px;font-weight:700}
+.secret{padding:6px 8px;border-top:1px solid #e3d8bd;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12.5px}
+.secret .lb{font-weight:800;color:#5b3b7a;margin-right:2px}
+.secret button{border:0;border-radius:7px;padding:5px 7px;cursor:pointer;font-weight:800;font-size:12.5px;background:#eee}
+.secret .cdot{width:26px;height:26px;padding:0;border-radius:50%}
+.chatin{display:flex;gap:6px;padding:8px;border-top:1px solid #e3d8bd;position:relative;flex-wrap:wrap}
+.chatin select{width:auto;flex:0 0 auto;max-width:42%;padding:8px 6px;font-size:13px}
+.chatin input{flex:1;min-width:120px}
+.chatin.priv input{background:#f1eaff;border-color:#8e6bd0}
+.atpop{position:absolute;left:8px;right:8px;bottom:100%;background:#fff;border-radius:10px;box-shadow:0 -4px 16px rgba(0,0,0,.25);overflow:hidden;display:none;z-index:5}
+.atpop.on{display:block}
+.atpop div{padding:8px 10px;cursor:pointer;font-weight:700}
+.atpop div:hover,.atpop div.sel{background:#f1eaff}
+.hist .strip{display:flex;gap:3px;overflow-x:auto;padding:4px 0 8px;margin-bottom:6px;border-bottom:1px solid #e3d8bd}
+.hist .strip .card{--w:34px}
+.hline{display:flex;gap:8px;align-items:center;font-size:13.5px;margin-bottom:6px;line-height:1.3}
+.hline .card{--w:26px;flex:none}
+.hline .t{flex:1}
+.hline.new{animation:resalta 1.6s}
+@keyframes resalta{from{background:#ffe9a8}}
+.prow{display:flex;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:7px 8px;margin-bottom:6px;font-size:14px}
+.prow .nm{flex:1;min-width:0}
+.prow .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .nm small{color:#777}
+.prow .pts{font-weight:900;font-size:16px}
+/* ---------- avisos ---------- */
+#toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:100;text-align:center;max-width:92%;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+#netbar{position:fixed;left:0;right:0;top:0;background:#b8860b;color:#fff;text-align:center;padding:6px;font-weight:700;z-index:99;display:none}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:14px;z-index:80}
+#modal.on{display:flex}
+#modal .mbox{background:var(--cream);border-radius:16px;padding:18px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#modal h2{margin:0 0 10px;font-size:21px}
+.colpick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.colpick button{border:0;border-radius:14px;padding:18px 8px;color:#fff;font-weight:900;font-size:18px;cursor:pointer;text-shadow:0 1px 2px #000;box-shadow:0 4px 0 rgba(0,0,0,.3)}
+.colpick button small{display:block;font-weight:600;font-size:12px;opacity:.9}
+.peek{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
+.peek .card{--w:46px}
+.score{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
+.score td{padding:6px 4px;border-bottom:1px solid #e3d8bd}
+.score .cards{display:flex;flex-wrap:wrap;gap:2px}
+.score .cards .card{--w:22px}
+.rules h3{margin:14px 0 6px}
+.rules p,.rules li{font-size:14.5px;line-height:1.45}
+.rules .cardrow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.rules .cardrow .card{--w:50px}
+/* carta volando de un lugar a otro */
+#fly{position:fixed;inset:0;pointer-events:none;z-index:70}
+#fly .card{position:absolute;left:0;top:0;transition:transform .45s cubic-bezier(.3,.7,.3,1);will-change:transform}
+.big-uno{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%) scale(.3);font:900 clamp(60px,14vw,140px)/1 "Arial Black",system-ui,sans-serif;color:var(--gold);
+  -webkit-text-stroke:3px #5a0b00;text-shadow:0 6px 0 #5a0b00,0 0 40px #ff9800;pointer-events:none;z-index:90;opacity:0;animation:unopop 1.4s ease-out forwards;white-space:nowrap}
+.big-uno small{display:block;font-size:.3em;text-align:center;color:#fff;-webkit-text-stroke:1px #000;text-shadow:0 2px 0 #000}
+@keyframes unopop{15%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}30%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%) scale(1)}}
+.yourturn{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:var(--gold);color:#3a1c10;font-weight:900;padding:10px 22px;border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,.5);z-index:85;pointer-events:none;animation:turnpop 1.6s forwards}
+@keyframes turnpop{0%{opacity:0;transform:translate(-50%,10px)}15%{opacity:1;transform:translate(-50%,0)}80%{opacity:1}100%{opacity:0}}
+/* ---------- caras: una cabecita con foto o cámara arriba de las cartas ---------- */
+.head{--hw2:46px;position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);width:var(--hw2);height:calc(var(--hw2) * 1.2);
+  border-radius:48% 48% 44% 44% / 58% 58% 42% 42%;overflow:hidden;background:var(--pc,#888);box-shadow:0 0 0 3px var(--pc,#888),0 4px 10px rgba(0,0,0,.55);
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--hw2) * .5);pointer-events:none;z-index:2}
+.head img,.head video{width:100%;height:100%;object-fit:cover;display:block}
+.head.live img,.head.live span{display:none}
+.head .rec{position:absolute;top:5px;right:7px;width:7px;height:7px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 5px #ff2d2d;animation:pulso2 1.4s infinite}
+.mine{position:relative}
+.mine .head{--hw2:44px;left:6px;transform:none}
+.mine .head video,.facepv video{transform:scaleX(-1)}   /* tu propia cámara se ve como en un espejo */
+.seat>.head{left:0;top:0;bottom:auto;transform:translate(-50%,calc(-100% - 20px))}
+.v3d .seat>.head{--hw2:58px;transform:translate(-50%,-50%) translateZ(calc(clamp(30px,5.6vmin,54px) * 2.5)) rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1)) translateY(-62%)}
+.facepv{display:flex;justify-content:center;margin:6px 0 14px}
+.facepv .head{position:relative;left:auto;bottom:auto;transform:none;--hw2:120px}
+.fthumb{width:26px;height:31px;object-fit:cover;border-radius:48% 48% 44% 44% / 58% 58% 42% 42%;flex:none}
+@media (max-width:600px){.head{--hw2:36px}.mine .head{--hw2:38px}.v3d .seat>.head{--hw2:44px}}
+.obsbar{background:#2b1d3f;color:#fff;text-align:center;font-size:13px;padding:5px}
+@media (max-width:600px){
+  .topbar .hidem{display:none}
+  .seat .tag{font-size:11px;padding:2px 7px 2px 2px}.seat .tag .av{width:24px;height:24px;font-size:14px}.seat .tag b{max-width:64px;font-size:11.5px}
+  .mesa{inset:9% 2% 7%}
+}
+</style>
+</head>
+<body>
+<div id="netbar"></div>
+
+<!-- ======================= MENÚ ======================= -->
+<div class="screen on" id="menu"><div class="menu">
+  <div class="logo">
+    <div class="cards" id="logoCards"></div>
+    <h1>PETEĨ<span>CARTAS PARAGUAYAS</span></h1>
+    <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
+  </div>
+  <div class="box">
+    <label for="myName" style="margin-top:0">Tu nombre</label>
+    <input type="text" id="myName" maxlength="16" placeholder="Ej.: Juan" autocomplete="nickname">
+    <label>Tu ficha</label>
+    <div class="tokens" id="tokens"></div>
+  </div>
+  <div class="box">
+    <h3>🌐 Jugar en línea con amigos</h3>
+    <button class="btn green wide" onclick="hostStart(false)">➕ Crear sala</button>
+    <label for="joinCode">o entrá con el código de la sala</label>
+    <div class="row"><input type="text" id="joinCode" maxlength="6" placeholder="Código" style="text-transform:uppercase;letter-spacing:3px;font-weight:800"><button class="btn" style="flex:0 0 auto" onclick="joinClick()">Entrar</button></div>
+    <button class="btn gold wide" id="btnResume" style="margin-top:10px;display:none" onclick="resumeClick()">↩️ Volver a la sala</button>
+    <p class="muted" style="margin-bottom:0">De 2 a 10 jugadores. Los que lleguen con la partida empezada (o con la mesa llena) entran a mirar 👀, con chat y voz.</p>
+  </div>
+  <div class="box">
+    <h3>🤖 Practicar contra bots</h3>
+    <div class="row"><select id="nBots"><option value="1">1 bot</option><option value="2">2 bots</option><option value="3" selected>3 bots</option><option value="4">4 bots</option><option value="5">5 bots</option><option value="6">6 bots</option><option value="7">7 bots</option><option value="8">8 bots</option><option value="9">9 bots</option></select>
+    <button class="btn" onclick="localStart()">Jugar</button></div>
+    <p class="muted" style="margin-bottom:0">En la sala en línea también se pueden sumar bots para completar la mesa.</p>
+  </div>
+  <button class="btn dark wide" onclick="showRules()">📜 Reglas del Peteĩ (clásicas y de la casa)</button>
+  <p class="muted" id="musicCredit" style="color:#e8cfb0;text-align:center;font-size:11px;margin-top:14px"></p>
+</div></div>
+
+<!-- ======================= SALA DE ESPERA ======================= -->
+<div class="screen" id="lobby"><div class="lobbywrap">
+  <div class="lmain">
+    <div class="box">
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1">🃏 Sala de espera</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música de fondo">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🚪 Salir</button></div>
+      <div id="lobbyCodeBox"><p class="muted" style="text-align:center;margin:8px 0 0">Código de la sala</p><div class="code" id="lobbyCode">—</div>
+        <div class="row"><button class="btn sm" onclick="shareRoom()">📤 Compartir enlace</button><button class="btn sm gray" onclick="copyCode()">📋 Copiar código</button></div></div>
+      <div id="lobbyObs"></div>
+      <h3 style="margin-top:14px">Jugadores <span class="muted" id="pcount"></span></h3>
+      <ul class="plist" id="plist"></ul>
+      <button class="btn sm dark" style="margin-bottom:8px" onclick="faceModal()">📷 Mi cara: foto o cámara (opcional)</button>
+      <div id="lobbyHostBtns"></div>
+    </div>
+    <div class="box">
+      <h3>⚙️ Cómo se juega en esta mesa</h3>
+      <div id="optsBox"></div>
+    </div>
+    <div class="box">
+      <h3>📝 Reglas propias del grupo</h3>
+      <p class="muted" style="margin-top:0">Cada grupo tiene sus mañas. El anfitrión escribe acá lo que se acordó y todos lo ven durante la partida.</p>
+      <div id="grulesBox"></div>
+    </div>
+    <div class="box">
+      <h3>💡 Sugerencias de reglas</h3>
+      <p class="muted" style="margin-top:0">Cualquiera (también los que miran) puede proponer una regla nueva y votar las de los demás 👍.</p>
+      <div id="sugBox"></div>
+      <div class="row" style="margin-top:6px"><input type="text" id="sugIn" maxlength="240" placeholder="Ej.: el que tira un 8 se toma un tereré 🧉" onkeydown="if(event.key==='Enter')sendSug('sugIn')"><button class="btn sm" style="flex:0 0 auto" onclick="sendSug('sugIn')">Sugerir</button></div>
+    </div>
+  </div>
+  <div id="lobbySide"></div>
+</div></div>
+
+<!-- ======================= PARTIDA ======================= -->
+<div class="screen" id="game">
+  <div class="topbar">
+    <span class="ttl">PETEĨ<small>PY</small></span>
+    <span class="btn sm dark" id="roomTag" style="cursor:default" title="Código de la sala"></span>
+    <span class="sp"></span>
+    <button class="btn sm dark" id="btnView" onclick="toggleView()">🧊 3D</button>
+    <button class="btn sm dark" onclick="faceModal()" title="Tu foto o tu cámara arriba de tus cartas">📷</button>
+    <button class="btn sm dark" id="btnSnd" onclick="toggleSound()">🔊</button>
+    <button class="btn sm dark btnMusic" onclick="toggleMusic()" title="Música de fondo">🎶</button>
+    <button class="btn sm dark hidem" onclick="showRules()">📜</button>
+    <button class="btn sm dark" id="btnSide" onclick="toggleSide()">💬<span class="badge" id="unread" style="display:none">0</span></button>
+    <button class="btn sm red" onclick="leaveClick()" title="Salir de la partida">🚪</button>
+  </div>
+  <div id="obsbar" class="obsbar" style="display:none"></div>
+  <div class="gmain">
+    <div class="area">
+      <div class="stage" id="stage">
+        <div class="mesa" id="mesa">
+          <div class="dirring" id="dirring"></div>
+          <div class="marca">PETEĨ · PARAGUAY · ÑANDUTÍ</div>
+          <div class="centro">
+            <div class="pila" id="deck" onclick="drawClick()"></div>
+            <div class="descarte" id="discard"></div>
+          </div>
+          <div id="seats"></div>
+        </div>
+        <div class="cam3d">
+          <button onclick="cam('spin',-30)" title="Girar">⟲</button>
+          <button onclick="cam('spin',30)" title="Girar">⟳</button>
+          <button onclick="cam('tilt',-8)" title="Más de arriba">⤒</button>
+          <button onclick="cam('tilt',8)" title="Más de costado">⤓</button>
+          <button onclick="cam('zoom',.08)" title="Acercar">＋</button>
+          <button onclick="cam('zoom',-.08)" title="Alejar">－</button>
+          <button onclick="cam('reset')" title="Volver a mi lugar">🎯</button>
+        </div>
+      </div>
+      <div class="handbar">
+        <div class="status" id="status"></div>
+        <div class="hhead"><div id="mineTag"></div><div class="actions" id="actions"></div><button class="btn sm dark" id="btnSort" onclick="cycleSort()" title="Ordenar las cartas">↕️ Ordenar</button></div>
+        <div class="hand" id="hand"></div>
+      </div>
+    </div>
+    <div id="gameSide"></div>
+  </div>
+</div>
+
+<!-- ======================= PANEL (se mueve entre la sala y la partida) ======================= -->
+<div class="side" id="side">
+  <div class="voice" id="voiceBar">
+    <button class="btn sm gray" id="btnMic" onclick="toggleMic()">🎤 Activar micrófono</button>
+    <button class="btn sm gray" id="btnSpk" style="flex:0 0 46px" onclick="toggleSpk()" title="Escuchar a los demás">🔊</button>
+    <button class="btn sm gray only-mobile" id="btnCloseSide" style="flex:0 0 46px" onclick="toggleSide(false)">✕</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="chat" class="on">💬 Chat</button>
+    <button data-tab="hist">📜 Jugadas</button>
+    <button data-tab="mesa">👥 Mesa</button>
+    <button data-tab="reglas">🏠 Reglas</button>
+  </div>
+  <div class="tabp on" id="tab-chat">
+    <div class="scroll" id="chatList"></div>
+    <div class="secret" id="secretBar">
+      <span class="lb">🤫 Pedir en secreto:</span>
+      <button class="cdot" style="background:var(--cr)" onclick="askSecret('r')" title="Rojo"></button>
+      <button class="cdot" style="background:var(--cy)" onclick="askSecret('y')" title="Amarillo"></button>
+      <button class="cdot" style="background:var(--cg)" onclick="askSecret('g')" title="Verde"></button>
+      <button class="cdot" style="background:var(--cb)" onclick="askSecret('b')" title="Azul"></button>
+      <select id="askNum" style="width:auto;padding:4px 6px;font-size:12.5px" onchange="if(this.value){askSecret(this.value);this.value=''}">
+        <option value="">Nº / carta…</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option>
+        <option value="Salto">⛔ Salto</option><option value="Reversa">🔄 Reversa</option><option value="+2">🎁 +2</option><option value="no +4">👹 que no me tires +4</option></select>
+    </div>
+    <div class="chatin" id="chatIn">
+      <div class="atpop" id="atpop"></div>
+      <select id="chatTo" title="Para quién es el mensaje" onchange="chatToChanged()"></select>
+      <input type="text" id="chatText" maxlength="300" placeholder="Escribí… (@nombre = privado)" autocomplete="off">
+      <button class="btn sm" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+  <div class="tabp hist" id="tab-hist"><div class="scroll" id="histList"></div></div>
+  <div class="tabp" id="tab-mesa"><div class="scroll" id="mesaList"></div></div>
+  <div class="tabp" id="tab-reglas"><div class="scroll" id="reglasList"></div></div>
+</div>
+
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast"></div>
+<div id="fly"></div>
+
+<script src="reglas.js?v=2"></script>
+<script src="juego.js?v=7"></script>
+<script src="caras.js?v=1"></script>
+<script src="../dueno-link.js"></script>
+<script src="../inicio.js?v=2"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', sonidos:['#btnSnd','.btnMusic'], ocultar:['[onclick="leaveClick()"]'], barra:'.topbar'};</script>
+<script>
+// le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)
+if(window.DuenoLink) DuenoLink.start({game:"uno",
+  info(){
+    if(!S || (NET.mode!=="host" && NET.mode!=="local")) return null;
+    const local=NET.mode==="local"; if(local && !S.localCode) S.localCode="L"+genCode();
+    const c=S.phase==="play" ? S.players[S.turn] : null;
+    return {code: local ? S.localCode : NET.code, local, phase:S.phase, round:S.round, started:S.startedAt||null,
+      host:(P(S.hostPid)||{}).name||"", turn:c ? c.name : null, opts:S.opts,
+      players:S.players.map(p=>({n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot, cards:p.hand.length, pts:p.score})),
+      obs:(S.observers||[]).filter(o=>o.conn).map(o=>({n:o.name, owner:!!o.owner}))};
+  },
+  onIam(tok){ if(NET.mode!=="host") return; S.ownerTok=[...new Set([...(S.ownerTok||[]), tok])].slice(-4); commit(); }
+});
+</script>
+</body>
+</html>

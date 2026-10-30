@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   UNO Paraguayo — mazo, reglas oficiales, reglas de la casa y bots.
+   Peteĩ — mazo, reglas clásicas, reglas de la casa y bots.
    Todo lo decide el anfitrión (o el propio aparato en el modo solo):
    act(pid, accion) cambia el estado S y devuelve un texto si no se puede.
    ===================================================================== */
@@ -43,7 +43,7 @@ function cardName(c, color){
   if(isAction(c)) return `${VAL_INFO[c.v].name} ${col} (${VAL_INFO[c.v].ref})`;
   return `${c.v} ${col} (${VAL_INFO[c.v].ref})`;
 }
-// 108 cartas como el UNO oficial: por color un 0, dos de cada 1-9, dos Salto, dos Reversa y dos Roba 2; 4 Comodines y 4 Comodines +4
+// 108 cartas como el juego clásico: por color un 0, dos de cada 1-9, dos Salto, dos Reversa y dos Roba 2; 4 Comodines y 4 Comodines +4
 function newDeck(){
   const d=[]; let id=1;
   for(const c of COLORS){
@@ -94,7 +94,7 @@ function addPlayer(name, emoji, token, peerId, bot){
   S.players.push(p); return p;
 }
 function addBot(){
-  if(S.players.length>=MAXP) return 'Ya son 10 jugadores (el máximo del UNO oficial).';
+  if(S.players.length>=MAXP) return 'Ya son 10 jugadores (el máximo de las reglas clásicas).';
   const free=BOT_NAMES.filter(([n,e])=>!S.players.some(p=>p.name===n));
   const [n,e]=free.length?free[rnd(free.length)]:['Bot '+(S.players.length+1),'🤖'];
   const b=addPlayer(n, e, null, null, true);
@@ -236,17 +236,17 @@ function act(pid, a){
     }
     case 'uno': {
       if(S.phase!=='play') return;
-      if(S.unoWatch && S.unoWatch.pid===pid){ S.unoWatch=null; log(`📣 ${p.name} cantó ¡UNO! a tiempo.`); ev('uno',{pid}); commit(); return; }
+      if(S.unoWatch && S.unoWatch.pid===pid){ S.unoWatch=null; log(`📣 ${p.name} cantó ¡Peteĩ! a tiempo.`); ev('uno',{pid}); commit(); return; }
       if(p.hand.length===1){ ev('uno',{pid}); commit(); return; }   // ya lo había cantado
-      return 'Se canta ¡UNO! cuando te queda una sola carta.';
+      return 'Se canta ¡Peteĩ! cuando te queda una sola carta.';
     }
     case 'catch': {
-      const w=S.unoWatch; if(!w) return 'Nadie se olvidó de cantar ¡UNO!';
+      const w=S.unoWatch; if(!w) return 'Nadie se olvidó de cantar ¡Peteĩ!';
       if(w.pid===pid) return;
       const t=P(w.pid); S.unoWatch=null;
       if(!t || t.hand.length!==1){ commit(); return; }
       drawCards(t,1);
-      log(`🚨 ${p.name} le cantó ¡UNO! antes a ${t.name}: roba 1 carta del mazo.`, {pid:t.id});
+      log(`🚨 ${p.name} le cantó ¡Peteĩ! antes a ${t.name}: roba 1 carta del mazo.`, {pid:t.id});
       ev('catch', {pid:t.id, by:pid});
       commit(); return;
     }
@@ -332,7 +332,7 @@ function doPlay(p, c, a){
   log(`${p.emoji} ${p.name} tira ${cardName(c, isWild(c)?a.color:null)}.`, {card:c, pid:p.id, col:S.color});
   ev('play', {pid:p.id, card:c, col:S.color});
   if(p.hand.length===1){
-    S.unoWatch={pid:p.id, at:Date.now()};   // le queda una: tiene que cantar ¡UNO! antes que otro se lo cante
+    S.unoWatch={pid:p.id, at:Date.now()};   // le queda una: tiene que cantar ¡Peteĩ! antes que otro se lo cante
   }
   p.unoSaid=false;
   const n=S.players.length, me=S.players.indexOf(p);
@@ -405,8 +405,8 @@ const BOT = {next:0, watchTry:null, selfTry:null, jumpTry:0};
 const BOT_TALK = {
   play:['¡Tomá!','Upéi…','¡Ahí va!','Jaha 😎','Esa te dolió','¡Aguanteee!','Mba\'éichapa la mano 😏'],
   d4:['¡El Pombero te visita! 👹','Che ra\'a, robá nomás 😈','+4 y un tereré 🧉'],
-  uno:['¡UNO! 📣','¡Peteĩ! (uno) 📣','¡UNO, atención! 📣'],
-  catchd:['¡UNO! 📣 Te lo canté primero, robá una 😜','Ndaje… ¡UNO! Te gané de mano 📣'],
+  uno:['¡Peteĩ! 📣','¡Peteĩ, me queda una! 📣','¡Peteĩ, atención! 📣'],
+  catchd:['¡Peteĩ! 📣 Te lo canté primero, robá una 😜','Ndaje… ¡Peteĩ! Te gané de mano 📣'],
   draw:['Nde… a robar 😩','Ndaipóri… robo','Ni una me sirve 😅'],
 };
 const pick = a => a[rnd(a.length)];
@@ -444,7 +444,7 @@ function botChoose(b){
 function botTick(){
   if(!S || S.phase!=='play' || (NET.mode!=='host' && NET.mode!=='local')) return;
   const now=Date.now();
-  // alguien se olvidó de cantar UNO: algún bot lo puede agarrar (no al instante, para dar tiempo a cantarlo)
+  // alguien se olvidó de cantar Peteĩ: algún bot lo puede agarrar (no al instante, para dar tiempo a cantarlo)
   const w=S.unoWatch;
   if(w){
     const t=P(w.pid);
