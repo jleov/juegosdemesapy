@@ -375,6 +375,11 @@ body > #comm{display:none !important}   /* el chat solo se muestra dentro de la 
 @keyframes grabpulse{0%,100%{box-shadow:0 0 0 .15em #ffd400,0 1px 3px rgba(0,0,0,.6)}50%{box-shadow:0 0 0 .4em #ffd400,0 1px 3px rgba(0,0,0,.6)}}
 .tk.grab.lifted{opacity:.35;animation:none;box-shadow:0 0 0 .15em #ffd400}
 .tk.nudge{animation:nudge .45s}
+/* "Terminar turno": brilla para que no se olviden de pasar el turno */
+.btn.endturn{background:linear-gradient(180deg,#2fbf55,#1f8f3d);color:#fff;font-size:1.15em;padding:.7em 1.4em;animation:endglow 1.4s ease-in-out infinite;position:relative}
+@keyframes endglow{0%,100%{box-shadow:0 0 0 0 rgba(255,212,0,.0),0 3px 8px rgba(0,0,0,.3)}50%{box-shadow:0 0 0 .35em rgba(255,212,0,.75),0 0 1.4em .3em rgba(255,212,0,.6)}}
+.btn.endturn.nudge{animation:endglow 1.4s ease-in-out infinite,endjump .6s ease-in-out}
+@keyframes endjump{0%,100%{transform:none}25%{transform:translateY(-.4em) scale(1.06)}50%{transform:none}75%{transform:translateY(-.2em) scale(1.03)}}
 @keyframes nudge{20%,60%{translate:-.25em 0}40%,80%{translate:.25em 0}}
 #ghostTok{position:fixed;z-index:90;pointer-events:none;width:46px;height:46px;margin:-60px 0 0 -23px;border-radius:50%;background:#fff;border:4px solid var(--pc);
   display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 14px 18px rgba(0,0,0,.45);animation:ghostup .25s ease-out}
@@ -2292,6 +2297,7 @@ const SFX = {
   buy(){ this.coins(); tone({t:.18, f:1568, type:'triangle', dur:.5, vol:.06}); tone({t:.18, f:2093, dur:.6, vol:.03}); },
   card(){ noise({dur:.12, vol:.18, freq:2200, freq2:5000, q:.8, attack:.04}); noise({t:.13, dur:.08, vol:.12, freq:4000, q:1}); },
   turn(){ [[784,0],[1047,.13],[1319,.26]].forEach(([f,t])=>{ tone({t, f, dur:.45, vol:.07}); tone({t, f:f*4, dur:.06, vol:.02}); }); },
+  recordar(){ [[988,0],[784,.22]].forEach(([f,t])=>{ tone({t, f, type:'triangle', dur:.55, vol:.06}); tone({t, f:f*2, dur:.2, vol:.015}); }); },   // "din-don": falta terminar el turno
   jail(){   // reja de metal que se cierra
     noise({dur:.06, vol:.3, freq:900, q:1});
     [187,463,891,1307,1903].forEach((f,k)=>tone({f, dur:1.1-k*.15, vol:.08/(1+k*.4), type:k?'sine':'triangle'}));
@@ -2682,6 +2688,22 @@ function idleBoxHTML(){
 const BUSY_WHAT=['negociando','pidiendo cambio al Banco','contando billetes','mirando sus títulos','mirando sus propiedades','jugando'];
 const BUSY_BY_MODAL={trade:'negociando', bank:'pidiendo cambio al Banco', rentpick:'contando billetes', titles:'mirando sus títulos', buy:'mirando sus títulos', props:'mirando sus propiedades', prop:'mirando sus títulos'};
 let lastTouch=0, lastBusySent=0, lastBusyWhat='';
+// recordatorio de "Terminar turno": si ya hizo todo y no toca nada (ni negocia ni mira títulos), suena un din-don
+// y el botón da un salto; hasta 3 veces por turno
+const RECORDAR = {key:null, desde:0, veces:0, ultimo:0};
+setInterval(()=>{
+  if(!S || S.phase!=='play' || S.tp!=='end' || NET.mode==='spy') { RECORDAR.key=null; return; }
+  const p=cur(); if(!p || p.bot || !canAct(p.id) || p.money<0) return;
+  const key=p.id+':'+S.rollId;
+  if(RECORDAR.key!==key){ Object.assign(RECORDAR, {key, desde:Date.now(), veces:0, ultimo:0}); return; }
+  if(Date.now()<uiHoldUntil || $('#modalRoot').dataset.kind || (S.card && S.card.open) || (S.trades||[]).length) return;   // está mirando algo o negociando
+  const quieto = Date.now() - Math.max(lastTouch, RECORDAR.desde, RECORDAR.ultimo);
+  if(RECORDAR.veces>=3 || quieto < (RECORDAR.veces ? 20000 : 12000)) return;
+  RECORDAR.veces++; RECORDAR.ultimo=Date.now();
+  SFX.recordar();
+  document.querySelectorAll('.endturn').forEach(b=>{ b.classList.remove('nudge'); void b.offsetWidth; b.classList.add('nudge'); });
+  toast(`👉 ${NET.mode==='local'?p.name+', tocá':'Tocá'} “✔ Terminar turno” para que siga el próximo jugador.`);
+}, 2000);
 ['pointerdown','keydown','input'].forEach(ev=>document.addEventListener(ev, ()=>{ lastTouch=Date.now(); sendBusy(); }, {passive:true}));
 function sendBusy(force){
   if(NET.mode!=='client' || !S || S.phase!=='play' || !NET.myPid) return;
@@ -2910,7 +2932,9 @@ function renderCenterInner(){
       h+=`<div class="handhint">Caíste en <b>${DECK_NAME[S.drawDeck]}</b>: tocá ese mazo en el tablero (el que brilla) para sacar tu tarjeta.</div>`;
       acts.push(`<button class="btn gray" onclick="doAct({type:'draw'})">Sacar automático</button>`);
     } else if(S.tp==='end'){
-      acts.push(`<button class="btn" onclick="doAct({type:'end'})">✔ Terminar turno</button>`);
+      // ya hizo todo: el botón brilla para que no se olvide de pasar el turno
+      h+=`<div class="handhint">👉 Cuando termines de comprar, negociar o mirar tus títulos, pasá el turno.</div>`;
+      acts.push(`<button class="btn endturn" onclick="doAct({type:'end'})">✔ Terminar turno</button>`);
     }
   } else {
     let w='';
