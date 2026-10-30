@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Ajedrez y Damas PY como app.
-const CACHE = 'ajedrez-v2';
+const CACHE = 'ajedrez-v3';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './motor.js', './reglas.js', './juego.js', './tablero.js'];
 
 self.addEventListener('install', e => {

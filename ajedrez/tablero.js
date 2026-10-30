@@ -529,6 +529,8 @@ function geo(t){
 function pieceMat(color, th){
   if(th.neon) return new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:.45, metalness:.5, roughness:.25, transparent:true, opacity:.92});
   if(th.wood){ const tex=new THREE.CanvasTexture(woodCanvas('#ffffff','0,0,0', color===th.pb?3:9, 256, 256)); return new THREE.MeshStandardMaterial({color, map:tex, roughness:.5, metalness:.02}); }
+  // las fichas muy oscuras se aclaran un poco y brillan, para que se vea bien la forma (peón, alfil, etc.)
+  if(lum(color)<.2) return new THREE.MeshStandardMaterial({color:mix(color,'#5a5f6a',.35), roughness:.22, metalness:.25});
   return new THREE.MeshStandardMaterial({color, roughness:.32, metalness:.08});
 }
 function makePiece3D(code){
@@ -538,7 +540,7 @@ function makePiece3D(code){
   if(t==='P'){ const h=new THREE.Mesh(new THREE.SphereGeometry(.15,24,16), mat); h.position.y=.51; h.castShadow=true; grp.add(h); }
   if(t==='B'){   // el alfil: bolita arriba y el corte en diagonal de la mitra, para no confundirlo con el peón
     const ball=new THREE.Mesh(new THREE.SphereGeometry(.065,16,12), mat); ball.position.y=1.17; ball.castShadow=true; grp.add(ball);
-    const cut=new THREE.Mesh(new THREE.BoxGeometry(.04,.26,.5), new THREE.MeshStandardMaterial({color:lineCol(code[0]==='w'?th.pb:th.pn), roughness:.6}));
+    const cut=new THREE.Mesh(new THREE.BoxGeometry(.05,.28,.5), new THREE.MeshStandardMaterial({color:lineCol(code[0]==='w'?th.pb:th.pn), roughness:.6}));
     cut.position.y=.92; cut.rotation.z=.6; grp.add(cut);
     const col=new THREE.Mesh(new THREE.TorusGeometry(.2,.03,8,32), mat); col.rotation.x=Math.PI/2; col.position.y=.63; grp.add(col);
   }
@@ -584,6 +586,8 @@ function build3DScene(th){
   sc.add(new THREE.HemisphereLight(0xffffff, th.neon?0x220044:0x3a3028, th.neon?.45:.55));
   const dl=new THREE.DirectionalLight(0xffffff, th.neon?.5:.7); dl.position.set(4,12,6); dl.castShadow=true;
   dl.shadow.mapSize.set(1024,1024); Object.assign(dl.shadow.camera,{left:-6,right:6,top:6,bottom:-6,near:1,far:30}); sc.add(dl);
+  // luz de contorno desde atrás de cada lado: marca la silueta de las fichas oscuras
+  [[0,6,-9],[0,6,9]].forEach(([x,y,z])=>{ const r=new THREE.DirectionalLight(0xdfe8ff, th.neon?.15:.35); r.position.set(x,y,z); sc.add(r); });
   if(th.neon){ const a=new THREE.PointLight(0x3ff6ff,.9,18); a.position.set(-5,3,5); const b=new THREE.PointLight(0xff3fd8,.9,18); b.position.set(5,3,-5); sc.add(a,b); }
   // mesa
   const mesaMat = th.wood ? new THREE.MeshStandardMaterial({color:'#6b4424', roughness:.85}) : th.neon ? new THREE.MeshStandardMaterial({color:'#050716', roughness:.4, metalness:.6}) : new THREE.MeshStandardMaterial({color:'#2e333b', roughness:.9});
