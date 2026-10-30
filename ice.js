@@ -62,3 +62,12 @@ window.ICE_SERVERS = [
   P.emit = function(ev, ...a){ if(ev === 'connection') wrap(a[0]); return emit.call(this, ev, ...a); };   // las que me abren
   window.limpiarRed = clean;
 })();
+
+/* Micrófono con opción de supresor de ruido (microfono.js): se carga en todos los juegos */
+(function(){
+  try{
+    const s = document.createElement('script');
+    s.src = new URL('microfono.js', (document.currentScript && document.currentScript.src) || location.href).href;
+    (document.head || document.documentElement).appendChild(s);
+  }catch(e){}
+})();
