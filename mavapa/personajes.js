@@ -98,6 +98,12 @@ const PERSONAJES = [
   {id:'bertarojas', n:'Berta Rojas', cat:'far', nac:1966, r:'muj,mus,son,gui', bio:'Guitarrista clásica reconocida en todo el mundo.'},
   {id:'lali', n:'Lali González', cat:'far', nac:1985, r:'muj,cin,lar', bio:'Actriz de la película "7 cajas".'},
   {id:'marilina', n:'Marilina Bogado', cat:'far', nac:1996, r:'muj,mus,gor,rub,lar,son', bio:'Cantante paraguaya, conocida por su estilo vaquero.'},
+  {id:'menchi', n:'Menchi Barriocanal', cat:'far', nac:1965, r:'muj,rub,lar,son', bio:'Periodista y conductora de radio y televisión.'},
+  {id:'yolanda', n:'Yolanda Park', cat:'far', nac:1983, r:'muj,lar,son,cam', bio:'Conductora de televisión paraguaya.'},
+  {id:'bicho', n:'"Bicho" Riveros', cat:'far', nac:1982, r:'bar,big,son', bio:'Figura de la televisión paraguaya.'},
+  {id:'carmina', n:'Carmiña Masi', cat:'far', nac:1984, r:'muj,rub,lar,tat', bio:'Conductora y figura de la televisión paraguaya.'},
+  {id:'malala', n:'Malala Olitte', cat:'far', nac:1988, r:'muj,rub,lar', bio:'Modelo y figura de la televisión paraguaya.'},
+  {id:'joseayala', n:'José Ayala', cat:'far', nac:1985, r:'bar,big,son', bio:'Figura de la televisión paraguaya.'},
   // 📱 Influencers
   {id:'ariel', n:'Ariel Delgadillo', cat:'inf', nac:1995, r:'bar,big', bio:'Tiktoker de humor, uno de los creadores más queridos del país.'},
   {id:'romi', n:'Romi Mendoza', cat:'inf', nac:1998, r:'muj', bio:'Influencer de TikTok con millones de seguidores.'},
