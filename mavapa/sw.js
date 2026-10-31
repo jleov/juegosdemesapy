@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el ¿Mávapa? como app.
-const CACHE = 'mavapa-v1';
+const CACHE = 'mavapa-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './caricatura.js', './personajes.js', './reglas.js', './juego.js', './tablero.js'];
 
 self.addEventListener('install', e => {
