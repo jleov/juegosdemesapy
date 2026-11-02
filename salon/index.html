@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- SEO (buscadores y vista previa al compartir) -->
+<title>Salón de Belleza PY: peluquería, maquillaje y uñas online con amigos | Juegos PY</title>
+<meta name="description" content="Juego de salón de belleza paraguayo gratis: lavá, cortá, teñí, peiná, maquillá, afeitá y pintá las uñas a clientes con pedidos para su fiesta de 15, el casamiento o la Expo. Solo/a o entre 2 (juntos o en duelo), en 2D o 3D, con chat y voz.">
+<link rel="canonical" href="https://juegospy.com/salon/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Juegos Paraguay Digitales">
+<meta property="og:title" content="Salón de Belleza PY: peluquería, maquillaje y uñas online con amigos | Juegos PY">
+<meta property="og:description" content="Lavá, cortá, teñí, peiná, maquillá y pintá las uñas a clientes paraguayos. Solo/a o entre 2, en 2D o 3D, con chat y voz.">
+<meta property="og:url" content="https://juegospy.com/salon/">
+<meta property="og:image" content="https://juegospy.com/salon/icon-512.png">
+<meta property="og:locale" content="es_PY">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Salón de Belleza PY", "url": "https://juegospy.com/salon/", "description": "Juego de salón de belleza paraguayo: peluquería, color, peinados, maquillaje, facial, barbería, uñas y accesorios, solo o entre 2, en 2D o 3D.", "image": "https://juegospy.com/salon/icon-512.png", "inLanguage": "es", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "jleovgames", "url": "https://juegospy.com/"}, "isPartOf": {"@type": "WebSite", "name": "Juegos Paraguay Digitales", "url": "https://juegospy.com/"}, "genre": ["Simulación", "Peluquería", "Belleza"], "gamePlatform": ["Navegador web", "Android", "PC"], "playMode": ["SinglePlayer", "MultiPlayer"], "applicationCategory": "Game", "operatingSystem": "Cualquiera (navegador)"}</script>
+<!-- /SEO -->
+<meta name="theme-color" content="#3b1636">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!-- librería de conexión entre jugadores (PeerJS 1.5.4) y la de 3D (three.js r128), guardadas junto al juego -->
+<script src="peerjs.min.js"></script>
+<script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="three.min.js"></script>
+<script src="../ice.js"></script>
+<style>
+:root{--cream:#fbf4e4;--ink:#1d1d1d;--muted:#6b6b6b;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;overflow-x:clip}
+body{background:radial-gradient(circle at 30% 15%,#7b2f6a,#1e0b1d 75%) fixed;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+.screen{display:none}.screen.on{display:block}
+input,button,select,textarea{font:inherit}
+input[type=text],input[type=number],select,textarea{width:100%;padding:10px 12px;border:1px solid #cbbf9f;border-radius:10px;background:#fff;color:var(--ink)}
+textarea{resize:vertical;min-height:70px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff;touch-action:manipulation}
+.btn.red{background:var(--red)}.btn.gray{background:#7a7a7a}.btn.gold{background:var(--gold);color:#222}.btn.green{background:var(--green)}.btn.dark{background:#2a2f3a}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.wide{width:100%}
+.btn.big{font-size:17px;padding:12px 18px}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.muted{color:var(--muted);font-size:13px}
+.box{background:var(--cream);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:14px}
+.box h3{margin:0 0 10px;font-size:17px}
+.box label{display:block;font-size:13px;font-weight:800;margin:10px 0 4px}
+.tokens{display:flex;flex-wrap:wrap;gap:6px}
+.tok{font-size:24px;width:46px;height:46px;border-radius:50%;border:3px solid transparent;background:#fff;cursor:pointer;padding:0}
+.tok.sel{border-color:var(--red);transform:scale(1.08)}
+.code{font-size:38px;font-weight:900;letter-spacing:6px;text-align:center;color:var(--blue);margin:4px 0}
+.lookbtn{display:flex;align-items:center;gap:10px;width:100%;border:0;border-radius:12px;background:#fff;padding:10px;cursor:pointer;text-align:left}
+.lookbtn b{display:block}.lookbtn small{color:#666}
+/* ---------- sala de espera ---------- */
+.lobbywrap{max-width:1100px;margin:0 auto;padding:56px 12px 30px;display:flex;gap:14px;align-items:flex-start}
+.lobbywrap>.lmain{flex:1;min-width:0}
+#lobbySide{width:360px;flex:none;position:sticky;top:10px}
+@media (max-width:860px){.lobbywrap{flex-direction:column}#lobbySide{width:100%;position:static}}
+.plist{list-style:none;padding:0;margin:8px 0}
+.plist li{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#fff;margin-bottom:6px;flex-wrap:wrap}
+.plist li .nm{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.elosel{width:auto!important;max-width:100%;padding:6px 8px!important;font-size:13px;border-radius:8px!important}
+.elo{font-size:12.5px;color:#555;font-weight:700}
+.dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
+body>.side{display:none}
+.box label.opt,.opt{display:flex;gap:10px;align-items:flex-start;background:#fff;border-radius:10px;padding:9px 10px;margin-bottom:6px}
+.opt input{margin-top:3px;width:20px;height:20px;flex:none}
+.opt b{display:block;font-size:14px}.opt small{color:#555;font-size:12.5px;line-height:1.35;font-weight:400}
+.juegos{display:flex;gap:8px}
+.jbtn{flex:1;border:3px solid #ddd;background:#fff;border-radius:12px;padding:12px 6px;font-size:17px;font-weight:900;cursor:pointer}
+.jbtn.on{border-color:var(--red);background:#fff2e0}
+.jbtn:disabled{cursor:default}.jbtn:disabled:not(.on){opacity:.55}
+.nums{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.box label.numin{flex:1;min-width:130px;display:flex;flex-direction:column;gap:3px;margin:0;font-weight:700;font-size:12.5px;background:#fff;border-radius:10px;padding:7px 9px}
+.numin input{padding:6px 8px!important}
+.sug{display:flex;gap:8px;align-items:flex-start;background:#fff;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:14px}
+.sug .t{flex:1}.sug .t small{display:block;color:#777;font-size:12px}
+.vote{border:1px solid #ccc;background:#f4f4f4;border-radius:20px;padding:4px 9px;cursor:pointer;font-weight:800;white-space:nowrap}
+.vote.on{background:#ffe8a3;border-color:#e2b23c}
+.grules{white-space:pre-wrap;background:#fff;border-radius:10px;padding:10px;font-size:14px;border-left:4px solid var(--gold)}
+.juegos .jbtn{font-size:15px;text-align:left;padding:10px 12px}
+.pick2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.logo .ico{font-size:52px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.6))}
+
+/* ======================= SALÓN ======================= */
+#game.on{display:flex}
+#game{height:100vh;height:100dvh;flex-direction:column;overflow:hidden;background:#2a0f28}
+.topbar{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px 6px 56px;color:#fff;background:rgba(0,0,0,.45);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.topbar::-webkit-scrollbar{display:none}
+.topbar .ttl{font-weight:900;letter-spacing:1px;white-space:nowrap}
+.topbar .ttl small{font-weight:600;color:var(--gold);letter-spacing:2px;margin-left:4px}
+.topbar .sp{flex:1}
+.topbar .btn{white-space:nowrap}
+.badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:3px}
+.gmain{flex:1;display:flex;min-height:0}
+.area{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.stage{flex:1;position:relative;min-height:0;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.stage canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block;touch-action:none}
+#fx{pointer-events:none}
+.cam3d{position:absolute;right:8px;bottom:8px;display:none;flex-direction:column;gap:4px;z-index:6}
+.v3d .cam3d{display:flex}
+.cam3d button{width:38px;height:38px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:16px;cursor:pointer}
+#sayb{position:absolute;display:none;z-index:7;max-width:220px;background:#fff;color:#222;border-radius:14px;padding:7px 11px;font-size:14px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.35);pointer-events:none}
+#sayb::after{content:"";position:absolute;left:14px;bottom:-8px;border:8px solid transparent;border-top-color:#fff;border-bottom:0}
+#bubbles{position:absolute;left:8px;bottom:8px;right:60px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none;z-index:7}
+.bub{background:rgba(255,255,255,.92);color:#111;border-radius:12px;padding:4px 9px;font-size:13px;max-width:min(360px,80%);box-shadow:0 3px 10px rgba(0,0,0,.4);animation:bubin .25s;transition:opacity .5s}
+.bub.out{opacity:0}
+@keyframes bubin{from{transform:translateY(8px);opacity:0}}
+/* pedido */
+#hud{position:absolute;left:8px;top:8px;z-index:8;max-width:min(330px,62%)}
+.ped{background:rgba(255,250,240,.94);border-radius:12px;padding:7px 9px;box-shadow:0 4px 16px rgba(0,0,0,.35);font-size:13px}
+.ped .ph{cursor:pointer;font-size:14px}.ped .tog{float:right;color:#888}
+.ped .story{color:#5a4a3a;font-size:12.5px;margin:3px 0;font-style:italic}
+.ped ul{list-style:none;margin:4px 0;padding:0}
+.ped li{margin:3px 0;line-height:1.3}
+.ped li.ok{color:#2a7a3a}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;border:1px solid rgba(0,0,0,.3)}
+.bar{display:block;height:4px;background:#eadfd0;border-radius:3px;margin:2px 0 0 22px;overflow:hidden}.bar b{display:block;height:100%;background:#e6398c}
+.ped .hrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px}
+.clk{font-family:ui-monospace,Consolas,monospace;font-weight:900;font-size:16px;background:#2a2f3a;color:#fff;border-radius:8px;padding:1px 8px}
+.clk.low{background:#d52b1e;animation:pulso2 .8s infinite}
+.mon{background:#fff;border:2px solid #e2b23c;border-radius:8px;padding:0 6px;font-weight:800;font-size:12.5px}
+.turn{background:#ffe8a3;border-radius:8px;padding:3px 7px;margin:4px 0}
+#rival{position:absolute;right:8px;top:8px;width:120px;height:140px;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:8;display:none;border:2px solid #fff}
+/* controles de abajo */
+#ctrl{flex:none;background:rgba(20,6,20,.92);padding:6px 6px 8px;color:#fff;display:flex;flex-direction:column;gap:5px;max-height:42vh;overflow-y:auto}
+#ctrl .msgline{text-align:center;font-size:15px;padding:8px}
+.cats,.tools,.pal{display:flex;gap:5px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+.cat,.tool{flex:none;border:0;border-radius:10px;background:#3a1f3a;color:#fff;font-weight:700;font-size:12px;padding:4px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;min-width:60px;touch-action:manipulation}
+.cat span,.tool span{font-size:20px;line-height:1.2}
+.cat.on{background:#e6398c}
+.tool{background:#fff;color:#3a1f3a}
+.tool.on{background:#ffe08a;box-shadow:0 0 0 2px #e6398c}
+.tool:disabled{opacity:.45}
+.sep{flex:none;width:2px;background:rgba(255,255,255,.3);margin:0 3px}
+.pal{align-items:center}
+.swb{flex:none;width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.6);cursor:pointer;padding:0}
+.swb.on{border:3px solid #fff;box-shadow:0 0 0 2px #e6398c;transform:scale(1.12)}
+.desb{flex:none;border:0;border-radius:16px;padding:5px 10px;background:#fff;font-weight:700;cursor:pointer;font-size:13px}
+.desb.on{background:#ffe08a;box-shadow:0 0 0 2px #e6398c}
+#ctrl .btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.tinfo{flex:1;font-size:12.5px;color:#f3d6ea;min-width:160px}
+/* ---------- panel lateral ---------- */
+.side{width:350px;flex:none;display:flex;flex-direction:column;background:var(--cream);min-height:0;box-shadow:-4px 0 18px rgba(0,0,0,.35)}
+#lobbySide .side{width:100%;height:min(640px,80vh);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);overflow:hidden}
+#gameSide{display:flex;min-height:0}
+@media (min-width:1000px){.only-mobile{display:none}}
+#lobbySide .only-mobile{display:none}
+@media (max-width:999px){
+  #game .side{position:fixed;right:0;top:0;bottom:0;width:min(380px,94vw);transform:translateX(105%);transition:transform .25s;z-index:60}
+  #game .side.open{transform:none}
+}
+.voice{display:flex;gap:6px;padding:8px;border-bottom:1px solid #e3d8bd}
+.voice .btn{flex:1}.voice .btn.on{background:#d52b1e;animation:pulso2 1.4s infinite}
+@keyframes pulso2{50%{opacity:.75}}
+.tabs{display:flex;border-bottom:1px solid #e3d8bd}
+.tabs button{flex:1;border:0;background:none;padding:9px 2px;font-weight:800;font-size:13px;cursor:pointer;color:#7b6a4c;border-bottom:3px solid transparent}
+.tabs button.on{color:#1d1d1d;border-bottom-color:var(--red)}
+.tabp{display:none;flex:1;min-height:0;flex-direction:column}
+.tabp.on{display:flex}
+.scroll{flex:1;overflow-y:auto;padding:8px 10px;min-height:0}
+.msg{margin:0 0 6px;font-size:14px;line-height:1.35;word-wrap:break-word}
+.msg .who{font-weight:800}
+.msg.sys{color:#7b6a4c;font-size:12.5px;font-style:italic}
+.msg.priv{background:#2b1d3f;color:#fff;border-radius:10px;padding:6px 9px}
+.msg.priv .who{color:#ffd77a}
+.msg.priv small{color:#cdbbe9;display:block;font-size:11.5px}
+.msg .at{background:#ffe9a8;border-radius:4px;padding:0 3px;font-weight:700}
+.quick{padding:6px 8px;border-top:1px solid #e3d8bd;display:flex;flex-wrap:wrap;gap:4px}
+.quick button{border:0;border-radius:14px;padding:4px 9px;cursor:pointer;font-weight:700;font-size:12.5px;background:#eee}
+.chatin{display:flex;gap:6px;padding:8px;border-top:1px solid #e3d8bd;position:relative;flex-wrap:wrap}
+.chatin select{width:auto;flex:0 0 auto;max-width:42%;padding:8px 6px;font-size:13px}
+.chatin input{flex:1;min-width:120px}
+.chatin.priv input{background:#f1eaff;border-color:#8e6bd0}
+.atpop{position:absolute;left:8px;right:8px;bottom:100%;background:#fff;border-radius:10px;box-shadow:0 -4px 16px rgba(0,0,0,.25);overflow:hidden;display:none;z-index:5}
+.atpop.on{display:block}
+.atpop div{padding:8px 10px;cursor:pointer;font-weight:700}
+.atpop div:hover,.atpop div.sel{background:#f1eaff}
+.hline{font-size:13.5px;margin-bottom:6px;line-height:1.3}
+.moves{display:grid;grid-template-columns:1fr;gap:2px}
+.mrow{display:grid;grid-template-columns:34px 1fr 1fr;gap:3px;align-items:center}
+.mn{color:#888;font-size:13px;text-align:right;padding-right:3px}
+.mv{border:0;background:#fff;border-radius:6px;padding:4px 7px;text-align:left;font-weight:700;font-size:14px;cursor:pointer;font-family:ui-monospace,Consolas,monospace}
+.mv.on{background:var(--gold)}
+.prow{display:flex;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:7px 8px;margin-bottom:6px;font-size:14px}
+.prow .nm{flex:1;min-width:0}
+.prow .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .nm small{color:#777;display:block}
+.hbox{background:#fff;border-radius:10px;padding:8px 10px;font-size:13.5px}
+.hbox p{margin:4px 0;color:#5a4a3a;font-style:italic}
+.tl{padding-left:0;list-style:none;margin:6px 0;font-size:13.5px}.tl li{margin:4px 0}
+.tl small{color:#7a5a4a}
+/* ---------- avisos y ventanas ---------- */
+#toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:100;text-align:center;max-width:92%;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+#netbar{position:fixed;left:0;right:0;top:0;background:#b8860b;color:#fff;text-align:center;padding:6px;font-weight:700;z-index:99;display:none}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:14px;z-index:80}
+#modal.on{display:flex}
+#modal .mbox{background:var(--cream);border-radius:16px;padding:18px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#modal h2{margin:0 0 10px;font-size:21px}
+#modal h3{margin:12px 0 6px;font-size:15px}
+.score{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
+.score td{padding:6px 4px;border-bottom:1px solid #e3d8bd}
+.rules h3{margin:14px 0 6px}
+.rules p,.rules li{font-size:14.5px;line-height:1.45}
+.mcols{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:10px}
+.mcol{flex:1;min-width:220px;max-width:330px;background:#fff;border-radius:14px;padding:8px;text-align:center}
+.mcol.win{box-shadow:0 0 0 3px var(--gold)}
+.mcol h3{margin:4px 0}
+.mirror{position:relative;border-radius:50% 50% 12px 12px;overflow:hidden;border:6px solid #d8b56a;box-shadow:inset 0 0 20px rgba(0,0,0,.3)}
+.mirror img{display:block;width:100%}
+.mirror .hshot{position:absolute;right:4px;bottom:4px;width:42%;border-radius:8px;border:2px solid #fff}
+.stars{font-size:24px;margin:4px 0}
+.quote{font-size:16px;font-weight:700;margin:4px 0}
+.mcol .tl{text-align:left}
+.pay{font-size:15px}
+.obsbar{background:#2b1d3f;color:#fff;text-align:center;font-size:13px;padding:5px;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+@media (max-width:600px){
+  .topbar .hidem{display:none}
+  #hud{max-width:72%}
+  .ped{font-size:12px}
+  #rival{width:86px;height:100px}
+  .cat,.tool{min-width:54px;font-size:11px}
+}
+</style>
+</head>
+<body>
+<div id="netbar"></div>
+
+<!-- ======================= MENÚ ======================= -->
+<div class="screen on" id="menu"><div class="menu">
+  <div class="logo">
+    <div class="ico">💇‍♀️💅💄</div>
+    <h1>SALÓN DE BELLEZA<span>PELUQUERÍA JEGUAKA · PARAGUAY</span></h1>
+    <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
+  </div>
+  <div class="box">
+    <label for="myName" style="margin-top:0">Tu nombre</label>
+    <input type="text" id="myName" maxlength="16" placeholder="Ej.: Lili" autocomplete="nickname">
+    <label>Tu ficha</label>
+    <div class="tokens" id="tokens"></div>
+  </div>
+  <div class="box">
+    <h3>💇 Atender en este aparato</h3>
+    <button class="btn green wide big" onclick="localStart()">💇 Abrir mi salón (con pedidos)</button>
+    <button class="btn wide" style="margin-top:8px" onclick="localStart(false, true)">🎨 Modo libre (sin pedido ni reloj)</button>
+    <button class="btn dark wide" style="margin-top:8px" onclick="localStart(true)">👥 Dos en este aparato (juntos o en duelo)</button>
+  </div>
+  <div class="box">
+    <h3>🌐 Jugar en línea con alguien</h3>
+    <button class="btn green wide" onclick="hostStart(false)">➕ Crear sala</button>
+    <label for="joinCode">o entrá con el código de la sala</label>
+    <div class="row"><input type="text" id="joinCode" maxlength="6" placeholder="Código" style="text-transform:uppercase;letter-spacing:3px;font-weight:800"><button class="btn" style="flex:0 0 auto" onclick="joinClick()">Entrar</button></div>
+    <button class="btn gold wide" id="btnResume" style="margin-top:10px;display:none" onclick="resumeClick()">↩️ Volver a la sala</button>
+    <p class="muted" style="margin-bottom:0">Atienden 2: <b>juntos</b> al mismo cliente (uno el pelo, el otro las uñas…) o en <b>duelo</b> a ver quién lo deja mejor. Los que entren después miran 👀 con chat y voz.</p>
+  </div>
+  <button class="btn dark wide" onclick="showRules()">📜 Cómo se juega</button>
+  <p class="muted" id="musicCredit" style="color:#e6c8dc;text-align:center;font-size:11px;margin-top:14px"></p>
+</div></div>
+
+<!-- ======================= SALA DE ESPERA ======================= -->
+<div class="screen" id="lobby"><div class="lobbywrap">
+  <div class="lmain">
+    <div class="box">
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1" id="lobbyTitle">💇 Sala de espera</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música de fondo">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🚪 Salir</button></div>
+      <div id="lobbyCodeBox"><p class="muted" style="text-align:center;margin:8px 0 0">Código de la sala</p><div class="code" id="lobbyCode">—</div>
+        <div class="row"><button class="btn sm" onclick="shareRoom()">📤 Compartir enlace</button><button class="btn sm gray" onclick="copyCode()">📋 Copiar código</button></div></div>
+      <div id="lobbyObs"></div>
+      <h3 style="margin-top:14px">Estilistas <span class="muted" id="pcount"></span></h3>
+      <ul class="plist" id="plist"></ul>
+      <div id="lobbyHostBtns"></div>
+    </div>
+    <div class="box">
+      <h3>⚙️ Cómo se atiende hoy</h3>
+      <div id="optsBox"></div>
+    </div>
+    <div class="box">
+      <h3>📝 Reglas propias del grupo</h3>
+      <div id="grulesBox"></div>
+    </div>
+    <div class="box">
+      <h3>💡 Sugerencias de reglas</h3>
+      <p class="muted" style="margin-top:0">Cualquiera (también los que miran) puede proponer una regla y votar las de los demás 👍.</p>
+      <div id="sugBox"></div>
+      <div class="row" style="margin-top:6px"><input type="text" id="sugIn" maxlength="240" placeholder="Ej.: sin raparle la cabeza a nadie" onkeydown="if(event.key==='Enter')sendSug('sugIn')"><button class="btn sm" style="flex:0 0 auto" onclick="sendSug('sugIn')">Sugerir</button></div>
+    </div>
+  </div>
+  <div id="lobbySide"></div>
+</div></div>
+
+<!-- ======================= EL SALÓN ======================= -->
+<div class="screen" id="game">
+  <div class="topbar">
+    <span class="ttl" id="gameTitle">SALÓN<small>PY</small></span>
+    <span class="btn sm dark" id="roomTag" style="cursor:default" title="Código de la sala"></span>
+    <span class="sp"></span>
+    <button class="btn sm dark" id="btnView" onclick="toggleView()">🧊 3D</button>
+    <button class="btn sm dark" id="btnSnd" onclick="toggleSound()">🔊</button>
+    <button class="btn sm dark btnMusic hidem" onclick="toggleMusic()" title="Música de fondo">🎶</button>
+    <button class="btn sm dark hidem" onclick="showRules()">📜</button>
+    <button class="btn sm dark" id="btnSide" onclick="toggleSide()">💬<span class="badge" id="unread" style="display:none">0</span></button>
+    <button class="btn sm red" onclick="leaveClick()" title="Salir">🚪</button>
+  </div>
+  <div id="obsbar" class="obsbar" style="display:none"></div>
+  <div class="gmain">
+    <div class="area">
+      <div class="stage" id="stage">
+        <canvas id="c2d"></canvas>
+        <canvas id="c3d" style="display:none"></canvas>
+        <canvas id="fx"></canvas>
+        <div id="hud"></div>
+        <canvas id="rival" width="240" height="280"></canvas>
+        <div id="sayb"></div>
+        <div class="cam3d">
+          <button onclick="cam3('reset')" title="Vista normal">🎯</button>
+          <button onclick="cam3('turn',-1)" title="Girar">⟲</button>
+          <button onclick="cam3('turn',1)" title="Girar">⟳</button>
+          <button onclick="cam3('zoom',1)" title="Acercar">＋</button>
+          <button onclick="cam3('zoom',-1)" title="Alejar">－</button>
+        </div>
+        <div id="bubbles"></div>
+      </div>
+      <div id="ctrl"></div>
+    </div>
+    <div id="gameSide"></div>
+  </div>
+</div>
+
+<!-- ======================= PANEL (se mueve entre la sala y el salón) ======================= -->
+<div class="side" id="side">
+  <div class="voice" id="voiceBar">
+    <button class="btn sm gray" id="btnMic" onclick="toggleMic()">🎤 Activar micrófono</button>
+    <button class="btn sm gray" id="btnSpk" style="flex:0 0 46px" onclick="toggleSpk()" title="Escuchar a los demás">🔊</button>
+    <button class="btn sm gray only-mobile" style="flex:0 0 46px" onclick="toggleSide(false)">✕</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="chat" class="on">💬 Chat</button>
+    <button data-tab="hist">📋 Pedido</button>
+    <button data-tab="mesa">👥 Salón</button>
+    <button data-tab="reglas">🏠 Reglas</button>
+  </div>
+  <div class="tabp on" id="tab-chat">
+    <div class="scroll" id="chatList"></div>
+    <div class="quick">
+      <button onclick="quick('¡Quedó divina! 😍')">😍 Divina</button><button onclick="quick('Yo hago el pelo, vos las uñas 💇💅')">💇💅</button>
+      <button onclick="quick('Pasame la tijera ✂️')">✂️</button><button onclick="quick('¡Se acaba el tiempo! ⏱️')">⏱️</button><button onclick="quick('Pasame el tereré 🧉')">🧉</button><button onclick="quick('¡Buen trabajo! 🤝')">🤝</button>
+    </div>
+    <div class="chatin" id="chatIn">
+      <div class="atpop" id="atpop"></div>
+      <select id="chatTo" title="Para quién es el mensaje" onchange="chatToChanged()"></select>
+      <input type="text" id="chatText" maxlength="300" placeholder="Escribí… (@nombre = privado)" autocomplete="off">
+      <button class="btn sm" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+  <div class="tabp" id="tab-hist"><div class="scroll" id="histList"></div></div>
+  <div class="tabp" id="tab-mesa"><div class="scroll" id="mesaList"></div></div>
+  <div class="tabp" id="tab-reglas"><div class="scroll" id="reglasList"></div></div>
+</div>
+
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast"></div>
+
+<script src="modelo.js?v=1"></script>
+<script src="reglas.js?v=1"></script>
+<script src="juego.js?v=1"></script>
+<script src="dibujo.js?v=1"></script>
+<script src="vista.js?v=1"></script>
+<script src="vista3d.js?v=1"></script>
+<script src="../dueno-link.js"></script>
+<script src="../inicio.js?v=2"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', sonidos:['#btnSnd','.btnMusic'], ocultar:['[onclick="leaveClick()"]'], barra:'.topbar'};</script>
+<script>
+// le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida en un aparato)
+if(window.DuenoLink) DuenoLink.start({game:"salon",
+  info(){
+    if(!S || (NET.mode!=="host" && NET.mode!=="local")) return null;
+    const local=NET.mode==="local"; if(local && !S.localCode) S.localCode="L"+genCode();
+    return {code: local ? S.localCode : NET.code, local, phase:S.phase, round:S.n||0, started:S.startedAt||null,
+      host:(P(S.hostPid)||{}).name||"", turn:S.req ? S.req.e+' '+S.req.who : null, opts:S.opts,
+      players:S.players.map(p=>({n:p.name, e:p.emoji, bot:false, conn:!!p.conn || !!p.local})),
+      obs:(S.observers||[]).filter(o=>o.conn).map(o=>({n:o.name, owner:!!o.owner}))};
+  },
+  onIam(tok){ if(NET.mode!=="host") return; S.ownerTok=[...new Set([...(S.ownerTok||[]), tok])].slice(-4); commit(); }
+});
+if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
