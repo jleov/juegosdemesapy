@@ -15,7 +15,8 @@ const SIZES=[{v:16,t:'16 personajes (rápida)'},{v:20,t:'20 personajes'},{v:24,t
 const RACES=[{v:1,t:'Una sola ronda'},{v:2,t:'Al mejor de 3 (gana 2)'},{v:3,t:'Al mejor de 5 (gana 3)'}];
 const PICKS={elegir:'✋ Cada uno elige su personaje', azar:'🎲 El juego reparte al azar'};
 const WRONGS={pierde:'❌ Si arriesgás y errás, perdés la ronda (como el original)', turno:'🔄 Si errás, solo perdés el turno'};
-function defaultOpts(){ return {cats:['fut','his','pol','far','inf'], mios:true, n:24, pick:'elegir', wrong:'pierde', race:2, ayuda:true, libres:true, bot:'normal'}; }
+function defaultOpts(){ return {cats:['fut','his','pol','far','inf'], mios:true, n:24, pick:'elegir', wrong:'pierde', race:2, ayuda:true, libres:true, bot:'normal', responde:'jugador'}; }
+const RESPONDE={jugador:'🙋 Contesta el otro jugador (Sí / No / No sé)', juego:'🤖 Las de la lista las contesta el juego (sin trampa)'};
 const BOTLV=[{v:'facil',t:'🙂 Fácil'},{v:'normal',t:'😎 Normal'},{v:'crack',t:'🔥 Crack'}];
 
 // personajes: los del juego + los que agregó el anfitrión (llegan aparte, con su foto)
@@ -133,6 +134,7 @@ function act(pid, a){
       else if(a.k==='pick' && PICKS[a.v]) o.pick=a.v;
       else if(a.k==='wrong' && WRONGS[a.v]) o.wrong=a.v;
       else if(a.k==='bot' && BOTLV.some(x=>x.v===a.v)) o.bot=a.v;
+      else if(a.k==='responde' && RESPONDE[a.v]) o.responde=a.v;
       else if(['ayuda','libres','mios'].includes(a.k)) o[a.k]=!!a.v;
       commit(); return;
     }
@@ -166,9 +168,15 @@ function act(pid, a){
       const i=d.indexOf(a.id); if(i>=0) d.splice(i,1); else d.push(a.id);
       commit(); return;
     }
-    case 'ask': {    // pregunta rápida: la contesta el juego, sin trampa
+    case 'ask': {    // pregunta de la lista: la contesta el otro jugador o, si la mesa lo eligió, el juego
       if(S.phase!=='play' || S.cur!==pid || S.stage!=='ask') return 'No es tu turno de preguntar.';
       const q=PREGUNTAS.find(x=>x.k===a.k); if(!q) return;
+      if(S.opts.responde!=='juego' && !autoPlays(P(opp))){
+        S.q={n:S.qs.length+1, by:pid, to:opp, k:q.k, text:q.q, ans:null, auto:false, at:Date.now()};
+        S.qs.push(S.q); S.stage='answer';
+        log(`❓ ${pname(pid)} pregunta: ${q.q}`);
+        commit(); return;
+      }
       const ans = respuesta(CH(S.sec[opp]), q.k) ? 'si' : 'no';
       S.q={n:S.qs.length+1, by:pid, to:opp, k:q.k, text:q.q, ans, auto:true};
       S.qs.push(S.q); S.stage='flip';
@@ -194,6 +202,7 @@ function act(pid, a){
     }
     case 'autoFlip': {   // ayuda: baja las cartas que ya no pueden ser
       if(S.phase!=='play' || S.cur!==pid || S.stage!=='flip' || !S.q || !S.q.k || !S.opts.ayuda) return;
+      if(S.q.ans==='nose') return 'Con “No sé” no se puede bajar ninguna sola.';
       const want=S.q.ans==='si', d=S.down[pid];
       S.board.forEach(id=>{ if(respuesta(CH(id), S.q.k)!==want && !d.includes(id)) d.push(id); });
       commit(); return;
@@ -263,7 +272,7 @@ function botTick(){
   if(S.stage==='answer' && S.q && autoPlays(P(S.q.to))){
     const b=P(S.q.to); BOT.busy=true;
     setTimeout(()=>{ BOT.busy=false; if(!S || S.stage!=='answer' || S.q.to!==b.id) return;
-      const ans=botAnswer(S.q.text, S.sec[b.id]); act(b.id, {type:'answer', a:ans});
+      const ans = S.q.k ? (respuesta(CH(S.sec[b.id]), S.q.k) ? 'si' : 'no') : botAnswer(S.q.text, S.sec[b.id]); act(b.id, {type:'answer', a:ans});
       if(ans==='nose' && b.bot) botChat(b, 'No te entendí 🤷 Probá con las preguntas de la lista.'); }, 1500+rnd(1200));
     return;
   }

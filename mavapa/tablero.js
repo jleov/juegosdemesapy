@@ -66,6 +66,7 @@ function optsHTML(host){
     <label>Personaje secreto</label>${sel('pick', Object.keys(PICKS).map(k=>({v:k,t:PICKS[k]})))}
     <label>Si alguien arriesga mal</label>${sel('wrong', Object.keys(WRONGS).map(k=>({v:k,t:WRONGS[k]})))}
     <label>Duración</label>${sel('race', RACES)}
+    <label>¿Quién contesta las preguntas?</label>${sel('responde', Object.keys(RESPONDE).map(k=>({v:k,t:RESPONDE[k]})))}
     <label>Nivel del bot</label>${sel('bot', BOTLV)}
     <label>Ayudas</label>
     ${chk('libres','✍️ Preguntas escritas','Además de las de la lista, se puede escribir cualquier pregunta y la contesta el otro jugador (Sí / No / No sé).')}
@@ -128,7 +129,7 @@ function renderCtrl(){
       <div class="btns"><button class="btn green big" onclick="askModal()">❓ Preguntar</button><button class="btn red big" onclick="setGuess(true)">🎯 Arriesgar</button></div>`;
     else if(myTurn && V.stage==='answer') h=`<div class="btns">${sec}${lastQ()}</div><div class="msgline">⏳ Esperando que ${esc(VPn(opp))} conteste…</div>`;
     else if(myTurn && V.stage==='flip') h=`<div class="btns">${sec}${lastQ()}</div><div class="msgline">Bajá las cartas que ya no pueden ser (tocalas).</div>
-      <div class="btns">${V.opts.ayuda && V.q && V.q.k?`<button class="btn gold" onclick="doAct({type:'autoFlip'})">🪄 Bajar los que no son</button>`:''}<button class="btn red" onclick="setGuess(true)">🎯 Arriesgar</button><button class="btn green" onclick="doAct({type:'endTurn'})">✅ Listo, paso el turno</button></div>`;
+      <div class="btns">${V.opts.ayuda && V.q && V.q.k && V.q.ans!=='nose'?`<button class="btn gold" onclick="doAct({type:'autoFlip'})">🪄 Bajar los que no son</button>`:''}<button class="btn red" onclick="setGuess(true)">🎯 Arriesgar</button><button class="btn green" onclick="doAct({type:'endTurn'})">✅ Listo, paso el turno</button></div>`;
     else if(pl && V.stage==='answer' && V.q && V.q.to===my) h=`<div class="btns">${sec}<div class="lq big"><small>${esc(VPn(V.q.by))} te pregunta:</small> <b>${esc(V.q.text)}</b></div></div>
       <div class="btns"><button class="btn green big" onclick="doAct({type:'answer',a:'si'})">✅ Sí</button><button class="btn red big" onclick="doAct({type:'answer',a:'no'})">❌ No</button><button class="btn gray" onclick="doAct({type:'answer',a:'nose'})">🤷 No sé</button></div>
       <p class="muted" style="text-align:center;margin:2px">Contestá la verdad mirando a tu personaje 😉</p>`;
@@ -179,7 +180,7 @@ function askModal(){
   const foto=RASGOS.filter(r=>r.foto), quien=[...RASGOS.filter(r=>!r.foto), ...PREG_EXTRA];
   modal(`<h2>❓ ¿Qué querés preguntar?</h2>
     ${V.opts.libres?`<div class="row" style="margin-bottom:10px"><input type="text" id="freeQ" maxlength="160" placeholder="Escribí tu pregunta… (la contesta ${esc(VPn(oppOf(me())))})" onkeydown="if(event.key==='Enter')sendFree()"><button class="btn" style="flex:0 0 auto" onclick="sendFree()">Preguntar</button></div>`:''}
-    <p class="muted" style="margin:0 0 6px">Las de la lista las contesta el juego, sin trampa:</p>
+    <p class="muted" style="margin:0 0 6px">${V.opts.responde==='juego'?'Las de la lista las contesta el juego, sin trampa:':'O elegí una de la lista (la contesta '+esc(VPn(oppOf(me())))+'):'}</p>
     <h3>👀 Cómo se ve en la foto</h3><div class="qgrid">${foto.map(btn).join('')}</div>
     <h3>🕵️ Quién es</h3><div class="qgrid">${quien.map(btn).join('')}</div>
     <button class="btn gray wide" style="margin-top:10px" onclick="closeModal()">Cerrar</button>`);
@@ -470,7 +471,7 @@ function renderMesaTab(){
 function renderReglasTab(){
   const o=V.opts, host=amHost();
   $('#reglasList').innerHTML = `<p style="margin-top:0"><b>Categorías:</b> ${o.cats.map(c=>CATS[c].e+' '+CATS[c].n).join(', ')}</p>
-    <p class="muted">${esc(PICKS[o.pick])}<br>${esc(WRONGS[o.wrong])}<br>${o.libres?'✍️ Se pueden escribir preguntas':'📋 Solo preguntas de la lista'}${o.ayuda?' · 🪄 con ayuda para bajar':''}</p>`
+    <p class="muted">${esc(PICKS[o.pick])}<br>${esc(WRONGS[o.wrong])}<br>${esc(RESPONDE[o.responde||'jugador'])}<br>${o.libres?'✍️ Se pueden escribir preguntas':'📋 Solo preguntas de la lista'}${o.ayuda?' · 🪄 con ayuda para bajar':''}</p>`
     + `<b>📝 Reglas propias del grupo</b>` + (V.grules?`<div class="grules" style="margin:6px 0 10px">${esc(V.grules)}</div>`:`<p class="muted">${host?'Las podés escribir en la sala de espera.':'No hay.'}</p>`)
     + `<b>💡 Sugerencias</b><div style="margin-top:6px">${sugsHTML(host)}</div>
        <div class="row"><input type="text" id="sugIn2" maxlength="240" placeholder="Proponé una regla…" onkeydown="if(event.key==='Enter')sendSug('sugIn2')"><button class="btn sm" style="flex:0 0 auto" onclick="sendSug('sugIn2')">Sugerir</button></div>
@@ -579,7 +580,7 @@ function showRules(){
   modal(`<div class="rules"><h2>📜 Cómo se juega</h2>
   <p>Cada jugador tiene un <b>personaje secreto</b> del tablero. Hay que adivinar el del otro antes que él adivine el tuyo.</p>
   <h3>🙋 En tu turno</h3>
-  <ul><li><b>❓ Preguntar</b> algo que se conteste con sí o no. Las preguntas de la lista las contesta el juego (no hay trampa). Si la mesa lo permite, también podés escribir tu propia pregunta y la contesta el otro jugador.</li>
+  <ul><li><b>❓ Preguntar</b> algo que se conteste con sí o no. Elegila de la lista o, si la mesa lo permite, escribila vos. El otro jugador contesta Sí, No o No sé mirando a su personaje (el anfitrión puede elegir que las de la lista las conteste el juego, sin trampa).</li>
   <li>Con la respuesta, <b>bajá las cartas</b> que ya no pueden ser (tocalas; si te equivocás, tocá de nuevo y se levanta). El botón 🪄 las baja solas.</li>
   <li>Tocá <b>✅ Listo</b> para pasar el turno.</li>
   <li>Cuando creas que sabés quién es, tocá <b>🎯 Arriesgar</b> y elegí la carta. Si acertás, ganás la ronda. Si errás, perdés la ronda (o solo el turno, según la mesa).</li></ul>
