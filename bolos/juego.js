@@ -724,6 +724,7 @@ function sheetHTML(st, mark){
   return `<table class="sheet${mark?' big':''}">${head}${rows}</table>`;
 }
 function renderScore(){
+  if(ANIM.on) return;   // el puntaje del tiro se muestra recién cuando terminan de caer los pinos
   const el=$('#score'); el.innerHTML=sheetHTML(V);
   const on=el.querySelector('tr.on'); if(on && el.scrollHeight>el.clientHeight) el.scrollTop=on.offsetTop-24;
 }
@@ -759,7 +760,7 @@ function renderCtrl(){
 }
 setInterval(()=>{
   // si la pestaña estuvo escondida la animación no avanza: igual se cierra para no trabar el turno
-  if(ANIM.on && animFrame()>ANIM.end+45){ ANIM.on=false; rollStop(); afterShotUI(true); renderScore(); renderCtrl(); renderPinHud(); }
+  if(ANIM.on && animFrame()>ANIM.end+45){ ANIM.on=false; rollStop(); afterShotUI(true); renderScore(); renderCtrl(); renderPinHud(); renderSidePanels(); }
   if(V && V.phase==='play' && V.opts.timer && $('#game').classList.contains('on')) renderCtrl();
 }, 1000);
 function paintSpin(){ const v=Math.round(AIM.spin*100); $('#spinTxt').textContent = v===0 ? 'derecha' : v<0 ? `↶ ${-v}%` : `↷ ${v}%`; }
@@ -826,7 +827,7 @@ function dispState(){
     while(ANIM.evI<(sh.ev||[]).length && sh.ev[ANIM.evI].f<=f){ const e=sh.ev[ANIM.evI++];
       if(e.k==='h'){ sfx.hit(e.v); rollStop(); } else if(e.k==='p') sfx.pin(e.v); else if(e.k==='w') sfx.wall(e.v); else if(e.k==='g') sfx.gutter(); }
     if(f>=sh.frames-2) rollStop();
-    if(f>=ANIM.end){ ANIM.on=false; rollStop(); afterShotUI(true); renderScore(); renderCtrl(); renderPinHud(); }
+    if(f>=ANIM.end){ ANIM.on=false; rollStop(); afterShotUI(true); renderScore(); renderCtrl(); renderPinHud(); renderSidePanels(); }
     else {
       const nb=sh.bt.length/2, [bx,by]=trackAt(sh.bt, Math.min(f, nb-1));
       const pins=[];
@@ -1227,7 +1228,7 @@ setTimeout(()=>{ if(VIEW.mode==='3d' && !init3D()) VIEW.mode='2d'; applyView(); 
 function renderSidePanels(){ if($('#tab-hist').classList.contains('on')) renderHist(); renderMesaTab(); renderReglasTab(); }
 let HIST_N=0;
 function renderHist(){
-  if(!V) return;
+  if(!V || ANIM.on) return;
   const L=(V.log||[]).slice().reverse(); const fresh=L.length-HIST_N; HIST_N=L.length;
   $('#histList').innerHTML = L.map((l,i)=>`<div class="hline ${i<fresh&&fresh<5?'new':''}">${esc(l.x)}</div>`).join('') || '<p class="muted">Todavía no hubo tiros.</p>';
 }
