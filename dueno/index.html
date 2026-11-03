@@ -81,6 +81,7 @@ const GAMES = {
   billar:  {n:'Billar PY',         ico:'../billar/icon-192.png',   phase:{lobby:'⏳ En la sala de espera', play:'🎱 Jugando', rackEnd:'🏆 Entre partidas', over:'🏁 Terminada'}},
   bolos:   {n:'Bolos PY',          ico:'../bolos/icon-192.png',    phase:{lobby:'⏳ En la sala de espera', play:'🎳 Jugando', lineEnd:'🏆 Entre líneas', over:'🏁 Terminada'}},
   minigolf:{n:'Mini Golf PY',      ico:'../minigolf/icon-192.png', phase:{lobby:'⏳ En la sala de espera', play:'⛳ Jugando', holeEnd:'🏁 Entre hoyos', over:'🏆 Terminada'}},
+  basta:   {n:'Basta PY',          ico:'../basta/icon-192.png',    phase:{lobby:'⏳ En la sala de espera', abc:'🔤 Frenando el abecedario', pick:'👉 Eligiendo la letra', spin:'🎱 Sacando la letra', write:'✏️ Escribiendo', review:'📝 Revisando palabras', roundEnd:'🧮 Entre rondas', over:'🏆 Terminada'}},
   ajedrez: {n:'Ajedrez y Damas PY', ico:'../ajedrez/icon-192.png',  phase:{lobby:'⏳ En la sala de espera', play:'♟️ Jugando', gameEnd:'🏆 Entre partidas', over:'🏁 Terminada'}},
   salon:   {n:'Salón de Belleza PY', ico:'../salon/icon-192.png', phase:{lobby:'⏳ En la sala de espera', play:'💇 Atendiendo', review:'🪞 Cliente en el espejo', over:'🏁 Día terminado'}},
   adivina: {n:'¿Mávapa?',          ico:'../mavapa/icon-192.png',  phase:{lobby:'⏳ En la sala de espera', pick:'🤫 Eligiendo personajes', play:'🕵️ Jugando', roundEnd:'🏆 Entre rondas', over:'🏁 Terminada'}},
@@ -145,8 +146,8 @@ function tokenOf(key){ let t=load(key); if(!t){ t=Math.random().toString(36).sli
 // entrar como dueño (a la vista de todos): la sala anota este aparato y después se abre el juego
 function enter(k){
   const r=A.rooms[k]; if(!r || !r.conn.open) return toast('Esa sala ya no responde.');
-  const tok = r.game==='uno' ? tokenOf('uno_token') : r.game==='billar' ? tokenOf('billar_token') : r.game==='bolos' ? tokenOf('bolos_token') : r.game==='minigolf' ? tokenOf('golf_token') : r.game==='adivina' ? tokenOf('adivina_token') : r.game==='ajedrez' ? tokenOf('ajedrez_token') : r.game==='salon' ? tokenOf('salon_token') : tokenOf('bnq_token');
-  const url = r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='minigolf' || r.game==='adivina' || r.game==='ajedrez' || r.game==='salon' ? `../${r.game==='uno'?'petei':r.game==='adivina'?'mavapa':r.game}/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
+  const tok = r.game==='uno' ? tokenOf('uno_token') : r.game==='billar' ? tokenOf('billar_token') : r.game==='bolos' ? tokenOf('bolos_token') : r.game==='minigolf' ? tokenOf('golf_token') : r.game==='basta' ? tokenOf('basta_token') : r.game==='adivina' ? tokenOf('adivina_token') : r.game==='ajedrez' ? tokenOf('ajedrez_token') : r.game==='salon' ? tokenOf('salon_token') : tokenOf('bnq_token');
+  const url = r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='minigolf' || r.game==='basta' || r.game==='adivina' || r.game==='ajedrez' || r.game==='salon' ? `../${r.game==='uno'?'petei':r.game==='adivina'?'mavapa':r.game}/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
   const tab = window.open('about:blank', '_blank');
   A.pending[k]={url, tab};
   try{ r.conn.send({t:'iam', token:tok}); }catch(e){}
@@ -163,7 +164,7 @@ function roomHTML(k, r){
   }).join('');
   let det='';
   if(i.turn && r.game==='salon') det+=`<div class="muted">Atendiendo a <b>${esc(i.turn)}</b> · cliente ${i.round}</div>`;
-  else if(i.turn) det+=`<div class="muted">Turno de <b>${esc(i.turn)}</b>${i.round?` · ${r.game==='bolos'?'cuadro':r.game==='minigolf'?'hoyo':'mano'} ${i.round}`:''}</div>`;
+  else if(i.turn) det+=`<div class="muted">Turno de <b>${esc(i.turn)}</b>${i.round?` · ${r.game==='bolos'?'cuadro':r.game==='minigolf'?'hoyo':r.game==='basta'?'ronda':'mano'} ${i.round}`:''}</div>`;
   if(r.game==='loteria') det+=`<div class="muted">${i.cantor?`🎤 Canta <b>${esc(i.cantor)}</b>`:''}${i.phase==='juego'?` · salieron <b>${i.balls}</b> de 90 bolillas`:''}${i.round?` · ronda ${i.round}`:''}</div>`;
   if(r.game==='kombate') det+=`<div class="muted">${i.kind==='duel'?(i.guest?'Los dos peleadores conectados':'Esperando al rival'):`👀 ${i.viewers||0} mirando`}</div>`;
   const obs=i.obs||[];
@@ -172,7 +173,7 @@ function roomHTML(k, r){
   if(r.game==='banquero'){
     if(!i.local) btns+=`<button class="btn sm green" onclick="enter('${k}')">👑 Entrar a la vista</button>`;
     btns+=`<a class="btn sm gray" href="../banquero/#panel-dueno" target="_blank" rel="noopener">🕵️ Mirar sin que me vean (panel del Banquero)</a>`;
-  } else if(r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='minigolf' || r.game==='adivina' || r.game==='ajedrez' || r.game==='salon'){
+  } else if(r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='minigolf' || r.game==='basta' || r.game==='adivina' || r.game==='ajedrez' || r.game==='salon'){
     if(!i.local) btns+=`<button class="btn sm green" onclick="enter('${k}')">👑 Entrar a mirar</button>`;
   } else if(r.game==='loteria'){
     btns+=`<a class="btn sm" href="../loteria/?sala=${encodeURIComponent(r.code)}" target="_blank" rel="noopener">👀 Abrir la sala</a><span class="muted" style="align-self:center">(ahí tocá “Entrar solo a mirar”)</span>`;
