@@ -61,9 +61,9 @@ const SCORES={
   simple: {t:'🔟 Simple: 10 / 5 / 0', d:'Cada palabra buena vale 10 y la repetida 5. Para cuentas cortitas.'},
 };
 const PICKS={
-  azar:      {t:'🎱 Bolillero (al azar)', d:'La letra sale sola del bolillero.'},
-  abecedario:{t:'🔤 Abecedario y ¡stop!', d:'Como se juega en casa: las letras pasan rapidito y al que le toca grita ¡stop! (toca el botón) para frenarlas.'},
-  elige:     {t:'👉 La elige uno', d:'Por turno, uno elige la letra de las que quedan.'},
+  azar:      {t:'🌼 Ñandutí (al azar)', d:'Las letras del tablero de ñandutí giran y se frenan solas en una.'},
+  abecedario:{t:'🔤 Abecedario y ¡stop!', d:'Como se juega en casa: las letras pasan rapidito por el tablero y al que le toca grita ¡stop! (toca el botón o el tablero) para frenarlas.'},
+  elige:     {t:'👉 La elige uno', d:'Por turno, uno elige la letra de las que quedan (tocando un pétalo del tablero o un botón).'},
 };
 const FORMATS={ind:'👤 Cada uno su planilla', eq:'👥 Por equipos (el equipo comparte la planilla)'};
 const HOUSE=[

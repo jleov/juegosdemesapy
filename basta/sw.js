@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Basta PY como app.
-const CACHE = 'basta-v1';
+const CACHE = 'basta-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './reglas.js', './juego.js'];
 
 self.addEventListener('install', e => {

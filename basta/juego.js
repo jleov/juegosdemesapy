@@ -652,7 +652,7 @@ function renderGame(){
   if(PREV.phase!==null){
     if(V.phase!==PREV.phase || V.round!==PREV.round){
       if(V.phase==='spin'){ sfx.spin(); }
-      else if(V.phase==='write'){ sfx.letter(); bigText(`Letra ${V.letter}`); }
+      else if(V.phase==='write'){ sfx.letter(); bigText(`Letra ${V.letter}`); R3.flipAt=performance.now(); }
       else if(V.phase==='review'){ sfx.stop(); flushWrites(); banner('📝 ¡Lápiz abajo! Revisen las palabras.', ''); }
       else if(V.phase==='roundEnd'){ sfx.good(); }
       else if(V.phase==='abc' || V.phase==='pick'){ if(chooserPid(V)===NET.myPid && !NET.obs){ sfx.turn(); yourTurn(V.phase==='abc'?'🔤 ¡Te toca frenar el abecedario!':'👉 ¡Te toca elegir la letra!'); } }
@@ -707,7 +707,7 @@ function renderPanel(){
   FORM.key=null;
   const host=amHost(), chooser=V.players.find(p=>p.id===chooserPid(V));
   if(ph==='write'){ el.innerHTML=`<div class="wait"><div class="bigL">${esc(V.letter)}</div><p>👀 Están escribiendo… <span id="wtimer"></span></p></div>`; paintTimer(); return; }
-  if(ph==='spin'){ el.innerHTML=`<div class="wait"><p style="font-size:20px">🎱 Sacando la letra del bolillero…</p></div>`; return; }
+  if(ph==='spin'){ el.innerHTML=`<div class="wait"><p style="font-size:20px">🌼 Girando las letras del ñandutí…</p></div>`; return; }
   if(ph==='abc'){
     const mineC = chooserPid(V)===NET.myPid && !NET.obs;
     el.innerHTML=`<div class="wait"><div class="bigL" id="abcL">?</div>${mineC?`<button class="btn red basta" onclick="doAct({type:'stopAbc'})">✋ ¡STOP!</button><p>Las letras pasan rapidito: frenalas cuando quieras.</p>`:`<p>🔤 <b>${esc(chooser?chooser.name:'?')}</b> está por frenar el abecedario…</p>`}</div>`;
@@ -822,22 +822,39 @@ function init3D(){
   const shade=new T.Mesh(new T.ConeGeometry(30, 22, 32, 1, true), new T.MeshStandardMaterial({color:0x2a9d3f, side:T.DoubleSide, roughness:.5, emissive:0x0a2a10})); shade.position.y=TY+165; scene.add(shade);
   const bulb=new T.Mesh(new T.SphereGeometry(5, 16, 12), new T.MeshBasicMaterial({color:0xfff2c0})); bulb.position.y=TY+156; scene.add(bulb);
   const cord=new T.Mesh(new T.CylinderGeometry(.4,.4,200,6), new T.MeshBasicMaterial({color:0x111111})); cord.position.y=TY+276; scene.add(cord);
-  // bolillero en el medio
-  const drum=new T.Group(); drum.position.set(0, TY+22, 0); scene.add(drum); R3.drum=drum;
-  const cage=new T.Mesh(new T.CylinderGeometry(13, 13, 22, 12, 3, true), new T.MeshStandardMaterial({color:0xd8b45a, metalness:.7, roughness:.3, wireframe:true})); cage.rotation.z=Math.PI/2; drum.add(cage); R3.cage=cage;
-  R3.drumBalls=[]; const bcol=[0xd52b1e,0xffffff,0x0038a8,0xf2c14e];
-  for(let i=0;i<14;i++){ const b=new T.Mesh(new T.SphereGeometry(2.6, 12, 10), new T.MeshStandardMaterial({color:bcol[i%4], roughness:.3})); b.userData.a=Math.random()*6.28; b.userData.r=4+Math.random()*6; b.userData.x=(Math.random()-.5)*16; drum.add(b); R3.drumBalls.push(b); }
-  for(const sx of [-1,1]){ const post=new T.Mesh(new T.BoxGeometry(2, 22, 4), new T.MeshStandardMaterial({color:0x6b4423})); post.position.set(sx*13, TY+11, 0); scene.add(post); }
-  // letra que flota arriba del bolillero (con el reloj)
+  // tablero de ñandutí en el medio: las letras alrededor como pétalos
+  const board=new T.Group(); board.position.y=TY; scene.add(board); R3.board=board;
+  const btop=canvasTex(1024,1024,(g,w,h)=>{ g.fillStyle='#1b2340'; g.fillRect(0,0,w,h); nanduti(g, w/2, h/2, w*.47); g.fillStyle='#1b2340'; g.beginPath(); g.arc(w/2,h/2,w*.13,0,7); g.fill(); });
+  const edgeM=new T.MeshStandardMaterial({color:0x6b4423, roughness:.5});
+  const disc=new T.Mesh(new T.CylinderGeometry(27, 28, 2.4, 72), [edgeM, new T.MeshStandardMaterial({map:btop, roughness:.6}), edgeM]); disc.position.y=1.2; disc.castShadow=true; disc.receiveShadow=true; board.add(disc);
+  R3.petals=[]; R3.poolKey=null;
+  // el mate del medio es el reloj: la yerba baja con el tiempo y el anillo se achica
+  const mate=new T.Group(); mate.position.y=2.4; board.add(mate); R3.mate=mate;
+  const prof=[[0,0],[3.5,.2],[6,1.6],[7.2,4.5],[6.9,7.8],[5.8,10.2],[5.2,11.6]].map(([r,y])=>new T.Vector2(r,y));
+  const gourd=new T.Mesh(new T.LatheGeometry(prof, 32), new T.MeshStandardMaterial({color:0xffffff, roughness:.55, side:T.DoubleSide, map:canvasTex(256,128,(g,w,h)=>{ g.fillStyle='#7a4a22'; g.fillRect(0,0,w,h); g.strokeStyle='#d9a32a'; g.lineWidth=4; for(let x=0;x<w;x+=32){ g.beginPath(); g.moveTo(x,40); g.lineTo(x+16,60); g.lineTo(x+32,40); g.stroke(); } g.fillStyle='#d52b1e'; g.fillRect(0,90,w,6); g.fillStyle='#0038a8'; g.fillRect(0,100,w,6); })})); gourd.castShadow=true; mate.add(gourd);
+  const silver=new T.MeshStandardMaterial({color:0xd7dde3, metalness:.85, roughness:.25});
+  const rim=new T.Mesh(new T.TorusGeometry(5.3, .55, 10, 32), silver); rim.rotation.x=Math.PI/2; rim.position.y=11.6; mate.add(rim);
+  R3.yerba=new T.Mesh(new T.CylinderGeometry(5.6, 5.6, .8, 28), new T.MeshStandardMaterial({color:0x6b8f2a, roughness:1})); R3.yerba.position.y=10.8; mate.add(R3.yerba);
+  const bomb=new T.Mesh(new T.CylinderGeometry(.32, .32, 20, 8), silver); bomb.position.set(1.8, 15, 0); bomb.rotation.z=-.22; mate.add(bomb);
+  R3.timeRing=new T.Mesh(new T.RingGeometry(9.2, 11.6, 64), new T.MeshBasicMaterial({color:0x2a9d3f, side:T.DoubleSide})); R3.timeRing.rotation.x=-Math.PI/2; R3.timeRing.position.y=2.5; board.add(R3.timeRing); R3.ringLv=1;
+  // letra grande que flota arriba del mate (con el reloj)
   R3.letterCv=document.createElement('canvas'); R3.letterCv.width=256; R3.letterCv.height=320;
   R3.letterTex=new T.CanvasTexture(R3.letterCv);
-  R3.letter=new T.Mesh(new T.PlaneGeometry(22, 27.5), new T.MeshBasicMaterial({map:R3.letterTex, transparent:true, depthWrite:false})); R3.letter.position.set(0, TY+58, 0); scene.add(R3.letter);
-  // botón de ¡BASTA!
-  const btn=new T.Group(); scene.add(btn); R3.btn=btn;
-  const base=new T.Mesh(new T.CylinderGeometry(9, 10, 3, 32), new T.MeshStandardMaterial({color:0x222222, roughness:.5})); base.position.y=1.5; btn.add(base);
-  const capTex=canvasTex(256,256,(g,w,h)=>{ g.fillStyle='#e53935'; g.fillRect(0,0,w,h); g.fillStyle='#fff'; g.font='900 64px system-ui'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('¡BASTA!', w/2, h/2); });
-  const cap=new T.Mesh(new T.CylinderGeometry(7, 7.4, 4, 32), [new T.MeshStandardMaterial({color:0xe53935, roughness:.3}), new T.MeshStandardMaterial({map:capTex, roughness:.3}), new T.MeshStandardMaterial({color:0xe53935})]);
-  cap.position.y=5; cap.castShadow=true; btn.add(cap); R3.cap=cap;
+  R3.letter=new T.Mesh(new T.PlaneGeometry(20, 25), new T.MeshBasicMaterial({map:R3.letterTex, transparent:true, depthWrite:false})); R3.letter.position.set(0, TY+50, 0); scene.add(R3.letter);
+  // tarjeta de categorías parada al costado (se da vuelta en cada ronda)
+  const card=new T.Group(); scene.add(card); R3.card=card;
+  const easel=new T.Mesh(new T.BoxGeometry(18, 2, 5), edgeM); easel.position.y=1; card.add(easel);
+  const flip=new T.Group(); flip.position.y=13; flip.rotation.x=-.22; card.add(flip); R3.flip=flip;
+  R3.cardCv=document.createElement('canvas'); R3.cardCv.width=360; R3.cardCv.height=500; R3.cardTex=new T.CanvasTexture(R3.cardCv); R3.cardTex.anisotropy=4;
+  const front=new T.Mesh(new T.PlaneGeometry(17, 23.6), new T.MeshStandardMaterial({map:R3.cardTex, roughness:.7})); front.position.z=.06; flip.add(front);
+  const back=new T.Mesh(new T.PlaneGeometry(17, 23.6), new T.MeshStandardMaterial({roughness:.7, map:canvasTex(360,500,(g,w,h)=>{ g.fillStyle='#d52b1e'; g.fillRect(0,0,w,h); g.fillStyle='#fff'; g.fillRect(14,14,w-28,h-28); g.fillStyle='#1b2340'; g.fillRect(24,24,w-48,h-48); nanduti(g, w/2, h/2-20, 130); g.fillStyle='#fff'; g.font='900 46px system-ui'; g.textAlign='center'; g.fillText('BASTA PY', w/2, h-50); })})); back.rotation.y=Math.PI; back.position.z=-.06; flip.add(back);
+  // sello de goma de ¡BASTA!
+  const stamp=new T.Group(); scene.add(stamp); R3.stamp=stamp;
+  const rub=new T.Mesh(new T.BoxGeometry(13, 2, 7.5), new T.MeshStandardMaterial({color:0xc62828, roughness:.8})); rub.position.y=1; stamp.add(rub);
+  const label=new T.MeshStandardMaterial({roughness:.6, map:canvasTex(256,64,(g,w,h)=>{ g.fillStyle='#6b4423'; g.fillRect(0,0,w,h); g.fillStyle='#fff3dd'; g.font='900 44px system-ui'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('¡BASTA!', w/2, h/2+2); })});
+  const blk=new T.Mesh(new T.BoxGeometry(13, 3.4, 7.5), [edgeM, edgeM, edgeM, edgeM, label, edgeM]); blk.position.y=3.7; blk.castShadow=true; stamp.add(blk);
+  const hnd=new T.Mesh(new T.CylinderGeometry(1.3, 1.6, 7, 16), edgeM); hnd.position.y=8.9; stamp.add(hnd);
+  const knob=new T.Mesh(new T.SphereGeometry(2.8, 20, 14), new T.MeshStandardMaterial({color:0xd52b1e, roughness:.35})); knob.position.y=13.6; knob.castShadow=true; stamp.add(knob); R3.knob=knob;
   R3.seatG=new T.Group(); scene.add(R3.seatG);
   wire3DInput(cv3);
   resizeStage();
@@ -903,12 +920,52 @@ function drawSheet(s){
   if(V.bastaBy===s.pid){ c.save(); c.translate(w-120, h-70); c.rotate(-.25); c.strokeStyle='#d52b1e'; c.lineWidth=6; c.strokeRect(-90,-34,180,62); c.fillStyle='#d52b1e'; c.font='900 40px system-ui'; c.textAlign='center'; c.fillText('¡BASTA!', 0, 12); c.restore(); }
   s.tex.needsUpdate=true;
 }
+// dibujo de encaje ñandutí (para el tablero, la tarjeta y la letra)
+function nanduti(g, cx, cy, r){
+  const cols=['#d52b1e','#0038a8','#2a9d3f','#f2c14e','#e75480','#ff7f11','#13a8a8'];
+  g.save(); g.strokeStyle='rgba(255,255,255,.85)'; g.lineWidth=Math.max(1, r/150);
+  for(let i=0;i<64;i++){ const a=i/64*Math.PI*2; g.beginPath(); g.moveTo(cx,cy); g.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r); g.stroke(); }
+  for(let ring=1; ring<=7; ring++){
+    const rr=r*ring/7.4, n=8+ring*6;
+    g.strokeStyle=cols[(ring+3)%cols.length]; g.lineWidth=Math.max(1, r/80); g.beginPath(); g.arc(cx, cy, rr+r*.055, 0, 7); g.stroke();
+    for(let i=0;i<n;i++){ const a=(i+(ring%2)*.5)/n*Math.PI*2; g.fillStyle=cols[(ring+i%2)%cols.length]; g.beginPath(); g.ellipse(cx+Math.cos(a)*rr, cy+Math.sin(a)*rr, r*.05*(1+ring*.12), r*.022*(1+ring*.08), a, 0, 7); g.fill(); }
+  }
+  g.restore();
+}
+// las letras de la partida, en orden, alrededor del tablero
+const petalPool = () => 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('').filter(l=>EASY.includes(l) || (V.opts.dificiles && HARD.includes(l)));
+function buildPetals(pool){
+  const T=THREE, B=R3.board;
+  R3.petals.forEach(p=>{ B.remove(p.g); disposeTree(p.g); });
+  R3.petals=[];
+  const cols=[0xd52b1e, 0xffffff, 0x0038a8], n=pool.length, rad=n>22 ? 21.5 : 21;
+  pool.forEach((L,i)=>{
+    const a=Math.PI/2+i/n*Math.PI*2, g=new T.Group(); g.position.set(Math.cos(a)*rad, 2.4, Math.sin(a)*rad); B.add(g);
+    const body=new T.Mesh(new T.CylinderGeometry(1, 1, 1.6, 28), new T.MeshStandardMaterial({color:cols[i%3], roughness:.4})); body.scale.set(n>22?2.2:2.5, 1, 3.4); body.rotation.y=Math.PI/2-a; body.position.y=.8; body.castShadow=true; g.add(body);
+    const top=new T.Mesh(new T.PlaneGeometry(4.2, 4.2), new T.MeshBasicMaterial({transparent:true, map:canvasTex(128,128,(c,w,h)=>{ c.fillStyle='#fff6e0'; c.beginPath(); c.arc(w/2,h/2,58,0,7); c.fill(); c.lineWidth=6; c.strokeStyle='#8a5a12'; c.stroke(); c.fillStyle='#1b2340'; c.font='900 86px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(L, w/2, h/2+6); })}));
+    top.rotation.x=-Math.PI/2; top.rotation.z=Math.PI/2-a; top.position.y=1.65; g.add(top);
+    body.userData.L=L; top.userData.L=L;
+    R3.petals.push({L, g, body, top, col:cols[i%3]});
+  });
+}
+function drawCard(){
+  const c=R3.cardCv.getContext('2d'), w=360, h=500;
+  c.fillStyle='#d52b1e'; c.fillRect(0,0,w,h); c.fillStyle='#fffdf3'; c.fillRect(12,12,w-24,h-24);
+  c.fillStyle='#0038a8'; c.fillRect(12,12,w-24,78);
+  c.fillStyle='#fff'; c.font='900 38px system-ui'; c.textAlign='left'; c.fillText('Categorías', 30, 66);
+  c.fillStyle='#f2c14e'; c.beginPath(); c.arc(w-56, 51, 30, 0, 7); c.fill(); c.fillStyle='#d52b1e'; c.font='900 40px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(V.letter||'?', w-56, 53); c.textBaseline='alphabetic';
+  const n=Math.max(1, V.cats.length), rowH=Math.min(46, (h-120)/n);
+  V.cats.forEach((cat,k)=>{ const y=118+k*rowH+rowH*.7; c.fillStyle=['#d52b1e','#0038a8','#2a9d3f'][k%3]; c.beginPath(); c.arc(36, y-rowH*.25, 7, 0, 7); c.fill();
+    c.fillStyle='#1b2340'; c.font=`bold ${Math.min(30, rowH*.62)}px system-ui`; c.textAlign='left'; c.fillText(cat.slice(0,20), 54, y); });
+  R3.cardTex.needsUpdate=true;
+}
 function drawLetterCv(L, sub, hot){
   const c=R3.letterCv.getContext('2d'), w=256, h=320;
   c.clearRect(0,0,w,h);
-  const g=c.createRadialGradient(100,90,20,128,128,120); g.addColorStop(0,'#fff'); g.addColorStop(.5,'#ffe6a0'); g.addColorStop(1,'#d9a32a');
-  c.fillStyle=g; c.beginPath(); c.arc(128,128,118,0,7); c.fill(); c.lineWidth=8; c.strokeStyle='#8a5a12'; c.stroke();
-  c.fillStyle='#d52b1e'; c.font='900 150px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(L, 128, 138);
+  c.fillStyle='#1b2340'; c.beginPath(); c.arc(128,128,122,0,7); c.fill();
+  nanduti(c, 128, 128, 118);
+  c.fillStyle='#fff6e0'; c.beginPath(); c.arc(128,128,74,0,7); c.fill(); c.lineWidth=6; c.strokeStyle='#d9a32a'; c.stroke();
+  c.fillStyle='#d52b1e'; c.font='900 110px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(L, 128, 136);
   if(sub){ c.fillStyle=hot?'#ff5252':'#fff'; c.font='bold 46px system-ui'; c.textBaseline='alphabetic'; c.strokeStyle='rgba(0,0,0,.7)'; c.lineWidth=8; c.strokeText(sub, 128, 305); c.fillText(sub, 128, 305); }
   R3.letterTex.needsUpdate=true;
 }
@@ -924,10 +981,13 @@ function wire3DInput(canvas){
   });
   canvas.addEventListener('pointerup', e=>{
     const d=drag; drag=null; if(!d || d.moved) return;
-    // tocar el botón rojo = ¡BASTA!
+    // tocar el sello = ¡BASTA!; en el abecedario frena; al elegir, se toca un pétalo
     const r=canvas.getBoundingClientRect(), T=THREE, ray=new T.Raycaster();
     ray.setFromCamera(new T.Vector2((e.clientX-r.left)/r.width*2-1, -((e.clientY-r.top)/r.height)*2+1), R3.cam);
-    if(ray.intersectObject(R3.btn, true).length){ if(canWrite()) basta(); else if(V.phase==='abc' && chooserPid(V)===NET.myPid) doAct({type:'stopAbc'}); }
+    const mineC=chooserPid(V)===NET.myPid && !NET.obs;
+    if(ray.intersectObject(R3.stamp, true).length){ if(canWrite()) basta(); else if(V.phase==='abc' && mineC) doAct({type:'stopAbc'}); return; }
+    if(V.phase==='abc' && mineC && ray.intersectObject(R3.board, true).length){ doAct({type:'stopAbc'}); return; }
+    if(V.phase==='pick' && mineC){ const h=ray.intersectObjects(R3.petals.map(p=>p.body).concat(R3.petals.map(p=>p.top)))[0]; if(h) doAct({type:'pickL', l:h.object.userData.L}); }
   });
   canvas.addEventListener('pointercancel', ()=>{ drag=null; });
   canvas.addEventListener('wheel', e=>{ e.preventDefault(); CAM3.zoom=Math.max(.5, Math.min(2, CAM3.zoom*(e.deltaY>0?1.08:.93))); saveCam3(); }, {passive:false});
@@ -946,28 +1006,49 @@ function draw3D(){
   if(R3.sheetKey!==sk){ R3.sheetKey=sk; R3.seats.forEach(s=>{ const si=sideOf(V,s.pid), n=filled(V,si); if(s.last>=0 && n>s.last) s.wob=now; s.last=n; drawSheet(s); }); }
   R3.seats.forEach(s=>{ const t=(now-s.wob)/1000; if(t<1.2){ s.pencil.position.set(s.pp.x+Math.sin(t*30)*1.5, s.pp.y+Math.abs(Math.sin(t*15))*1.2, s.pp.z+Math.cos(t*25)*1.2); } else s.pencil.position.copy(s.pp);
     s.face.lookAt(R3.cam.position); s.tag.lookAt(R3.cam.position); });
-  // bolillero y letra
-  const ph=V.phase, spinning = ph==='spin' || ph==='abc' || ph==='pick';
-  R3.drum.rotation.x += spinning ? .12 : .004;
-  R3.drumBalls.forEach((b,i)=>{ const a=b.userData.a+(spinning?now/180:now/2000)+i; b.position.set(b.userData.x, Math.sin(a)*b.userData.r*(spinning?1:.4)-(spinning?0:6), Math.cos(a)*b.userData.r*(spinning?1:.6)); });
-  let L='?', sub='', hot=false;
-  if(ph==='spin'){ const k=(hostMs()-V.phaseAt)/2800; const pool=EASY.concat(V.opts.dificiles?HARD:[]); L = k<.75 ? pool[Math.floor(now/70)%pool.length] : V.letter; }
-  else if(ph==='abc'){ L=abcLetter(V, hostMs()); if(L!==R3.lastAbc){ R3.lastAbc=L; sfx.abc(); const el=$('#abcL'); if(el) el.textContent=L; } }
-  else if(ph==='pick') L='?';
-  else L=V.letter||'?';
+  // tablero: pétalos de las letras, mate reloj, tarjeta y sello
+  const ph=V.phase, pool=petalPool();
+  if(R3.poolKey!==pool.join('')){ R3.poolKey=pool.join(''); buildPetals(pool); }
+  let cur=-1;
+  if(ph==='spin'){ const t=pool.indexOf(V.letter), k=Math.max(0, Math.min(1, (hostMs()-V.phaseAt)/2400)), e=1-Math.pow(1-k,3), st=Math.floor((1-e)*pool.length*3); cur=((t-st)%pool.length+pool.length)%pool.length; }
+  else if(ph==='abc') cur=pool.indexOf(abcLetter(V, hostMs()));
+  if(cur!==R3.cur){ R3.cur=cur; if(cur>=0){ if(ph==='abc'){ sfx.abc(); const el=$('#abcL'); if(el) el.textContent=pool[cur]; } else sfx.tick(); } }
+  const showCur = !['spin','abc','pick','lobby'].includes(ph);
+  R3.petals.forEach((p,i)=>{
+    const used=V.used.includes(p.L) && !(showCur && p.L===V.letter), isCur=showCur && p.L===V.letter, hl=i===cur, canPick=ph==='pick' && chooserPid(V)===NET.myPid && !V.used.includes(p.L);
+    p.body.material.color.setHex(isCur ? 0xf2c14e : hl ? 0x7fd7ff : used ? 0x4a4550 : p.col);
+    p.body.material.emissive.setHex(isCur ? 0x553300 : hl ? 0x1a4a66 : canPick && Math.sin(now/250+i)>0 ? 0x332200 : 0);
+    const y = 2.4 + (isCur ? 1.8+Math.sin(now/300)*.4 : hl ? 1.2 : used ? -.6 : 0);
+    p.g.position.y += (y-p.g.position.y)*.3; p.top.material.opacity = used ? .35 : 1;
+  });
+  // el mate se va vaciando con el tiempo
+  let lv=1;
+  if(ph==='write' && V.endsAt){ const tot=(V.bastaBy ? V.opts.count : V.opts.timer)*1000 || 1; lv=Math.max(0, Math.min(1, (V.endsAt-hostMs())/tot)); }
+  else if(ph==='review' || ph==='roundEnd' || ph==='over') lv=0;
+  R3.yerba.position.y=3.5+lv*7.3; R3.yerba.visible=lv>.02;
+  if(Math.abs(lv-R3.ringLv)>.004){ R3.ringLv=lv; R3.timeRing.geometry.dispose(); R3.timeRing.geometry=new T.RingGeometry(9.2, 11.6, 64, 1, Math.PI/2, Math.max(.001, lv*Math.PI*2)); R3.timeRing.material.color.setHSL(lv*.33, .8, .45); }
+  R3.timeRing.visible = ph==='write' && !!V.endsAt;
+  // letra grande arriba del mate
+  let L = cur>=0 ? pool[cur] : ph==='pick' ? '?' : (V.letter||'?'), sub='', hot=false;
   if(ph==='write'){ const s=timeLeft(); if(s!=null){ sub=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; hot=s<=10; } else sub='✏️'; }
   const lk=L+'|'+sub+'|'+hot; if(R3.lk!==lk){ R3.lk=lk; drawLetterCv(L, sub, hot); }
   R3.letter.position.y=TY+50+Math.sin(now/600)*1.5; R3.letter.lookAt(R3.cam.position);
-  // botón: delante mío
-  const myA=Math.PI/2; R3.btn.position.copy(polar(myA, 30, TY));
-  const pressed = V.bastaBy || (R3.pressAt && now-R3.pressAt<400);
-  R3.cap.position.y = pressed ? 3.2 : 5; R3.cap.material[0].emissive.setHex(V.bastaBy?0x550000:0);
+  // tarjeta: se da vuelta cuando empieza cada ronda
+  const ck=V.round+'|'+V.letter+'|'+V.cats.join(','); if(R3.ck!==ck){ R3.ck=ck; drawCard(); }
+  R3.card.position.copy(polar(Math.PI/2-.62, 40, TY)); R3.card.lookAt(0, TY+8, 160);
+  const ft=R3.flipAt ? Math.min(1, (now-R3.flipAt)/800) : 1, faceUp = ph!=='spin' && ph!=='abc' && ph!=='pick';
+  R3.flip.rotation.y = faceUp ? Math.PI*Math.pow(1-ft,3) : Math.PI;
+  // sello: delante mío, al costado; cae cuando alguien grita ¡BASTA!
+  R3.stamp.position.copy(polar(Math.PI/2+.62, 36, TY));
+  const pt=R3.pressAt ? (now-R3.pressAt)/600 : 9;
+  R3.stamp.position.y = TY + (pt<1 ? (pt<.3 ? 10*(1-pt/.3) : (pt-.3)/.7*3) : (V.bastaBy?3:0)) + (canWrite()&&!V.bastaBy ? Math.abs(Math.sin(now/400))*.8 : 0);
+  R3.knob.material.emissive.setHex(canWrite() && !V.bastaBy ? 0x330000 : 0);
   // cámara
   const z=CAM3.zoom, cam=R3.cam;
   let want, look;
   if(CAM3.mode==='arriba'){ want=new T.Vector3(Math.cos(Math.PI/2+CAM3.yaw)*40, TY+300*z, Math.sin(Math.PI/2+CAM3.yaw)*40); look=new T.Vector3(0,TY,0); }
   else if(CAM3.mode==='hoja'){ const sp=polar(Math.PI/2, TR-24, TY); want=new T.Vector3(sp.x+Math.sin(CAM3.yaw)*20, TY+48*z, sp.z+22*z); look=sp; }
-  else { const a=Math.PI/2+CAM3.yaw, nar=cam.aspect<1 ? 1+(1-cam.aspect)*.9 : 1, r=(TR+50)*z*nar; want=new T.Vector3(Math.cos(a)*r, TY+(110+CAM3.pitch*90)*z*nar, Math.sin(a)*r); look=new T.Vector3(Math.cos(a)*14, TY+16, Math.sin(a)*14); }
+  else { const a=Math.PI/2+CAM3.yaw, nar=cam.aspect<1 ? 1+(1-cam.aspect)*.9 : 1, r=(TR+38)*z*nar; want=new T.Vector3(Math.cos(a)*r, TY+(98+CAM3.pitch*90)*z*nar, Math.sin(a)*r); look=new T.Vector3(Math.cos(a)*14, TY+16, Math.sin(a)*14); }
   cam.position.lerp(want, .15);
   R3.camLook=(R3.camLook||look.clone()).lerp(look, .15); cam.lookAt(R3.camLook);
   R3.renderer.render(R3.scene, cam);
