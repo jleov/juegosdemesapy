@@ -492,6 +492,7 @@ function setupConn(c) {
     c.send({ t: 'hi', name: S.name, muted: S.muted, deaf: S.deaf });
     // le mando mis transmisiones: voz y cada pantalla
     S.local.forEach(ls => callStream(c.peer, ls));
+    watchOnPeer(c.peer);
     if (!old) sysMsg(`${p.name} entró a la sala.`);
     render();
   });
@@ -506,6 +507,7 @@ function dropPeer(id) {
   S.local.forEach(ls => { const call = ls.calls.get(id); if (call) { ls.calls.delete(id); try { call.close(); } catch (e) {} } });
   [...S.remote.values()].filter(r => r.peer === id).forEach(r => removeRemote(r.key));
   if (p) sysMsg(`${p.name} salió de la sala.`);
+  watchOnDrop(id);
   render();
 }
 
@@ -534,6 +536,8 @@ function onData(from, d) {
       applyPause(ls, from);
       break;
     }
+    case 'wp':
+      onWatchMsg(from, d); break;
   }
 }
 
@@ -1001,6 +1005,8 @@ function renderBar() {
   $('#btnShare').classList.toggle('act', n > 0);
   $('#btnShare').dataset.tip = n ? `Compartiendo ${n} — tocá para compartir otra a la vez` : 'Compartir pantalla';
   const c = $('#shareCount'); c.textContent = n ? n + '+' : ''; c.classList.toggle('hidden', !n);
+  $('#btnWatch').classList.toggle('act', !!W.s);
+  $('#btnWatch').dataset.tip = W.s ? `Ver juntos: «${W.s.title}»` : 'Ver juntos (Netflix, Disney+, Prime…)';
 }
 
 function avatar(name, talkId, extra = '') {
@@ -1266,6 +1272,8 @@ const toggleChat = show => {
   renderTiles();
 };
 $('#btnChat').onclick = () => toggleChat($('#chat').classList.contains('hidden'));
+$('#btnWatch').onclick = () => toggleWatch(!W.open);
+$('#btnWatchClose').onclick = () => toggleWatch(false);
 $('#btnChatClose').onclick = () => toggleChat(false);
 $('#chatForm').onsubmit = e => {
   e.preventDefault();
@@ -1291,6 +1299,293 @@ document.addEventListener('keydown', e => {
   if (e.key === 'm' || e.key === 'M') $('#btnMic').click();
 });
 window.addEventListener('pagehide', () => { try { S.me && S.me.destroy(); S.reg && S.reg.destroy(); } catch (e) {} });
+
+/* =====================================================================
+   VER JUNTOS: Netflix, Disney+, Prime, YouTube… cada uno con su cuenta,
+   sincronizados por la sala. La extensión «Ver juntos» (ver-juntos/) maneja
+   la pestaña de la película; acá se reparte quién pausa, adelanta o cambia el volumen.
+   - Guía (W.s.host): el que empezó; cada 2 s manda en qué minuto va (a: 'sync').
+   - Los que tienen control mandan órdenes (a: 'cmd'); todos las aplican.
+   - Cada uno corrige su película si se atrasa o adelanta más de 1,5 s.
+   ===================================================================== */
+const W = { ext: false, extV: '', tabs: [], local: null, s: null, quiet: 0, fixAt: 0, reps: new Map(), open: false, drag: false, off: false, last: '' };
+const toExt = m => window.postMessage({ ...m, src: 'salas-app' }, location.origin);
+const myId = () => (S.me && S.me.id) || 'me';
+const nameOf = id => id === myId() ? S.name : ((S.peers.get(id) || {}).name || '?');
+const lat = from => { if (from === myId()) return 0; const p = S.peers.get(from); return p && p.rtt ? p.rtt / 2000 : 0.05; };
+const expected = () => !W.s ? 0 : W.s.paused ? W.s.time : W.s.time + (Date.now() - W.s.at) / 1000;
+const canCtrl = id => !!W.s && (W.s.ctrl === 'all' || id === W.s.host || (Array.isArray(W.s.ctrl) && W.s.ctrl.includes(id)));
+const iAmHost = () => !!W.s && W.s.host === myId();
+const fmtT = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+function setGroup(time, paused, from) { W.s.time = (+time || 0) + (paused ? 0 : lat(from)); W.s.paused = !!paused; W.s.at = Date.now(); }
+
+// mensajes de la extensión
+window.addEventListener('message', e => {
+  if (e.source !== window || !e.data || e.data.src !== 'salas-ext') return;
+  const m = e.data;
+  if (m.type === 'hello') { if (!W.ext) { W.ext = true; W.extV = String(m.v || ''); toExt({ type: 'tabs' }); renderWatch(); } }
+  else if (m.type === 'tabs') { W.ext = true; W.tabs = Array.isArray(m.list) ? m.list : []; renderWatch(); }
+  else if (m.type === 'state') {
+    W.ext = true;
+    const had = !!W.local;
+    W.local = m.has ? m : null;
+    if (had !== !!W.local) renderWatch();
+    watchReconcile();
+  }
+  else if (m.type === 'ev') watchLocalEvent(m);
+});
+toExt({ type: 'ping' });
+
+function watchStart() {
+  const L = W.local;
+  if (!L) { toast('Primero abrí la película en otra pestaña y dale play.'); return; }
+  W.off = false;
+  W.s = { host: myId(), title: String(L.title || 'Película').slice(0, 120), plat: L.plat || '', url: L.url || '', dur: L.duration || 0, ctrl: 'all', time: L.time, paused: L.paused, at: Date.now(), vol: null };
+  broadcast({ t: 'wp', a: 'start', s: watchPub() });
+  sysMsg(`🍿 Empezaste a ver «${W.s.title}» (${W.s.plat}) con la sala.`);
+  renderWatch(); renderBar();
+}
+const watchPub = () => ({ host: W.s.host, title: W.s.title, plat: W.s.plat, url: W.s.url, dur: W.s.dur, ctrl: W.s.ctrl, time: expected(), paused: W.s.paused, vol: W.s.vol });
+
+function onWatchMsg(from, d) {
+  switch (d.a) {
+    case 'start': {
+      const s = d.s || {};
+      const nuevo = !W.s || W.s.title !== s.title;
+      W.s = {
+        host: String(s.host || from), title: String(s.title || 'Película').slice(0, 120), plat: String(s.plat || '').slice(0, 30),
+        url: /^https:\/\//.test(s.url || '') ? String(s.url).slice(0, 500) : '', dur: +s.dur || 0,
+        ctrl: s.ctrl === 'all' ? 'all' : (Array.isArray(s.ctrl) ? s.ctrl.map(String).slice(0, 30) : []),
+        vol: typeof s.vol === 'number' ? s.vol : null, time: 0, paused: true, at: Date.now(),
+      };
+      setGroup(s.time, s.paused, from);
+      W.quiet = 0; W.off = false;
+      if (nuevo) {
+        sysMsg(`🍿 ${nameOf(W.s.host)} está viendo «${W.s.title}» (${W.s.plat}). Tocá 🍿 Ver juntos para sumarte.`);
+        if (!W.open) toast(`🍿 ${nameOf(W.s.host)} empezó a ver «${W.s.title}». Tocá 🍿 para sumarte.`, 7000);
+      }
+      renderWatch(); renderBar(); watchReconcile(true);
+      break;
+    }
+    case 'sync':
+      if (!W.s || from !== W.s.host || Date.now() < W.quiet) break;
+      setGroup(d.time, d.paused, from);
+      if (+d.dur) W.s.dur = +d.dur;
+      watchReconcile();
+      break;
+    case 'cmd':
+      if (W.s && canCtrl(from)) watchApply(d, from);
+      break;
+    case 'ctrl':
+      if (!W.s || from !== W.s.host) break;
+      W.s.ctrl = d.ctrl === 'all' ? 'all' : (Array.isArray(d.ctrl) ? d.ctrl.map(String) : []);
+      renderWatch();
+      if (canCtrl(myId()) && from !== myId()) toast('🍿 Ahora podés manejar la película.');
+      break;
+    case 'rep':
+      W.reps.set(from, { has: !!d.has, ext: !!d.ext, time: +d.time || 0, paused: !!d.paused, ad: !!d.ad, at: Date.now() });
+      break;
+    case 'stop':
+      if (W.s && from === W.s.host) { W.s = null; sysMsg(`🍿 ${nameOf(from)} terminó el ver juntos.`); renderWatch(); renderBar(); }
+      break;
+  }
+}
+
+// aplicar una orden (mía o de otro con control)
+const ACT = { play: 'le dio play', pause: 'pausó', seek: 'movió la película a', vol: 'cambió el volumen de todos' };
+// propia: lo hizo la persona con los botones de su película (ya está hecho, no se le vuelve a ordenar)
+function watchApply(d, from, propia) {
+  const cmd = d.cmd;
+  if (cmd === 'vol') {
+    W.s.vol = Math.max(0, Math.min(1, +d.vol || 0));
+    if (!W.off) toExt({ type: 'cmd', cmd: 'vol', vol: W.s.vol });
+  } else if (cmd === 'play' || cmd === 'pause' || cmd === 'seek') {
+    const paused = cmd === 'pause' ? true : cmd === 'play' ? false : (typeof d.paused === 'boolean' ? d.paused : W.s.paused);
+    setGroup(d.time, paused, from);
+    W.quiet = Date.now() + 3000;   // unos segundos sin hacer caso al minuto del guía, que todavía no se enteró
+    if (propia) W.fixAt = Date.now() + 3000;
+    else if (!W.off) toExt({ type: 'cmd', cmd: paused ? 'pause' : 'play', time: expected(), seek: cmd === 'seek' });
+  } else return;
+  W.last = `${nameOf(from)} ${ACT[cmd]}${cmd === 'seek' ? ' ' + fmtT(d.time) : cmd === 'vol' ? ' (' + Math.round(W.s.vol * 100) + '%)' : ''}`;
+  if (from !== myId()) toast('🍿 ' + W.last, 2500);
+  tickWatch();
+}
+function watchCmd(cmd, time, vol, propia) {
+  if (!W.s) return;
+  if (!canCtrl(myId())) { toast(`Solo manejan la película los que tienen el control (guía: ${nameOf(W.s.host)}).`); return; }
+  // al adelantar desde la película se respeta si quedó en pausa o andando
+  const paused = cmd === 'pause' ? true : cmd === 'play' ? false : (propia && W.local ? W.local.paused : W.s.paused);
+  const d = { t: 'wp', a: 'cmd', cmd, time, vol, paused };
+  watchApply(d, myId(), propia);
+  broadcast(d);
+}
+
+// la persona usó los botones de Netflix/Disney… en su pestaña
+function watchLocalEvent(m) {
+  if (!W.s || W.off) return;
+  if (canCtrl(myId())) watchCmd(m.ev === 'seeked' ? 'seek' : m.ev, +m.time || 0, null, true);
+  else {
+    toExt({ type: 'cmd', cmd: W.s.paused ? 'pause' : 'play', time: expected(), seek: true });
+    toast(`Solo manejan la película los que tienen el control (guía: ${nameOf(W.s.host)}).`);
+  }
+}
+
+// corregir mi película si quedó distinta a la del grupo
+function watchReconcile(force) {
+  if (!W.s || !W.local || W.off || W.local.ad) { tickWatch(); return; }
+  if (iAmHost() && !force) { tickWatch(); return; }
+  const now = Date.now();
+  if (!force && now < W.fixAt) return;
+  const exp = expected(), off = W.local.time - exp;
+  if (W.local.paused !== W.s.paused || Math.abs(off) > (W.s.paused ? 1 : 1.5)) {
+    W.fixAt = now + 3000;
+    toExt({ type: 'cmd', cmd: W.s.paused ? 'pause' : 'play', time: exp + (W.s.paused ? 0 : 0.3), seek: Math.abs(off) > 1 });
+  }
+  tickWatch();
+}
+
+function watchOnPeer(pid) {
+  if (!iAmHost()) return;
+  try { S.peers.get(pid).conn.send({ t: 'wp', a: 'start', s: watchPub() }); } catch (e) {}
+}
+function watchOnDrop(id) {
+  W.reps.delete(id);
+  if (!W.s || W.s.host !== id) return;
+  // se fue el guía: lo toma el de id más chico entre los que quedan (todos eligen al mismo)
+  W.s.host = [myId(), ...S.peers.keys()].sort()[0];
+  if (iAmHost()) toast('🍿 Ahora vos guiás el ver juntos.');
+  renderWatch();
+}
+
+// el guía avisa en qué minuto va; todos cuentan cómo están
+setInterval(() => {
+  if (!W.s || !S.me || S.left) return;
+  if (iAmHost() && W.local && !W.off && Date.now() > W.quiet) {
+    W.s.time = W.local.time; W.s.paused = W.local.paused; W.s.at = Date.now();
+    if (W.local.duration) W.s.dur = W.local.duration;
+    broadcast({ t: 'wp', a: 'sync', time: W.local.time, paused: W.local.paused, dur: W.s.dur });
+  }
+}, 2000);
+setInterval(() => {
+  if (!W.s || !S.me || S.left) return;
+  broadcast({ t: 'wp', a: 'rep', has: !!W.local && !W.off, ext: W.ext, time: W.local ? W.local.time : 0, paused: W.local ? W.local.paused : true, ad: !!(W.local && W.local.ad) });
+}, 3000);
+setInterval(tickWatch, 500);
+
+/* ---------------- panel ---------------- */
+const EXT_STEPS = `
+  <div class="winst">
+    <b>Instalá la extensión «Ver juntos» (una sola vez, en la PC con Chrome o Edge)</b>
+    <ol>
+      <li><a href="ver-juntos.zip" download>Descargá ver-juntos.zip</a> y descomprimilo (clic derecho → <b>Extraer todo</b>).</li>
+      <li>Abrí <code>chrome://extensions</code> en una pestaña nueva <button class="btn ghost mini" id="wCopyExt" type="button">Copiar</button></li>
+      <li>Arriba a la derecha activá <b>Modo de desarrollador</b>.</li>
+      <li>Tocá <b>Cargar descomprimida</b> y elegí la carpeta <b>ver-juntos</b>.</li>
+      <li>Volvé acá y recargá la página.</li>
+    </ol>
+    <small>Cada uno mira con su propia cuenta de Netflix, Disney+, Prime… En el celular no se puede: Chrome del celular no tiene extensiones.</small>
+  </div>`;
+
+function renderWatch() {
+  const btnW = $('#btnWatch');
+  if (btnW) btnW.classList.toggle('act', !!W.s);
+  const box = $('#watchBody'); if (!box || !W.open) return;
+  let h = '';
+  if (W.s) {
+    const ctl = canCtrl(myId());
+    h += `<div class="wtitle"><b>${esc(W.s.title)}</b><small>${esc(W.s.plat)} · guía: ${esc(nameOf(W.s.host))}</small></div>`;
+    if (!W.ext) h += `<div class="wwarn">Para que tu película siga a la del grupo necesitás la extensión (abajo).</div>`;
+    else if (!W.local) h += `<div class="wwarn">Abrí la misma película en otra pestaña y dale play: se acomoda sola al minuto del grupo.${W.s.url ? ' <button class="btn ghost mini" id="wOpen" type="button">Abrir la misma</button>' : ''}</div>`;
+    h += `<div class="wtime"><span id="wNow">0:00</span><input type="range" id="wSeek" min="0" max="${Math.max(1, Math.round(W.s.dur || 0))}" step="1" ${ctl ? '' : 'disabled'} aria-label="Minuto de la película"><span id="wDur">${W.s.dur ? fmtT(W.s.dur) : '--:--'}</span></div>`;
+    if (ctl) {
+      h += `<div class="wctl">
+        <button class="cb" id="wBack" title="Atrás 10 s" type="button">⏪</button>
+        <button class="cb act" id="wPlay" title="Play / pausa" type="button">▶</button>
+        <button class="cb" id="wFwd" title="Adelante 10 s" type="button">⏩</button>
+      </div>
+      <label class="wvol">🔊 Volumen de todos <input type="range" id="wVol" min="0" max="100" value="${Math.round((W.s.vol ?? 1) * 100)}"></label>`;
+    } else h += `<div class="wnote">Mirás sin control: manejan ${W.s.ctrl === 'all' ? 'todos' : 'el guía' + (W.s.ctrl.length ? ' y ' + W.s.ctrl.map(nameOf).join(', ') : '')}.</div>`;
+    h += `<div class="wlast" id="wLast"></div><div class="wmem" id="wMem"></div>`;
+    if (iAmHost()) {
+      h += `<h4>¿Quién puede manejar la película?</h4>
+        <label class="wchk"><input type="checkbox" id="wAll" ${W.s.ctrl === 'all' ? 'checked' : ''}> Todos</label>`;
+      if (W.s.ctrl !== 'all') S.peers.forEach((p, id) => {
+        h += `<label class="wchk"><input type="checkbox" data-ctrl="${esc(id)}" ${W.s.ctrl.includes(id) ? 'checked' : ''}> ${esc(p.name)}</label>`;
+      });
+      h += `<button class="btn ghost wide" id="wStop" type="button">Terminar el ver juntos</button>`;
+    } else {
+      h += `<button class="btn ghost wide" id="wOff" type="button">${W.off ? 'Volver a sincronizar mi película' : 'Dejar de sincronizar mi película'}</button>`;
+    }
+  } else {
+    h += `<p class="wnote">Cada uno pone la película en su propia cuenta (Netflix, Disney+, Prime Video, Max, YouTube…) y la sala los mantiene en el mismo minuto: si alguien pausa, adelanta o baja el volumen, les pasa a todos.</p>`;
+    if (W.ext) {
+      if (!W.tabs.length) h += `<div class="wwarn">Abrí la película en otra pestaña y dale play. Aparece acá sola.</div>`;
+      else {
+        h += `<label class="f">Película</label><select id="wTab">${W.tabs.map(t => `<option value="${esc(t.key)}" ${t.elegido ? 'selected' : ''}>${esc(t.plat)} — ${esc(t.title || 'video')}</option>`).join('')}</select>
+          <button class="btn wide" id="wStart" type="button">🍿 Empezar a ver juntos</button>`;
+      }
+    }
+  }
+  if (!W.ext) h += EXT_STEPS;
+  else h += `<p class="wext">✅ Extensión «Ver juntos» ${esc(W.extV)} instalada</p>`;
+  box.innerHTML = h;
+
+  const on = (id, ev, fn) => { const el = box.querySelector('#' + id); if (el) el[ev] = fn; };
+  on('wStart', 'onclick', watchStart);
+  on('wTab', 'onchange', e => toExt({ type: 'bind', key: e.target.value }));
+  on('wOpen', 'onclick', () => W.ext ? toExt({ type: 'open', url: W.s.url }) : window.open(W.s.url, '_blank', 'noopener'));
+  on('wCopyExt', 'onclick', () => navigator.clipboard.writeText('chrome://extensions').then(() => toast('Copiado: pegalo en la barra de direcciones de una pestaña nueva.')).catch(() => {}));
+  on('wPlay', 'onclick', () => watchCmd(W.s.paused ? 'play' : 'pause', expected()));
+  on('wBack', 'onclick', () => watchCmd('seek', Math.max(0, expected() - 10)));
+  on('wFwd', 'onclick', () => watchCmd('seek', expected() + 10));
+  on('wVol', 'onchange', e => watchCmd('vol', null, +e.target.value / 100));
+  const seek = box.querySelector('#wSeek');
+  if (seek) {
+    seek.oninput = () => { W.drag = true; $('#wNow').textContent = fmtT(+seek.value); };
+    seek.onchange = () => { W.drag = false; watchCmd('seek', +seek.value); };
+  }
+  on('wStop', 'onclick', () => { broadcast({ t: 'wp', a: 'stop' }); sysMsg('🍿 Terminaste el ver juntos.'); W.s = null; renderWatch(); renderBar(); });
+  on('wOff', 'onclick', () => { W.off = !W.off; if (!W.off) watchReconcile(true); renderWatch(); });
+  on('wAll', 'onchange', e => { W.s.ctrl = e.target.checked ? 'all' : []; broadcast({ t: 'wp', a: 'ctrl', ctrl: W.s.ctrl }); renderWatch(); });
+  box.querySelectorAll('[data-ctrl]').forEach(c => c.onchange = () => {
+    const id = c.dataset.ctrl, list = Array.isArray(W.s.ctrl) ? W.s.ctrl.filter(x => x !== id) : [];
+    if (c.checked) list.push(id);
+    W.s.ctrl = list; broadcast({ t: 'wp', a: 'ctrl', ctrl: list });
+  });
+  tickWatch();
+}
+
+// lo que cambia cada medio segundo: minuto, botón play/pausa y cómo está cada uno
+function tickWatch() {
+  if (!W.open || !W.s) return;
+  const exp = expected();
+  const now = $('#wNow'), seek = $('#wSeek'), play = $('#wPlay'), mem = $('#wMem'), last = $('#wLast');
+  if (now && !W.drag) now.textContent = fmtT(exp);
+  if (seek && !W.drag) { if (W.s.dur && +seek.max !== Math.round(W.s.dur)) { seek.max = Math.round(W.s.dur); $('#wDur').textContent = fmtT(W.s.dur); } seek.value = Math.round(exp); }
+  if (play) play.textContent = W.s.paused ? '▶' : '⏸';
+  if (last) last.textContent = W.last;
+  if (!mem) return;
+  const st = (has, ext, time, ad, at) => {
+    if (at && Date.now() - at > 9000) return '⏳ sin noticias';
+    if (!ext) return '⚠️ sin la extensión';
+    if (!has) return '⚠️ sin la película abierta';
+    if (ad) return '📺 en publicidad';
+    const d = time - exp;
+    return Math.abs(d) < 2.5 ? '✅ sincronizado' : `⏱ ${Math.abs(d).toFixed(0)} s ${d < 0 ? 'atrás' : 'adelante'}`;
+  };
+  const rows = [`<div><b>${esc(S.name)} (vos)</b> ${st(!!W.local && !W.off, W.ext, W.local ? W.local.time : 0, W.local && W.local.ad)}</div>`];
+  S.peers.forEach((p, id) => {
+    const r = W.reps.get(id);
+    rows.push(`<div><b>${esc(p.name)}</b> ${r ? st(r.has, r.ext, r.time + (r.paused ? 0 : (Date.now() - r.at) / 1000), r.ad, r.at) : '⏳ esperando…'}${canCtrl(id) ? ' 🎮' : ''}</div>`);
+  });
+  mem.innerHTML = rows.join('');
+}
+
+function toggleWatch(show) {
+  W.open = show;
+  $('#watch').classList.toggle('hidden', !show);
+  if (show) { toExt({ type: 'ping' }); toExt({ type: 'tabs' }); renderWatch(); }
+}
 
 /* =====================================================================
    APP: instalar, avisar versión nueva y seguir hablando con el celular minimizado
@@ -1363,7 +1658,7 @@ function mediaSession() {
 function mediaMic() { try { navigator.mediaSession && navigator.mediaSession.setMicrophoneActive && navigator.mediaSession.setMicrophoneActive(!S.muted); } catch (e) {} }
 
 // para revisar desde la consola
-window.SALA = { S, A, cfg, voiceGuard };
+window.SALA = { S, A, cfg, voiceGuard, W };
 
 // botón 🏠 de todos los juegos (../inicio.js): si estás en una sala, primero se sale bien
 window.INICIO = {
