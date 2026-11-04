@@ -474,35 +474,135 @@ const R3={ok:false, dirty:true};
 const CAM3=Object.assign({pitch:55, zoom:1, yaw:0}, load('naval_cam3')||{});
 function saveCam3(){ store('naval_cam3', {pitch:CAM3.pitch, zoom:CAM3.zoom, yaw:CAM3.yaw}); }
 const CELL=10;   // tamaño de una casilla en el 3D
+const RADAR_Y=4.6; // altura de la pantalla de radar sobre el agua
+// olas: las mismas en la placa de video y acá (para que los barcos suban y bajen con el agua)
+const WAVES=[[.96,.28,.045,1.0,1.1],[-.37,.93,.06,.7,1.4],[.71,-.71,.11,.3,2.0],[.22,.97,.18,.14,2.6]];
+function waveH(x, z, t){
+  let h=0; for(const [dx,dz,k,a,s] of WAVES) h+=a*Math.sin(k*(dx*x+dz*z)+s*t);
+  const R=R3.calmR||100, u=Math.max(0, Math.min(1, (Math.hypot(x,z)-R*.55)/(R*.9)));
+  return h*(.45+.55*u*u*(3-2*u));
+}
+const WATER_VS=`
+uniform float uT, uCalm;
+varying vec3 vW; varying vec3 vN; varying float vH;
+void wv(vec2 p, vec2 d, float k, float a, float s, inout float h, inout vec2 g){ float ph=k*dot(d,p)+s*uT; h+=a*sin(ph); g+=a*k*d*cos(ph); }
+void main(){
+  vec4 w=modelMatrix*vec4(position,1.0); vec2 p=w.xz; float h=0.0; vec2 g=vec2(0.0);
+  wv(p,vec2(.96,.28),.045,1.0,1.1,h,g); wv(p,vec2(-.37,.93),.06,.7,1.4,h,g); wv(p,vec2(.71,-.71),.11,.3,2.0,h,g); wv(p,vec2(.22,.97),.18,.14,2.6,h,g);
+  float c=.45+.55*smoothstep(uCalm*.55, uCalm*1.45, length(p)); h*=c; g*=c;
+  w.y+=h; vW=w.xyz; vH=h; vN=normalize(vec3(-g.x,1.0,-g.y));
+  gl_Position=projectionMatrix*viewMatrix*w;
+}`;
+const WATER_FS=`
+uniform float uT, uGrid, uN, uCell, uFogN, uFogF;
+uniform vec3 uSun, uDeep, uShallow, uHor, uZen, uFog;
+varying vec3 vW; varying vec3 vN; varying float vH;
+void main(){
+  vec2 p=vW.xz; vec3 n=vN;
+  // ondas chiquitas que brillan
+  n.x+=.09*sin(p.x*.9+uT*3.1)*cos(p.y*.7-uT*2.3)+.05*sin(p.y*1.7+p.x*.4+uT*4.0)+.03*sin(p.x*3.1+p.y*2.3-uT*6.0);
+  n.z+=.09*cos(p.y*.85-uT*2.7)*sin(p.x*.6+uT*1.9)+.05*sin(p.x*1.9-p.y*.5-uT*3.6)+.03*cos(p.y*3.3-p.x*2.1+uT*5.5);
+  n=normalize(n);
+  vec3 V=normalize(cameraPosition-vW);
+  float fr=.04+.96*pow(1.0-max(dot(n,V),0.0),4.0);
+  vec3 R=reflect(-V,n);
+  vec3 sky=mix(uHor,uZen,clamp(R.y*1.6,0.0,1.0));
+  vec3 base=mix(uDeep,uShallow,clamp(vH*.3+.45,0.0,1.0));
+  base+=uShallow*.25*pow(max(dot(n,normalize(vec3(V.x,0.0,V.z)+uSun)),0.0),3.0);
+  vec3 col=mix(base,sky,clamp(fr,0.0,1.0)*.85);
+  float sp=pow(max(dot(R,uSun),0.0),220.0); col+=vec3(1.0,.95,.85)*sp*2.2;
+  col+=vec3(1.0)*pow(max(dot(R,uSun),0.0),24.0)*.12;
+  // espuma en la cresta de las olas
+  float fo=smoothstep(1.15,2.1,vH)*(.55+.45*sin(p.x*1.3+p.y*1.1+uT*2.0)*sin(p.y*1.7-p.x*.9-uT*1.4));
+  col=mix(col,vec3(.93,.97,1.0),clamp(fo,0.0,1.0)*.6);
+  // la grilla pintada sobre el agua (cuando se mira la flota propia)
+  if(uGrid>.5){
+    float hf=uN*uCell*.5; vec2 q=(p+hf)/uCell;
+    if(q.x>=0.0&&q.y>=0.0&&q.x<=uN&&q.y<=uN){
+      vec2 fw=fwidth(q); vec2 gl=1.0-smoothstep(vec2(0.0),fw*1.6,min(fract(q),1.0-fract(q)));
+      col=mix(col,vec3(.88,.96,1.0),max(gl.x,gl.y)*.5);
+      col=mix(col,uShallow*1.2,.12);
+    }
+  }
+  float d=length(cameraPosition-vW); col=mix(col,uFog,smoothstep(uFogN,uFogF,d));
+  gl_FragColor=vec4(col,1.0);
+}`;
+const RADAR_VS=`varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
+const RADAR_FS=`
+uniform float uT, uN, uCell, uAimOn; uniform vec2 uAim; uniform sampler2D uMarks;
+varying vec3 vW;
+const float TAU=6.28318;
+void main(){
+  vec2 p=vW.xz; float hf=uN*uCell*.5; vec2 q=(p+hf)/uCell;
+  float inB=step(0.0,q.x)*step(q.x,uN)*step(0.0,q.y)*step(q.y,uN);
+  vec3 G=vec3(.25,1.0,.5); vec3 col=vec3(0.0,.16,.07); float a=.24*inB;
+  // borde de la pantalla
+  float e=min(min(q.x,uN-q.x),min(q.y,uN-q.y));
+  if(inB<.5){ col=vec3(.02,.07,.05); a=.62; float rim=1.0-smoothstep(0.0,.18,abs(e)); col+=G*rim*.9; a+=rim*.3; gl_FragColor=vec4(col,a); return; }
+  col+=G*(1.0-smoothstep(0.0,.12,e))*.8; a+=(1.0-smoothstep(0.0,.12,e))*.4;
+  // cuadrícula
+  vec2 fw=fwidth(q); vec2 gl=1.0-smoothstep(vec2(0.0),fw*1.5,min(fract(q),1.0-fract(q))); float line=max(gl.x,gl.y);
+  col+=G*line*.45; a+=line*.35;
+  // círculos del radar
+  float rv=length(p)/(hf*.5); float rl=1.0-smoothstep(0.0,fwidth(rv)*1.4,abs(fract(rv+.5)-.5));
+  col+=G*rl*.35; a+=rl*.22;
+  // barrido que gira
+  float sw=mod(uT*1.5,TAU); float ang=atan(p.y,p.x); float da=mod(sw-ang,TAU);
+  float trail=exp(-da*2.4)*smoothstep(hf*1.5,hf*.2,length(p)); float beam=1.0-smoothstep(0.0,.035,da);
+  col+=G*(trail*.5+beam*.9); a+=trail*.28+beam*.45;
+  // marcas: el barrido las hace brillar al pasar
+  vec2 ci=floor(q); vec2 fc=fract(q)-.5; float dd=length(fc);
+  float v=floor(texture2D(uMarks,(ci+.5)/uN).r*255.0+.5);
+  vec2 cc=(ci+.5)*uCell-hf; float lit=.45+.55*exp(-mod(sw-atan(cc.y,cc.x),TAU)*1.3);
+  if(v==1.0||v==4.0){ float k=v==1.0?1.0:.45; float dot=1.0-smoothstep(.1,.16,dd); col+=vec3(.6,1.0,.95)*dot*lit*k; a+=dot*.55*lit*k; }
+  else if(v==2.0){ float pu=.5+.5*sin(uT*6.0+ci.x+ci.y); float dot=1.0-smoothstep(.22,.29,dd); float ring=(1.0-smoothstep(0.0,.04,abs(dd-(.3+pu*.12))))*.8;
+    col=mix(col,vec3(1.0,.2,.15),clamp(dot*lit+ring*.6,0.0,1.0)); a+=dot*.6+ring*.3; }
+  else if(v==3.0){ float x=1.0-smoothstep(.04,.09,min(abs(fc.x-fc.y),abs(fc.x+fc.y))); x*=step(max(abs(fc.x),abs(fc.y)),.36);
+    col=mix(col,vec3(.55,.05,.04),.55); col=mix(col,vec3(1.0,.35,.2),x*lit); a+=.25+x*.4; }
+  // la mira
+  if(uAimOn>.5){
+    float pu=.5+.5*sin(uT*8.0);
+    if(ci.y==uAim.x||ci.x==uAim.y){ col+=vec3(1.0,.85,.3)*.12; a+=.06; }
+    if(ci.y==uAim.x&&ci.x==uAim.y){ float bx=1.0-smoothstep(.0,.06,.5-max(abs(fc.x),abs(fc.y))); col=mix(col,vec3(1.0,.9,.35),bx*.95+.18+pu*.12); a+=bx*.5+.2; }
+  }
+  // líneas de barrido de la pantalla
+  a*=.9+.1*sin(vW.z*2.6-uT*14.0);
+  gl_FragColor=vec4(col,clamp(a,0.0,.92));
+}`;
 function init3D(){
   if(R3.ok) return true; if(!window.THREE) return false;
   const T=THREE, canvas=$('#c3d');
   let renderer; try{ renderer=new T.WebGLRenderer({canvas, antialias:true}); }catch(e){ toast('Este aparato no puede mostrar 3D. Seguimos en 2D.'); return false; }
   const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, mobile?1.5:2));
-  renderer.shadowMap.enabled=true;
-  const scene=new T.Scene(); scene.background=new T.Color(0x9fc6e8); scene.fog=new T.Fog(0x9fc6e8, 400, 1100);
+  const scene=new T.Scene();
+  // cielo con degradé
+  const sc=document.createElement('canvas'); sc.width=2; sc.height=256; const sg=sc.getContext('2d'), gr=sg.createLinearGradient(0,0,0,256);
+  gr.addColorStop(0,'#3d7fc4'); gr.addColorStop(.55,'#8fc0e6'); gr.addColorStop(1,'#d6ecf8'); sg.fillStyle=gr; sg.fillRect(0,0,2,256);
+  scene.background=new T.CanvasTexture(sc);
   const cam=new T.PerspectiveCamera(45, 1, 1, 3000);
   Object.assign(R3, {T, renderer, scene, cam, ok:true});
-  scene.add(new T.HemisphereLight(0xeaf6ff, 0x1d3550, .8));
-  const sun=new T.DirectionalLight(0xfff2d6, .9); sun.position.set(120, 260, 140); sun.castShadow=true; sun.shadow.mapSize.set(1024,1024);
-  Object.assign(sun.shadow.camera, {left:-160, right:160, top:160, bottom:-160, near:10, far:700}); scene.add(sun);
-  // el mar: una malla que se mueve con olas
-  const geo=new T.PlaneGeometry(1400, 1400, 70, 70); geo.rotateX(-Math.PI/2);
-  R3.waterBase=geo.attributes.position.array.slice();
-  R3.water=new T.Mesh(geo, new T.MeshPhongMaterial({color:0x16578c, shininess:90, specular:0x9ad2ff, flatShading:true, transparent:true, opacity:.96}));
-  R3.water.receiveShadow=true; scene.add(R3.water);
+  scene.add(new T.HemisphereLight(0xeaf6ff, 0x1d3550, .85));
+  const sun=new T.DirectionalLight(0xfff2d6, .95); sun.position.set(120, 260, 140); scene.add(sun);
+  // el mar: las olas se calculan en la placa de video
+  const seg=mobile?110:160, geo=new T.PlaneGeometry(1600, 1600, seg, seg); geo.rotateX(-Math.PI/2);
+  R3.wu={ uT:{value:0}, uCalm:{value:100}, uGrid:{value:1}, uN:{value:10}, uCell:{value:CELL}, uFogN:{value:420}, uFogF:{value:1150},
+    uSun:{value:new T.Vector3(120,260,140).normalize()}, uDeep:{value:new T.Color(0x07304f)}, uShallow:{value:new T.Color(0x1c78a6)},
+    uHor:{value:new T.Color(0xcfe6f5)}, uZen:{value:new T.Color(0x4f93cf)}, uFog:{value:new T.Color(0xc4e0f3)} };
+  const wm=new T.ShaderMaterial({uniforms:R3.wu, vertexShader:WATER_VS, fragmentShader:WATER_FS}); wm.extensions.derivatives=true;
+  R3.water=new T.Mesh(geo, wm); R3.water.frustumCulled=false; scene.add(R3.water);
   // costa paraguaya de fondo: lomas verdes
-  for(let i=0;i<9;i++){ const h=new T.Mesh(new T.SphereGeometry(80+rnd(60), 16, 10), new T.MeshLambertMaterial({color: i%2?0x3f7d3a:0x4f8f45})); h.scale.y=.35; h.position.set(-520+i*130, -12, -560-rnd(80)); scene.add(h); }
+  for(let i=0;i<9;i++){ const h=new T.Mesh(new T.SphereGeometry(80+rnd(60), 16, 10), new T.MeshLambertMaterial({color: i%2?0x3f7d3a:0x4f8f45})); h.scale.y=.35; h.position.set(-520+i*130, -12, -620-rnd(80)); scene.add(h); }
   R3.board=new T.Group(); scene.add(R3.board);
   R3.ray=new T.Raycaster(); R3.plane=new T.Plane(new T.Vector3(0,1,0), 0);
-  R3.fx=[];
+  R3.fx=[]; R3.bobs=[];
   wire3D(canvas); resizeStage();
   return true;
 }
 function labelSprite(txt, col){
   const c=document.createElement('canvas'); c.width=64; c.height=64; const g=c.getContext('2d');
-  g.fillStyle=col||'#ffffff'; g.font='bold 40px system-ui'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(txt, 32, 34);
+  g.fillStyle=col||'#ffffff'; g.font='bold 40px system-ui'; g.textAlign='center'; g.textBaseline='middle';
+  g.shadowColor='rgba(0,0,0,.6)'; g.shadowBlur=6; g.fillText(txt, 32, 34);
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false, depthTest:false})); s.renderOrder=5; s.scale.set(7,7,1); return s;
 }
 // barco 3D: casco con proa, puente, cañones y una banderita paraguaya
@@ -510,51 +610,75 @@ function shipMesh(l, sunk){
   const T=THREE, g=new T.Group(), L=l*CELL-2.4, W=CELL*.62;
   const sh=new T.Shape(); sh.moveTo(-L/2, -W/2); sh.lineTo(L/2-W*.8, -W/2); sh.quadraticCurveTo(L/2+W*.2, 0, L/2-W*.8, W/2); sh.lineTo(-L/2, W/2); sh.lineTo(-L/2, -W/2);
   const hull=new T.Mesh(new T.ExtrudeGeometry(sh, {depth:3.4, bevelEnabled:true, bevelSize:.5, bevelThickness:.5, bevelSegments:1}), new T.MeshStandardMaterial({color: sunk?0x3b2a24:0x6f7d8c, roughness:.6, metalness:.3}));
-  hull.rotation.x=-Math.PI/2; hull.position.y=-1.2; hull.castShadow=true; g.add(hull);
+  hull.rotation.x=-Math.PI/2; hull.position.y=-1.2; g.add(hull);
+  // franja roja en la línea de flotación
+  const wl=new T.Mesh(new T.BoxGeometry(L*.97, .7, W*1.04), new T.MeshStandardMaterial({color: sunk?0x2a1a14:0x8c2a22, roughness:.7})); wl.position.set(-W*.15, -.9, 0); g.add(wl);
   const deck=new T.Mesh(new T.BoxGeometry(L*.9, .5, W*.86), new T.MeshStandardMaterial({color: sunk?0x2a1e18:0x9aa6b2})); deck.position.set(-W*.2, 2.6, 0); g.add(deck);
   if(!sunk){
-    const bridge=new T.Mesh(new T.BoxGeometry(Math.min(8,L*.3), 4, W*.6), new T.MeshStandardMaterial({color:0xe8edf2})); bridge.position.set(-L*.12, 4.8, 0); bridge.castShadow=true; g.add(bridge);
+    const bridge=new T.Mesh(new T.BoxGeometry(Math.min(8,L*.3), 4, W*.6), new T.MeshStandardMaterial({color:0xe8edf2})); bridge.position.set(-L*.12, 4.8, 0); g.add(bridge);
+    const win=new T.Mesh(new T.BoxGeometry(Math.min(8,L*.3)+.1, .8, W*.62), new T.MeshStandardMaterial({color:0x1d2a36, metalness:.6, roughness:.2})); win.position.set(-L*.12, 6, 0); g.add(win);
     for(let k=0;k<Math.max(1,l-2);k++){ const tur=new T.Mesh(new T.CylinderGeometry(1.4,1.6,1.2,10), new T.MeshStandardMaterial({color:0x56616d})); tur.position.set(L*.3-k*CELL*.7, 3.4, 0); g.add(tur);
       const gun=new T.Mesh(new T.CylinderGeometry(.3,.3,4,6), tur.material); gun.rotation.z=Math.PI/2; gun.position.set(L*.3-k*CELL*.7+2.2, 3.6, 0); g.add(gun); }
     const mast=new T.Mesh(new T.CylinderGeometry(.2,.2,7,6), new T.MeshStandardMaterial({color:0x333333})); mast.position.set(-L*.12, 9.5, 0); g.add(mast);
+    // antena de radar que gira
+    const ant=new T.Mesh(new T.BoxGeometry(3.2,.5,.3), new T.MeshStandardMaterial({color:0xdfe6ec})); ant.position.set(-L*.12, 12.6, 0); g.add(ant); g.userData.ant=ant;
     const fc=document.createElement('canvas'); fc.width=48; fc.height=30; const fg=fc.getContext('2d'); [['#d52b1e',0],['#ffffff',10],['#0038a8',20]].forEach(([col,y])=>{ fg.fillStyle=col; fg.fillRect(0,y,48,10); });
-    const flag=new T.Mesh(new T.PlaneGeometry(4,2.5), new T.MeshBasicMaterial({map:new T.CanvasTexture(fc), side:T.DoubleSide})); flag.position.set(-L*.12-2, 11.5, 0); g.add(flag);
+    const flag=new T.Mesh(new T.PlaneGeometry(4,2.5), new T.MeshBasicMaterial({map:new T.CanvasTexture(fc), side:T.DoubleSide})); flag.position.set(-L*.12-2, 11.2, 0); g.add(flag); g.userData.flag=flag;
   }
+  // espuma alrededor del casco
+  const fo=new T.Mesh(new T.CircleGeometry(1, 28), new T.MeshBasicMaterial({color:0xffffff, transparent:true, opacity: sunk?.12:.28, depthWrite:false}));
+  fo.rotation.x=-Math.PI/2; fo.scale.set(L*.62, W*1.05, 1); fo.position.set(-W*.1, .2, 0); g.add(fo);
   return g;
 }
 function cellPos(r, c, n){ return [(c-(n-1)/2)*CELL, (r-(n-1)/2)*CELL]; }
+function bob(o, k, extra){ o.updateMatrix(); R3.bobs.push(Object.assign({o, x:o.position.x, z:o.position.z, y0:o.position.y, rx:o.rotation.x, rz:o.rotation.z, ph:Math.random()*6, k}, extra||{})); }
 // rehace el tablero 3D (el mar que se ve grande) cuando cambia algo
 function build3D(){
   const T=R3.T, n=N(), B=R3.board; while(B.children.length) B.remove(B.children[0]);
+  R3.bobs=[]; R3.radar=null; R3.fires=[];
   if(!V || V.phase==='lobby') return;
   const i = V.phase==='place' ? mySide() : (R3.showOwn ? smallSide() : bigSide()); R3.side=i;
   if(i<0 || !V.sides[i]) return;
   const s=V.sides[i], d=ANIM.disp[i]||s.grid||[], size=n*CELL;
-  // marco de boyas y grilla
-  const lines=[]; for(let k=0;k<=n;k++){ const p=-size/2+k*CELL; lines.push(-size/2,.3,p, size/2,.3,p, p,.3,-size/2, p,.3,size/2); }
-  const lg=new T.BufferGeometry(); lg.setAttribute('position', new T.Float32BufferAttribute(lines,3));
-  B.add(new T.LineSegments(lg, new T.LineBasicMaterial({color:0xd9f1ff, transparent:true, opacity:.45})));
-  // marco dorado alrededor del mar
-  const fm=new T.MeshStandardMaterial({color:0xf2c14e, roughness:.4, metalness:.3});
-  for(const [w,d,x,z] of [[size+4,2,0,-size/2-1],[size+4,2,0,size/2+1],[2,size+4,-size/2-1,0],[2,size+4,size/2+1,0]]){ const b=new T.Mesh(new T.BoxGeometry(w,1.6,d), fm); b.position.set(x,.6,z); B.add(b); }
-  for(let k=0;k<n;k++){ const a=labelSprite(String(k+1)); const [x]=cellPos(0,k,n); a.position.set(x, 5, -size/2-6); B.add(a);
-    const b=labelSprite(LETRAS[k]); const [,z]=cellPos(k,0,n); b.position.set(-size/2-6, 5, z); B.add(b); }
+  // radar: cuando se mira el mar del enemigo durante la batalla
+  const radar = V.phase==='play' && !s.pids.includes(viewer());
+  R3.isRadar=radar; R3.plane.constant = radar ? -RADAR_Y : 0;
+  R3.calmR=size*.75; R3.wu.uCalm.value=size*.75; R3.wu.uN.value=n; R3.wu.uGrid.value=radar?0:1;
+  // marco alrededor del mar: dorado en tu mar, metal verde en el radar
+  const fm=radar ? new T.MeshStandardMaterial({color:0x22332b, emissive:0x0c3a1c, roughness:.35, metalness:.7}) : new T.MeshStandardMaterial({color:0xf2c14e, roughness:.4, metalness:.3});
+  const fy=radar?RADAR_Y-.4:.8;
+  for(const [w,dd,x,z] of [[size+16,3,0,-size/2-7],[size+16,3,0,size/2+7],[3,size+16,-size/2-7,0],[3,size+16,size/2+7,0]]){ const b=new T.Mesh(new T.BoxGeometry(w,radar?1.2:1.6,dd), fm); b.position.set(x,fy,z); B.add(b); if(!radar) bob(b,.35); }
+  for(let k=0;k<n;k++){ const lc=radar?'#8dffb4':'#ffffff';
+    const a=labelSprite(String(k+1), lc); const [x]=cellPos(0,k,n); a.position.set(x, radar?RADAR_Y+2.5:5, -size/2-3.5); B.add(a);
+    const b=labelSprite(LETRAS[k], lc); const [,z]=cellPos(k,0,n); b.position.set(-size/2-3.5, radar?RADAR_Y+2.5:5, z); B.add(b); }
   // barcos que se ven
   const ownOrAll = s.pids.includes(viewer()) || (NET.obs && V.opts.obsVen) || V.phase!=='play';
   const ships = V.phase==='place' ? PL.ships() : (s.fleet||[]).filter(x=>x.r!=null && !x.hidden && (ownOrAll ? true : sunkDisp(i,x)));
   ships.forEach(x=>{ const sunk = V.phase!=='place' && sunkDisp(i,x), m=shipMesh(x.l, sunk), [x0,z0]=cellPos(x.r, x.c, n);
     const ang = x.dir==='v' ? -Math.PI/2 : 0, off=(x.l-1)*CELL/2;
-    m.position.set(x.dir==='h' ? x0+off : x0, sunk?-2.2:0, x.dir==='v' ? z0+off : z0); m.rotation.y=ang; if(sunk){ m.rotation.z=.12; m.rotation.x=.08; } B.add(m); });
-  // marcas: agua = boya blanca, tocado = estaca roja con fuego
+    m.position.set(x.dir==='h' ? x0+off : x0, sunk?-2.6:0, x.dir==='v' ? z0+off : z0); m.rotation.y=ang; if(sunk){ m.rotation.z=.12; m.rotation.x=.08; } B.add(m);
+    bob(m, sunk?.25:.75, {ship:true}); });
+  // marcas: agua = boya blanca, tocado = estaca roja con fuego y humo
   const missM=new T.MeshStandardMaterial({color:0xffffff, roughness:.4}), hitM=new T.MeshStandardMaterial({color:0xd52b1e, emissive:0x550000});
-  R3.fires=[];
   for(let r=0;r<n;r++) for(let c=0;c<n;c++){ const g=d[r*n+c]; if(!g) continue; const [x,z]=cellPos(r,c,n);
-    if(g===1 || g===4){ const b=new T.Mesh(new T.SphereGeometry(g===4?1:1.6, 10, 8), missM); b.position.set(x, .8, z); if(g===4){ b.material=b.material.clone(); b.material.transparent=true; b.material.opacity=.45; } B.add(b); }
-    else { const p=new T.Mesh(new T.CylinderGeometry(.9,.9,6,8), hitM); p.position.set(x, 3, z); B.add(p);
-      const f=new T.Mesh(new T.ConeGeometry(2.2, 5, 8), new T.MeshBasicMaterial({color:0xff8a00, transparent:true, opacity:.85})); f.position.set(x, 7, z); B.add(f); R3.fires.push(f); }
+    if(g===1 || g===4){ const b=new T.Mesh(new T.SphereGeometry(g===4?1:1.6, 10, 8), missM); b.position.set(x, .6, z); if(g===4){ b.material=b.material.clone(); b.material.transparent=true; b.material.opacity=.45; } B.add(b); bob(b,1); }
+    else { const p=new T.Mesh(new T.CylinderGeometry(.9,.9,6,8), hitM); p.position.set(x, 3, z); B.add(p); bob(p,.75);
+      const f=new T.Mesh(new T.ConeGeometry(2.2, 5, 8), new T.MeshBasicMaterial({color:0xff8a00, transparent:true, opacity:.85})); f.position.set(x, 7, z); B.add(f); R3.fires.push(f); bob(f,.75);
+      const f2=new T.Mesh(new T.ConeGeometry(1.2, 3.4, 8), new T.MeshBasicMaterial({color:0xffe066, transparent:true, opacity:.9})); f2.position.set(x, 6.2, z); B.add(f2); R3.fires.push(f2); bob(f2,.75);
+      if(g===2) R3.fires.push({smoke:true, x, z, next:0}); }
+  }
+  // la pantalla de radar semitransparente
+  if(radar){
+    const data=new Uint8Array(n*n*4); for(let k=0;k<n*n;k++){ data[k*4]=d[k]||0; data[k*4+3]=255; }
+    if(R3.marksTex) R3.marksTex.dispose();
+    const tex=new T.DataTexture(data, n, n, T.RGBAFormat); tex.magFilter=tex.minFilter=T.NearestFilter; tex.needsUpdate=true; R3.marksTex=tex;
+    R3.ru={ uT:{value:0}, uN:{value:n}, uCell:{value:CELL}, uMarks:{value:tex}, uAim:{value:new T.Vector2(-1,-1)}, uAimOn:{value:0} };
+    const rm=new T.ShaderMaterial({uniforms:R3.ru, vertexShader:RADAR_VS, fragmentShader:RADAR_FS, transparent:true, depthWrite:false, side:T.DoubleSide}); rm.extensions.derivatives=true;
+    const pg=new T.PlaneGeometry(size+11, size+11); pg.rotateX(-Math.PI/2);
+    R3.radar=new T.Mesh(pg, rm); R3.radar.position.y=RADAR_Y; R3.radar.renderOrder=3; B.add(R3.radar);
   }
   // mira
-  R3.aim=new T.Mesh(new T.RingGeometry(3.2, 4.4, 24), new T.MeshBasicMaterial({color:0xffe066, side:T.DoubleSide, transparent:true, opacity:.9})); R3.aim.rotation.x=-Math.PI/2; R3.aim.visible=false; B.add(R3.aim);
+  R3.aim=new T.Mesh(new T.RingGeometry(3.2, 4.4, 24), new T.MeshBasicMaterial({color:0xffe066, side:T.DoubleSide, transparent:true, opacity:.9, depthTest:!radar})); R3.aim.rotation.x=-Math.PI/2; R3.aim.visible=false; R3.aim.renderOrder=4; B.add(R3.aim);
   R3.builtKey=bkey3();
   R3.dirty=false;
 }
@@ -573,7 +697,7 @@ function wire3D(cv){
   cv.addEventListener('wheel', e=>{ e.preventDefault(); CAM3.zoom=Math.max(.5, Math.min(2.2, CAM3.zoom*(e.deltaY>0?1.08:.93))); saveCam3(); }, {passive:false});
 }
 function cam3(k, d){
-  if(k==='own'){ R3.showOwn=!R3.showOwn; R3.dirty=true; toast(R3.showOwn?'⚓ Mirando el otro mar (tu flota si jugás)':'🎯 Mirando el mar enemigo'); return; }
+  if(k==='own'){ R3.showOwn=!R3.showOwn; R3.dirty=true; toast(R3.showOwn?'⚓ Mirando el otro mar (tu flota si jugás)':'📡 Mirando el radar del mar enemigo'); return; }
   if(k==='zoom') CAM3.zoom=Math.max(.5, Math.min(2.2, CAM3.zoom*(d>0?.85:1.18)));
   else if(k==='pitch') CAM3.pitch=Math.max(20, Math.min(88, CAM3.pitch+d));
   else if(k==='reset'){ CAM3.pitch=55; CAM3.zoom=1; CAM3.yaw=0; }
@@ -582,37 +706,82 @@ function cam3(k, d){
 function draw3D(t){
   const T=R3.T;
   if(R3.dirty || R3.builtKey!==bkey3()) build3D();
-  // olas
-  const a=R3.water.geometry.attributes.position, b=R3.waterBase, tt=t/1000;
-  for(let k=0;k<a.count;k++){ const x=b[k*3], z=b[k*3+2]; a.array[k*3+1]=Math.sin(x*.02+tt*1.1)*1.1+Math.cos(z*.025+tt*.8)*.9; }
-  a.needsUpdate=true; R3.water.geometry.computeVertexNormals();
-  (R3.fires||[]).forEach((f,k)=>{ const s=1+Math.sin(tt*9+k)*.18; f.scale.set(s, 1+Math.sin(tt*7+k*2)*.25, s); });
+  const tt=t/1000, n=N();
+  R3.wu.uT.value=tt;
+  // todo lo que flota sube y baja con las olas
+  for(const b of R3.bobs){ const o=b.o, h=waveH(b.x, b.z, tt);
+    o.position.y=b.y0+h*b.k;
+    if(b.ship){ const sx=waveH(b.x+6, b.z, tt)-waveH(b.x-6, b.z, tt), sz=waveH(b.x, b.z+6, tt)-waveH(b.x, b.z-6, tt);
+      o.rotation.x=b.rx-sz*.035; o.rotation.z=b.rz+sx*.035;
+      const u=o.userData; if(u.ant) u.ant.rotation.y=tt*2.4+b.ph; if(u.flag) u.flag.rotation.y=Math.sin(tt*3+b.ph)*.35; } }
+  (R3.fires||[]).forEach((f,k)=>{
+    if(f.smoke){ if(t>f.next){ f.next=t+380+Math.random()*260; puff(f.x+(Math.random()-.5)*2, 9, f.z+(Math.random()-.5)*2, 0x2b2b2b, .55, 2.6); } return; }
+    const s=1+Math.sin(tt*9+k)*.18; f.scale.set(s, 1+Math.sin(tt*7+k*2)*.25, s); });
   // mira y bomba en camino
-  const n=N();
-  if(R3.aim){ const am = myTurn() && AIM.r!=null && AIM.to===R3.side ? AIM : (REMOTE_AIM && REMOTE_AIM.to===R3.side && REMOTE_AIM.r!=null && !mine(curShooter()) ? REMOTE_AIM : null);
-    R3.aim.visible=!!am; if(am){ const [x,z]=cellPos(am.r, am.c, n); R3.aim.position.set(x, 1.2+Math.sin(tt*6)*.3, z); } }
+  const am = myTurn() && AIM.r!=null && AIM.to===R3.side ? AIM : (REMOTE_AIM && REMOTE_AIM.to===R3.side && REMOTE_AIM.r!=null && !mine(curShooter()) ? REMOTE_AIM : null);
+  if(R3.aim){ R3.aim.visible=!!am; if(am){ const [x,z]=cellPos(am.r, am.c, n); R3.aim.position.set(x, (R3.isRadar?RADAR_Y+.3:1.4+waveH(x,z,tt)*.8)+Math.sin(tt*6)*.3, z); } }
+  if(R3.radar){ R3.ru.uT.value=tt; R3.ru.uAimOn.value=am?1:0; if(am) R3.ru.uAim.value.set(am.r, am.c); }
   const cur=ANIM.cur;
   if(cur && cur.to===R3.side){
-    if(!R3.bomb){ R3.bomb=new T.Mesh(new T.SphereGeometry(1.8, 12, 8), new T.MeshStandardMaterial({color:0x222222, metalness:.6})); R3.scene.add(R3.bomb); }
+    if(!R3.bomb){ R3.bomb=missileMesh(); R3.scene.add(R3.bomb); }
     const k=Math.min(1,(performance.now()-ANIM.t0)/1100), [x,z]=cellPos(cur.r, cur.c, n);
-    R3.bomb.visible=k<1; R3.bomb.position.set(x, 2+130*(1-k)+45*Math.sin(Math.PI*k), z+(1-k)*170);
-    if(k>=1 && !R3.fxDone){ R3.fxDone=cur.n; spawnFx(x, z, cur.res); }
+    const pos=kk=>new T.Vector3(x, 2+130*(1-kk)+45*Math.sin(Math.PI*kk), z+(1-kk)*170);
+    const p=pos(k); R3.bomb.visible=k<1; R3.bomb.position.copy(p); R3.bomb.lookAt(pos(Math.min(1,k+.02)));
+    if(k<1 && t>(R3.trailT||0)){ R3.trailT=t+28; puff(p.x, p.y, p.z, 0xdddddd, .7, 1.6, .9); }
+    if(k>=1 && R3.fxDone!==cur.n){ R3.fxDone=cur.n; spawnFx(x, z, cur.res); }
   } else if(R3.bomb) R3.bomb.visible=false;
   if(!cur) R3.fxDone=null;
-  R3.fx=R3.fx.filter(f=>{ const age=(t-f.t0)/1000; if(age>1.6){ R3.scene.remove(f.m); return false; }
-    if(f.kind==='splash'){ f.m.scale.set(1+age*.8, Math.max(.01, Math.sin(Math.min(1,age/1.2)*Math.PI)*1.6), 1+age*.8); f.m.material.opacity=.8*(1-age/1.6); }
-    else { const s=1+age*5; f.m.scale.set(s,s,s); f.m.material.opacity=Math.max(0,.9-age*.7); f.m.material.color.setHSL(.08-age*.05, 1, .55-age*.25); }
-    return true; });
+  R3.fx=R3.fx.filter(f=>{ const age=(t-f.t0)/1000; if(age>f.life){ R3.scene.remove(f.m); if(f.light) R3.scene.remove(f.light); return false; } f.up(age); return true; });
   // cámara
   const size=n*CELL, dist=size*2.05*CAM3.zoom, p=CAM3.pitch*Math.PI/180, yw=CAM3.yaw;
   R3.cam.position.set(Math.sin(yw)*Math.cos(p)*dist, Math.sin(p)*dist, Math.cos(yw)*Math.cos(p)*dist);
   R3.cam.lookAt(0, 0, 2);
   R3.renderer.render(R3.scene, R3.cam);
 }
+function missileMesh(){
+  const T=R3.T, g=new T.Group(), m=new T.MeshStandardMaterial({color:0x4a4f55, metalness:.7, roughness:.35});
+  const body=new T.Mesh(new T.CylinderGeometry(.8,.8,6,10), m); body.rotation.x=Math.PI/2; g.add(body);
+  const nose=new T.Mesh(new T.ConeGeometry(.8,2.2,10), new T.MeshStandardMaterial({color:0xd52b1e})); nose.rotation.x=Math.PI/2; nose.position.z=4.1; g.add(nose);
+  for(let k=0;k<4;k++){ const fin=new T.Mesh(new T.BoxGeometry(.15,2.2,1.6), m); fin.position.z=-2.4; fin.rotation.z=k*Math.PI/2; fin.translateY(1); g.add(fin); }
+  const fl=new T.Mesh(new T.ConeGeometry(.7,3,8), new T.MeshBasicMaterial({color:0xffb347, transparent:true, opacity:.9})); fl.rotation.x=-Math.PI/2; fl.position.z=-4.4; g.add(fl);
+  return g;
+}
+const PUFFGEO={};
+function puff(x, y, z, color, op, sz, life){
+  const T=R3.T; if(R3.fx.length>160) return;
+  const geo=PUFFGEO.s||(PUFFGEO.s=new T.SphereGeometry(1, 8, 6));
+  const m=new T.Mesh(geo, new T.MeshBasicMaterial({color, transparent:true, opacity:op, depthWrite:false})); m.position.set(x,y,z); R3.scene.add(m);
+  const L=life||2.4, dx=(Math.random()-.5)*1.5;
+  R3.fx.push({m, t0:performance.now(), life:L, up(a){ const k=a/L, s=sz*(1+k*2.2); m.scale.set(s,s,s); m.position.y=y+a*5; m.position.x=x+dx*a; m.material.opacity=op*(1-k); }});
+}
 function spawnFx(x, z, res){
-  const T=R3.T;
-  if(res==='agua'){ const m=new T.Mesh(new T.CylinderGeometry(1.5, 4, 14, 14, 1, true), new T.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.8, side:T.DoubleSide})); m.position.set(x, 7, z); R3.scene.add(m); R3.fx.push({m, t0:performance.now(), kind:'splash'}); }
-  else { const m=new T.Mesh(new T.SphereGeometry(2.4, 14, 10), new T.MeshBasicMaterial({color:0xff7a00, transparent:true, opacity:.9})); m.position.set(x, 4, z); R3.scene.add(m); R3.fx.push({m, t0:performance.now(), kind:'boom'}); }
+  const T=R3.T, now=performance.now(), sc=R3.scene, add=(m,life,up,light)=>{ sc.add(m); if(light) sc.add(light); R3.fx.push({m, t0:now, life, up, light}); };
+  // onda en el agua
+  const rg=new T.Mesh(new T.RingGeometry(.8, 1.4, 40), new T.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.8, side:T.DoubleSide, depthWrite:false}));
+  rg.rotation.x=-Math.PI/2; rg.position.set(x, 1.6, z);
+  add(rg, 1.8, a=>{ const s=1+a*9; rg.scale.set(s,s,s); rg.material.opacity=.8*(1-a/1.8); });
+  // ping en el radar
+  if(R3.isRadar){ const pr=new T.Mesh(new T.RingGeometry(1.2, 1.9, 40), new T.MeshBasicMaterial({color: res==='agua'?0x8dffb4:0xff5040, transparent:true, opacity:.95, side:T.DoubleSide, depthWrite:false}));
+    pr.rotation.x=-Math.PI/2; pr.position.set(x, RADAR_Y+.2, z); pr.renderOrder=6;
+    add(pr, 1.4, a=>{ const s=1+a*6; pr.scale.set(s,s,s); pr.material.opacity=.95*(1-a/1.4); }); }
+  // gotas o escombros que vuelan y caen
+  const N=res==='agua'?60:45, pos=new Float32Array(N*3), vel=[];
+  for(let k=0;k<N;k++){ const an=Math.random()*Math.PI*2, sp=res==='agua'?4+Math.random()*8:6+Math.random()*14; vel.push([Math.cos(an)*sp, (res==='agua'?18:14)+Math.random()*14, Math.sin(an)*sp]); pos[k*3]=x; pos[k*3+1]=2; pos[k*3+2]=z; }
+  const pg=new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(pos,3));
+  const pts=new T.Points(pg, new T.PointsMaterial({color: res==='agua'?0xeaf7ff:0x2a201a, size: res==='agua'?1.3:1.1, transparent:true, opacity:.95, depthWrite:false}));
+  add(pts, 1.9, a=>{ for(let k=0;k<N;k++){ const v=vel[k]; pos[k*3]=x+v[0]*a; pos[k*3+1]=Math.max(.5, 2+v[1]*a-16*a*a); pos[k*3+2]=z+v[2]*a; } pg.attributes.position.needsUpdate=true; pts.material.opacity=.95*(1-a/1.9); });
+  if(res==='agua'){
+    const m=new T.Mesh(new T.CylinderGeometry(1.5, 4, 14, 14, 1, true), new T.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.8, side:T.DoubleSide, depthWrite:false})); m.position.set(x, 7, z);
+    add(m, 1.6, a=>{ m.scale.set(1+a*.8, Math.max(.01, Math.sin(Math.min(1,a/1.2)*Math.PI)*1.6), 1+a*.8); m.position.y=7*m.scale.y*.6; m.material.opacity=.8*(1-a/1.6); });
+    for(let k=0;k<5;k++) setTimeout(()=>puff(x+(Math.random()-.5)*5, 3, z+(Math.random()-.5)*5, 0xffffff, .5, 2.2, 1.4), k*60);
+  } else {
+    const m=new T.Mesh(new T.SphereGeometry(2.4, 16, 12), new T.MeshBasicMaterial({color:0xffb030, transparent:true, opacity:.95})); m.position.set(x, 5, z);
+    const light=new T.PointLight(0xff8a30, 4, 120); light.position.set(x, 12, z);
+    add(m, 1.3, a=>{ const s=1+Math.min(a,.5)*9; m.scale.set(s,s,s); m.material.opacity=.95*Math.pow(1-a/1.3,.8); m.material.color.setHSL(.11-a*.05, 1, .66-a*.18); light.intensity=Math.max(0, 4-a*6); }, light);
+    const core=new T.Mesh(new T.SphereGeometry(2, 12, 10), new T.MeshBasicMaterial({color:0xfff6c0, transparent:true, opacity:1, depthWrite:false})); core.position.set(x, 6, z); core.renderOrder=7;
+    add(core, .55, a=>{ const s=1+a*7; core.scale.set(s,s,s); core.material.opacity=1-a/.55; });
+    for(let k=0;k<10;k++) setTimeout(()=>puff(x+(Math.random()-.5)*6, 8+Math.random()*4, z+(Math.random()-.5)*6, k<3?0x4a3328:0x262626, .65, 3+Math.random()*2, 3), 450+k*80);
+  }
 }
 function resizeStage(){
   if(!R3.ok) return;
