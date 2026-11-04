@@ -544,27 +544,78 @@ const sfx={
 function toggleSound(){ SND.on=!SND.on; store('mvk_snd', SND.on); $('#btnSnd').textContent=SND.on?'🔊':'🔇'; if(SND.on) sfx.turn(); }
 $('#btnSnd').textContent=SND.on?'🔊':'🔇';
 document.addEventListener('pointerdown', ()=>actx(), {once:true});
-const MUSIC_CREDIT = 'Música: "Monkeys Spinning Monkeys" de Kevin MacLeod (incompetech.com). Licencia Creative Commons Atribución 4.0: creativecommons.org/licenses/by/4.0/';
-const MUSIC = { on: load('mvk_music')!==false, buf:null, src:null, gain:null, loading:false, VOL:.08 };
-function musicLoad(){
-  if(MUSIC.buf || MUSIC.loading) return Promise.resolve(); MUSIC.loading=true;
-  const c=actx(); if(!c){ MUSIC.loading=false; return Promise.resolve(); }
-  return fetch('../petei/musica.mp3').then(r=>r.arrayBuffer()).then(b=>c.decodeAudioData(b)).then(buf=>{ MUSIC.buf=buf; }).catch(()=>{ MUSIC.loading=false; });
+/* ---- música de suspenso propia: se toca en el momento con el navegador (sin archivos ni licencias) ----
+   Contrabajo pizzicato con la línea que baja de a medio tono (re, do#, do, si), reloj que hace tic-tac,
+   cuerdas graves y un vibráfono misterioso que aparece cada tanto. Re menor, 84 por minuto, ciclo de 8 compases. */
+const MUSIC_CREDIT = 'Música de suspenso propia del juego (se toca en el momento, sin archivos).';
+const MUSIC = { on: load('mvk_music')!==false, src:null, gain:null, VOL:.32 };
+const NOIR = { timer:null, next:0, step:0, out:null, fx:null, noise:null };
+const mtof = m => 440*Math.pow(2,(m-69)/12);
+const STEP = 60/84/2;   // una corchea
+const N_BASS = [[38,45,50,45],[38,45,49,45],[38,45,48,45],[38,45,47,45],[34,41,46,41],[31,38,43,46],[33,40,45,40],[33,37,40,43]];
+const N_PAD  = [[50,53,57],[49,53,57],[48,53,57],[47,53,57],[46,50,53,57],[43,46,50,55],[45,49,52,57],[45,49,52,55]];
+const N_MEL  = [[[0,74],[3,77],[6,76]],[[0,73]],[[0,72],[4,74]],[[0,71]],[[0,70],[3,74],[6,77]],[[0,79],[4,77]],[[0,76],[3,73]],[[0,69],[5,68]]];
+function nVoice(type, f, t, dur, vol, lp, dest, attack){
+  const c=SND.ctx, o=c.createOscillator(), g=c.createGain(), fl=c.createBiquadFilter();
+  o.type=type; o.frequency.setValueAtTime(f, t); fl.type='lowpass'; fl.frequency.value=lp||2000;
+  const a=attack||.006;
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t+a); g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+  o.connect(fl).connect(g).connect(dest||NOIR.out); o.start(t); o.stop(t+dur+.05);
+  return g;
+}
+function nBass(m, t, vol){ nVoice('triangle', mtof(m), t, .55, vol||.5, 700); nVoice('sine', mtof(m)/2, t, .4, (vol||.5)*.5, 300); }
+function nPad(ch, t, dur){ ch.forEach(m=>{ [-4,4].forEach(dt=>{ const c=SND.ctx, o=c.createOscillator(), g=c.createGain(), fl=c.createBiquadFilter();
+  o.type='sawtooth'; o.frequency.value=mtof(m); o.detune.value=dt; fl.type='lowpass'; fl.frequency.value=520;
+  g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(.035,t+dur*.45); g.gain.linearRampToValueAtTime(.0001,t+dur+.25);
+  o.connect(fl).connect(g).connect(NOIR.out); o.start(t); o.stop(t+dur+.3); }); }); }
+function nVib(m, t){
+  const c=SND.ctx, g=nVoice('sine', mtof(m), t, 1.8, .16, 4000, NOIR.fx);
+  nVoice('sine', mtof(m)*4, t, .25, .03, 6000, NOIR.fx);
+  const l=c.createOscillator(), lg=c.createGain(); l.frequency.value=5.5; lg.gain.value=.03; l.connect(lg).connect(g.gain); l.start(t); l.stop(t+1.9);
+}
+function nTick(t, hi){
+  const c=SND.ctx, s=c.createBufferSource(), f=c.createBiquadFilter(), g=c.createGain();
+  s.buffer=NOIR.noise; f.type='bandpass'; f.frequency.value=hi?3200:2100; f.Q.value=6;
+  g.gain.setValueAtTime(hi?.5:.35, t); g.gain.exponentialRampToValueAtTime(.0001, t+.04);
+  s.connect(f).connect(g).connect(NOIR.out); s.start(t); s.stop(t+.05);
+}
+function nBoom(t){ const c=SND.ctx, o=c.createOscillator(), g=c.createGain();
+  o.frequency.setValueAtTime(70,t); o.frequency.exponentialRampToValueAtTime(38,t+1); g.gain.setValueAtTime(.55,t); g.gain.exponentialRampToValueAtTime(.0001,t+1.3);
+  o.connect(g).connect(NOIR.out); o.start(t); o.stop(t+1.4); }
+function nSched(){
+  const c=SND.ctx; if(!c || !NOIR.out) return;
+  if(c.state!=='running'){ NOIR.next=c.currentTime+.1; return; }
+  if(NOIR.next<c.currentTime) NOIR.next=c.currentTime+.05;
+  while(NOIR.next < c.currentTime+1.4){
+    const t=NOIR.next, k=NOIR.step, s=k%8, bar=Math.floor(k/8)%8, cyc=Math.floor(k/64);
+    if(s===0 && bar===0) nBoom(t);
+    if(s%2===0){ nBass(N_BASS[bar][s/2], t, s===0?.55:.42); nTick(t, (s/2)%2===0); }
+    else if(s===7 && Math.random()<.4) nBass(N_BASS[(bar+1)%8][0]+1, t, .22);   // nota de paso
+    if(s===0 && cyc%4!==0) nPad(N_PAD[bar], t, STEP*8);
+    if(cyc%2===1) N_MEL[bar].forEach(([st,m])=>{ if(st===s) nVib(m, t); });
+    else if(s===4 && bar===3 && cyc>0) nVib(81, t);   // una nota alta suelta, para el misterio
+    NOIR.step++; NOIR.next+=STEP;
+  }
 }
 function musicStart(){
-  if(!MUSIC.on || MUSIC.src) return;
-  musicLoad().then(()=>{
-    if(!MUSIC.buf || MUSIC.src || !MUSIC.on || !musicWanted()) return;
-    const c=actx(), s=c.createBufferSource(), g=c.createGain();
-    s.buffer=MUSIC.buf; s.loop=true; s.connect(g); g.connect(c.destination);
-    g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(MUSIC.VOL, c.currentTime+2.5);
-    s.start(); MUSIC.src=s; MUSIC.gain=g;
-  });
+  if(!MUSIC.on || MUSIC.src || !musicWanted()) return;
+  const c=actx(); if(!c) return;
+  if(!NOIR.noise){ const b=c.createBuffer(1, c.sampleRate*.06, c.sampleRate), ch=b.getChannelData(0); for(let i=0;i<ch.length;i++) ch[i]=Math.random()*2-1; NOIR.noise=b; }
+  const out=c.createGain(), comp=c.createDynamicsCompressor();
+  out.gain.setValueAtTime(.0001, c.currentTime); out.gain.exponentialRampToValueAtTime(MUSIC.VOL, c.currentTime+2.5);
+  out.connect(comp).connect(c.destination);
+  // eco suave para el vibráfono
+  const fx=c.createGain(), dl=c.createDelay(), fb=c.createGain(); dl.delayTime.value=STEP*3; fb.gain.value=.35;
+  fx.connect(out); fx.connect(dl); dl.connect(fb).connect(dl); dl.connect(out);
+  NOIR.out=out; NOIR.fx=fx; NOIR.step=0; NOIR.next=c.currentTime+.15;
+  NOIR.timer=setInterval(nSched, 150); nSched();
+  MUSIC.src=true; MUSIC.gain=out;
 }
 function musicStop(){
   if(!MUSIC.src) return;
-  const c=actx(), s=MUSIC.src, g=MUSIC.gain; MUSIC.src=null; MUSIC.gain=null;
-  try{ g.gain.setValueAtTime(g.gain.value, c.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime+.8); s.stop(c.currentTime+.85); }catch(e){}
+  const c=SND.ctx, g=MUSIC.gain; MUSIC.src=null; MUSIC.gain=null;
+  clearInterval(NOIR.timer); NOIR.timer=null; NOIR.out=null;
+  try{ g.gain.setValueAtTime(Math.max(.0001,g.gain.value), c.currentTime); g.gain.exponentialRampToValueAtTime(.0001, c.currentTime+.8); setTimeout(()=>{ try{ g.disconnect(); }catch(e){} }, 2500); }catch(e){}
 }
 const musicWanted = () => !!S && !!NET.mode;
 function musicSync(){ if(MUSIC.on && musicWanted()) musicStart(); else musicStop(); renderMusicBtn(); }
