@@ -12,8 +12,10 @@ function rnd(n){ if(window.crypto && crypto.getRandomValues){ const a=new Uint32
 const W2=50, L2=100, PR=3.2;
 const mr = o => o.mazo ? 7 : 5;                                   // radio del mazo
 const goalHalf = o => ({angosto:12, normal:15, ancho:19})[o.goal]||15;
-const SPEEDS={normal:{t:'🙂 Normal', fr:.16, max:520}, rapida:{t:'⚡ Rápida', fr:.07, max:700}, turbo:{t:'🔥 Turbo', fr:.03, max:900}};
-const MALLET_V=1100;                                               // lo más rápido que se mueve un mazo (cm/s)
+const SPEEDS={normal:{t:'🙂 Normal', fr:.45, max:380}, rapida:{t:'⚡ Rápida', fr:.3, max:500}, turbo:{t:'🔥 Turbo', fr:.18, max:650}};
+const MALLET_V=650;                                                // lo más rápido que se mueve un mazo (cm/s)
+const MALLET_A=4500;                                               // cuánto acelera el mazo (cm/s²): tiene peso, no se teletransporta
+const HIT_E=.8, HIT_M=.72;                                         // rebote del golpe y cuánto empuja el mazo (el tejo pesa)
 const SUB=1/240;                                                   // paso de la física
 
 /* ====================== OPCIONES ====================== */
@@ -114,12 +116,12 @@ function stepWorld(dt){
     const k=Math.max(0, 1-sp.fr*dt); p.vx*=k; p.vy*=k;
     p.x+=p.vx*dt; p.y+=p.vy*dt;
     // bandas de los costados
-    if(p.x<-W2+PR){ p.x=-W2+PR; p.vx=Math.abs(p.vx)*.9; wallHit(p); }
-    if(p.x>W2-PR){ p.x=W2-PR; p.vx=-Math.abs(p.vx)*.9; wallHit(p); }
+    if(p.x<-W2+PR){ p.x=-W2+PR; p.vx=Math.abs(p.vx)*.8; wallHit(p); }
+    if(p.x>W2-PR){ p.x=W2-PR; p.vx=-Math.abs(p.vx)*.8; wallHit(p); }
     // cabeceras con el arco
     for(const s of [-1,1]){
       const inGoal=Math.abs(p.x)<gh-PR*.3;
-      if(s*p.y>L2-PR && !inGoal && s*p.y<L2+PR){ p.y=s*(L2-PR); p.vy=-s*Math.abs(p.vy)*.9; wallHit(p); }
+      if(s*p.y>L2-PR && !inGoal && s*p.y<L2+PR){ p.y=s*(L2-PR); p.vy=-s*Math.abs(p.vy)*.8; wallHit(p); }
       if(s*p.y>L2-PR && inGoal){
         if(Math.abs(p.x)>gh-PR){ p.x=Math.sign(p.x)*(gh-PR); p.vx*=-.5; }
         if(s*p.y>L2+PR*1.6){ goal(p, s>0 ? 0 : 1); break; }   // en el arco de arriba (y>0) mete el lado 0
@@ -131,12 +133,12 @@ function stepWorld(dt){
       const dx=p.x-m.x, dy=p.y-m.y, d=Math.hypot(dx,dy), rr=PR+R; if(d>=rr || d<1e-6) return;
       const nx=dx/d, ny=dy/d; p.x=m.x+nx*rr; p.y=m.y+ny*rr;
       const rvx=p.vx-m.vx, rvy=p.vy-m.vy, vn=rvx*nx+rvy*ny;
-      if(vn<0){ p.vx-=1.9*vn*nx; p.vy-=1.9*vn*ny; RT.ev.push(['h', Math.min(1,-vn/600)]); }
+      if(vn<0){ const j=(1+HIT_E)*HIT_M; p.vx-=j*vn*nx; p.vy-=j*vn*ny; RT.ev.push(['h', Math.min(1,-vn/450)]); }
       p.hit=S.mallets[i].side; p.wall=false;
       // si el mazo lo apretó contra la banda, el tejo vuelve adentro y se escapa por el costado
       const cx=Math.max(-W2+PR, Math.min(W2-PR, p.x)), inG=Math.abs(p.x)<gh-PR*.3, cy = inG ? p.y : Math.max(-L2+PR, Math.min(L2-PR, p.y));
-      if(cx!==p.x){ p.x=cx; p.vx=-Math.sign(p.x)*40; p.vy=-(Math.sign(p.y)||1)*220; }
-      if(cy!==p.y){ p.y=cy; p.vy=-Math.sign(p.y)*40; p.vx=-(Math.sign(p.x)||1)*220; }
+      if(cx!==p.x){ p.x=cx; p.vx=-Math.sign(p.x)*30; p.vy=-(Math.sign(p.y)||1)*150; }
+      if(cy!==p.y){ p.y=cy; p.vy=-Math.sign(p.y)*30; p.vx=-(Math.sign(p.x)||1)*150; }
       // el tejo no puede atravesar la banda: el que se corre es el mazo
       const ex=m.x-p.x, ey=m.y-p.y, ed=Math.hypot(ex,ey);
       if(ed<rr){ const ux=ed>.01?ex/ed:-Math.sign(p.x)||1, uy=ed>.01?ey/ed:-Math.sign(p.y)||1; m.x=p.x+ux*rr; m.y=p.y+uy*rr; }
@@ -151,13 +153,18 @@ function stepWorld(dt){
     if(s<6){ p.still+=dt; const lim=Math.abs(p.y)<PR+R ? 2.5 : 5; if(p.still>lim){ p.vx=-p.x*1.5; p.vy=Math.abs(p.y)<PR+R ? (Math.random()<.5?-1:1)*40 : -p.y*1.2; p.still=0; } } else p.still=0;
   }
 }
-function wallHit(p){ p.wall=true; RT.ev.push(['w', Math.min(1, Math.hypot(p.vx,p.vy)/600)]); }
-// mueve el mazo hacia donde apunta el jugador (con tope de velocidad y sin pasar la mitad)
+function wallHit(p){ p.wall=true; RT.ev.push(['w', Math.min(1, Math.hypot(p.vx,p.vy)/400)]); }
+// mueve el mazo hacia donde apunta el jugador: acelera de a poco y frena al llegar (tiene peso), sin pasar la mitad
 function moveMallet(m, side, R, dt){
-  const tx=Math.max(-W2+R, Math.min(W2-R, m.tx)), ty = side ? Math.max(R, Math.min(L2-R, m.ty)) : Math.max(-L2+R, Math.min(-R, m.ty));
-  const dx=tx-m.x, dy=ty-m.y, d=Math.hypot(dx,dy), mv=(m.vmax||MALLET_V)*dt;
-  const k = d>mv ? mv/d : 1, ox=m.x, oy=m.y;
-  m.x+=dx*k; m.y+=dy*k; m.vx=(m.x-ox)/dt; m.vy=(m.y-oy)/dt;
+  const x0=-W2+R, x1=W2-R, y0=side ? R : -L2+R, y1=side ? L2-R : -R;
+  const tx=Math.max(x0, Math.min(x1, m.tx)), ty=Math.max(y0, Math.min(y1, m.ty));
+  const dx=tx-m.x, dy=ty-m.y, d=Math.hypot(dx,dy), want=Math.min(m.vmax||MALLET_V, Math.sqrt(1.6*MALLET_A*d), d*30);
+  const wx = d>.01 ? dx/d*want : 0, wy = d>.01 ? dy/d*want : 0;
+  let ax=wx-m.vx, ay=wy-m.vy; const a=Math.hypot(ax,ay), am=MALLET_A*dt;
+  if(a>am){ ax*=am/a; ay*=am/a; }
+  m.vx+=ax; m.vy+=ay; m.x+=m.vx*dt; m.y+=m.vy*dt;
+  if(m.x<x0){ m.x=x0; m.vx=Math.max(0,m.vx); } if(m.x>x1){ m.x=x1; m.vx=Math.min(0,m.vx); }
+  if(m.y<y0){ m.y=y0; m.vy=Math.max(0,m.vy); } if(m.y>y1){ m.y=y1; m.vy=Math.min(0,m.vy); }
 }
 function goal(p, side){
   const o=S.opts, pts = o.rebote2 && p.wall && p.hit===side ? 2 : 1, own = p.hit===1-side;
@@ -290,7 +297,7 @@ function removePlayer(t, msg){
 }
 
 /* ====================== BOTS ====================== */
-const BOTSP={facil:{v:430, err:16, lag:.12}, normal:{v:720, err:8, lag:.22}, crack:{v:1050, err:3, lag:.45}};
+const BOTSP={facil:{v:330, err:16, lag:.12}, normal:{v:480, err:8, lag:.22}, crack:{v:620, err:3, lag:.45}};
 const autoPlays = p => p && (p.bot || (!p.conn && p.offAt && Date.now()-p.offAt>5000));
 function botMove(i){
   const m=RT.ms[i], side=S.mallets[i].side, lv=BOTSP[S.opts.bot]||BOTSP.normal, R=mr(S.opts), dir=side ? -1 : 1, gy=side ? L2 : -L2;
@@ -301,7 +308,16 @@ function botMove(i){
   const p=ps.sort((a,b)=>Math.abs(a.y-gy)-Math.abs(b.y-gy))[0];
   const mine = side ? p.y>0 : p.y<0, coming = dir*p.vy<0;
   m.err = m.err==null || Math.random()<.02 ? (Math.random()-.5)*lv.err : m.err;
-  let tx, ty;
+  let tx, ty, clear=false;
+  const deep = dir*(p.y-gy)<14 && Math.abs(p.x)<goalHalf(S.opts)+14 && Math.hypot(p.vx,p.vy)<220;
+  if(deep && !(mates.length>1 && !defender)){
+    // el tejo se metió junto a mi arco: sacarlo de costado hacia la banda (no se puede ponerse detrás)
+    const sx=Math.sign(p.x)||1, ax=p.x-sx*(R+PR+6); clear=true;
+    if(sx*(p.x-m.x) < R+PR || Math.abs(m.y-p.y) > R+PR){
+      tx=ax; ty = Math.abs(m.x-ax)>4 ? Math.max(Math.abs(p.y-gy)+R+PR+4, Math.abs(m.y-gy))*dir+gy : p.y+dir*3;   // primero de costado, después baja
+    }
+    else { tx=p.x+sx*14; ty=p.y+dir*6; }
+  } else
   if(mine && !defender && (!coming || Math.hypot(p.vx,p.vy)<120)){
     // atacar: ponerse detrás del tejo mirando al arco de enfrente y pasarle por encima
     const ax=(m.aim==null || Math.random()<.01) ? (m.aim=(Math.random()-.5)*20) : m.aim, ay=-gy;
@@ -321,6 +337,17 @@ function botMove(i){
     const ly=gy+dir*(defender?10:13); let px=p.x;
     if(coming && Math.abs(p.vy)>20){ const t=(ly-p.y)/p.vy; if(t>0 && t<2){ px=p.x+p.vx*t; while(Math.abs(px)>W2){ px = px>0 ? 2*W2-px : -2*W2-px; } } }
     const gh=goalHalf(S.opts); tx=Math.max(-gh-3, Math.min(gh+3, px))+m.err*.5; ty=ly;
+    // el tejo quedó entre el mazo y mi arco: volver por el costado, sin pisarlo hacia atrás
+    if(dir*(p.y-m.y)<R && Math.abs(p.y-gy)<L2*.9 && Math.abs(p.x-m.x)<R+PR+10){
+      const sg = p.x>m.x ? -1 : 1, ox=p.x+sg*(R+PR+12);
+      tx = Math.abs(ox)<W2-R ? ox : p.x-sg*(R+PR+12); ty=p.y-dir*4;
+    }
   }
   m.tx += (tx-m.tx)*Math.min(1, lv.lag*2.2); m.ty += (ty-m.ty)*Math.min(1, lv.lag*2.2);
+  // el mazo tiene envión: si va a pisar el tejo desde adelante (empujándolo a su propio arco), se abre de costado
+  const ex=p.x-m.x, ey=p.y-m.y, ed=Math.hypot(ex,ey)||1;
+  if(!clear && ed<R+PR+16 && dir*ey<R*.5 && (m.vx*ex+m.vy*ey)/ed>20){
+    const sg = ex>0 ? -1 : 1, sx = Math.abs(m.x+sg*20)<W2-R ? sg : -sg;
+    m.tx=m.x+sx*20; m.ty=m.y+dir*10;
+  }
 }
