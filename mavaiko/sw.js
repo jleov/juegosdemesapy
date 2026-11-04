@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar ¿Mávaiko Ojuka? como app.
-const CACHE = 'mavaiko-v1';
+const CACHE = 'mavaiko-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './reglas.js', './juego.js', './caras.js'];
 
 self.addEventListener('install', e => {

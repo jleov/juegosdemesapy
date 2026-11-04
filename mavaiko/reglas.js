@@ -54,7 +54,7 @@ const cardName = id => cardInfo(id).n;
 const KIND_N = {s:'Sospechoso', w:'Arma', r:'Lugar'};
 const triple = (s,w,r) => ['s'+s, 'w'+w, 'r'+r];
 const tripleTxt = (s,w,r) => `${SUS[s].n} con ${artW(w)} en ${artR(r)}`;
-function artW(w){ const n=WPN[w].n; return (/^(Soga|Plancha|Hacha)/.test(n)?'la ':'el ')+n; }
+function artW(w){ const n=WPN[w].n; return (/^(Soga|Plancha)/.test(n)?'la ':'el ')+n; }
 function artR(r){ const n=ROOMS[r].n; return (/^(Cocina|Sala|Capilla)/.test(n)?'la ':'el ')+n; }
 
 function rnd(n){ if(window.crypto && crypto.getRandomValues){ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]%n; } return Math.floor(Math.random()*n); }

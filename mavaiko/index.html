@@ -84,6 +84,7 @@ html,body{overflow-x:clip}
 #gameSide{display:flex;min-height:0}
 @media (min-width:1000px){.only-mobile{display:none}}
 #lobbySide .only-mobile{display:none}
+.backgame{position:sticky;top:-8px;z-index:3;margin:-8px 0 8px;box-shadow:0 3px 8px rgba(0,0,0,.25)}
 
 /* ======================= CARTAS ======================= */
 .card{--w:96px;--cc:#333;width:var(--w);height:calc(var(--w) * 1.42);border-radius:calc(var(--w) * .09);background:#fbf3df;position:relative;flex:none;overflow:hidden;
@@ -203,6 +204,7 @@ html,body{overflow-x:clip}
 @media (max-width:999px){
   #game .side{position:fixed;right:0;top:0;bottom:0;width:min(390px,96vw);transform:translateX(105%);transition:transform .25s;z-index:60}
   #game .side.open{transform:none}
+  #game .side .voice{padding-right:104px;padding-left:54px;flex-wrap:wrap}   /* deja lugar a los botones de sonido de la esquina */
 }
 .voice{display:flex;gap:6px;padding:8px;border-bottom:1px solid #e3d8bd}
 .voice .btn{flex:1}.voice .btn.on{background:#d52b1e;animation:pulso2 1.4s infinite}
@@ -417,7 +419,7 @@ html,body{overflow-x:clip}
   <div class="voice" id="voiceBar">
     <button class="btn sm gray" id="btnMic" onclick="toggleMic()">🎤 Activar micrófono</button>
     <button class="btn sm gray" id="btnSpk" style="flex:0 0 46px" onclick="toggleSpk()" title="Escuchar a los demás">🔊</button>
-    <button class="btn sm gray only-mobile" id="btnCloseSide" style="flex:0 0 46px" onclick="toggleSide(false)">✕</button>
+    <button class="btn sm green only-mobile" id="btnCloseSide" style="flex:0 0 auto" onclick="toggleSide(false)" title="Volver al juego">⬅️ Juego</button>
   </div>
   <div class="tabs" id="tabs">
     <button data-tab="chat" class="on">💬 Chat</button>
@@ -451,8 +453,8 @@ html,body{overflow-x:clip}
 <div id="modal"><div class="mbox" id="mbox"></div></div>
 <div id="toast"></div>
 
-<script src="reglas.js?v=1"></script>
-<script src="juego.js?v=1"></script>
+<script src="reglas.js?v=2"></script>
+<script src="juego.js?v=3"></script>
 <script src="caras.js?v=1"></script>
 <script src="../dueno-link.js"></script>
 <script src="../inicio.js?v=2"></script>

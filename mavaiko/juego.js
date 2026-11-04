@@ -941,18 +941,21 @@ function noteStrike(c){ const d=noteData(); d[c]=d[c]||{}; d[c].x=!d[c].x; store
 function noteClear(){ if(!confirm('¿Borrar todo lo que anotaste a mano en la libreta?')) return; store(noteKey(), undefined); renderNotes(); }
 function renderNotes(){
   const el=$('#notaList'); if(!el || !V) return;
-  if(V.phase==='lobby'){ el.innerHTML='<p class="muted">La libreta se usa durante el caso.</p>'; return; }
+  if(V.phase==='lobby'){ setHTML(el, '<p class="muted">La libreta se usa durante el caso.</p>'); return; }
   const ps=V.players, m=noteMarks();
   const head=`<tr><th></th>${ps.map(p=>`<th title="${esc(p.name)}" style="--pc:${p.color}"><span>${esc(p.emoji)}</span><small>${esc(p.name.slice(0,6))}</small></th>`).join('')}</tr>`;
   const sec=(k,t)=>`<tr class="sec"><td colspan="${ps.length+1}">${t}</td></tr>`+CARDS.filter(c=>c[0]===k).map(c=>{
     const x=cardInfo(c);
     return `<tr class="${m.dead[c]?'dead':''}"><td class="cn" onclick="noteStrike('${c}')" title="Tocá para tachar o destachar">${x.e} ${esc(x.n)}${(V.up||[]).includes(c)?' 👁️':''}</td>${ps.map(p=>{ const v=m.get(c,p.id); return `<td class="mk m${CYCLE.indexOf(v)}" onclick="noteTap('${c}','${p.id}')">${v}</td>`; }).join('')}</tr>`;
   }).join('');
-  el.innerHTML=`<p class="muted" style="margin:0 0 6px">Tocá un casillero para anotar: ✖ no la tiene · ✔ la tiene · ? puede ser. Tocá el nombre para tacharlo. ${V.opts.autoNote?'Lo seguro se anota solo.':'Anotás todo vos.'}</p>
+  setHTML(el, `<button class="btn green wide backgame only-mobile" onclick="toggleSide(false)">⬅️ Volver al juego</button><p class="muted" style="margin:0 0 6px">Tocá un casillero para anotar: ✖ no la tiene · ✔ la tiene · ? puede ser. Tocá el nombre para tacharlo. ${V.opts.autoNote?'Lo seguro se anota solo.':'Anotás todo vos.'}</p>
     <table class="nota">${head}${sec('s','🧑 ¿Quién?')}${sec('w','🗡️ ¿Con qué?')}${sec('r','🏠 ¿Dónde?')}</table>
     <p class="muted">Lo que no está tachado puede estar en el sobre 📜. La libreta se guarda en este aparato.</p>
-    <button class="btn sm gray" onclick="noteClear()">🧽 Borrar lo que anoté a mano</button>`;
+    <button class="btn sm gray" onclick="noteClear()">🧽 Borrar lo que anoté a mano</button>
+    <button class="btn green wide only-mobile" style="margin-top:10px" onclick="toggleSide(false)">⬅️ Volver al juego</button>`);
 }
+// solo cambia el contenido si cambió algo (si no, se pierden los toques mientras los bots juegan)
+function setHTML(el, h){ if(el._h===h) return; el._h=h; el.innerHTML=h; }
 
 /* ====================== PANEL: jugadas, mesa y reglas ====================== */
 function renderSidePanels(){
@@ -967,8 +970,8 @@ function renderHist(){
   const fresh=L.length-HIST_N; HIST_N=L.length;
   const sus=(V.hist||[]).slice().reverse().map(h=>{ const by=VP(h.by), sh=h.shower&&VP(h.shower);
     return `<tr><td>${esc(by?by.emoji:'')} ${esc(by?by.name:'?')}</td><td>${SUS[h.s].e}${WPN[h.w].e}${ROOMS[h.r].e}</td><td>${h.passed.map(id=>{ const q=VP(id); return q?esc(q.emoji):''; }).join('')||'—'}</td><td>${sh?esc(sh.emoji)+' '+esc(sh.name.slice(0,8)):'nadie'}${h.card?` <b>(${esc(cardName(h.card))})</b>`:''}</td></tr>`; }).join('');
-  $('#histList').innerHTML = (sus?`<b>🕵️ Sospechas</b><table class="htab"><tr><td class="muted">Quién</td><td class="muted">Qué</td><td class="muted">No tenían</td><td class="muted">Mostró</td></tr>${sus}</table>`:'')
-    + `<b>📜 Lo que pasó</b>` + L.map((l,i)=>`<div class="hline ${i<fresh&&fresh<5?'new':''} ${l.acc?'acc':''}"><span class="t">${esc(l.x)}</span></div>`).join('');
+  setHTML($('#histList'), (sus?`<b>🕵️ Sospechas</b><table class="htab"><tr><td class="muted">Quién</td><td class="muted">Qué</td><td class="muted">No tenían</td><td class="muted">Mostró</td></tr>${sus}</table>`:'')
+    + `<b>📜 Lo que pasó</b>` + L.map((l,i)=>`<div class="hline ${i<fresh&&fresh<5?'new':''} ${l.acc?'acc':''}"><span class="t">${esc(l.x)}</span></div>`).join(''));
 }
 function renderMesaTab(){
   const host=amHost(), inPlay=V.phase!=='lobby';
@@ -982,22 +985,22 @@ function renderMesaTab(){
   const obs=(V.observers||[]).map(o=>`<div class="prow"><span style="font-size:20px">👀</span><span class="nm"><b>${esc(o.name)}${o.id===me()?' (vos)':''}</b><small>mirando${o.mic?' · 🎙️':''}</small></span></div>`).join('');
   const sit = NET.obs && V.phase!=='play' && V.players.length<MAXP ? `<button class="btn gold wide" onclick="doAct({type:'joinNext'})">🪑 Sumarme a jugar</button>` : NET.obs ? `<p class="muted">Te podés sumar cuando termine el caso (si hay lugar).</p>` : '';
   const where = inPlay ? `<p class="muted">Caso ${V.round} · ${(MOVES.find(m=>m.v===V.opts.moves)||{}).t||''}</p>` : '';
-  $('#mesaList').innerHTML = where + `<b>Pesquisas (${V.players.length}/${MAXP})</b>` + ps + (obs?`<b>Mirando</b>${obs}`:'') + sit
+  setHTML($('#mesaList'), where + `<b>Pesquisas (${V.players.length}/${MAXP})</b>` + ps + (obs?`<b>Mirando</b>${obs}`:'') + sit
     + `<b>🧑 Sospechosos</b>` + SUS.map((x,i)=>`<div class="prow" style="border-left:5px solid ${x.c}"><span style="font-size:22px">${x.e}</span><span class="nm"><b>${esc(x.n)}</b><small>${esc(x.t)}${inPlay&&V.tokS?` · en ${esc(ROOMS[V.tokS[i]].n)}`:''}</small></span></div>`).join('')
-    + (NET.mode!=='local'&&NET.code?`<p class="muted" style="margin-top:12px">Invitá con el código <b>${NET.code}</b> <button class="btn sm" onclick="shareRoom()">📤 Compartir</button></p>`:'');
+    + (NET.mode!=='local'&&NET.code?`<p class="muted" style="margin-top:12px">Invitá con el código <b>${NET.code}</b> <button class="btn sm" onclick="shareRoom()">📤 Compartir</button></p>`:''));
 }
 function renderReglasTab(){
   const o=V.opts, on=HOUSE.filter(h=>o[h.k]);
   const host=amHost(), localEdit = NET.mode==='local';
   const lo=Object.assign(defaultOpts(), load('mvk_localopts')||{});
-  $('#reglasList').innerHTML = `<p style="margin-top:0"><b>${(MOVES.find(m=>m.v===o.moves)||{}).t||''}</b></p>`
+  setHTML($('#reglasList'), `<p style="margin-top:0"><b>${(MOVES.find(m=>m.v===o.moves)||{}).t||''}</b></p>`
     + (localEdit ? `<p class="muted">Lo que cambies acá vale para el próximo caso de práctica.</p><select onchange="setLocalOpt('moves',this.value)">${MOVES.map(t=>`<option value="${t.v}" ${lo.moves===t.v?'selected':''}>${t.t}</option>`).join('')}</select>`
         +HOUSE.map(h=>`<label class="opt" style="font-weight:400"><input type="checkbox" ${lo[h.k]?'checked':''} onchange="setLocalOpt('${h.k}',this.checked)"><span><b>${h.t}</b><small>${h.d}</small></span></label>`).join('')
       : `<b>Reglas de la casa activas</b>` + (on.length ? on.map(h=>`<div class="opt"><span><b>${h.t}</b><small>${h.d}</small></span></div>`).join('') : '<p class="muted">Ninguna: reglas clásicas puras.</p>'))
     + `<b>📝 Reglas propias del grupo</b>` + (V.grules?`<div class="grules" style="margin:6px 0 10px">${esc(V.grules)}</div>`:`<p class="muted">${host&&!localEdit?'Las podés escribir en la sala de espera.':'No hay.'}</p>`)
     + `<b>💡 Sugerencias</b><div style="margin-top:6px">${sugsHTML(host)}</div>
        <div class="row"><input type="text" id="sugIn2" maxlength="240" placeholder="Proponé una regla…" onkeydown="if(event.key==='Enter')sendSug('sugIn2')"><button class="btn sm" style="flex:0 0 auto" onclick="sendSug('sugIn2')">Sugerir</button></div>
-       <button class="btn dark wide" style="margin-top:12px" onclick="showRules()">📜 Reglas completas</button>`;
+       <button class="btn dark wide" style="margin-top:12px" onclick="showRules()">📜 Reglas completas</button>`);
 }
 function setLocalOpt(k, v){ const o=Object.assign(defaultOpts(), load('mvk_localopts')||{}); o[k]=v; store('mvk_localopts', o); toast('Se usa en el próximo caso de práctica.'); }
 
