@@ -537,14 +537,96 @@ function noise(d, v, when, hp, lp){
   const s=c.createBufferSource(), g=c.createGain(), f=c.createBiquadFilter(); f.type=lp?'lowpass':'highpass'; f.frequency.value=lp||hp||1800;
   s.buffer=b; g.gain.value=v||.2; s.connect(f).connect(g).connect(c.destination); s.start(t);
 }
+/* ---------- artillería: misil que sale, silbido al caer, explosión, chapuzón y hundimiento ----------
+   Todo se arma con ruido y osciladores (no hay archivos de audio). Pasa por un eco de mar abierto
+   (reverberación) y un compresor para que las explosiones fuertes no se rompan. */
+const FX={};
+function fxInit(){
+  const c=actx(); if(!c) return null;
+  if(FX.c===c) return c;
+  FX.c=c;
+  FX.out=c.createDynamicsCompressor(); FX.out.threshold.value=-14; FX.out.ratio.value=5; FX.out.attack.value=.003; FX.out.release.value=.25;
+  const master=c.createGain(); master.gain.value=.9; FX.out.connect(master).connect(c.destination);
+  // eco de mar abierto: respuesta generada (ruido que se apaga en 2,6 s, más opaca al final)
+  const len=Math.floor(c.sampleRate*2.6), ir=c.createBuffer(2, len, c.sampleRate);
+  for(let ch=0; ch<2; ch++){ const d=ir.getChannelData(ch); let lp=0; for(let i=0;i<len;i++){ const k=i/len; lp += ((Math.random()*2-1) - lp) * (0.55 - k*.45); d[i]=lp*Math.pow(1-k, 2.6)*(i<c.sampleRate*.012?0:1); } }
+  FX.rev=c.createConvolver(); FX.rev.buffer=ir; const wet=c.createGain(); wet.gain.value=.5; FX.rev.connect(wet).connect(FX.out);
+  // ruido blanco y ruido "marrón" (más grave) para reusar
+  const nb=(brown)=>{ const b=c.createBuffer(1, c.sampleRate*3, c.sampleRate), d=b.getChannelData(0); let l=0; for(let i=0;i<d.length;i++){ const w=Math.random()*2-1; if(brown){ l=(l+.02*w)/1.02; d[i]=l*3.5; } else d[i]=w; } return b; };
+  FX.white=nb(false); FX.brown=nb(true);
+  // distorsión suave para el estallido
+  FX.curve=new Float32Array(1024); for(let i=0;i<1024;i++){ const x=i/511.5-1; FX.curve[i]=Math.tanh(x*3.2); }
+  return c;
+}
+// fuente de ruido con su filtro, volumen y paneo; devuelve los nodos para automatizarlos
+function fxNoise(t, dur, o){
+  const c=FX.c, s=c.createBufferSource(); s.buffer = o.brown ? FX.brown : FX.white; s.loop=true;
+  const f=c.createBiquadFilter(); f.type=o.type||'lowpass'; f.frequency.setValueAtTime(o.f||1000, t); f.Q.value=o.q||.7;
+  const g=c.createGain(); g.gain.setValueAtTime(.0001, t);
+  let n=s.connect(f);
+  if(o.dist){ const w=c.createWaveShaper(); w.curve=FX.curve; n=n.connect(w); }
+  n=n.connect(g);
+  if(o.pan!=null && c.createStereoPanner){ const p=c.createStereoPanner(); p.pan.setValueAtTime(o.pan, t); if(o.pan2!=null) p.pan.linearRampToValueAtTime(o.pan2, t+dur); n=n.connect(p); }
+  n.connect(FX.out); if(o.rev) { const r=c.createGain(); r.gain.value=o.rev; n.connect(r).connect(FX.rev); }
+  s.start(t, Math.random()*2); s.stop(t+dur+.05);
+  return {f, g};
+}
+function fxOsc(t, dur, o){
+  const c=FX.c, s=c.createOscillator(), g=c.createGain(); s.type=o.type||'sine';
+  s.frequency.setValueAtTime(o.f, t); if(o.f2) s.frequency.exponentialRampToValueAtTime(o.f2, t+(o.glide||dur));
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(o.v, t+(o.a||.005)); g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+  let n=s.connect(g);
+  if(o.lp){ const f=c.createBiquadFilter(); f.type='lowpass'; f.frequency.value=o.lp; n=n.connect(f); }
+  n.connect(FX.out); if(o.rev){ const r=c.createGain(); r.gain.value=o.rev; n.connect(r).connect(FX.rev); }
+  if(o.vib){ const l=c.createOscillator(), lg=c.createGain(); l.frequency.value=o.vib; lg.gain.value=o.vibA||10; l.connect(lg).connect(s.frequency); l.start(t); l.stop(t+dur+.05); }
+  s.start(t); s.stop(t+dur+.05);
+  return {s, g};
+}
+const env=(g, t, a, peak, d, end) => { g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(peak, t+a); g.gain.exponentialRampToValueAtTime(end||.0001, t+a+d); };
 const sfx={
-  // silbido de la bomba que cae (baja de tono)
-  whistle(d){ if(!SND.on) return; const c=actx(); if(!c) return; const t=c.currentTime, o=c.createOscillator(), g=c.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(1500,t); o.frequency.exponentialRampToValueAtTime(380,t+d); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.06,t+.15); g.gain.exponentialRampToValueAtTime(.0001,t+d);
-    o.connect(g).connect(c.destination); o.start(t); o.stop(t+d+.05); },
-  splash(){ noise(.6,.32,0,0,1400); noise(.35,.12,.05,2500); tone(90,.25,'sine',.08); },
-  boom(){ noise(.9,.5,0,0,500); tone(55,.6,'sine',.3); tone(80,.4,'triangle',.15,.03); noise(.4,.2,.08,1200); },
-  sink(){ noise(1.4,.25,0,0,300); [0,.25,.5,.8,1.1].forEach(w=>tone(180+rnd(160),.08,'sine',.05,.3+w)); tone(45,1.2,'sine',.2,.1); },
+  // el misil sale: golpe de encendido, rugido del motor que se aleja y el silbido cuando cae (dur = hasta el impacto)
+  launch(dur){
+    if(!SND.on || !fxInit()) return; const t=FX.c.currentTime+.02;
+    fxOsc(t, .35, {f:85, f2:38, v:.55, a:.004});                                           // golpe de encendido
+    env(fxNoise(t, .4, {type:'highpass', f:700, rev:.3}).g, t, .006, .55, .35);              // chispazo
+    const roar=fxNoise(t, .9, {type:'bandpass', f:260, q:.9, dist:true, rev:.45, pan:-.35, pan2:.45});
+    roar.f.frequency.exponentialRampToValueAtTime(1300, t+.35); roar.f.frequency.exponentialRampToValueAtTime(700, t+.85);
+    roar.g.gain.setValueAtTime(.0001, t); roar.g.gain.exponentialRampToValueAtTime(.5, t+.06); roar.g.gain.exponentialRampToValueAtTime(.18, t+.4); roar.g.gain.exponentialRampToValueAtTime(.0001, t+.88);
+    env(fxNoise(t, .9, {brown:true, f:180, rev:.3}).g, t, .05, .45, .8);                      // retumbo grave del motor
+    // silbido de caída: baja de tono y se acerca
+    const w0=t+Math.max(.25, dur-.62), wd=t+dur-w0;
+    const wh=fxOsc(w0, wd, {f:2600, f2:650, glide:wd, v:.11, a:wd*.85, vib:7, vibA:18, rev:.35});
+    const air=fxNoise(w0, wd, {type:'bandpass', f:2400, q:3, rev:.2}); air.f.frequency.exponentialRampToValueAtTime(700, w0+wd); env(air.g, w0, wd*.9, .16, wd*.1);
+    void wh;
+  },
+  // impacto en un barco: chasquido, estallido grave, golpe de metal, escombros y fuego
+  boom(){
+    if(!SND.on || !fxInit()) return; const t=FX.c.currentTime+.01;
+    env(fxNoise(t, .12, {type:'highpass', f:1600, rev:.6}).g, t, .002, .9, .1);
+    const body=fxNoise(t, 2.2, {f:1400, dist:true, rev:.9}); body.f.frequency.exponentialRampToValueAtTime(160, t+.7); env(body.g, t, .008, .95, 2);
+    fxOsc(t, 1.3, {f:62, f2:26, glide:1, v:.9, a:.006});                                      // golpe en el pecho
+    env(fxNoise(t, 2.4, {brown:true, f:120, rev:.6}).g, t, .02, .7, 2.3);                      // retumbo largo
+    [178, 437, 711, 1132, 1590].forEach((f,i)=>fxOsc(t+.01, 1.4-i*.15, {f:f*(1+(Math.random()-.5)*.02), v:.06-i*.008, a:.002, rev:.7}));   // chapa del barco
+    for(let i=0;i<26;i++){ const tt=t+.08+Math.pow(Math.random(),1.6)*1.4; env(fxNoise(tt, .05, {type:'bandpass', f:1800+Math.random()*3500, q:2, pan:Math.random()*1.6-.8}).g, tt, .002, .05+Math.random()*.12, .04); }   // escombros
+    for(let i=0;i<18;i++){ const tt=t+.6+Math.random()*1.6; env(fxNoise(tt, .03, {type:'highpass', f:2500, pan:Math.random()-.5}).g, tt, .001, .04+Math.random()*.05, .025); }   // fuego que chisporrotea
+  },
+  // agua: golpe contra el agua, columna que sube y cae, gotas y golpe sordo debajo
+  splash(){
+    if(!SND.on || !fxInit()) return; const t=FX.c.currentTime+.01;
+    env(fxNoise(t, .14, {type:'bandpass', f:1300, q:.6, rev:.5}).g, t, .003, .75, .12);
+    const col=fxNoise(t, 1.8, {f:3200, rev:.7}); col.f.frequency.exponentialRampToValueAtTime(500, t+1.4); env(col.g, t+.02, .05, .55, 1.6);
+    fxOsc(t, .4, {f:95, f2:45, v:.45, a:.004});
+    env(fxNoise(t, 1.2, {brown:true, f:300, rev:.4}).g, t, .02, .35, 1.1);
+    for(let i=0;i<34;i++){ const tt=t+.35+Math.random()*1.4; env(fxNoise(tt, .03, {type:'bandpass', f:2500+Math.random()*4000, q:4, pan:Math.random()*1.4-.7}).g, tt, .002, .03+Math.random()*.07, .03); }   // gotas que vuelven a caer
+  },
+  // se hunde: chapa que cruje, agua que entra y burbujas
+  sink(){
+    if(!SND.on || !fxInit()) return; const t=FX.c.currentTime+.05;
+    fxOsc(t, 2.6, {type:'sawtooth', f:72, f2:34, glide:2.4, v:.26, a:.3, lp:380, vib:3.5, vibA:4, rev:.8});
+    [0,.7,1.4].forEach(w=>fxOsc(t+w, .7, {type:'triangle', f:330-w*40, f2:210-w*30, v:.05, a:.15, vib:9, vibA:12, rev:.9}));   // crujidos
+    env(fxNoise(t, 2.6, {f:450, rev:.6}).g, t, .4, .5, 2.1);
+    for(let i=0;i<30;i++){ const tt=t+.4+Math.random()*2.3, f=260+Math.random()*700; fxOsc(tt, .07, {f, f2:f*1.8, glide:.06, v:.09+Math.random()*.07, a:.004, rev:.3}); }   // burbujas
+  },
   place(){ tone(520,.06,'triangle',.08); tone(780,.08,'triangle',.06,.05); },
   bad(){ tone(240,.15,'square',.04); },
   turn(){ tone(740,.12,'sine',.12); tone(988,.18,'sine',.12,.11); },

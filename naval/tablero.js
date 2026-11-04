@@ -118,16 +118,16 @@ function animTick(){
   const now=performance.now();
   if(!ANIM.cur && ANIM.q.length){
     ANIM.cur=ANIM.q.shift(); ANIM.t0=now; ANIM.landed=false;
-    sfx.whistle(1.05);
+    sfx.launch(1.1);   // sale el misil; el impacto suena cuando cae (a los 1,1 s)
     if(VIEW.mode!=='3d' || !R3.ok){ const s=ANIM.cur; if(ANIM.cur.to!==bigSide() && ANIM.cur.to!==smallSide()) WATCH=s.to; }
     renderBoards(); renderStatus();
   }
   const s=ANIM.cur; if(!s) return;
   if(!ANIM.landed && now-ANIM.t0>1100){
     ANIM.landed=true; landShot(s);
-    if(s.res==='agua') sfx.splash(); else { sfx.boom(); if(s.res==='hundido') setTimeout(()=>sfx.sink(), 350); }
+    if(s.res==='agua') sfx.splash(); else { sfx.boom(); if(s.res==='hundido') setTimeout(()=>sfx.sink(), 650); }
     const L=coordTxt(s.r,s.c), voz=`${LETRA_VOZ[L[0]]||L[0]} ${L.slice(1)}… ` + (s.res==='agua' ? 'agua' : s.res==='tocado' ? `¡tocado${s.ship?' el '+s.ship:''}!` : `¡hundido el ${s.ship}!`);
-    cantar(voz);
+    setTimeout(()=>cantar(voz), 900);   // primero se escucha el impacto
     const mineHit = V.sides[s.to] && V.sides[s.to].pids.includes(viewer());
     if(s.res!=='agua') banner(`${L}: ${s.res==='tocado'?'🔥 ¡Tocado'+(s.ship?' el '+s.ship:'')+'!':'💥 ¡Hundido el '+s.ship+'!'}${s.out?` · ${sideName(V,s.to)} se quedó sin barcos`:''}`, mineHit?'bad':'good');
     else banner(`${L}: 💧 Agua`, '');
@@ -197,7 +197,7 @@ function renderFleetBar(){
   const big=bigSide(), m=mySide(), sh=curShooter();
   $('#fleetbar').innerHTML = V.sides.map((s,i)=>{
     const names = s.pids.map(pid=>{ const p=V.players.find(x=>x.id===pid); if(!p) return ''; return `<span class="${pid===sh&&V.phase==='play'?'shoot':''}">${esc(p.emoji)} ${esc(p.name)}${p.bot?'🤖':''}${!p.bot&&!p.conn&&!p.local?'⚠️':''}${p.mic?'🎙️':''}</span>`; }).join(' ');
-    const ships = (s.fleet||fleetDef(V.opts).ships.map(([k,n,l],j)=>({i:j,k,n,l}))).map(x=>`<i class="sh ${sunkDisp(i,x)?'sunk':''}" style="--l:${x.l}" title="${esc(x.n)}"></i>`).join('');
+    const ships = (s.fleet||fleetDef(V.opts).ships.map(([k,n,l],j)=>({i:j,k,n,l}))).map(x=>`<i class="sh ${sunkDisp(i,x)?'sunk':''}" style="--l:${x.l}" title="${esc(x.n)}">${shipSVG(x.k, x.l, 'h')}</i>`).join('');
     const afloat = s.fleet ? s.fleet.filter(x=>!sunkDisp(i,x)).length : fleetDef(V.opts).ships.length;
     const ready = V.phase==='place' ? (s.ready ? '<small>✅ listo</small>' : '<small>⏳ poniendo barcos</small>') : '';
     const wins = V.opts.race>1 ? `<span class="wins">${'●'.repeat(s.wins)}${'○'.repeat(Math.max(0,V.opts.race-s.wins))}</span>` : '';
@@ -292,24 +292,68 @@ function seaHTML(i, kind){
   const cur=ANIM.cur && ANIM.cur.to===i && !ANIM.landed ? ANIM.cur : null;
   const aiming = kind==='target' && myTurn() && AIM.to===i ? AIM : (REMOTE_AIM && REMOTE_AIM.to===i && V.phase==='play' && !mine(curShooter()) ? REMOTE_AIM : null);
   const ghost = kind==='place' ? PL.ghostCells() : null;
-  let h=`<div class="sea ${kind}" style="--n:${n}"><i class="corner"></i>`;
-  for(let c=0;c<n;c++) h+=`<i class="lab">${c+1}</i>`;
+  // cada casilla va en su lugar fijo de la grilla, así los barcos dibujados se pueden poner encima
+  const at=(r,c)=>`grid-row:${r+2};grid-column:${c+2}`;
+  let h=`<div class="sea ${kind}" style="--n:${n}"><i class="corner" style="grid-row:1;grid-column:1"></i>`;
+  for(let c=0;c<n;c++) h+=`<i class="lab" style="grid-row:1;grid-column:${c+2}">${c+1}</i>`;
+  const drawn=new Set();
+  for(const k in shipAt){ const x=shipAt[k].x; if(drawn.has(x)) continue; drawn.add(x);
+    h+=`<div class="shipimg ${x.dir}${shipAt[k].sunk?' sunk':''}${kind==='place'&&PL.sel===x.i?' sel':''}" style="grid-row:${x.r+2} / span ${x.dir==='v'?x.l:1};grid-column:${x.c+2} / span ${x.dir==='h'?x.l:1}">${shipSVG(x.k, x.l, x.dir)}</div>`; }
   for(let r=0;r<n;r++){
-    h+=`<i class="lab">${LETRAS[r]}</i>`;
+    h+=`<i class="lab" style="grid-row:${r+2};grid-column:1">${LETRAS[r]}</i>`;
     for(let c=0;c<n;c++){
       const k=r*n+c, g=d[k]||0, sa=shipAt[k];
       let cls='cell';
-      if(sa){ const x=sa.x, l=x.l; cls+=` ship ${x.dir} ${l===1?'one':sa.j===0?'st':sa.j===l-1?'en':'mid'}${sa.sunk?' sunk':''}${kind==='place'&&PL.sel===x.i?' sel':''}`; }
+      if(sa) cls+=' ship';
       if(g===1) cls+=' miss'; else if(g===4) cls+=' auto'; else if(g===2) cls+=' hit'; else if(g===3) cls+=' hit dead';
       if(cur && cur.r===r && cur.c===c) cls+=' incoming';
       if(aiming && aiming.r===r && aiming.c===c) cls+=' aim';
       if(ghost && ghost.cells.some(([y,x])=>y===r&&x===c)) cls+= ghost.ok ? ' gok' : ' gbad';
       const recent=BOOM.find(b=>b.to===i && b.r===r && b.c===c && performance.now()-b.t<900);
       if(recent) cls+= recent.res==='agua' ? ' splash' : ' boom';
-      h+=`<button class="${cls}" data-r="${r}" data-c="${c}" aria-label="${coordTxt(r,c)}"></button>`;
+      h+=`<button class="${cls}" style="${at(r,c)}" data-r="${r}" data-c="${c}" aria-label="${coordTxt(r,c)}"></button>`;
     }
   }
   return h+'</div>';
+}
+/* ---------- dibujo de los barcos (vistos desde arriba, la proa a la derecha) ---------- */
+const SHIPCACHE={};
+function shipSVG(k, l, dir){
+  const key=k+l+dir; if(SHIPCACHE[key]) return SHIPCACHE[key];
+  const W=l*100;
+  const flag=x=>`<g transform="translate(${x},38)"><rect width="18" height="8" fill="#d52b1e"/><rect y="8" width="18" height="8" fill="#fff"/><rect y="16" width="18" height="8" fill="#0038a8"/><rect width="18" height="24" fill="none" stroke="#222" stroke-width="1.2"/></g>`;
+  const turret=(x, back)=>`<g transform="translate(${x},50)"><rect x="${back?-34:0}" y="-3.5" width="34" height="7" rx="3" fill="#3c4650"/><circle r="13" fill="#6f7c89" stroke="#2d3a45" stroke-width="2.5"/><circle r="5" fill="#4b5763"/></g>`;
+  const hull=`<path d="M10,28 L${W-60},22 Q${W-3},50 ${W-60},78 L10,72 Q3,50 10,28 Z" fill="#97a5b2" stroke="#2b3742" stroke-width="3.5"/><path d="M22,40 L${W-70},37 Q${W-38},50 ${W-70},63 L22,60 Z" fill="#a9b5c0" opacity=".55"/>`;
+  let body='';
+  if(k==='sub'){
+    body=`<ellipse cx="${W/2}" cy="50" rx="${W/2-8}" ry="20" fill="#3d4853" stroke="#1d252c" stroke-width="3.5"/><ellipse cx="${W/2}" cy="44" rx="${W/2-20}" ry="7" fill="#56626e" opacity=".7"/>
+      <rect x="${W*.42}" y="38" width="${Math.max(26,W*.14)}" height="24" rx="11" fill="#2a333b" stroke="#111" stroke-width="2"/><line x1="${W*.42+10}" y1="50" x2="${W*.42+10}" y2="30" stroke="#111" stroke-width="3"/>
+      <path d="M8,50 L-2,40 L-2,60 Z" fill="#2a333b"/>`;
+  } else if(k==='porta'){
+    body=`<path d="M6,24 L${W-40},18 Q${W-2},50 ${W-40},82 L6,76 Z" fill="#97a5b2" stroke="#2b3742" stroke-width="3.5"/>
+      <path d="M14,30 L${W-50},26 L${W-30},50 L${W-50},74 L14,70 Z" fill="#4d5862"/>
+      <line x1="24" y1="50" x2="${W-60}" y2="50" stroke="#f2f2f2" stroke-width="3" stroke-dasharray="16 12"/><line x1="40" y1="34" x2="${W*.55}" y2="66" stroke="#f2c14e" stroke-width="2.5" opacity=".8"/>
+      <rect x="${W*.62}" y="10" width="42" height="18" rx="3" fill="#dfe5ea" stroke="#2b3742" stroke-width="2"/>
+      ${[0.2,0.38].map(f=>`<path d="M${W*f},50 l14,-14 l4,0 l-6,14 l6,14 l-4,0 Z" fill="#aab4bd" stroke="#333" stroke-width="1"/>`).join('')}${flag(16)}`;
+  } else if(k==='remo'){
+    body=hull+`<rect x="${W*.28}" y="32" width="${W*.32}" height="36" rx="8" fill="#e8edf2" stroke="#2b3742" stroke-width="2.5"/><rect x="${W*.33}" y="40" width="${W*.1}" height="20" rx="3" fill="#7fb3dc"/>
+      ${[0.15,0.4,0.65].map(f=>`<circle cx="${W*f}" cy="25" r="5" fill="#222"/><circle cx="${W*f}" cy="75" r="5" fill="#222"/>`).join('')}<circle cx="${W*.72}" cy="50" r="9" fill="#c0392b" stroke="#222" stroke-width="2"/>${flag(14)}`;
+  } else if(k==='lancha'){
+    body=`<path d="M10,32 L${W-55},28 Q${W-6},50 ${W-55},72 L10,68 Q4,50 10,32 Z" fill="#97a5b2" stroke="#2b3742" stroke-width="3.5"/>
+      <rect x="${W*.35}" y="38" width="${W*.22}" height="24" rx="6" fill="#e8edf2" stroke="#2b3742" stroke-width="2"/><rect x="${W*.52}" y="41" width="10" height="18" rx="2" fill="#7fb3dc"/>${turret(W*.78)}${flag(14)}`;
+  } else {
+    // acorazados, cruceros, cañoneros, destructores y patrulleros: puente, chimenea y cañones según el largo
+    const tur = l>=5 ? [[.17,true],[.3,true],[.72,false],[.85,false]] : l===4 ? [[.18,true],[.72,false],[.86,false]] : l===3 ? [[.2,true],[.78,false]] : [[.8,false]];
+    body=hull + tur.map(([f,b])=>turret(W*f,b)).join('')
+      + `<rect x="${W*(l>2?.42:.32)}" y="34" width="${l>2?W*.16:W*.3}" height="32" rx="5" fill="#e8edf2" stroke="#2b3742" stroke-width="2.5"/><rect x="${W*(l>2?.42:.32)+6}" y="42" width="${l>2?W*.16-12:W*.3-12}" height="16" rx="3" fill="#cfd8e0"/>`
+      + (l>2 ? `<ellipse cx="${W*.6}" cy="50" rx="11" ry="9" fill="#2d2d2d" stroke="#111" stroke-width="2"/><ellipse cx="${W*.6}" cy="48" rx="6" ry="4" fill="#555"/>` : '')
+      + flag(14);
+  }
+  const inner=`<g transform="translate(0,50) scale(1,1.6) translate(0,-50)">${body}</g>`;   // más ancho: que llene la casilla
+  const svg = dir==='v'
+    ? `<svg viewBox="0 0 100 ${W}" preserveAspectRatio="none"><g transform="rotate(90) translate(0,-100)">${inner}</g></svg>`
+    : `<svg viewBox="0 0 ${W} 100" preserveAspectRatio="none">${inner}</svg>`;
+  return SHIPCACHE[key]=svg;
 }
 function renderBoards(){
   if(!V || V.phase==='lobby') return;
@@ -393,7 +437,7 @@ function renderPlace(){
     return;
   }
   const F=PL.F();
-  const chips=F.ships.map(([k,n,l],i)=>`<button class="chip ${PL.sel===i?'sel':''} ${PL.list[i]?'done':''}" onclick="PL.pick(${i})"><b>${esc(n)}</b><span>${'<i></i>'.repeat(l)}</span></button>`).join('');
+  const chips=F.ships.map(([k,n,l],i)=>`<button class="chip ${PL.sel===i?'sel':''} ${PL.list[i]?'done':''}" onclick="PL.pick(${i})"><b>${esc(n)}</b><span class="mini" style="--l:${l}">${shipSVG(k, l, 'h')}</span></button>`).join('');
   $('#placeBox').innerHTML=`<div class="seat">🚢 Poné tus barcos${V.opts.toca===false?' <small>(no se pueden tocar)</small>':''}</div>
     <div class="placewrap">${seaHTML(m,'place')}
     <div class="ppanel"><div class="chips">${chips}</div>
