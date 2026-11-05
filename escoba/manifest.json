@@ -1,0 +1,16 @@
+{
+  "name": "Escoba de 15",
+  "short_name": "Escoba",
+  "description": "La Escoba de 15 con la baraja española y toque paraguayo para jugar en línea con amigos: de 2 a 6 jugadores, en parejas, chat, voz y bots.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#3a1c10",
+  "theme_color": "#3a1c10",
+  "lang": "es-PY",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

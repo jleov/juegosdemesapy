@@ -18,6 +18,7 @@
     { "name": "Banquero Paraguayo", "short_name": "Banquero", "url": "banquero/", "icons": [{ "src": "banquero/icon-192.png", "sizes": "192x192" }] },
     { "name": "Lotería", "short_name": "Lotería", "url": "loteria/", "icons": [{ "src": "loteria/icon-192.png", "sizes": "192x192" }] },
     { "name": "Peteĩ", "short_name": "Peteĩ", "url": "petei/", "icons": [{ "src": "petei/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Escoba de 15", "short_name": "Escoba", "url": "escoba/", "icons": [{ "src": "escoba/icon-192.png", "sizes": "192x192" }] },
     { "name": "¿Mávaiko Ojuka?", "short_name": "Mávaiko", "url": "mavaiko/", "icons": [{ "src": "mavaiko/icon-192.png", "sizes": "192x192" }] }
   ]
 }
