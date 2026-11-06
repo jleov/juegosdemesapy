@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- SEO (buscadores y vista previa al compartir) -->
+<title>El Impostor online gratis: palabra secreta, pistas y votación con amigos | Juegos PY</title>
+<meta name="description" content="El Impostor con toque paraguayo para jugar en línea gratis: todos saben la palabra secreta menos el impostor. Pistas, discusión y votación, de 3 a 20 jugadores, con chat, voz, cámara y bots.">
+<link rel="canonical" href="https://juegospy.com/impostor/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Juegos Paraguay Digitales">
+<meta property="og:title" content="El Impostor online gratis: palabra secreta, pistas y votación con amigos | Juegos PY">
+<meta property="og:description" content="Todos saben la palabra secreta menos el impostor. Pistas, discusión y votación, de 3 a 20 jugadores, con chat, voz, cámara y bots. Con chipa, tereré y cosas bien paraguayas.">
+<meta property="og:url" content="https://juegospy.com/impostor/">
+<meta property="og:image" content="https://juegospy.com/impostor/icon-512.png">
+<meta property="og:locale" content="es_PY">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "El Impostor", "url": "https://juegospy.com/impostor/", "description": "Juego de palabra secreta e impostor con toque paraguayo para jugar en línea gratis: pistas, discusión y votación, de 3 a 20 jugadores, con chat, voz, cámara y bots.", "image": "https://juegospy.com/impostor/icon-512.png", "inLanguage": "es", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "jleovgames", "url": "https://juegospy.com/"}, "isPartOf": {"@type": "WebSite", "name": "Juegos Paraguay Digitales", "url": "https://juegospy.com/"}, "genre": ["Juego de palabras", "Juego de deducción social", "Juego de fiesta"], "gamePlatform": ["Navegador web", "Android", "PC"], "playMode": "MultiPlayer", "applicationCategory": "Game", "operatingSystem": "Cualquiera (navegador)"}</script>
+<!-- /SEO -->
+<meta name="theme-color" content="#2a0f2e">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!-- librería de conexión entre jugadores (PeerJS 1.5.4), guardada junto al juego para no depender de otro sitio -->
+<script src="peerjs.min.js"></script>
+<script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="../ice.js"></script>
+<style>
+:root{--cream:#fbf4e4;--ink:#1d1d1d;--muted:#6b6b6b;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#2a9d3f;--wine:#5a1530;--night:#1c0b22}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(circle at 25% 10%,#6a1f45,#2a0f2e 55%,#12061a) fixed;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+/* un ñandutí gigante y suave de fondo */
+body::before{content:"";position:fixed;left:50%;top:50%;width:min(130vmax,1400px);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;opacity:.06;pointer-events:none;z-index:-1;
+  background:radial-gradient(circle,transparent 0 10%,#fff 10.4% 11%,transparent 11.4% 24%,#fff 24.4% 25%,transparent 25.4% 40%,#fff 40.4% 41%,transparent 41.4% 56%,#fff 56.4% 57%,transparent 57.4% 69%,#fff 69.4% 70%,transparent 70.5%),repeating-conic-gradient(#fff 0 .5deg,transparent .5deg 7.5deg)}
+.screen{display:none}.screen.on{display:block}
+input,button,select,textarea{font:inherit}
+input[type=text],select,textarea{width:100%;padding:10px 12px;border:1px solid #cbbf9f;border-radius:10px;background:#fff;color:var(--ink)}
+textarea{resize:vertical;min-height:70px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff;touch-action:manipulation}
+.btn.red{background:var(--red)}.btn.gray{background:#7a7a7a}.btn.gold{background:var(--gold);color:#222}.btn.green{background:var(--green)}.btn.dark{background:#3a2140}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.wide{width:100%}.btn.big{font-size:17px;padding:12px 20px}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:420px){.row2{grid-template-columns:1fr}}
+.muted{color:var(--muted);font-size:13px}
+.box{background:var(--cream);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:14px}
+.box h3{margin:0 0 10px;font-size:17px}
+.box label{display:block;font-size:13px;font-weight:800;margin:10px 0 4px}
+/* ---------- menú ---------- */
+.menu{max-width:470px;margin:0 auto;padding:18px 16px 40px}
+.logo{text-align:center;color:#fff;margin:6px 0 18px}
+.mask{font-size:76px;line-height:1;filter:drop-shadow(0 6px 10px rgba(0,0,0,.5));display:inline-block;animation:flota 3s ease-in-out infinite}
+@keyframes flota{50%{transform:translateY(-6px) rotate(-4deg)}}
+.logo h1{margin:4px 0 0;font-size:44px;letter-spacing:3px;font-weight:900;text-shadow:0 3px 0 #000;line-height:1}
+.logo h1 small{display:block;font-size:.36em;letter-spacing:3px;color:var(--gold);margin-bottom:2px}
+.logo h1 span{color:var(--gold);font-size:.36em;letter-spacing:2px;display:block;margin-top:6px}
+.bandera{display:inline-block;margin-top:10px;border-radius:5px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.45);line-height:1}
+.bandera i{display:block;height:7px}.bandera i.rojo{background:#d52b1e}.bandera i.azul{background:#0038a8}
+.bandera b{display:block;background:#fff;color:#1b2a5a;font-weight:900;letter-spacing:5px;font-size:14px;padding:5px 11px 5px 16px}
+.tokens{display:flex;flex-wrap:wrap;gap:6px}
+.tok{font-size:24px;width:46px;height:46px;border-radius:50%;border:3px solid transparent;background:#fff;cursor:pointer;padding:0}
+.tok.sel{border-color:var(--red);transform:scale(1.08)}
+.code{font-size:38px;font-weight:900;letter-spacing:6px;text-align:center;color:var(--wine);margin:4px 0}
+.howto{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:12px;font-weight:700;color:#4a2a3a}
+.howto div{background:#fff;border-radius:10px;padding:8px 4px}.howto div b{display:block;font-size:22px}
+/* ---------- sala de espera ---------- */
+.lobbywrap{max-width:1100px;margin:0 auto;padding:56px 12px 30px;display:flex;gap:14px;align-items:flex-start}
+.lobbywrap>.lmain{flex:1;min-width:0}
+#lobbySide{width:360px;flex:none;position:sticky;top:10px}
+@media (max-width:860px){.lobbywrap{flex-direction:column}#lobbySide{width:100%;position:static}}
+.plist{list-style:none;padding:0;margin:8px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
+.plist li{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#fff}
+.plist li .nm{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
+body>.side{display:none}
+html,body{overflow-x:clip}
+.box label.opt,.opt{display:flex;gap:10px;align-items:flex-start;background:#fff;border-radius:10px;padding:9px 10px;margin-bottom:6px}
+.opt input{margin-top:3px;width:20px;height:20px;flex:none}
+.opt b{display:block;font-size:14px}.opt small{color:#555;font-size:12.5px;line-height:1.35}
+.variants{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.var{border:2px solid #e3d0b0;background:#fff;border-radius:10px;padding:7px 8px;text-align:left;cursor:pointer}
+.var:hover:not(:disabled){border-color:var(--wine)}
+.var:disabled{cursor:default;opacity:.7}
+.var b{display:block;font-size:13.5px}.var small{display:block;font-size:11.5px;color:#666;line-height:1.3;margin-top:2px}
+.cats{display:flex;flex-wrap:wrap;gap:6px}
+.box label.catchk{display:inline-flex;align-items:center;gap:5px;margin:0;background:#fff;border:2px solid #e3d0b0;border-radius:20px;padding:5px 10px;font-size:13px;font-weight:700;cursor:pointer}
+.catchk.on{border-color:var(--wine);background:#fbe3ec}
+.catchk input{width:16px;height:16px;margin:0}
+.sug{display:flex;gap:8px;align-items:flex-start;background:#fff;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:14px}
+.sug .t{flex:1}.sug .t small{display:block;color:#777;font-size:12px}
+.vote{border:1px solid #ccc;background:#f4f4f4;border-radius:20px;padding:4px 9px;cursor:pointer;font-weight:800;white-space:nowrap}
+.vote.on{background:#ffe8a3;border-color:#e2b23c}
+.grules{white-space:pre-wrap;background:#fff;border-radius:10px;padding:10px;font-size:14px;border-left:4px solid var(--gold)}
+.teamprev{background:#fff;border-radius:10px;padding:8px 10px;font-size:14px;margin-top:6px;line-height:1.5}
+#gameSide{display:flex;min-height:0}
+@media (min-width:1000px){.only-mobile{display:none}}
+#lobbySide .only-mobile{display:none}
+
+/* ======================= JUEGO ======================= */
+#game.on{display:flex}
+#game{height:100vh;height:100dvh;flex-direction:column;overflow:hidden}
+.topbar{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px 6px 56px;color:#fff;background:rgba(0,0,0,.4);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.topbar::-webkit-scrollbar{display:none}
+.topbar .ttl{font-weight:900;letter-spacing:1px;white-space:nowrap}
+.topbar .ttl small{font-weight:600;color:var(--gold);letter-spacing:2px;margin-left:4px}
+.topbar .sp{flex:1}
+.topbar .btn{white-space:nowrap}
+.badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:3px}
+.gmain{flex:1;display:flex;min-height:0}
+.area{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.gscroll{flex:1;overflow-y:auto;padding:10px 10px 16px;min-height:0}
+.gwrap{max-width:1000px;margin:0 auto}
+/* la tarjeta secreta */
+#tarjeta{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:10px}
+.tj{position:relative;width:min(100%,460px);border-radius:18px;padding:14px 16px 12px;text-align:center;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5),inset 0 0 0 3px rgba(255,255,255,.25);overflow:hidden;transition:filter .2s}
+.tj::after{content:"";position:absolute;right:-40px;top:-40px;width:140px;height:140px;border-radius:50%;opacity:.16;pointer-events:none;
+  background:radial-gradient(circle,transparent 0 18%,#fff 19% 21%,transparent 22% 42%,#fff 43% 45%,transparent 46% 68%,#fff 69% 71%,transparent 72%),repeating-conic-gradient(#fff 0 1.5deg,transparent 1.5deg 15deg)}
+.tj.civ{background:linear-gradient(160deg,#0b4fb3,#0038a8 50%,#0a2a6e)}
+.tj.imp{background:linear-gradient(160deg,#e3362a,#a0150d 55%,#5a0b06)}
+.tj.reveal,.tj.own{background:linear-gradient(160deg,#7a2a55,#4a1033)}
+.tj.obs{background:linear-gradient(160deg,#4a3a5a,#2a1f36)}
+.tjk{font-size:13px;font-weight:800;letter-spacing:.5px;opacity:.92;text-transform:uppercase}
+.tjw{font-size:clamp(30px,8vw,46px);font-weight:900;letter-spacing:1px;line-height:1.1;margin:4px 0;text-shadow:0 3px 0 rgba(0,0,0,.35);word-break:break-word}
+.tjc{display:inline-block;background:rgba(255,255,255,.18);border-radius:20px;padding:3px 12px;font-size:13.5px;font-weight:700;margin:2px}
+.tjs{font-size:13px;margin-top:6px;opacity:.95;line-height:1.35}
+.tjout{margin-top:8px;background:rgba(0,0,0,.35);border-radius:10px;padding:5px 8px;font-size:13px;font-weight:700}
+.tj.tapada>*{filter:blur(14px)}
+.tj.tapada::before{content:"🙈 Tarjeta tapada";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;z-index:2;filter:none}
+.tjbtn{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;margin:0 3px}
+/* la fase y el reloj */
+#fase{background:rgba(0,0,0,.38);color:#fff;border-radius:14px;padding:8px 12px 10px;margin:0 auto 10px;max-width:1000px}
+.fh{display:flex;align-items:center;gap:8px;font-size:17px}
+.fh b{flex:1}
+.fs{font-size:14.5px;margin-top:3px;line-height:1.35}.fs b{color:var(--gold)}.fs b.red{color:#ff7b70}
+.fs .muted{color:#d9c3d6}
+.timer{font-weight:900;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.14);border-radius:12px;padding:2px 10px;font-size:15px}
+.timer:empty{display:none}
+.timer.hurry{background:var(--red);animation:pulso2 .5s infinite}
+.tbar{height:4px;background:rgba(255,255,255,.12);border-radius:3px;margin-top:7px;overflow:hidden}
+.tbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red),var(--gold));transition:width .25s linear}
+/* la ronda de jugadores */
+#ronda{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+#ronda.many{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+@media (max-width:600px){#ronda,#ronda.many{grid-template-columns:repeat(2,1fr);gap:7px}}
+.tile{position:relative;background:var(--cream);border-radius:14px;padding:10px 8px 8px;text-align:center;box-shadow:0 0 0 3px var(--pc),0 5px 14px rgba(0,0,0,.4);transition:transform .2s,box-shadow .2s;min-width:0}
+.tile.me{background:#fff7d6}
+.tile.turn{box-shadow:0 0 0 4px var(--gold),0 0 26px 6px rgba(242,193,78,.65);transform:translateY(-2px);animation:pulso 1.3s infinite}
+@keyframes pulso{50%{box-shadow:0 0 0 4px #fff,0 0 34px 10px rgba(242,193,78,.8)}}
+@keyframes pulso2{50%{opacity:.7}}
+.tile.isout{opacity:.62;filter:grayscale(.6)}
+.tile.off{opacity:.8}
+.tile.canvote{cursor:pointer}
+.tile.canvote:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 0 0 4px var(--red),0 8px 20px rgba(0,0,0,.5)}
+.tile.myvote{box-shadow:0 0 0 5px var(--red),0 0 24px 4px rgba(213,43,30,.7)}
+.tile.myvote::after{content:"🗳️ tu voto";position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);background:var(--red);color:#fff;font-size:11px;font-weight:900;border-radius:10px;padding:1px 8px;white-space:nowrap}
+.tile.pop{animation:popin .5s}
+@keyframes popin{40%{transform:scale(1.07)}}
+.tav{height:58px;display:flex;align-items:center;justify-content:center;position:relative}
+.tav .emo{width:54px;height:54px;border-radius:50%;background:var(--pc);display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 3px 8px rgba(0,0,0,.35)}
+.tnm b{display:block;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tnm small{color:#7a6a5a;font-size:11.5px}
+.clues{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:6px;min-height:24px}
+.clue{background:#fff;border:2px solid var(--pc);border-radius:12px;padding:2px 8px;font-size:13.5px;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;animation:popin .4s}
+.clue.skip{border-style:dashed;color:#999}.clue.voz{color:#5b3b7a;border-style:dotted}.clue.none{border:0;background:none;color:#aaa}
+.st{display:inline-block;margin-top:5px;font-size:11.5px;font-weight:900;border-radius:10px;padding:1px 7px;background:#e7f6e9;color:#1d6b2c}
+.st.out{background:#fde4e2;color:#a3170c}
+.guampa{position:absolute;left:4px;top:2px;font-size:28px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));animation:flota 1.4s ease-in-out infinite;z-index:3}
+.matek{position:absolute;right:4px;top:4px;font-size:10.5px;font-weight:900;background:var(--red);color:#fff;border-radius:8px;padding:0 5px}
+.gain{position:absolute;right:6px;top:6px;background:var(--gold);color:#3a1c10;font-weight:900;font-size:13px;border-radius:10px;padding:0 7px}
+.vcnt{position:absolute;right:-6px;top:-10px;background:var(--red);color:#fff;font-weight:900;font-size:13px;border-radius:12px;padding:1px 8px;box-shadow:0 0 0 2px #fff;z-index:2}
+.voters{font-size:14px;margin-top:3px;letter-spacing:1px;word-break:break-all}
+.bub{position:absolute;left:50%;top:-8px;transform:translate(-50%,-100%);background:#fff;color:#111;border-radius:12px;padding:5px 9px;font-size:12.5px;font-weight:700;width:max-content;max-width:180px;box-shadow:0 3px 10px rgba(0,0,0,.45);z-index:6;animation:bubin .25s}
+.bub::after{content:"";position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);border:6px solid transparent;border-bottom:0;border-top-color:#fff}
+@keyframes bubin{from{transform:translate(-50%,-80%) scale(.6);opacity:0}}
+/* barra de acciones de abajo */
+#actbar{flex:none;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(0,0,0,.45);min-height:52px}
+#actbar:empty{display:none}
+#actbar .wh{color:#f3e3f0}
+.cluein{display:flex;gap:6px;flex:1 1 320px;max-width:520px}
+.cluein input{flex:1;font-size:16px;font-weight:700}
+.quick{width:auto!important;max-width:220px;padding:7px 8px!important;font-size:13px}
+/* ---------- caras ---------- */
+.head{--hw2:56px;position:relative;width:var(--hw2);height:calc(var(--hw2) * 1.15);
+  border-radius:48% 48% 44% 44% / 58% 58% 42% 42%;overflow:hidden;background:var(--pc,#888);box-shadow:0 0 0 3px var(--pc,#888),0 4px 10px rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--hw2) * .5)}
+.head img,.head video{width:100%;height:100%;object-fit:cover;display:block}
+.head.live img,.head.live span{display:none}
+.head .rec{position:absolute;top:5px;right:7px;width:7px;height:7px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 5px #ff2d2d;animation:pulso2 1.4s infinite}
+.tile.me .head video,.facepv video{transform:scaleX(-1)}
+.tav .head{--hw2:48px}
+.facepv{display:flex;justify-content:center;margin:6px 0 14px}
+.facepv .head{--hw2:120px}
+.fthumb{width:26px;height:31px;object-fit:cover;border-radius:48% 48% 44% 44% / 58% 58% 42% 42%;flex:none}
+/* ---------- panel lateral ---------- */
+.side{width:350px;flex:none;display:flex;flex-direction:column;background:var(--cream);min-height:0;box-shadow:-4px 0 18px rgba(0,0,0,.35)}
+#lobbySide .side{width:100%;height:min(640px,80vh);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);overflow:hidden}
+@media (max-width:999px){
+  #game .side{position:fixed;right:0;top:0;bottom:0;width:min(380px,94vw);transform:translateX(105%);transition:transform .25s;z-index:60}
+  #game .side.open{transform:none}
+}
+.voice{display:flex;gap:6px;padding:8px;border-bottom:1px solid #e3d8bd;flex-wrap:wrap}
+.voice .btn{flex:1}.voice .btn.on{background:#d52b1e;animation:pulso2 1.4s infinite}
+.tabs{display:flex;border-bottom:1px solid #e3d8bd}
+.tabs button{flex:1;border:0;background:none;padding:9px 2px;font-weight:800;font-size:13px;cursor:pointer;color:#7b6a4c;border-bottom:3px solid transparent}
+.tabs button.on{color:#1d1d1d;border-bottom-color:var(--red)}
+.tabp{display:none;flex:1;min-height:0;flex-direction:column}
+.tabp.on{display:flex}
+.scroll{flex:1;overflow-y:auto;padding:8px 10px;min-height:0}
+.msg{margin:0 0 6px;font-size:14px;line-height:1.35;word-wrap:break-word}
+.msg .who{font-weight:800}
+.msg.sys{color:#7b6a4c;font-size:12.5px;font-style:italic}
+.msg.priv{background:#2b1d3f;color:#fff;border-radius:10px;padding:6px 9px}
+.msg.priv .who{color:#ffd77a}
+.msg.priv small{color:#cdbbe9;display:block;font-size:11.5px}
+.msg .at{background:#ffe9a8;border-radius:4px;padding:0 3px;font-weight:700}
+.chatin{display:flex;gap:6px;padding:8px;border-top:1px solid #e3d8bd;position:relative;flex-wrap:wrap}
+.chatin select{width:auto;flex:0 0 auto;max-width:42%;padding:8px 6px;font-size:13px}
+.chatin input{flex:1;min-width:120px}
+.chatin.priv input{background:#f1eaff;border-color:#8e6bd0}
+.atpop{position:absolute;left:8px;right:8px;bottom:100%;background:#fff;border-radius:10px;box-shadow:0 -4px 16px rgba(0,0,0,.25);overflow:hidden;display:none;z-index:5;max-height:240px;overflow-y:auto}
+.atpop.on{display:block}
+.atpop div{padding:8px 10px;cursor:pointer;font-weight:700}
+.atpop div:hover,.atpop div.sel{background:#f1eaff}
+.hline{font-size:13.5px;margin-bottom:7px;line-height:1.3}
+.hline.esc{background:#fff4c2;border-radius:8px;padding:3px 5px}
+.hline.new{animation:resalta 1.6s}
+@keyframes resalta{from{background:#ffe9a8}}
+.prow{display:flex;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:7px 8px;margin-bottom:6px;font-size:14px}
+.prow .nm{flex:1;min-width:0}
+.prow .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .nm small{color:#777}
+.prow .pts{font-weight:900;font-size:16px}
+.rsum{background:#fff;border-radius:10px;padding:8px 10px;font-size:13.5px;line-height:1.5;margin-bottom:10px}
+/* ---------- avisos ---------- */
+#toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:100;text-align:center;max-width:92%;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+#netbar{position:fixed;left:0;right:0;top:0;background:#b8860b;color:#fff;text-align:center;padding:6px;font-weight:700;z-index:99;display:none}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:14px;z-index:80}
+#modal.on{display:flex}
+#modal .mbox{background:var(--cream);border-radius:16px;padding:18px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#modal h2{margin:0 0 10px;font-size:21px}
+.secretbox{background:linear-gradient(160deg,#7a2a55,#4a1033);color:#fff;border-radius:12px;padding:10px 12px;font-size:15px;line-height:1.5}
+.secretbox .muted{color:#e6c9da}
+.scorewrap{overflow-x:auto;margin:8px 0}
+.score{width:100%;border-collapse:collapse;font-size:14px}
+.score th,.score td{padding:6px 5px;border-bottom:1px solid #e3d8bd;text-align:center;white-space:nowrap}
+.score td:first-child,.score th:first-child{text-align:left}
+.score .won{background:#fff1b8;font-weight:900}
+.rules h3{margin:14px 0 6px}
+.rules p,.rules li{font-size:14.5px;line-height:1.45}
+.bigtx{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.3);font:900 clamp(40px,10vw,96px)/1.05 "Arial Black",system-ui,sans-serif;color:var(--gold);text-align:center;
+  -webkit-text-stroke:2px #3a0a1c;text-shadow:0 5px 0 #3a0a1c,0 0 40px #ff4d8a;pointer-events:none;z-index:90;opacity:0;animation:bigpop 1.8s ease-out forwards;white-space:nowrap}
+.bigtx.imp{color:#ff5a4d;text-shadow:0 5px 0 #3a0a1c,0 0 40px #ff2200}
+.bigtx.inoc{color:#7fd0ff;text-shadow:0 5px 0 #0a1c3a,0 0 40px #4da6ff}
+.bigtx.turnpop{font-size:clamp(34px,8vw,70px)}
+.bigtx small{display:block;font-size:.3em;color:#fff;-webkit-text-stroke:0;text-shadow:0 2px 0 #000;margin-top:4px}
+@keyframes bigpop{15%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}30%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%) scale(1)}}
+.obsbar{background:#2b1d3f;color:#fff;text-align:center;font-size:13px;padding:5px}
+@media (max-width:600px){
+  .topbar .hidem{display:none}
+  .gscroll{padding:8px 8px 14px}
+  /* en el celular cada jugador es una fichita horizontal: entran más sin tener que bajar tanto */
+  .tile{display:grid;grid-template-columns:40px 1fr;gap:2px 7px;align-items:center;text-align:left;padding:7px 7px 6px}
+  .tav{height:auto;grid-row:span 2}.tav .emo{width:38px;height:38px;font-size:21px}.tav .head{--hw2:34px}
+  .tnm b{font-size:13.5px}.tnm small{font-size:11px}
+  .clues{grid-column:1/-1;justify-content:flex-start;margin-top:3px;min-height:0}
+  .clue{font-size:12.5px;padding:1px 7px}
+  .st{grid-column:1/-1;justify-self:start;margin-top:2px}
+  .voters{grid-column:1/-1}
+  .guampa{left:auto;right:4px;top:auto;bottom:4px;font-size:22px}
+  .tj{padding:10px 12px 9px}.tjs{font-size:12.5px;margin-top:4px}
+  #fase{padding:7px 10px 8px}.fh{font-size:16px}.fs{font-size:13.5px}
+}
+</style>
+</head>
+<body>
+<div id="netbar"></div>
+
+<!-- ======================= MENÚ ======================= -->
+<div class="screen on" id="menu"><div class="menu">
+  <div class="logo">
+    <div class="mask">🎭</div>
+    <h1><small>EL</small>IMPOSTOR<span>¿QUIÉN NO SABE LA PALABRA?</span></h1>
+    <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
+  </div>
+  <div class="box">
+    <div class="howto"><div><b>🎴</b>Mirá tu palabra</div><div><b>🧉</b>Decí una pista</div><div><b>🗣️</b>Discutan</div><div><b>🗳️</b>Echen al impostor</div></div>
+  </div>
+  <div class="box">
+    <label for="myName" style="margin-top:0">Tu nombre</label>
+    <input type="text" id="myName" maxlength="16" placeholder="Ej.: Juan" autocomplete="nickname">
+    <label>Tu ficha</label>
+    <div class="tokens" id="tokens"></div>
+  </div>
+  <div class="box">
+    <h3>🌐 Jugar en línea con amigos</h3>
+    <button class="btn green wide" onclick="hostStart(false)">➕ Crear sala</button>
+    <label for="joinCode">o entrá con el código de la sala</label>
+    <div class="row"><input type="text" id="joinCode" maxlength="6" placeholder="Código" style="text-transform:uppercase;letter-spacing:3px;font-weight:800"><button class="btn" style="flex:0 0 auto" onclick="joinClick()">Entrar</button></div>
+    <button class="btn gold wide" id="btnResume" style="margin-top:10px;display:none" onclick="resumeClick()">↩️ Volver a la sala</button>
+    <p class="muted" style="margin-bottom:0">De 3 a 20 jugadores. Lo mejor: con voz 🎤 o todos juntos en la misma ronda de tereré. Los que lleguen con la partida empezada miran 👀 y se suman al terminar la ronda.</p>
+  </div>
+  <div class="box">
+    <h3>🤖 Practicar contra bots</h3>
+    <div class="row"><select id="nBots"><option value="2">3 jugadores (2 bots)</option><option value="3">4 jugadores (3 bots)</option><option value="4" selected>5 jugadores (4 bots)</option><option value="5">6 jugadores (5 bots)</option><option value="7">8 jugadores (7 bots)</option><option value="9">10 jugadores (9 bots)</option><option value="14">15 jugadores (14 bots)</option></select>
+    <button class="btn" style="flex:0 0 auto" onclick="localStart()">Jugar</button></div>
+    <p class="muted" style="margin-bottom:0">Los bots dan pistas, sospechan, discuten y votan. Antes de empezar elegís las reglas.</p>
+  </div>
+  <button class="btn dark wide" onclick="showRules()">📜 Reglas y variantes para grupos</button>
+  <p class="muted" id="musicCredit" style="color:#e8cfe0;text-align:center;font-size:11px;margin-top:14px"></p>
+</div></div>
+
+<!-- ======================= SALA DE ESPERA ======================= -->
+<div class="screen" id="lobby"><div class="lobbywrap">
+  <div class="lmain">
+    <div class="box">
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1">🎭 Sala de espera</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música de fondo">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🚪 Salir</button></div>
+      <div id="lobbyCodeBox"><p class="muted" style="text-align:center;margin:8px 0 0">Código de la sala</p><div class="code" id="lobbyCode">—</div>
+        <div class="row"><button class="btn sm" onclick="shareRoom()">📤 Compartir enlace</button><button class="btn sm gray" onclick="copyCode()">📋 Copiar código</button></div></div>
+      <div id="lobbyObs"></div>
+      <h3 style="margin-top:14px">Jugadores <span class="muted" id="pcount"></span></h3>
+      <ul class="plist" id="plist"></ul>
+      <div id="teamPrev"></div>
+      <button class="btn sm dark" style="margin:8px 0" onclick="faceModal()">📷 Mi cara: foto o cámara (opcional)</button>
+      <div id="lobbyHostBtns"></div>
+    </div>
+    <div class="box">
+      <h3>⚙️ Reglas de esta sala</h3>
+      <div id="optsBox"></div>
+    </div>
+    <div class="box">
+      <h3>📝 Reglas propias del grupo</h3>
+      <p class="muted" style="margin-top:0">Cada grupo tiene sus mañas. El anfitrión escribe acá lo que se acordó y todos lo ven durante la partida.</p>
+      <div id="grulesBox"></div>
+    </div>
+    <div class="box">
+      <h3>💡 Sugerencias de reglas</h3>
+      <p class="muted" style="margin-top:0">Cualquiera (también los que miran) puede proponer una regla nueva y votar las de los demás 👍.</p>
+      <div id="sugBox"></div>
+      <div class="row" style="margin-top:6px"><input type="text" id="sugIn" maxlength="240" placeholder="Ej.: el que echan ceba el tereré 🧉" onkeydown="if(event.key==='Enter')sendSug('sugIn')"><button class="btn sm" style="flex:0 0 auto" onclick="sendSug('sugIn')">Sugerir</button></div>
+    </div>
+  </div>
+  <div id="lobbySide"></div>
+</div></div>
+
+<!-- ======================= PARTIDA ======================= -->
+<div class="screen" id="game">
+  <div class="topbar">
+    <span class="ttl">IMPOSTOR<small>PY</small></span>
+    <span class="btn sm dark" id="roomTag" style="cursor:default" title="Código de la sala"></span>
+    <span class="btn sm dark" id="roundTag" style="cursor:pointer" onclick="setTab('mesa');toggleSide(true)" title="Puntos"></span>
+    <span class="sp"></span>
+    <button class="btn sm dark" onclick="faceModal()" title="Tu foto o tu cámara">📷</button>
+    <button class="btn sm dark" id="btnSnd" onclick="toggleSound()">🔊</button>
+    <button class="btn sm dark btnMusic" onclick="toggleMusic()" title="Música de fondo">🎶</button>
+    <button class="btn sm dark hidem" onclick="showRules()">📜</button>
+    <button class="btn sm dark" id="btnSide" onclick="toggleSide()">💬<span class="badge" id="unread" style="display:none">0</span></button>
+    <button class="btn sm red" onclick="leaveClick()" title="Salir de la partida">🚪</button>
+  </div>
+  <div id="obsbar" class="obsbar" style="display:none"></div>
+  <div class="gmain">
+    <div class="area">
+      <div class="gscroll"><div class="gwrap">
+        <div id="tarjeta"></div>
+        <div id="fase"></div>
+        <div id="ronda"></div>
+      </div></div>
+      <div id="actbar"></div>
+    </div>
+    <div id="gameSide"></div>
+  </div>
+</div>
+
+<!-- ======================= PANEL (se mueve entre la sala y la partida) ======================= -->
+<div class="side" id="side">
+  <div class="voice" id="voiceBar">
+    <button class="btn sm gray" id="btnMic" onclick="toggleMic()">🎤 Activar micrófono</button>
+    <button class="btn sm gray" id="btnSpk" style="flex:0 0 46px" onclick="toggleSpk()" title="Escuchar a los demás">🔊</button>
+    <button class="btn sm gray only-mobile" id="btnCloseSide" style="flex:0 0 46px" onclick="toggleSide(false)">✕</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="chat" class="on">💬 Chat</button>
+    <button data-tab="hist">📜 Historial</button>
+    <button data-tab="mesa">👥 Puntos</button>
+    <button data-tab="reglas">🏠 Reglas</button>
+  </div>
+  <div class="tabp on" id="tab-chat">
+    <div class="scroll" id="chatList"></div>
+    <div class="chatin" id="chatIn">
+      <div class="atpop" id="atpop"></div>
+      <select id="chatTo" title="Para quién es el mensaje" onchange="chatToChanged()"></select>
+      <input type="text" id="chatText" maxlength="300" placeholder="Escribí… (@nombre = privado)" autocomplete="off">
+      <button class="btn sm" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+  <div class="tabp" id="tab-hist"><div class="scroll" id="histList"></div></div>
+  <div class="tabp" id="tab-mesa"><div class="scroll" id="mesaList"></div></div>
+  <div class="tabp" id="tab-reglas"><div class="scroll" id="reglasList"></div></div>
+</div>
+
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast"></div>
+
+<script src="palabras.js?v=1"></script>
+<script src="reglas.js?v=1"></script>
+<script src="juego.js?v=1"></script>
+<script src="caras.js?v=1"></script>
+<script src="../dueno-link.js"></script>
+<script src="../inicio.js?v=2"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', sonidos:['#btnSnd','.btnMusic'], ocultar:['[onclick="leaveClick()"]'], barra:'.topbar'};</script>
+<script>
+// le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)
+if(window.DuenoLink) DuenoLink.start({game:"impostor",
+  info(){
+    if(!S || (NET.mode!=="host" && NET.mode!=="local")) return null;
+    const local=NET.mode==="local"; if(local && !S.localCode) S.localCode="L"+genCode();
+    const c=curP();
+    return {code: local ? S.localCode : NET.code, local, phase:S.phase, round:S.round, started:S.startedAt||null,
+      host:(P(S.hostPid)||{}).name||"", turn:c ? c.name : null, word:S.word||null, opts:{rounds:S.opts.rounds, nImp:S.opts.nImp},
+      players:S.players.map(p=>({n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot, imp:S.imps.includes(p.id), out:!!p.out, pts:p.score})),
+      obs:(S.observers||[]).filter(o=>o.conn).map(o=>({n:o.name, owner:!!o.owner}))};
+  },
+  onIam(tok){ if(NET.mode!=="host") return; S.ownerTok=[...new Set([...(S.ownerTok||[]), tok])].slice(-4); commit(); }
+});
+</script>
+</body>
+</html>
