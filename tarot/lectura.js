@@ -4,7 +4,9 @@
    el número de vida, el año personal, el tema elegido y las cartas que salieron.
    ===================================================================== */
 (function(){
-const elige = a => a[Math.floor(Math.random()*a.length)];
+let rnd = Math.random;   // leer() lo cambia por uno con semilla, así un link reproduce la misma lectura
+const elige = a => a[Math.floor(rnd()*a.length)];
+function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
 
 /* ---------- signos del zodíaco ---------- */
@@ -142,9 +144,50 @@ const TEMAS = {
   extra:['Esta noche, antes de dormir, hacé tu pregunta en voz baja: la respuesta puede llegar en un sueño.','Prendé una vela y escribí lo que te preocupa; después soltalo.','Prestá atención a las señales de los próximos tres días.']}
 };
 
+/* ---------- para cuándo: hoy, la semana, el mes, el año ---------- */
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIAS_S = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const PERIODOS = {
+ dia:{n:'Hoy', d:'Del día', un:'un día', ese:'este día', carta:'Tu carta del día', tres:['La mañana','La tarde','La noche'], tresF:['Por la mañana','Por la tarde','Cuando caiga la noche']},
+ semana:{n:'Semana', d:'Esta semana', un:'una semana', ese:'esta semana', carta:'Tu carta de la semana', tres:['Inicio de semana','Mitad de semana','Fin de semana'], tresF:['Al empezar la semana','A mitad de semana','Para el fin de semana']},
+ mes:{n:'Mes', d:'Este mes', un:'un mes', ese:'este mes', carta:'Tu carta del mes', tres:['Primeros días','Mediados de mes','Fin de mes'], tresF:['En los primeros días','A mediados de mes','Para el cierre del mes']},
+ anio:{n:'Año', d:'Este año', un:'un año', ese:'este año', carta:'Tu carta del año', tres:['Pasado','Presente','Futuro'], tresF:['En tu pasado','En tu presente','Hacia el futuro']},
+ libre:{n:'Sin plazo', d:'Sin fecha', carta:'Tu mensaje'}
+};
+const ENERGIA = {
+ 1:'de comienzos: animate a dar el primer paso',
+ 2:'de paciencia y acuerdos: mejor juntos que solos',
+ 3:'de alegría, charla y creatividad',
+ 4:'de trabajo y orden: lo que construyas queda firme',
+ 5:'de movimiento y sorpresas: estate atento a lo inesperado',
+ 6:'de hogar, amor y gente querida',
+ 7:'de calma y reflexión: escuchá tu voz interior',
+ 8:'de logros y cosecha: lo que sembraste empieza a rendir',
+ 9:'de cierres y limpieza: soltá lo que ya no va'
+};
+function hoyMismo(f){ const h=new Date(); return f.getFullYear()===h.getFullYear() && f.getMonth()===h.getMonth() && f.getDate()===h.getDate(); }
+// el texto del plazo, con la fecha escrita (así un link visto otro día sigue siendo correcto)
+function cuando(per, f){
+  const dm = x => `${x.getDate()} de ${MESES[x.getMonth()]}`;
+  if(per==='dia') return (hoyMismo(f) ? 'hoy, ' : 'el ') + `${DIAS_S[f.getDay()]} ${dm(f)}`;
+  if(per==='semana'){
+    const lu = new Date(f.getFullYear(), f.getMonth(), f.getDate() - (f.getDay()+6)%7), dom = new Date(lu.getFullYear(), lu.getMonth(), lu.getDate()+6);
+    return `la semana del ${lu.getDate()}${lu.getMonth()!==dom.getMonth()?' de '+MESES[lu.getMonth()]:''} al ${dm(dom)}`;
+  }
+  if(per==='mes') return `${MESES[f.getMonth()]} de ${f.getFullYear()}`;
+  if(per==='anio') return `el año ${f.getFullYear()}`;
+  return '';
+}
+// número personal del plazo (numerología: año personal + mes + día)
+function numPlazo(pf, per, f){
+  if(per==='mes') return reducir(pf.ap + reducir(f.getMonth()+1), false);
+  if(per==='dia' || per==='semana') return reducir(pf.ap + reducir(f.getMonth()+1) + reducir(f.getDate()), false);
+  return pf.ap;
+}
+
 /* ---------- tiradas ---------- */
 const TIRADAS = {
- 1:{n:'Una carta',d:'Mensaje del día',pos:[{n:'Tu mensaje',f:'Para tu consulta'}]},
+ 1:{n:'Una carta',d:'Un mensaje directo',pos:[{n:'Tu mensaje',f:'Para tu consulta'}]},
  3:{n:'Tres cartas',d:'Pasado · presente · futuro',pos:[{n:'Pasado',f:'En tu pasado'},{n:'Presente',f:'En tu presente'},{n:'Futuro',f:'Hacia el futuro'}]},
  5:{n:'La cruz',d:'Cinco cartas en cruz',pos:[{n:'Tu situación',f:'En el centro de tu situación'},{n:'A tu favor',f:'Como aliada'},{n:'En contra',f:'Como obstáculo'},{n:'El consejo',f:'Como consejo'},{n:'Resultado',f:'Como resultado probable'}]}
 };
@@ -154,27 +197,41 @@ function polaridad(t){ return t.inv ? t.c.q : t.c.p; }
 function banda(v){ return v>0.35 ? 'pos' : v<-0.05 ? 'neg' : 'neu'; }
 
 /* perfil a partir de nombre y fecha */
-function perfil(nombre, d, m, a){
-  const s = signo(d,m), nv = numeroVida(d,m,a), hoy = new Date();
-  const ap = anioPersonal(d,m,hoy.getFullYear());
-  return {nombre:(nombre||'').trim(), d, m, a, signo:s, nv, ap, anio:hoy.getFullYear(),
+function perfil(nombre, d, m, a, fecha){
+  const s = signo(d,m), nv = numeroVida(d,m,a), anio = (fecha||new Date()).getFullYear();
+  return perfilDe({n:nombre, s:SIGNOS.indexOf(s), nv, ap:anioPersonal(d,m,anio), anio});
+}
+// perfil sin la fecha de nacimiento (es lo que viaja en un link compartido)
+function perfilDe(o){
+  const s = SIGNOS[o.s] || SIGNOS[0], nv = NUM[o.nv] ? o.nv : 1;
+  return {nombre:String(o.n||'').trim().slice(0,30), signo:s, si:SIGNOS.indexOf(s), nv, ap: ANIO[o.ap] ? o.ap : 1, anio:o.anio||new Date().getFullYear(),
     arcSigno:s.arc, arcNum: nv===22?0 : nv>21 ? reducir(nv,false) : nv};
 }
 
 /* ---------- la lectura ---------- */
-function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores){
-  const T = TEMAS[temaId], TI = TIRADAS[tiradaId], M = window.TAROT.MAZO;
+function posiciones(tiradaId, per){
+  const TI = TIRADAS[tiradaId], P = PERIODOS[per] || PERIODOS.libre;
+  if(+tiradaId===1) return [{n:P.carta, f:'Para vos'}];
+  if(+tiradaId===3 && P.tres) return P.tres.map((n,k)=>({n, f:P.tresF[k]}));
+  return TI.pos;
+}
+function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
+  const per = PERIODOS[opc.per] ? opc.per : 'libre', fecha = opc.fecha || new Date(), PR = PERIODOS[per];
+  rnd = mulberry(opc.seed!=null ? opc.seed : Math.random()*4294967296>>>0);
+  const T = TEMAS[temaId], TI = {...TIRADAS[tiradaId], pos:posiciones(tiradaId, per)}, M = window.TAROT.MAZO;
+  const cuandoTxt = cuando(per, fecha);
   const nom = pf.nombre;
   const out = [];   // párrafos (HTML)
   const saludo = nom
     ? elige([`${esc(nom)}, Jasy ya iluminó tus cartas.`, `Mba'éichapa, ${esc(nom)}. Las cartas se abrieron para vos.`, `${esc(nom)}, el ñandutí de tu destino empezó a mostrar su dibujo.`])
     : elige(['Alma curiosa: Jasy ya iluminó tus cartas.', 'Mba\'éichapa. Las cartas se abrieron para vos.', 'El ñandutí de tu destino empezó a mostrar su dibujo.']);
   const preg = pregunta ? ` Tu pregunta, <i>“${esc(pregunta)}”</i>, quedó flotando sobre la mesa mientras barajábamos.` : '';
-  out.push({cls:'intro', h:`${saludo} Consultaste por <b>${T.t.toLowerCase()}</b> <span class="gn">(${T.gn})</span>.${preg}`});
+  out.push({cls:'intro', h:`${saludo} Consultaste por <b>${T.t.toLowerCase()}</b> <span class="gn">(${T.gn})</span>${cuandoTxt?` para <b>${cuandoTxt}</b>`:''}.${preg}`});
 
   const E = ELEM[pf.signo.el];
   out.push({cls:'astro', h:`Naciste bajo <b>${pf.signo.s}︎ ${pf.signo.n}</b>, signo de ${E.desc}, regido por ${pf.signo.pl}. Llevás en vos ${pf.signo.r}. `
     + `Tu número de vida es el <b>${pf.nv}</b>, ${NUM[pf.nv]}, y este ${pf.anio} es para vos ${ANIO[pf.ap]}. `
+    + (per==='dia'||per==='semana'||per==='mes' ? `Para ${PR.ese} tu número personal es el <b>${numPlazo(pf,per,fecha)}</b>, que anuncia ${PR.un} ${ENERGIA[numPlazo(pf,per,fecha)]}. ` : '')
     + `En ${T.nom}, tu elemento te dice que la clave es ${E.clave}.`});
 
   // cada carta
@@ -183,7 +240,7 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores){
     const kw = elige(t.inv ? c.ki : c.kn);
     const apl = elige(T[b]).replace('{k}', `<b>${kw}</b>`);
     const nombreC = `${art(c)}<b class="cn">${c.nombre}</b>${t.inv?' <span class="inv">(invertida)</span>':''}`;
-    let pre = TI.pos.length>1 ? `${P.f} ${elige(VERBO)} ${nombreC}.` : `Para vos ${elige(VERBO)} ${nombreC}.`;
+    let pre = `${P.f} ${elige(VERBO)} ${nombreC}.`;
     out.push({cls:'carta', pos:P.n, id:c.id, h:`${pre} ${t.inv?c.i:c.n} ${apl}`});
   });
 
@@ -222,14 +279,17 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores){
   const clave = N===5 ? sacadas[3] : sacadas[N-1];
   const consejo = clave.c.consejo || elige(T.extra);
   const numSuerte = ((pf.nv*7 + sacadas.reduce((a,t)=>a+t.c.num,0)) % 90) + 1;
-  out.push({cls:'final', h:`<b>${T.cierre[tono]}</b> ${N===5?'La carta del consejo':'Tu carta clave'}, ${art(clave.c)}${clave.c.nombre}, te susurra: <i>«${consejo}»</i> ${elige(T.extra)}`});
-  out.push({cls:'suerte', h:`Tu número de la suerte: <b>${numSuerte}</b> · Color: <b>${E.color}</b> · Día favorable: <b>${DIAS[pf.signo.pl]}</b> · Piedra: <b>${E.piedra}</b>`});
+  const cierre = cuandoTxt ? `${cap(cuandoTxt.replace(/^el año /,''))}: ${T.cierre[tono].charAt(0).toLowerCase()+T.cierre[tono].slice(1)}` : T.cierre[tono];
+  out.push({cls:'final', h:`<b>${cierre}</b> ${N===5?'La carta del consejo':'Tu carta clave'}, ${art(clave.c)}${clave.c.nombre}, te susurra: <i>«${consejo}»</i> ${elige(T.extra)}`});
+  out.push({cls:'suerte', h:`Tu número de la suerte: <b>${numSuerte}</b> · Color: <b>${E.color}</b> · ${per==='dia' ? `Hora de suerte: <b>${(numSuerte*7)%12+9} h</b>` : `Día favorable: <b>${DIAS[pf.signo.pl]}</b>`} · Piedra: <b>${E.piedra}</b>`});
   out.push({cls:'despedida', h:elige(['Que Jasy y Kuarahy te acompañen. ¡Jajotopata!','Guardá esta lectura en el corazón y volvé cuando la luna cambie. ¡Jajotopata!','Las cartas muestran caminos, pero quien camina sos vos. ¡Jajotopata!'])});
 
-  return {parrafos:out, tono, resumen:T.cierre[tono], numSuerte};
+  rnd = Math.random;
+  return {parrafos:out, tono, resumen:T.cierre[tono], cierre, numSuerte, cuando:cuandoTxt, pos:TI.pos, consejo,
+    color:E.color, clave:N===5?3:N-1};
 }
 function art(c){ return c.mayor ? '' : (c.rango===10||c.rango===12 ? 'la ' : 'el '); }
 function esc(s){ return String(s).replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
-window.LECTURA = { SIGNOS, TEMAS, TIRADAS, ELEM, perfil, leer, signo, numeroVida, esc };
+window.LECTURA = { SIGNOS, TEMAS, TIRADAS, PERIODOS, ELEM, perfil, perfilDe, leer, posiciones, cuando, signo, numeroVida, esc, cap };
 })();

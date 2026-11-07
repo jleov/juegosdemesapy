@@ -11,7 +11,7 @@ const espera = ms => new Promise(r=>setTimeout(r,ms));
 const MOV = !matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- datos guardados ---------- */
-let D = {nombre:'', d:0, m:0, a:0, tema:'amor', tirada:3, mazo:78};
+let D = {nombre:'', d:0, m:0, a:0, tema:'amor', tirada:3, mazo:78, per:'dia'};
 try{ Object.assign(D, JSON.parse(localStorage.getItem('tar_datos')||'{}')); }catch(e){}
 function guardar(){ try{ localStorage.setItem('tar_datos', JSON.stringify(D)); }catch(e){} }
 
@@ -58,11 +58,22 @@ Object.entries(L.TIRADAS).forEach(([n,t])=>{
   tirEl.appendChild(b);
 });
 document.querySelectorAll('#mazos .opt').forEach(b=> b.onclick = ()=>{ D.mazo=+b.dataset.m; marcar(); sonido.toque(); });
+const PLAZO_E = {dia:'☀️', semana:'📅', mes:'🌙', anio:'✨', libre:'♾️'};
+Object.entries(L.PERIODOS).forEach(([id,P])=>{
+  const b = document.createElement('button'); b.className='opt'; b.dataset.p=id;
+  b.innerHTML = `<span class="e">${PLAZO_E[id]}</span><b>${P.n}</b>`;
+  b.onclick = ()=>{ D.per=id; marcar(); sonido.toque(); };
+  $('#plazos').appendChild(b);
+});
 function marcar(){
   document.querySelectorAll('.tema').forEach(b=>b.classList.toggle('sel', b.dataset.t===D.tema));
   document.querySelectorAll('#tiradas .opt').forEach(b=>b.classList.toggle('sel', +b.dataset.n===D.tirada));
   document.querySelectorAll('#mazos .opt').forEach(b=>b.classList.toggle('sel', +b.dataset.m===D.mazo));
+  document.querySelectorAll('#plazos .opt').forEach(b=>b.classList.toggle('sel', b.dataset.p===D.per));
+  const c = L.cuando(D.per, new Date());
+  $('#vistaPlazo').textContent = c ? `Las cartas van a hablar ${("de "+c).replace(/^de el /,"del ")}` : 'Una lectura sin fecha: el mensaje que tu alma necesita ahora';
 }
+if(!L.PERIODOS[D.per]) D.per='dia';
 if(!L.TEMAS[D.tema]) D.tema='amor';
 if(!L.TIRADAS[D.tirada]) D.tirada=3;
 if(D.mazo!==22 && D.mazo!==78) D.mazo=78;
@@ -104,8 +115,10 @@ const VIS = 14;   // cartas que se ven en el mazo animado
 
 async function ritual(){
   const yo = ++corrida, vivo = ()=>yo===corrida;
-  const pf = L.perfil(D.nombre, D.d, D.m, D.a), T = L.TEMAS[D.tema], TI = L.TIRADAS[D.tirada];
-  $('#perfil').innerHTML = `<span class="chip">${pf.signo.s}︎ <b>${pf.signo.n}</b></span><span class="chip">Nº de vida <b>${pf.nv}</b></span><span class="chip">${T.e} <b>${T.t}</b></span>`;
+  const fecha = new Date(), pf = L.perfil(D.nombre, D.d, D.m, D.a, fecha), T = L.TEMAS[D.tema];
+  const TI = {...L.TIRADAS[D.tirada], pos:L.posiciones(D.tirada, D.per)};
+  verModo(false);
+  chips(pf, T, D.per);
   $('#lectura').innerHTML=''; $('#finBtns').classList.add('oculto'); $('#btnLeer').classList.add('oculto'); $('#btnTodas').classList.add('oculto');
   const zona = $('#zonaMazo'); zona.classList.remove('chica');
   zona.querySelectorAll('.mz,.pila').forEach(e=>e.remove());
@@ -230,9 +243,13 @@ async function ritual(){
     c.onclick=toca; c.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toca(); } };
   });
   $('#btnTodas').onclick = async ()=>{ $('#btnTodas').classList.add('oculto'); for(let k=0;k<slots.length;k++){ if(darVuelta(slots[k],k)) await espera(380); } };
-  $('#btnLeer').onclick = ()=>{ $('#btnLeer').classList.add('oculto'); mostrarLectura(pf, sacadas); };
+  $('#btnLeer').onclick = ()=>{ $('#btnLeer').classList.add('oculto'); mostrarLectura(pf, sacadas, fecha); };
 }
 
+function chips(pf, T, per){
+  $('#perfil').innerHTML = `<span class="chip">${pf.signo.s}︎ <b>${pf.signo.n}</b></span><span class="chip">Nº de vida <b>${pf.nv}</b></span><span class="chip">${T.e} <b>${T.t}</b></span>`
+    + (per!=='libre' ? `<span class="chip">${PLAZO_E[per]} <b>${L.PERIODOS[per].d}</b></span>` : '');
+}
 function msg(h){ const m=$('#msg'); m.style.opacity=0; setTimeout(()=>{ m.innerHTML=h; m.style.transition='opacity .5s'; m.style.opacity=1; }, 180); }
 
 function chispas(el){
@@ -268,15 +285,24 @@ addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarModal(); });
 
 /* ---------- la lectura escrita ---------- */
 let ultima = null;
-async function mostrarLectura(pf, sacadas){
-  const T=L.TEMAS[D.tema], TI=L.TIRADAS[D.tirada];
-  const preg = ($('#fPreg').value||'').trim().slice(0,160);
-  const r = L.leer(pf, D.tema, D.tirada, sacadas, preg, D.mazo===22);
-  ultima = {pf, sacadas, r, T, TI};
+function cajaLectura(r, T, TI, titulo){
   const box = document.createElement('div'); box.className='box';
-  box.innerHTML = `<h2>Tu lectura</h2><div class="sub">${T.e} ${T.t} · ${TI.n}</div><div class="sep">✦ ✦ ✦</div>`
+  box.innerHTML = `<h2>${titulo}</h2><div class="sub">${T.e} ${T.t} · ${TI.n}${r.cuando?` · ${L.cap(r.cuando)}`:''}</div><div class="sep">✦ ✦ ✦</div>`
     + r.parrafos.map(p=>`<p class="${p.cls}">${p.pos?`<span class="pos">${p.pos}</span>`:''}${p.h}</p>`).join('');
   $('#lectura').innerHTML=''; $('#lectura').appendChild(box);
+  return box;
+}
+async function mostrarLectura(pf, sacadas, fecha){
+  const T=L.TEMAS[D.tema], TI=L.TIRADAS[D.tirada];
+  const preg = ($('#fPreg').value||'').trim().slice(0,160);
+  let seed = 0; try{ seed = crypto.getRandomValues(new Uint32Array(1))[0]; }catch(e){ seed = Math.random()*4294967296>>>0; }
+  const r = L.leer(pf, D.tema, D.tirada, sacadas, preg, D.mazo===22, {per:D.per, fecha, seed});
+  // lo que viaja en el link: sin fecha de nacimiento ni la pregunta (son privadas)
+  const datos = {v:1, n:pf.nombre, s:pf.si, nv:pf.nv, ap:pf.ap, t:D.tema, r:D.tirada, z:D.mazo, p:D.per,
+    f:`${fecha.getFullYear()}${String(fecha.getMonth()+1).padStart(2,'0')}${String(fecha.getDate()).padStart(2,'0')}`,
+    c:sacadas.map(t=>t.c.id+(t.inv?'i':'')).join('.'), k:seed};
+  ultima = {pf, sacadas, r, T, TI, datos, img:null};
+  const box = cajaLectura(r, T, TI, 'Tu lectura');
   sonido.revelar(5);
   box.scrollIntoView({behavior:MOV?'smooth':'auto', block:'start'});
   const ps=[...box.querySelectorAll('p')];
@@ -284,18 +310,177 @@ async function mostrarLectura(pf, sacadas){
   $('#finBtns').classList.remove('oculto');
 }
 
+/* ---------- compartir: imagen para estados de WhatsApp + link a la lectura ---------- */
+function b64url(str){ return btoa(String.fromCharCode(...new TextEncoder().encode(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function desdeB64url(b){ b=b.replace(/-/g,'+').replace(/_/g,'/'); while(b.length%4) b+='='; return new TextDecoder().decode(Uint8Array.from(atob(b), ch=>ch.charCodeAt(0))); }
+function linkDe(datos){
+  const base = /^https:/.test(location.protocol) && !/localhost|127\.0\.0\.1/.test(location.hostname) ? location.origin+location.pathname : 'https://juegospy.com/tarot/';
+  return base + '?l=' + b64url(JSON.stringify(datos));
+}
+function textoDe(u){
+  const {pf, T, r} = u;
+  return `🔮 ${pf.nombre?`La lectura de Tarot de ${pf.nombre}`:'Mi lectura de Tarot'} · ${T.e} ${T.t}${r.cuando?` · ${L.cap(r.cuando)}`:''}\n✨ ${r.resumen}\n\nMirá la lectura completa y tirá tus cartas:`;
+}
+function cargarImg(svg){
+  return new Promise((ok,mal)=>{ const im=new Image(); im.onload=()=>ok(im); im.onerror=mal; im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg); });
+}
+function partir(ctx, txt, ancho){
+  const out=[]; let lin='';
+  for(const w of txt.split(/\s+/)){ const p = lin ? lin+' '+w : w; if(ctx.measureText(p).width>ancho && lin){ out.push(lin); lin=w; } else lin=p; }
+  if(lin) out.push(lin); return out;
+}
+async function hacerImagen(u){
+  const W=1080, H=1920, cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const x=cv.getContext('2d'), {pf, sacadas, r, T, TI} = u;
+  try{ await Promise.all(['700 40px Cinzel','italic 500 40px "Cormorant Garamond"','600 40px "Cormorant Garamond"'].map(f=>document.fonts.load(f))); }catch(e){}
+  const CIN='Cinzel,Georgia,serif', COR='"Cormorant Garamond",Georgia,serif', G='#f2c14e', GL='#ffe9a8', SU='#c9bce8';
+  // fondo: noche, brillo violeta y estrellas
+  let g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#090522'); g.addColorStop(.45,'#24135a'); g.addColorStop(1,'#080420');
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+  g=x.createRadialGradient(W/2,820,40,W/2,820,760); g.addColorStop(0,'rgba(150,100,255,.35)'); g.addColorStop(1,'rgba(150,100,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+  let sem=u.datos.k||7; const rr=()=>((sem=Math.imul(sem^sem>>>15,2246822507)+0x6D2B79F5|0)>>>0)/4294967296;
+  for(let i=0;i<260;i++){ x.globalAlpha=.25+rr()*.75; x.fillStyle=rr()<.15?GL:'#fff'; x.beginPath(); x.arc(rr()*W, rr()*H, rr()*2.2+.5, 0, 6.283); x.fill(); }
+  x.globalAlpha=1;
+  try{ const nd = await cargarImg(`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="${G}" stroke-width=".3">${nanduti(50,50,48,5,36)}</g></svg>`);
+    x.globalAlpha=.16; x.drawImage(nd, W/2-500, 300, 1000, 1000); x.globalAlpha=1; }catch(e){}
+  // marco
+  x.strokeStyle='rgba(242,193,78,.55)'; x.lineWidth=3; x.strokeRect(34,34,W-68,H-68);
+  x.strokeStyle='rgba(242,193,78,.25)'; x.lineWidth=1.5; x.strokeRect(48,48,W-96,H-96);
+  x.textAlign='center'; x.textBaseline='alphabetic';
+  // título
+  x.shadowColor='rgba(242,193,78,.6)'; x.shadowBlur=24;
+  x.fillStyle=GL; x.font=`700 70px ${CIN}`; x.fillText('TAROT JASY', W/2, 150);
+  x.shadowBlur=0;
+  x.fillStyle=G; x.font=`700 28px ${CIN}`; x.fillText('✦  ✦  ✦', W/2, 196);
+  x.fillStyle='#fff'; x.font=`italic 500 54px ${COR}`;
+  x.fillText(pf.nombre ? `La lectura de ${pf.nombre}` : 'Mi lectura de las cartas', W/2, 268);
+  x.fillStyle=GL; x.font=`600 40px ${COR}`;
+  let y=326;
+  for(const l of partir(x, `${T.e} ${T.t}${r.cuando?` · ${L.cap(r.cuando)}`:''}`, W-160)){ x.fillText(l, W/2, y); y+=46; }
+  x.fillStyle=SU; x.font=`500 34px ${COR}`; x.fillText(`${pf.signo.s}︎ ${pf.signo.n} · Nº de vida ${pf.nv}`, W/2, y+2); y+=40;
+  // cartas
+  const N=sacadas.length, cw = N===1?380:N===3?300:174, gap = N===5?16:32, ch=cw*1.7;
+  const tot = N*cw+(N-1)*gap, x0=(W-tot)/2, top=y+64;
+  const ims = await Promise.all(sacadas.map(t=>cargarImg(frenteSVG(t.c)).catch(()=>null)));
+  sacadas.forEach((t,k)=>{
+    const cx = x0+k*(cw+gap);
+    x.fillStyle=G; x.font=`700 ${N===5?19:24}px ${CIN}`;
+    const lab = partir(x, r.pos[k].n.toUpperCase(), cw+gap-6);
+    lab.forEach((l,i)=>x.fillText(l, cx+cw/2, top-14-(lab.length-1-i)*(N===5?22:28)));
+    x.save(); x.shadowColor='rgba(242,193,78,.55)'; x.shadowBlur=30;
+    x.fillStyle='#0b0820'; x.fillRect(cx+4, top+4, cw-8, ch-8); x.restore();
+    if(ims[k]){
+      x.save();
+      if(t.inv){ x.translate(cx+cw/2, top+ch/2); x.rotate(Math.PI); x.drawImage(ims[k], -cw/2, -ch/2, cw, ch); }
+      else x.drawImage(ims[k], cx, top, cw, ch);
+      x.restore();
+    }
+    x.fillStyle='#fff'; x.font=`600 ${N===5?25:31}px ${COR}`;
+    const nm = partir(x, t.c.nombre, cw+gap-6); let ny=top+ch+(N===5?32:40);
+    nm.forEach(l=>{ x.fillText(l, cx+cw/2, ny); ny+=N===5?27:33; });
+    if(t.inv){ x.fillStyle='#ff9d8a'; x.font=`italic 500 ${N===5?22:27}px ${COR}`; x.fillText('invertida', cx+cw/2, ny); }
+  });
+  // el mensaje, el consejo y la suerte, centrados entre las cartas y el pie
+  const ini = top+ch+(N===5?110:120), fin = H-280;
+  x.font=`italic 500 46px ${COR}`;
+  const lin = partir(x, r.cierre, W-220).slice(0, 7);
+  x.font=`500 36px ${COR}`;
+  const con = r.consejo ? partir(x, `«${r.consejo}»`, W-220).slice(0, 3) : [];
+  const alto = lin.length*56+40, total = alto + (con.length ? 30+con.length*44 : 0) + 70;
+  y = ini + Math.max(0, (fin-ini-total)/2) + 50;
+  x.fillStyle='rgba(242,193,78,.09)'; x.strokeStyle='rgba(242,193,78,.45)'; x.lineWidth=2;
+  if(x.roundRect){ x.beginPath(); x.roundRect(80, y-60, W-160, alto, 28); x.fill(); x.stroke(); } else { x.fillRect(80, y-60, W-160, alto); x.strokeRect(80, y-60, W-160, alto); }
+  x.fillStyle=GL; x.font=`italic 500 46px ${COR}`; lin.forEach((l,i)=>x.fillText(l, W/2, y+i*56)); y += alto - 10;
+  if(con.length){ y += 30; x.fillStyle='#fff'; x.font=`500 36px ${COR}`; con.forEach(l=>{ x.fillText(l, W/2, y); y+=44; }); }
+  x.fillStyle=SU; x.font=`500 34px ${COR}`;
+  x.fillText(`Número de la suerte ${r.numSuerte} · Color ${r.color}`, W/2, y+24);
+  // pie
+  x.fillStyle='#fff'; x.font=`italic 500 42px ${COR}`; x.fillText('¿Y a vos qué te dicen las cartas?', W/2, H-200);
+  x.shadowColor='rgba(242,193,78,.6)'; x.shadowBlur=18; x.fillStyle=G; x.font=`700 56px ${CIN}`; x.fillText('juegospy.com/tarot', W/2, H-122); x.shadowBlur=0;
+  x.fillStyle='rgba(200,190,230,.45)'; x.font=`500 24px ${COR}`; x.fillText('Solo un juego de entretenimiento', W/2, H-74);
+  return new Promise(ok=>cv.toBlob(ok, 'image/png'));
+}
+
 $('#btnCompartir').onclick = async ()=>{
   if(!ultima) return;
-  const {pf, sacadas, r, T, TI} = ultima;
-  const lineas = sacadas.map((t,k)=>`• ${TI.pos[k].n}: ${t.c.nombre}${t.inv?' (invertida)':''}`).join('\n');
-  const texto = `🔮 Tarot Jasy — ${T.e} ${T.t}${pf.nombre?` · ${pf.nombre}`:''}\n${pf.signo.s}︎ ${pf.signo.n} · Nº de vida ${pf.nv}\n\n${lineas}\n\n✨ ${r.resumen}\n\n¿Y a vos qué te dicen las cartas?`;
-  const url = 'https://juegospy.com/tarot/';
-  try{
-    if(navigator.share){ await navigator.share({title:'Mi lectura de Tarot Jasy', text:texto, url}); return; }
-  }catch(e){ if(e && e.name==='AbortError') return; }
-  try{ await navigator.clipboard.writeText(texto+'\n'+url); toast('Lectura copiada ✦ Pegala donde quieras'); }
-  catch(e){ toast('No se pudo copiar 😕'); }
+  sonido.toque();
+  const u = ultima, link = linkDe(u.datos), texto = textoDe(u);
+  $('#modalIn').innerHTML = `<h3>Compartí tu lectura</h3><p class="otra">Preparando la imagen…</p>`;
+  $('#modal').classList.add('on');
+  if(!u.img){ try{ u.img = await hacerImagen(u); }catch(e){ u.img=null; } }
+  if(ultima!==u || !$('#modal').classList.contains('on')) return;
+  const archivo = u.img ? new File([u.img], 'tarot-jasy.png', {type:'image/png'}) : null;
+  const puedeArchivo = !!(archivo && navigator.canShare && navigator.canShare({files:[archivo]}));
+  const urlImg = u.img ? URL.createObjectURL(u.img) : '';
+  $('#modalIn').innerHTML = `<h3>Compartí tu lectura</h3>
+    ${u.img?`<img class="prev" src="${urlImg}" alt="Imagen de tu lectura">`:''}
+    <p class="otra">Subila a tu estado de WhatsApp o mandala a un grupo. Con el link, quien lo abra ve tu lectura completa ✦</p>
+    <div class="acciones">
+      ${puedeArchivo?`<button class="btn" id="shImg">📲 Compartir imagen</button>`:''}
+      ${u.img?`<button class="btn${puedeArchivo?' sec':''}" id="shBaja">⬇️ Guardar imagen</button>`:''}
+      <button class="btn sec" id="shLink">🔗 ${navigator.share?'Compartir link':'Copiar link'}</button>
+    </div>
+    <button class="btn sec" id="cerrarModal" style="margin-top:12px">Cerrar</button>`;
+  $('#cerrarModal').onclick = cerrarModal;
+  if(puedeArchivo) $('#shImg').onclick = async ()=>{
+    try{ await navigator.share({files:[archivo], title:'Tarot Jasy', text:texto+'\n'+link}); }
+    catch(e){ if(!e || e.name!=='AbortError') toast('No se pudo compartir 😕 Probá guardando la imagen'); }
+  };
+  if(u.img) $('#shBaja').onclick = ()=>{
+    const a=document.createElement('a'); a.href=urlImg; a.download='tarot-jasy.png'; document.body.appendChild(a); a.click(); a.remove();
+    toast('Imagen guardada ✦ Ya la podés subir a tu estado');
+  };
+  $('#shLink').onclick = async ()=>{
+    try{ if(navigator.share){ await navigator.share({title:'Mi lectura de Tarot Jasy', text:texto, url:link}); return; } }
+    catch(e){ if(e && e.name==='AbortError') return; }
+    try{ await navigator.clipboard.writeText(texto+'\n'+link); toast('Link copiado ✦ Pegalo donde quieras'); }
+    catch(e){ toast('No se pudo copiar 😕'); }
+  };
 };
+
+/* ---------- ver la lectura que alguien compartió ---------- */
+function verModo(on){
+  document.getElementById('app').classList.toggle('ver', on);
+  $('#verCab').classList.toggle('oculto', !on); $('#verBtns').classList.toggle('oculto', !on);
+}
+function abrirCompartida(){
+  let o; try{ const q = new URLSearchParams(location.search).get('l'); if(!q) return false; o = JSON.parse(desdeB64url(q)); }catch(e){ return false; }
+  if(!o || !L.TEMAS[o.t] || !L.TIRADAS[o.r] || !L.PERIODOS[o.p]) return false;
+  const sacadas = String(o.c||'').split('.').map(s=>{ const c = MAZO.find(m=>m.id===s.replace(/i$/,'')); return c && {c, inv:/i$/.test(s)}; });
+  if(sacadas.length!==+o.r || sacadas.some(t=>!t)) return false;
+  const m = /^(\d{4})(\d{2})(\d{2})$/.exec(o.f||''); const fecha = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date();
+  const pf = L.perfilDe({n:o.n, s:o.s, nv:o.nv, ap:o.ap, anio:fecha.getFullYear()}), T = L.TEMAS[o.t];
+  const TI = {...L.TIRADAS[o.r]};
+  const r = L.leer(pf, o.t, +o.r, sacadas, '', o.z===22, {per:o.p, fecha, seed:o.k>>>0});
+  TI.pos = r.pos;
+  verModo(true);
+  $('#verCab').innerHTML = `<h2>${pf.nombre?`🔮 La lectura de ${L.esc(pf.nombre)}`:'🔮 Una lectura de Tarot Jasy'}</h2><p>${T.e} ${T.t}${r.cuando?` · ${L.cap(r.cuando)}`:''}</p>`;
+  chips(pf, T, o.p);
+  $('#msg').innerHTML = pf.nombre ? `Las cartas de ${L.esc(pf.nombre)} ✦` : 'Las cartas ya hablaron ✦';
+  $('#zonaMazo').classList.add('chica');
+  const tir = $('#tirada'); tir.innerHTML=''; tir.className='t'+o.r+' ya';
+  sacadas.forEach((t,k)=>{
+    const s=document.createElement('div'); s.className='slot ok vuelta'+(t.inv?' inv':'');
+    s.innerHTML = `<div class="pl">${r.pos[k].n}</div><div class="carta" role="button" tabindex="0" aria-label="${t.c.nombre}"><div class="giro"><div class="cara dorso">${dorso()}</div><div class="cara frente"><div class="rot">${frenteSVG(t.c)}</div></div></div></div><div class="nm">${t.c.nombre}${t.inv?'<i>invertida</i>':''}</div>`;
+    const c=s.querySelector('.carta'); c.onclick=()=>detalle(t, r.pos[k].n); c.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); detalle(t, r.pos[k].n); } };
+    tir.appendChild(s);
+  });
+  const box = cajaLectura(r, T, TI, pf.nombre ? `La lectura de ${L.esc(pf.nombre)}` : 'La lectura');
+  box.querySelectorAll('p').forEach(p=>p.classList.add('ve'));
+  $('#finBtns').classList.add('oculto');
+  ir('pMesa');
+  document.title = (pf.nombre ? `La lectura de ${pf.nombre}` : 'Una lectura') + ' · Tarot Jasy';
+  return true;
+}
+$('#btnMia').onclick = ()=>{
+  sonido.toque(); verModo(false);
+  try{ history.replaceState(null, '', location.pathname); }catch(e){}
+  document.title = 'Tarot Jasy: lectura de cartas del Tarot online gratis | Juegos PY';
+  $('#tirada').innerHTML=''; $('#lectura').innerHTML=''; $('#zonaMazo').classList.remove('chica');
+  ir('pInicio');
+};
+
 $('#btnOtra').onclick = ()=>{ sonido.toque(); window.scrollTo({top:0, behavior:MOV?'smooth':'auto'}); ritual(); };
 $('#btnNueva').onclick = ()=>{ corrida++; sonido.toque(); ir('pInicio'); };
 
@@ -397,6 +582,8 @@ const sonido = (function(){
 $('#btnSnd').onclick = ()=>sonido.alternar();
 // el primer toque en la página habilita el audio (los navegadores lo exigen)
 addEventListener('pointerdown', function primero(){ sonido.activar(); removeEventListener('pointerdown', primero); }, {once:true});
+
+abrirCompartida();
 
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();

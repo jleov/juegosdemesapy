@@ -69,6 +69,16 @@ textarea{resize:vertical;min-height:58px;font-size:17px}
 .opt .mini i{display:block;width:10px;height:16px;border-radius:2px;background:linear-gradient(#5a3fb0,#24145e);border:1px solid var(--g)}
 .opt.sel{border-color:var(--g);background:linear-gradient(160deg,rgba(242,193,78,.22),rgba(90,50,180,.3));box-shadow:0 0 14px rgba(242,193,78,.3)}
 .opts.dos{grid-template-columns:1fr 1fr}
+.plazos{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.plazos .opt{padding:9px 2px}.plazos .opt .e{display:block;font-size:20px;line-height:1.2}.plazos .opt b{font-size:11.5px}
+#vistaPlazo{margin-top:7px;text-align:center;color:var(--suave);font-style:italic;font-size:16px;min-height:22px}
+/* compartir */
+#modal .prev{display:block;width:min(62vw,250px);margin:0 auto 12px;border-radius:12px;box-shadow:0 0 30px rgba(242,193,78,.35);aspect-ratio:9/16;background:#140c34}
+#modal .acciones{margin:8px 0 0}#modal .acciones .btn{font-size:14px;padding:12px 16px}
+#verCab{text-align:center;margin:46px 0 0}#verCab h2{margin:0;color:var(--gl);font-size:clamp(20px,6vw,28px);letter-spacing:2px}
+#verCab p{margin:4px 0 0;color:var(--suave);font-style:italic}
+.ver #perfil{margin-top:10px}
+.ya .giro,.ya .rot,.ya .pl,.ya .nm{transition:none!important}
 .btn{display:inline-block;border:0;border-radius:40px;padding:14px 22px;font-family:Cinzel,serif;font-weight:700;letter-spacing:1.5px;font-size:16px;
   color:#24124a;background:linear-gradient(180deg,#ffe9a8,#f2c14e 55%,#c8902a);box-shadow:0 6px 22px rgba(242,193,78,.35),inset 0 1px 0 #fff8;text-align:center}
 .btn:active{transform:scale(.97)}
@@ -192,6 +202,9 @@ textarea{resize:vertical;min-height:58px;font-size:17px}
     <div class="temas" id="temas"></div>
     <label class="l" for="fPreg">Tu pregunta (opcional)</label>
     <textarea id="fPreg" maxlength="160" placeholder="Pensala con el corazón y escribila acá…"></textarea>
+    <label class="l">¿Para cuándo?</label>
+    <div class="plazos" id="plazos"></div>
+    <div id="vistaPlazo"></div>
   </div>
 
   <div class="box">
@@ -209,6 +222,7 @@ textarea{resize:vertical;min-height:58px;font-size:17px}
 
 <!-- ===================== la mesa ===================== -->
 <section id="pMesa" class="pant">
+  <div id="verCab" class="oculto"></div>
   <div id="perfil"></div>
   <div id="msg"></div>
   <div id="zonaMazo"><svg id="nandu" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#f2c14e" stroke-width=".35" id="nanduG"></g></svg></div>
@@ -223,6 +237,9 @@ textarea{resize:vertical;min-height:58px;font-size:17px}
     <button class="btn sec" id="btnOtra">🔄 Volver a tirar</button>
     <button class="btn sec" id="btnNueva">✎ Nueva consulta</button>
   </div>
+  <div class="acciones oculto" id="verBtns">
+    <button class="btn brilla" id="btnMia">🔮 Quiero mi propia lectura</button>
+  </div>
 </section>
 </div>
 
@@ -231,9 +248,9 @@ textarea{resize:vertical;min-height:58px;font-size:17px}
 
 <footer id="aviso">Tarot Jasy es solo un juego de entretenimiento. Las lecturas se arman al azar y no predicen el futuro: no las tomes en serio ni las uses para decidir sobre tu salud, tu dinero o tu vida. No reemplazan el consejo de médicos, psicólogos, abogados ni otros profesionales.</footer>
 
-<script src="cartas.js?v=1"></script>
-<script src="lectura.js?v=1"></script>
-<script src="juego.js?v=1"></script>
+<script src="cartas.js?v=2"></script>
+<script src="lectura.js?v=2"></script>
+<script src="juego.js?v=2"></script>
 <script>window.INICIO={sonidos:['#btnSnd']};</script>
 <script src="../inicio.js?v=2"></script>
 </body>
