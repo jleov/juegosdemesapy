@@ -119,6 +119,8 @@ function animTick(){
   if(!ANIM.cur && ANIM.q.length){
     ANIM.cur=ANIM.q.shift(); ANIM.t0=now; ANIM.landed=false;
     sfx.launch(1.1);   // sale el misil; el impacto suena cuando cae (a los 1,1 s)
+    // en 3D la cámara se va al mar donde cae el misil (también al tuyo) y después vuelve
+    if(VIEW.mode==='3d' && R3.ok && V.phase==='play'){ R3.follow=ANIM.cur.to; R3.followUntil=now+1100+1900; }
     if(VIEW.mode!=='3d' || !R3.ok){ const s=ANIM.cur; if(ANIM.cur.to!==bigSide() && ANIM.cur.to!==smallSide()) WATCH=s.to; }
     renderBoards(); renderStatus();
   }
@@ -637,11 +639,14 @@ function build3D(){
   const T=R3.T, n=N(), B=R3.board; while(B.children.length) B.remove(B.children[0]);
   R3.bobs=[]; R3.radar=null; R3.fires=[];
   if(!V || V.phase==='lobby') return;
-  const i = V.phase==='place' ? mySide() : (R3.showOwn ? smallSide() : bigSide()); R3.side=i;
+  const i = V.phase==='place' ? mySide() : side3(); R3.side=i;
   if(i<0 || !V.sides[i]) return;
   const s=V.sides[i], d=ANIM.disp[i]||s.grid||[], size=n*CELL;
   // radar: cuando se mira el mar del enemigo durante la batalla
   const radar = V.phase==='play' && !s.pids.includes(viewer());
+  const lbl=$('#sea3lbl'), myS=s.pids.includes(viewer()), fol=following3();
+  if(lbl){ lbl.className = radar ? 'radar' : myS && fol ? 'mio' : '';
+    lbl.textContent = radar ? `📡 Radar · mar de ${sideName(V,i)}` : myS ? (fol ? '🎯 ¡Te están tirando! · tu flota' : '⚓ Tu flota') : `⚓ Flota de ${sideName(V,i)}`; }
   R3.isRadar=radar; R3.plane.constant = radar ? -RADAR_Y : 0;
   R3.calmR=size*.75; R3.wu.uCalm.value=size*.75; R3.wu.uN.value=n; R3.wu.uGrid.value=radar?0:1;
   // marco alrededor del mar: dorado en tu mar, metal verde en el radar
@@ -682,13 +687,16 @@ function build3D(){
   R3.builtKey=bkey3();
   R3.dirty=false;
 }
-const bkey3 = () => [V.phase, V.round, R3.showOwn, bigSide(), smallSide(), JSON.stringify(ANIM.disp[R3.showOwn?smallSide():bigSide()]||[]).length, (ANIM.disp[bigSide()]||[]).join(''), V.phase==='place'?JSON.stringify(PL.list):'' ].join('|');
+// qué mar se ve en 3D: el que elegiste, salvo mientras cae un misil en otro
+const following3 = () => V && V.phase==='play' && R3.follow!=null && V.sides[R3.follow] && performance.now()<R3.followUntil;
+function side3(){ return following3() ? R3.follow : (R3.showOwn ? smallSide() : bigSide()); }
+const bkey3 = () => { const i=side3(); return [V.phase, V.round, i, following3(), (ANIM.disp[i]||[]).join(''), V.phase==='place'?JSON.stringify(PL.list):''].join('|'); };
 function wire3D(cv){
   let drag=null;
   cv.addEventListener('pointerdown', e=>{ cv.setPointerCapture(e.pointerId); drag={x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY}; });
   cv.addEventListener('pointermove', e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.x=e.clientX; drag.y=e.clientY; CAM3.yaw+=dx*.005; CAM3.pitch=Math.max(20, Math.min(88, CAM3.pitch+dy*.2)); });
   cv.addEventListener('pointerup', e=>{ if(!drag) return; const tap=Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy)<7; drag=null; saveCam3();
-    if(!tap || !V || V.phase!=='play' || R3.showOwn) return;
+    if(!tap || !V || V.phase!=='play' || !R3.isRadar) return;
     const r=cv.getBoundingClientRect(), v=new R3.T.Vector2((e.clientX-r.left)/r.width*2-1, -((e.clientY-r.top)/r.height*2-1));
     R3.ray.setFromCamera(v, R3.cam); const p=new R3.T.Vector3(); if(!R3.ray.ray.intersectPlane(R3.plane, p)) return;
     const n=N(), c=Math.floor(p.x/CELL+n/2), rr=Math.floor(p.z/CELL+n/2); if(rr<0||rr>=n||c<0||c>=n) return;
@@ -697,7 +705,7 @@ function wire3D(cv){
   cv.addEventListener('wheel', e=>{ e.preventDefault(); CAM3.zoom=Math.max(.5, Math.min(2.2, CAM3.zoom*(e.deltaY>0?1.08:.93))); saveCam3(); }, {passive:false});
 }
 function cam3(k, d){
-  if(k==='own'){ R3.showOwn=!R3.showOwn; R3.dirty=true; toast(R3.showOwn?'⚓ Mirando el otro mar (tu flota si jugás)':'📡 Mirando el radar del mar enemigo'); return; }
+  if(k==='own'){ R3.showOwn=!R3.showOwn; R3.followUntil=0; R3.dirty=true; toast(R3.showOwn?'⚓ Mirando el otro mar (tu flota si jugás)':'📡 Mirando el radar del mar enemigo'); return; }
   if(k==='zoom') CAM3.zoom=Math.max(.5, Math.min(2.2, CAM3.zoom*(d>0?.85:1.18)));
   else if(k==='pitch') CAM3.pitch=Math.max(20, Math.min(88, CAM3.pitch+d));
   else if(k==='reset'){ CAM3.pitch=55; CAM3.zoom=1; CAM3.yaw=0; }
