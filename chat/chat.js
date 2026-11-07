@@ -5,24 +5,55 @@
    los demás se conectan a él por PeerJS. Si la central se va, otro toma su lugar
    y sigue con el historial que tenía guardado.
    La central pone el nombre de quién escribió (nadie puede escribir como otro),
-   corta los mensajes largos y frena al que manda demasiados seguidos.
+   corta los mensajes largos, frena al que manda demasiados seguidos o repite lo mismo,
+   y guarda solo los últimos 50 mensajes (los más viejos se borran).
+   El dueño (el aparato donde se entró al panel del dueño: guarda la llave en bnq_owner)
+   firma un desafío de la central y puede borrar mensajes y echar gente por 24 horas.
    ===================================================================== */
 (function(){
   if(!window.Peer) return;
   const HUB = 'jpychat26-central', PREF = 'jpychat26-';
-  const MAXT = 200, MAXN = 20, HIST = 60;
+  const MAXT = 200, MAXN = 20, HIST = 50, BAN_MS = 24*3600e3;
   const $ = s => document.querySelector(s);
   const load = (k, d) => { try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(e){ return d; } };
   const store = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
   const opts = () => ({ debug:0, config:{ iceServers: window.ICE_SERVERS || [{urls:'stun:stun.l.google.com:19302'}] } });
   const rid = () => Math.random().toString(36).slice(2, 10);
-  const limpiaNom = n => String(n || '').replace(/\s+/g, ' ').trim().slice(0, MAXN);
-  const limpiaTxt = x => String(x || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MAXT);
+  const ofensivo = x => !!(window.FILTRO_CHAT && FILTRO_CHAT.ofensivo(x));   // chat/filtro.js
+  const MSG_OFENSA = '🚫 Ese mensaje tiene palabras ofensivas: no se puede mandar.';
+  const limpiaNom = n => String(n || '').replace(/👑/gu, '').replace(/\s+/g, ' ').trim().slice(0, MAXN);   // la corona es solo del dueño
+  const limpiaTxt = x => String(x || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').replace(/(.)\1{5,}/gu, '$1$1$1$1$1').trim().slice(0, MAXT);
+  // para comparar si alguien repite: sin mayúsculas, acentos, espacios ni signos, y "holaaaa" = "hola"
+  const parecido = x => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s.,;:!¡?¿\-_*~'"´`’”‹›]+/g, '').replace(/(.)\1+/gu, '$1');
+
+  // dueño: la misma llave que el panel del dueño (dueno/ y dueno-link.js)
+  const OWNER_PUB = {x:'eLdK1LWh1LGyAlt0IW6Apa9bnuRt1LwLi3D1MQtqtHk', y:'XPx_IfKocm2ZANCG_As4PxsgjToAMnZMEaWlzZWWBKk'};
+  const EC = {name:'ECDSA', namedCurve:'P-256'}, SIG = {name:'ECDSA', hash:'SHA-256'};
+  const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
+  const desafio = () => b64u(crypto.getRandomValues(new Uint8Array(18)));
+  let llave = null, pub = null, soyDueno = false;
+  async function cargarLlave(){
+    try{ const j = JSON.parse(load('bnq_owner', 'null')); if(j && j.d && j.x === OWNER_PUB.x && j.y === OWNER_PUB.y) llave = await crypto.subtle.importKey('jwk', j, EC, false, ['sign']); }catch(e){ llave = null; }
+  }
+  const firmar = async n => b64u(await crypto.subtle.sign(SIG, llave, new TextEncoder().encode(n)));
+  async function verificar(n, sig){
+    try{
+      pub = pub || await crypto.subtle.importKey('jwk', {kty:'EC', crv:'P-256', x:OWNER_PUB.x, y:OWNER_PUB.y}, EC, false, ['verify']);
+      return await crypto.subtle.verify(SIG, pub, unb64u(sig), new TextEncoder().encode(n));
+    }catch(e){ return false; }
+  }
 
   // nombre: el del chat, o el que ya usa en algún juego
   let nombre = limpiaNom(load('jpy_chat_nombre', '') || ['bnq_name','petei_name','uno_name','billar_name','bolos_name','ajedrez_name','basta_name'].map(k => load(k, '')).find(Boolean));
   let hist = []; try{ hist = JSON.parse(load('jpy_chat_hist', '[]')).slice(-HIST); }catch(e){}
   let mudos = []; try{ mudos = JSON.parse(load('jpy_chat_mudos', '[]')); }catch(e){}
+  // echados: cada aparato tiene una marca propia; la lista viaja a todos para que la próxima central también la cumpla
+  let DEV = load('jpy_chat_dev', ''); if(!DEV){ DEV = rid() + rid(); store('jpy_chat_dev', DEV); }
+  const limpiarBans = l => (Array.isArray(l) ? l : []).filter(b => b && typeof b.d === 'string' && +b.h > Date.now()).slice(-300).map(b => ({ d:b.d.slice(0, 40), h:+b.h }));
+  let bans = []; try{ bans = limpiarBans(JSON.parse(load('jpy_chat_bans', '[]'))); }catch(e){}
+  const guardarBans = () => store('jpy_chat_bans', JSON.stringify(bans));
+  const estoyEchado = () => +load('jpy_chat_ban', 0) > Date.now();
   let gente = [], yo = '', abierto = false, sinLeer = 0;
 
   /* ---------------- red ---------------- */
@@ -30,27 +61,30 @@
 
   function arrancar(){
     clearTimeout(R.reintento);
-    if(R.me){ try{ R.me.destroy(); }catch(e){} }
-    R.me = new Peer(PREF + rid(), opts());
-    R.me.on('open', id => { yo = id; conectarHub(); });
-    R.me.on('error', e => {
+    if(estoyEchado()){ mostrarEchado(); return; }
+    if(R.me){ const v = R.me; R.me = null; try{ v.destroy(); }catch(e){} }
+    const me = R.me = new Peer(PREF + rid(), opts());
+    me.on('open', id => { if(R.me !== me) return; yo = id; conectarHub(); });
+    me.on('error', e => { if(R.me !== me) return;
       if(e.type === 'peer-unavailable'){ ser(); return; }   // no hay central: me hago central
       if(['network','server-error','socket-error','socket-closed','disconnected'].includes(e.type)) reintentar();
     });
-    R.me.on('disconnected', () => { try{ R.me.reconnect(); }catch(e){ reintentar(); } });
+    // destroy() también avisa 'disconnected': se espera y solo se reconecta si sigue siendo el de uso (si no, queda un fantasma)
+    me.on('disconnected', () => setTimeout(() => { if(R.me === me && !me.destroyed){ try{ me.reconnect(); }catch(e){ reintentar(); } } }, 1000));
   }
   function conectarHub(){
     estado('Conectando…');
     const c = R.me.connect(HUB, { reliable:true });
     R.conn = c;
     const espera = setTimeout(() => { if(R.conn === c && !c.open){ R.conn = null; try{ c.close(); }catch(e){} reintentar(); } }, 9000);
-    c.on('open', () => { clearTimeout(espera); R.intento = 0; R.visto = Date.now(); enviar({ t:'hola', n:nombre }); estado(''); });
+    c.on('open', () => { clearTimeout(espera); R.intento = 0; R.visto = Date.now(); enviar({ t:'hola', n:nombre, dv:DEV }); estado(''); });
     c.on('data', d => { R.visto = Date.now(); recibir(d); });
     c.on('close', () => { if(R.conn === c){ R.conn = null; reintentar(); } });
     c.on('error', () => {});
   }
   function reintentar(){
     if(R.soyHub) return;
+    if(estoyEchado()){ mostrarEchado(); return; }
     estado('Reconectando…');
     clearTimeout(R.reintento);
     R.intento++;
@@ -63,12 +97,14 @@
       if(R.soyHub || R.hub) return;
       const h = new Peer(HUB, opts());
       R.hub = h;
-      h.on('open', () => {
+      h.on('open', async () => {
         R.soyHub = true; estado('');
-        if(R.me){ try{ R.me.destroy(); }catch(e){} R.me = null; }
+        if(R.me){ const v = R.me; R.me = null; try{ v.destroy(); }catch(e){} }
         if(!yo) yo = PREF + rid();
         R.conn = null;
+        bans = limpiarBans(bans);
         avisarGente();
+        if(llave){ const n = desafio(); if(await verificar(n, await firmar(n))){ soyDueno = true; avisarGente(); pintarTodo(); } }
       });
       h.on('connection', c => {
         c.on('open', () => { R.clientes.set(c.peer, { c, n:'', ts:[], visto:Date.now() }); });
@@ -77,50 +113,110 @@
         c.on('error', () => {});
       });
       h.on('error', e => {
-        if(e.type === 'unavailable-id' || !R.soyHub){ try{ h.destroy(); }catch(x){} R.hub = null; R.soyHub = false; reintentar(); }
+        if(e.type === 'unavailable-id' || !R.soyHub){ R.hub = null; R.soyHub = false; try{ h.destroy(); }catch(x){} reintentar(); }
       });
-      h.on('disconnected', () => { try{ h.reconnect(); }catch(e){} });
+      h.on('disconnected', () => setTimeout(() => { if(R.hub === h && !h.destroyed){ try{ h.reconnect(); }catch(e){} } }, 1000));
     }, Math.random()*1200);
   }
 
   /* --- la central --- */
-  function hubRecibe(id, d){
+  const difundir = o => R.clientes.forEach(c => { try{ c.c.open && c.c.send(o); }catch(e){} });
+  async function hubRecibe(id, d){
     const cl = R.clientes.get(id); if(!cl || !d || typeof d !== 'object') return;
     cl.visto = Date.now();
     if(d.t === 'hola' || d.t === 'nom'){
-      const n = limpiaNom(d.n) || ('Invitado ' + id.slice(-3).toUpperCase());
+      if(d.t === 'hola' && typeof d.dv === 'string') cl.dv = d.dv.slice(0, 40);
+      const ban = cl.dv && bans.find(b => b.d === cl.dv && b.h > Date.now());
+      if(ban){ try{ cl.c.send({ t:'echado', h:ban.h }); }catch(e){} setTimeout(() => { try{ cl.c.close(); }catch(e){} }, 400); R.clientes.delete(id); return; }
+      let n = limpiaNom(d.n);
+      if(n && ofensivo(n)){ n = ''; try{ cl.c.send({ t:'aviso', x:'🚫 Ese nombre no se puede usar en el chat.' }); }catch(e){} }
+      n = n || ('Invitado ' + id.slice(-3).toUpperCase());
       const nuevo = !cl.n; cl.n = n;
-      if(nuevo) cl.c.send({ t:'hist', m:hist, yo:id });
+      if(nuevo){ cl.no = desafio(); cl.c.send({ t:'hist', m:hist, yo:id, no:cl.no, b:bans }); }
       avisarGente();
     } else if(d.t === 'msg'){
       if(!cl.n) return;
       hubMensaje(id, cl.n, d.x, cl);
-    }
+    } else if(d.t === 'dueno' && cl.no && typeof d.sig === 'string'){
+      const no = cl.no; cl.no = null;
+      if(await verificar(no, d.sig)){ cl.dueno = true; try{ cl.c.send({ t:'eresDueno' }); }catch(e){} avisarGente(); }
+    } else if(d.t === 'borrar' && cl.dueno) hubBorrar(String(d.k));
+    else if(d.t === 'echar' && cl.dueno) hubEchar(String(d.id));
+  }
+  // frenos: no más de 1 cada 1,2 s ni 8 en 20 s, y lo mismo (o casi) solo 2 veces cada 2 minutos
+  const YO_HUB = { ts:[], rep:[] };
+  function frenar(x, cl){
+    const ahora = Date.now(), p = parecido(x);
+    cl.ts = (cl.ts || []).filter(t => ahora - t < 20000);
+    cl.rep = (cl.rep || []).filter(r => ahora - r.t < 120000);
+    if(cl.ts.length >= 8 || (cl.ts.length && ahora - cl.ts[cl.ts.length-1] < 1200)) return 'Despacio 🙂 esperá un poquito antes de mandar otro mensaje.';
+    if(p && cl.rep.filter(r => r.p === p).length >= 2) return 'Ese mensaje ya lo mandaste 🙂 esperá un rato antes de repetirlo.';
+    cl.ts.push(ahora); cl.rep.push({ p, t:ahora });
+    return '';
   }
   function hubMensaje(id, n, x, cl){
-    x = limpiaTxt(x); if(!x) return;
-    const ahora = Date.now();
-    if(cl){   // no más de 1 cada 1,2 s ni 8 en 20 s
-      cl.ts = cl.ts.filter(t => ahora - t < 20000);
-      if(cl.ts.length >= 8 || (cl.ts.length && ahora - cl.ts[cl.ts.length-1] < 1200)){ cl.c.send({ t:'aviso', x:'Despacio 🙂 esperá un poquito antes de mandar otro mensaje.' }); return; }
-      cl.ts.push(ahora);
+    x = limpiaTxt(x); if(!x) return false;
+    if(ofensivo(x)){   // 3 intentos en 10 minutos: afuera por 1 hora
+      if(!cl){ aviso(MSG_OFENSA); return false; }
+      const ahora = Date.now();
+      cl.malas = (cl.malas || []).filter(t => ahora - t < 600000).concat(ahora);
+      if(cl.malas.length >= 3 && !cl.dueno){ hubEchar(id, 3600e3); return false; }
+      try{ cl.c.send({ t:'aviso', x:MSG_OFENSA + (cl.malas.length === 2 ? ' Si insistís te saca del chat.' : '') }); }catch(e){}
+      return false;
     }
-    const m = { id, n, x, ts:ahora, k:rid() };
+    const no = frenar(x, cl || YO_HUB);
+    if(no){ if(cl){ try{ cl.c.send({ t:'aviso', x:no }); }catch(e){} } else aviso(no); return false; }
+    const m = { id, n, x, ts:Date.now(), k:rid() };
+    if(cl ? cl.dueno : soyDueno) m.d = 1;
     agregar(m);
-    R.clientes.forEach(o => { try{ o.c.open && o.c.send({ t:'msg', m }); }catch(e){} });
+    difundir({ t:'msg', m });
+    return true;
   }
-  const HUBTS = [];
+  function hubBorrar(k){ quitar(m => m.k === k); difundir({ t:'borrar', k }); }
+  function hubEchar(id, ms){
+    const h = Date.now() + (ms || BAN_MS);
+    quitar(m => m.id === id); difundir({ t:'borrarDe', id });
+    if(id === yo){   // el dueño echó a la central misma: se va y deja el lugar a otro
+      bans.push({ d:DEV, h }); guardarBans(); difundir({ t:'bans', l:bans });
+      store('jpy_chat_ban', String(h)); dejarCentral(); mostrarEchado(); return;
+    }
+    const cl = R.clientes.get(id); if(!cl) return;
+    if(cl.dv){ bans.push({ d:cl.dv, h }); bans = limpiarBans(bans); guardarBans(); difundir({ t:'bans', l:bans }); }
+    try{ cl.c.send({ t:'echado', h }); }catch(e){}
+    setTimeout(() => { try{ cl.c.close(); }catch(e){} }, 400);
+    R.clientes.delete(id); avisarGente();
+  }
   function avisarGente(){
-    gente = [{ id:yo, n:nombre || 'Invitado' }].concat([...R.clientes].filter(([,o]) => o.n).map(([id,o]) => ({ id, n:o.n })));
-    R.clientes.forEach(o => { try{ o.c.open && o.c.send({ t:'gente', l:gente }); }catch(e){} });
+    gente = [{ id:yo, n:nombre || 'Invitado', d:soyDueno ? 1 : 0 }].concat([...R.clientes].filter(([,o]) => o.n).map(([id,o]) => ({ id, n:o.n, d:o.dueno ? 1 : 0 })));
+    difundir({ t:'gente', l:gente });
     pintarGente();
+  }
+  function dejarCentral(){
+    difundir({ t:'chau' });
+    const h = R.hub; R.hub = null; R.soyHub = false; R.clientes.clear();
+    gente = []; pintarGente();
+    setTimeout(() => { try{ h && h.destroy(); }catch(e){} }, 300);
   }
 
   /* --- cliente --- */
   function enviar(o){ if(R.conn && R.conn.open) try{ R.conn.send(o); }catch(e){} }
   function recibir(d){
     if(!d || typeof d !== 'object') return;
-    if(d.t === 'hist' && Array.isArray(d.m)){ hist = d.m.filter(okMsg).slice(-HIST); yo = String(d.yo || yo); guardar(); pintarTodo(); }
+    if(d.t === 'hist' && Array.isArray(d.m)){
+      hist = d.m.filter(okMsg).slice(-HIST); yo = String(d.yo || yo); guardar(); pintarTodo();
+      if(Array.isArray(d.b)){ bans = limpiarBans(d.b); guardarBans(); }
+      if(llave && typeof d.no === 'string') firmar(d.no).then(sig => enviar({ t:'dueno', sig })).catch(() => {});
+    }
+    else if(d.t === 'eresDueno'){ if(!soyDueno){ soyDueno = true; pintarTodo(); aviso('👑 Estás en el chat como dueño: 🗑️ borra un mensaje y ⛔ echa a esa persona por 24 horas.'); } }
+    else if(d.t === 'borrar') quitar(m => m.k === String(d.k));
+    else if(d.t === 'borrarDe') quitar(m => m.id === String(d.id));
+    else if(d.t === 'bans'){ bans = limpiarBans(d.l); guardarBans(); }
+    else if(d.t === 'echado'){
+      store('jpy_chat_ban', String(Math.min(+d.h || 0, Date.now() + BAN_MS)));
+      const c = R.conn; R.conn = null; try{ c && c.close(); }catch(e){}
+      if(R.me){ const v = R.me; R.me = null; try{ v.destroy(); }catch(e){} }
+      gente = []; pintarGente(); mostrarEchado();
+    }
     else if(d.t === 'msg' && okMsg(d.m)) agregar(d.m);
     else if(d.t === 'gente' && Array.isArray(d.l)){ gente = d.l.filter(p => p && typeof p.n === 'string' && typeof p.id === 'string').slice(0, 300); pintarGente(); }
     else if(d.t === 'aviso' && typeof d.x === 'string') aviso(d.x.slice(0, 200));
@@ -132,17 +228,15 @@
     x = limpiaTxt(x); if(!x) return false;
     if(!nombre){ pedirNombre(); return false; }
     if(R.soyHub){
-      const ahora = Date.now();
-      while(HUBTS.length && ahora - HUBTS[0] > 20000) HUBTS.shift();
-      if(HUBTS.length >= 8 || (HUBTS.length && ahora - HUBTS[HUBTS.length-1] < 1200)){ aviso('Despacio 🙂 esperá un poquito antes de mandar otro mensaje.'); return false; }
-      HUBTS.push(ahora);
-      hubMensaje(yo, nombre, x, null);
-      return true;
+      return hubMensaje(yo, nombre, x, null);
     }
+    if(estoyEchado()){ mostrarEchado(); return false; }
+    if(ofensivo(x)){ aviso(MSG_OFENSA); return false; }
     if(!(R.conn && R.conn.open)){ aviso('Todavía conectando… probá en un ratito.'); return false; }
     enviar({ t:'msg', x }); return true;
   }
   function cambiarNombre(n){
+    if(ofensivo(n)){ aviso('🚫 Ese nombre no se puede usar en el chat.'); const i = $('#chatBox .nom'); if(i) i.value = nombre; return; }
     nombre = limpiaNom(n); store('jpy_chat_nombre', nombre);
     if(R.soyHub) avisarGente(); else enviar({ t:'nom', n:nombre });
     pintarCabeza();
@@ -163,9 +257,16 @@
   }, 10000);
   // la central avisa que se va, así otro toma su lugar enseguida
   window.addEventListener('pagehide', () => {
-    if(R.soyHub) R.clientes.forEach(o => { try{ o.c.open && o.c.send({ t:'chau' }); }catch(e){} });
+    if(R.soyHub) difundir({ t:'chau' });
     try{ R.hub && R.hub.destroy(); R.me && R.me.destroy(); }catch(e){}
   });
+  // acciones del dueño: si soy la central las hago yo, si no se las pido a la central
+  function accion(o){
+    if(!soyDueno) return;
+    if(R.soyHub){ if(o.t === 'borrar') hubBorrar(o.k); else hubEchar(o.id); }
+    else enviar(o);
+  }
+  function quitar(fn){ const antes = hist.length; hist = hist.filter(m => !fn(m)); if(hist.length !== antes){ guardar(); pintarTodo(); } }
 
   /* ---------------- pantalla ---------------- */
   const EMOJIS = '😀 😂 🤣 😅 😊 😍 😎 🤔 😮 😢 😡 🥳 👍 👎 👏 🙏 💪 🙌 👋 🤝 ❤️ 🔥 ⭐ 🎉 🎲 🃏 🎱 🎳 ♟️ ⚽ 🧉 🇵🇾 ✅ ❌ ⏰ 🙋'.split(' ');
@@ -205,6 +306,11 @@
 #chatBox form .env{background:#0038a8;color:#fff}
 #chatBox form .bem{background:#efe5c8}
 #chatBox .est{font-size:12px;color:#7a5b00;text-align:center;padding:3px;background:#fff1c2;display:none}
+#chatBox .m.dueno{background:#fff3c4;border:1px solid #e3b93f}
+#chatBox .m .n.dn{color:#8a5a00}
+#chatBox .m .herr{float:right;margin-left:6px}
+#chatBox .m .herr button{border:0;background:#f1e7c9;border-radius:8px;padding:1px 5px;margin-left:3px;font-size:13px;cursor:pointer}
+#chatBox .gente span.ech{cursor:pointer;text-decoration:underline dotted}
 #chatBox .reg{font-size:11.5px;color:#7a6a45;padding:0 12px 6px;background:#efe5c8}`;
 
   function armar(){
@@ -245,8 +351,19 @@
       if(mandar(txt.value)){ txt.value = ''; box.querySelector('.emo').classList.remove('on'); }
     };
     box.querySelector('.msgs').onclick = e => {
+      const b = e.target.closest('.herr button');
+      if(b){
+        const m = hist.find(x => x.k === b.dataset.k); if(!m) return;
+        if(b.dataset.a === 'borrar'){ if(confirm(`¿Borrar este mensaje de ${m.n} para todos?`)) accion({ t:'borrar', k:m.k }); }
+        else if(confirm(`¿Echar a ${m.n} del chat por 24 horas? También se borran todos sus mensajes.`)) accion({ t:'echar', id:m.id });
+        return;
+      }
       const n = e.target.closest('.n'); if(!n || !n.dataset.id || n.dataset.id === yo) return;
       silenciar(n.dataset.id, n.textContent);
+    };
+    box.querySelector('.gente').onclick = e => {
+      const s = e.target.closest('span.ech'); if(!s || !soyDueno) return;
+      if(confirm(`¿Echar a ${s.dataset.n} del chat por 24 horas? También se borran todos sus mensajes.`)) accion({ t:'echar', id:s.dataset.id });
     };
     document.addEventListener('keydown', e => { if(e.key === 'Escape' && abierto) abrir(false); });
     pintarCabeza(); pintarTodo();
@@ -284,10 +401,17 @@
   function guardar(){ store('jpy_chat_hist', JSON.stringify(hist.slice(-HIST))); }
   function burbuja(m){
     const d = document.createElement('div');
-    d.className = 'm' + (m.id === yo ? ' mio' : '');
+    d.className = 'm' + (m.id === yo ? ' mio' : '') + (m.d ? ' dueno' : '');
     if(/^(\p{Extended_Pictographic}|\p{Regional_Indicator}|‍|️|\s){1,12}$/u.test(m.x)) d.classList.add('solo');
-    const n = document.createElement('span'); n.className = 'n'; n.textContent = m.n; n.dataset.id = m.id;
+    const n = document.createElement('span'); n.className = 'n' + (m.d ? ' dn' : ''); n.textContent = (m.d ? '👑 ' : '') + m.n; n.dataset.id = m.id;
     if(m.id !== yo) n.title = 'Tocá para silenciar';
+    if(soyDueno && m.id !== yo){   // herramientas del dueño
+      const her = document.createElement('span'); her.className = 'herr';
+      [['borrar','🗑️','Borrar este mensaje para todos'], ['echar','⛔','Echar a esta persona por 24 horas']].forEach(([a, t, ti]) => {
+        const b = document.createElement('button'); b.type = 'button'; b.dataset.a = a; b.dataset.k = m.k; b.textContent = t; b.title = ti; her.appendChild(b);
+      });
+      d.appendChild(her);
+    }
     const h = document.createElement('span'); h.className = 'h';
     const t = new Date(+m.ts || Date.now()); h.textContent = t.toLocaleTimeString('es-PY', { hour:'2-digit', minute:'2-digit' });
     const x = document.createElement('span'); x.className = 'x'; x.textContent = m.x;
@@ -305,7 +429,11 @@
   function pintarGente(){
     const g = $('#chatBox .gente'); if(!g) return;
     g.textContent = '';
-    gente.forEach(p => { const s = document.createElement('span'); s.textContent = (p.id === yo ? '⭐ ' : '🟢 ') + p.n; g.appendChild(s); });
+    gente.forEach(p => {
+      const s = document.createElement('span'); s.textContent = (p.id === yo ? '⭐ ' : p.d ? '👑 ' : '🟢 ') + p.n;
+      if(soyDueno && p.id !== yo){ s.className = 'ech'; s.dataset.id = p.id; s.dataset.n = p.n; s.title = 'Tocá para echar a esta persona'; }
+      g.appendChild(s);
+    });
     pintarCabeza(); pintarBoton();
   }
   function pintarCabeza(){
@@ -319,8 +447,14 @@
     const nl = b.querySelector('.nl'); nl.textContent = sinLeer > 9 ? '9+' : sinLeer; nl.style.display = sinLeer ? 'inline-block' : 'none';
   }
   function estado(t){ const e = $('#chatBox .est'); if(e){ e.textContent = t; e.style.display = t ? 'block' : 'none'; } }
+  function mostrarEchado(){
+    const h = new Date(+load('jpy_chat_ban', 0)), hoy = h.toDateString() === new Date().toDateString();
+    estado(`⛔ Te sacaron del chat. Vas a poder volver ${hoy ? 'hoy' : 'mañana'} a las ${h.toLocaleTimeString('es-PY', { hour:'2-digit', minute:'2-digit' })}`);
+    const f = $('#chatBox form'); if(f) f.style.display = 'none';
+    gente = []; pintarCabeza(); pintarBoton();
+  }
   function aviso(t){ if(typeof window.toast === 'function') window.toast(t); else alert(t); }
 
-  function iniciar(){ armar(); arrancar(); }
+  async function iniciar(){ armar(); await cargarLlave(); arrancar(); }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
