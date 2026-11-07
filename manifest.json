@@ -20,6 +20,7 @@
     { "name": "Peteĩ", "short_name": "Peteĩ", "url": "petei/", "icons": [{ "src": "petei/icon-192.png", "sizes": "192x192" }] },
     { "name": "Escoba de 15", "short_name": "Escoba", "url": "escoba/", "icons": [{ "src": "escoba/icon-192.png", "sizes": "192x192" }] },
     { "name": "El Impostor", "short_name": "Impostor", "url": "impostor/", "icons": [{ "src": "impostor/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Tarot Jasy", "short_name": "Tarot", "url": "tarot/", "icons": [{ "src": "tarot/icon-192.png", "sizes": "192x192" }] },
     { "name": "¿Mávaiko Ojuka?", "short_name": "Mávaiko", "url": "mavaiko/", "icons": [{ "src": "mavaiko/icon-192.png", "sizes": "192x192" }] }
   ]
 }

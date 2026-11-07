@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- SEO (buscadores y vista previa al compartir) -->
+<title>Tarot Jasy: lectura de cartas del Tarot online gratis | Juegos PY</title>
+<meta name="description" content="Tirá las cartas del Tarot gratis: amor, salud, dinero, familia, amistad, estudios o lo que quieras preguntar. Lectura personalizada según tu signo y tu número de vida, con los 78 arcanos y toque paraguayo.">
+<link rel="canonical" href="https://juegospy.com/tarot/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Juegos Paraguay Digitales">
+<meta property="og:title" content="Tarot Jasy: lectura de cartas del Tarot online gratis | Juegos PY">
+<meta property="og:description" content="Tirá las cartas del Tarot gratis: amor, salud, dinero, familia y más. Lectura personalizada según tu signo y tu número de vida, con toque paraguayo.">
+<meta property="og:url" content="https://juegospy.com/tarot/">
+<meta property="og:image" content="https://juegospy.com/tarot/icon-512.png">
+<meta property="og:locale" content="es_PY">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Tarot Jasy", "url": "https://juegospy.com/tarot/", "description": "Lectura de cartas del Tarot online y gratis, personalizada según el signo y el número de vida, con los 22 Arcanos Mayores y los 56 Menores y toque paraguayo.", "image": "https://juegospy.com/tarot/icon-512.png", "inLanguage": "es", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "jleovgames", "url": "https://juegospy.com/"}, "isPartOf": {"@type": "WebSite", "name": "Juegos Paraguay Digitales", "url": "https://juegospy.com/"}, "genre": ["Entretenimiento", "Tarot"], "gamePlatform": ["Navegador web", "Android", "PC"], "playMode": "SinglePlayer", "applicationCategory": "Game", "operatingSystem": "Cualquiera (navegador)"}</script>
+<!-- /SEO -->
+<meta name="theme-color" content="#120a30">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+:root{--g:#f2c14e;--gl:#ffe9a8;--noche:#120a30;--violeta:#2a1a5e;--txt:#efe6ff;--suave:#b7a9d9}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(ellipse at 50% -10%,#3b2380 0%,#1a0f45 45%,#08051a 100%) fixed;color:var(--txt);
+  font-family:"Cormorant Garamond",Georgia,serif;font-size:18px;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+#cielo{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+#app{position:relative;z-index:1;max-width:760px;margin:0 auto;min-height:calc(100vh - 70px);min-height:calc(100dvh - 70px);padding:max(14px,env(safe-area-inset-top)) 16px 20px}
+.pant{display:none}.pant.on{display:block;animation:aparece .7s ease}
+@keyframes aparece{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+h1,h2,h3,.cin{font-family:Cinzel,Georgia,serif;font-weight:700}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+/* ---------- portada ---------- */
+.logo{text-align:center;margin:30px 0 14px}
+.logo svg{width:92px;height:92px;filter:drop-shadow(0 0 18px rgba(242,193,78,.45));animation:flota 6s ease-in-out infinite}
+@keyframes flota{50%{transform:translateY(-6px)}}
+.logo h1{margin:6px 0 0;font-size:clamp(34px,9vw,52px);letter-spacing:4px;color:var(--gl);text-shadow:0 0 22px rgba(242,193,78,.5)}
+.logo p{margin:4px 0 0;color:var(--suave);font-style:italic;font-size:18px}
+.box{background:rgba(20,12,52,.72);border:1px solid rgba(242,193,78,.35);border-radius:18px;padding:18px 16px;margin:14px 0;
+  box-shadow:0 10px 40px rgba(0,0,0,.45),inset 0 0 30px rgba(120,90,220,.12);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.box h3{margin:0 0 10px;font-size:15px;letter-spacing:2px;color:var(--g);text-transform:uppercase}
+label.l{display:block;font-family:Cinzel,serif;font-size:12px;letter-spacing:1.5px;color:var(--suave);margin:12px 0 5px;text-transform:uppercase}
+input[type=text],select,textarea{width:100%;padding:11px 12px;border-radius:12px;border:1px solid rgba(242,193,78,.35);background:rgba(8,5,26,.7);
+  color:var(--txt);font:inherit;font-size:18px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(242,193,78,.18)}
+select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--g) 50%),linear-gradient(135deg,var(--g) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:26px}
+select option{background:#1a1040;color:#fff}
+textarea{resize:vertical;min-height:58px;font-size:17px}
+.fecha{display:grid;grid-template-columns:1fr 1.5fr 1.2fr;gap:8px}
+#vistaSigno{margin-top:10px;min-height:24px;color:var(--gl);font-size:17px;text-align:center}
+.temas{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tema{background:rgba(8,5,26,.6);border:1px solid rgba(242,193,78,.25);border-radius:14px;padding:10px 4px 8px;color:var(--txt);text-align:center;transition:.2s}
+.tema .e{font-size:26px;display:block;line-height:1.2}
+.tema b{display:block;font-family:Cinzel,serif;font-size:11.5px;letter-spacing:.5px;margin-top:3px}
+.tema i{display:block;font-size:13px;color:var(--suave)}
+.tema.sel{border-color:var(--g);background:linear-gradient(160deg,rgba(242,193,78,.25),rgba(90,50,180,.35));box-shadow:0 0 16px rgba(242,193,78,.35);transform:translateY(-2px)}
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.opt{background:rgba(8,5,26,.6);border:1px solid rgba(242,193,78,.25);border-radius:14px;padding:10px 6px;color:var(--txt);text-align:center}
+.opt b{display:block;font-family:Cinzel,serif;font-size:13px}.opt span{display:block;font-size:14px;color:var(--suave);line-height:1.15;margin-top:2px}
+.opt .mini{display:flex;justify-content:center;gap:2px;margin-bottom:5px;height:22px;align-items:center}
+.opt .mini i{display:block;width:10px;height:16px;border-radius:2px;background:linear-gradient(#5a3fb0,#24145e);border:1px solid var(--g)}
+.opt.sel{border-color:var(--g);background:linear-gradient(160deg,rgba(242,193,78,.22),rgba(90,50,180,.3));box-shadow:0 0 14px rgba(242,193,78,.3)}
+.opts.dos{grid-template-columns:1fr 1fr}
+.btn{display:inline-block;border:0;border-radius:40px;padding:14px 22px;font-family:Cinzel,serif;font-weight:700;letter-spacing:1.5px;font-size:16px;
+  color:#24124a;background:linear-gradient(180deg,#ffe9a8,#f2c14e 55%,#c8902a);box-shadow:0 6px 22px rgba(242,193,78,.35),inset 0 1px 0 #fff8;text-align:center}
+.btn:active{transform:scale(.97)}
+.btn.sec{background:rgba(20,12,52,.8);color:var(--gl);border:1px solid rgba(242,193,78,.55);box-shadow:none}
+.btn.wide{display:block;width:100%}
+.btn:disabled{opacity:.45}
+.btn.brilla{animation:brilla 1.8s ease-in-out infinite}
+@keyframes brilla{50%{box-shadow:0 0 34px rgba(242,193,78,.75),inset 0 1px 0 #fff8}}
+#btnSnd{position:absolute;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));width:40px;height:40px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.55);background:rgba(15,12,30,.72);color:#fff;font-size:18px;padding:0;z-index:5}
+/* ---------- mesa ---------- */
+#perfil{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:46px 0 4px}
+.chip{background:rgba(20,12,52,.75);border:1px solid rgba(242,193,78,.4);border-radius:30px;padding:5px 12px;font-size:16px;color:var(--gl)}
+.chip b{font-family:Cinzel,serif;font-size:13px;letter-spacing:.5px}
+#msg{text-align:center;font-family:Cinzel,serif;color:var(--gl);font-size:clamp(15px,4.2vw,19px);letter-spacing:1px;min-height:52px;
+  display:flex;align-items:center;justify-content:center;margin:6px 0;text-shadow:0 0 12px rgba(242,193,78,.4);padding:0 10px}
+#zonaMazo{position:relative;height:min(62vw,300px);transition:height .7s ease,opacity .5s}
+#zonaMazo.chica{height:0;opacity:0;pointer-events:none}
+#nandu{position:absolute;left:50%;top:50%;width:min(80vw,380px);height:min(80vw,380px);transform:translate(-50%,-50%);opacity:.18;animation:gira 80s linear infinite;pointer-events:none}
+@keyframes gira{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.mz{position:absolute;left:50%;top:50%;width:var(--mw);height:calc(var(--mw)*1.7);margin-left:calc(var(--mw)/-2);margin-top:calc(var(--mw)*-.85);
+  border-radius:7%;box-shadow:0 4px 12px rgba(0,0,0,.5);will-change:transform}
+.mz svg,.cara svg{display:block;width:100%;height:100%}
+#zonaMazo{--mw:min(24vw,118px)}
+.pila{position:absolute;top:50%;width:var(--mw);height:calc(var(--mw)*1.7);margin-top:calc(var(--mw)*-.85);border-radius:9px;cursor:pointer;z-index:50}
+.pila:hover{box-shadow:0 0 0 2px var(--g),0 0 24px rgba(242,193,78,.6)}
+/* tirada */
+#tirada{display:grid;gap:10px 8px;justify-content:center;margin:4px auto 6px}
+#tirada.t1{grid-template-columns:var(--cw);--cw:min(46vw,200px)}
+#tirada.t3{grid-template-columns:repeat(3,var(--cw));--cw:min(28.5vw,165px)}
+#tirada.t5{grid-template-columns:repeat(3,var(--cw));--cw:min(26vw,128px);grid-template-areas:". p3 ." "p1 p0 p2" ". p4 ."}
+#tirada.t5 .slot:nth-child(1){grid-area:p0}#tirada.t5 .slot:nth-child(2){grid-area:p1}#tirada.t5 .slot:nth-child(3){grid-area:p2}
+#tirada.t5 .slot:nth-child(4){grid-area:p3}#tirada.t5 .slot:nth-child(5){grid-area:p4}
+.slot{display:flex;flex-direction:column;align-items:center;width:var(--cw)}
+.slot .pl{font-family:Cinzel,serif;font-size:clamp(10px,2.8vw,13px);letter-spacing:1px;color:var(--g);text-transform:uppercase;margin-bottom:4px;text-align:center;opacity:0;transition:opacity .6s}
+.slot.ok .pl{opacity:1}
+.slot .nm{font-size:clamp(13px,3.4vw,16px);text-align:center;color:var(--gl);line-height:1.1;margin-top:5px;min-height:2.3em;opacity:0;transition:opacity .6s .5s}
+.slot .nm i{display:block;color:#ff9d8a;font-size:.85em}
+.slot.vuelta .nm{opacity:1}
+.carta{width:var(--cw);aspect-ratio:100/170;perspective:900px;cursor:pointer;position:relative}
+.carta .giro{position:absolute;inset:0;transform-style:preserve-3d;transition:transform 1s cubic-bezier(.3,1.4,.5,1)}
+.slot.vuelta .giro{transform:rotateY(180deg)}
+.cara{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:7%;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.55)}
+.cara.frente{transform:rotateY(180deg)}
+.cara.frente .rot{width:100%;height:100%;transition:transform .6s .9s}
+.slot.inv.vuelta .cara.frente .rot{transform:rotate(180deg)}
+.slot.vuelta .cara.frente{box-shadow:0 0 0 1px rgba(242,193,78,.6),0 0 26px rgba(242,193,78,.45),0 8px 20px rgba(0,0,0,.6)}
+.slot:not(.vuelta) .carta:hover .cara.dorso{box-shadow:0 0 0 2px var(--g),0 0 24px rgba(242,193,78,.6)}
+.chispa{position:absolute;width:6px;height:6px;border-radius:50%;background:var(--gl);box-shadow:0 0 8px 2px var(--g);pointer-events:none;z-index:60}
+.acciones{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.oculto{display:none!important}
+/* lectura */
+#lectura{margin-top:8px}
+#lectura .box{padding:22px 18px;font-size:19px;line-height:1.5}
+#lectura h2{text-align:center;color:var(--gl);margin:0 0 4px;font-size:22px;letter-spacing:2px}
+#lectura .sub{text-align:center;color:var(--suave);font-style:italic;margin-bottom:14px}
+#lectura p{margin:0 0 14px;opacity:0;transform:translateY(8px);transition:opacity .9s,transform .9s}
+#lectura p.ve{opacity:1;transform:none}
+#lectura p.intro::first-letter{font-family:Cinzel,serif;font-size:2.4em;float:left;line-height:.9;margin:4px 6px 0 0;color:var(--g)}
+#lectura p.carta{border-left:2px solid rgba(242,193,78,.45);padding-left:12px}
+#lectura p.carta .pos{display:block;font-family:Cinzel,serif;font-size:12px;letter-spacing:2px;color:var(--g);text-transform:uppercase}
+#lectura .cn{color:var(--gl)}#lectura .inv{color:#ff9d8a;font-size:.9em}
+#lectura .gn{color:var(--suave);font-style:italic}
+#lectura p.final{background:rgba(242,193,78,.08);border:1px solid rgba(242,193,78,.3);border-radius:12px;padding:12px 14px}
+#lectura p.suerte{font-size:16px;text-align:center;color:var(--suave)}
+#lectura p.suerte b{color:var(--gl)}
+#lectura p.despedida{text-align:center;font-style:italic;color:var(--gl);font-size:20px}
+.sep{text-align:center;color:var(--g);letter-spacing:8px;margin:2px 0 12px;opacity:.7}
+/* modal */
+#modal{position:fixed;inset:0;z-index:9500;background:rgba(5,3,18,.85);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+#modal.on{display:flex;animation:aparece .3s}
+#modal .in{max-width:420px;width:100%;max-height:92vh;overflow:auto;text-align:center}
+#modal .grande{width:min(58vw,230px);margin:0 auto 12px;border-radius:7%;overflow:hidden;box-shadow:0 0 40px rgba(242,193,78,.45)}
+#modal .grande.inv svg{transform:rotate(180deg)}
+#modal h3{margin:0;color:var(--gl);font-size:22px}
+#modal .orient{color:#ff9d8a;font-style:italic}
+#modal .kw{color:var(--g);font-family:Cinzel,serif;font-size:13px;letter-spacing:1px;margin:6px 0}
+#modal p{margin:8px 0;line-height:1.4}
+#modal .otra{color:var(--suave);font-size:16px}
+#toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#1a1040;border:1px solid var(--g);color:var(--gl);padding:10px 18px;border-radius:30px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;font-size:16px}
+#toast.on{opacity:1}
+/* aviso legal: chiquito y tenue */
+#aviso{position:relative;z-index:1;text-align:center;font-family:system-ui,sans-serif;font-size:9.5px;line-height:1.35;color:rgba(190,180,215,.32);
+  max-width:520px;margin:18px auto 0;padding:0 16px max(14px,env(safe-area-inset-bottom))}
+@media (max-width:420px){.temas{grid-template-columns:repeat(4,1fr);gap:6px}.tema b{font-size:10px}.tema i{font-size:11.5px}.tema .e{font-size:23px}
+  .opt span{font-size:13px}#lectura .box{font-size:18px;padding:18px 14px}}
+@media (prefers-reduced-motion:reduce){.logo svg,#nandu{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="cielo"></canvas>
+<button id="btnSnd" title="Música" aria-label="Música">🎵</button>
+<div id="app">
+
+<!-- ===================== portada / consulta ===================== -->
+<section id="pInicio" class="pant on">
+  <div class="logo">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="lg" cx="40%" cy="35%"><stop offset="0" stop-color="#fff6d6"/><stop offset="1" stop-color="#f2c14e"/></radialGradient></defs>
+      <g id="logoNandu" fill="none" stroke="#f2c14e" stroke-width=".7" opacity=".55"></g>
+      <path d="M58 22 A30 30 0 1 0 58 78 A24 24 0 1 1 58 22Z" fill="url(#lg)"/>
+      <polygon points="66,40 68.4,46.6 75,49 68.4,51.4 66,58 63.6,51.4 57,49 63.6,46.6" fill="#fff6d6"/></svg>
+    <h1>TAROT JASY</h1>
+    <p>Las cartas te hablan bajo la luna paraguaya</p>
+  </div>
+
+  <div class="box">
+    <h3>✦ ¿Quién consulta?</h3>
+    <label class="l" for="fNombre">Tu nombre (opcional)</label>
+    <input type="text" id="fNombre" maxlength="30" autocomplete="given-name" placeholder="Como te dicen">
+    <label class="l">Fecha de nacimiento</label>
+    <div class="fecha">
+      <select id="fDia" aria-label="Día"></select>
+      <select id="fMes" aria-label="Mes"></select>
+      <select id="fAnio" aria-label="Año"></select>
+    </div>
+    <div id="vistaSigno"></div>
+  </div>
+
+  <div class="box">
+    <h3>✦ ¿Qué querés saber?</h3>
+    <div class="temas" id="temas"></div>
+    <label class="l" for="fPreg">Tu pregunta (opcional)</label>
+    <textarea id="fPreg" maxlength="160" placeholder="Pensala con el corazón y escribila acá…"></textarea>
+  </div>
+
+  <div class="box">
+    <h3>✦ La tirada</h3>
+    <div class="opts" id="tiradas"></div>
+    <label class="l">El mazo</label>
+    <div class="opts dos" id="mazos">
+      <button class="opt" data-m="22"><b>Arcanos Mayores</b><span>Las 22 cartas del destino</span></button>
+      <button class="opt" data-m="78"><b>Mazo completo</b><span>Los 78 arcanos</span></button>
+    </div>
+  </div>
+
+  <button class="btn wide brilla" id="btnConsultar">✦ Consultar a las cartas ✦</button>
+</section>
+
+<!-- ===================== la mesa ===================== -->
+<section id="pMesa" class="pant">
+  <div id="perfil"></div>
+  <div id="msg"></div>
+  <div id="zonaMazo"><svg id="nandu" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#f2c14e" stroke-width=".35" id="nanduG"></g></svg></div>
+  <div id="tirada"></div>
+  <div class="acciones">
+    <button class="btn sec oculto" id="btnTodas">Dar vuelta todas</button>
+    <button class="btn oculto brilla" id="btnLeer">✦ Ver mi lectura ✦</button>
+  </div>
+  <div id="lectura"></div>
+  <div class="acciones oculto" id="finBtns">
+    <button class="btn" id="btnCompartir">📤 Compartir</button>
+    <button class="btn sec" id="btnOtra">🔄 Volver a tirar</button>
+    <button class="btn sec" id="btnNueva">✎ Nueva consulta</button>
+  </div>
+</section>
+</div>
+
+<div id="modal"><div class="in" id="modalIn"></div></div>
+<div id="toast"></div>
+
+<footer id="aviso">Tarot Jasy es solo un juego de entretenimiento. Las lecturas se arman al azar y no predicen el futuro: no las tomes en serio ni las uses para decidir sobre tu salud, tu dinero o tu vida. No reemplazan el consejo de médicos, psicólogos, abogados ni otros profesionales.</footer>
+
+<script src="cartas.js?v=1"></script>
+<script src="lectura.js?v=1"></script>
+<script src="juego.js?v=1"></script>
+<script>window.INICIO={sonidos:['#btnSnd']};</script>
+<script src="../inicio.js?v=2"></script>
+</body>
+</html>

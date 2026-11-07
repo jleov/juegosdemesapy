@@ -1,0 +1,235 @@
+/* =====================================================================
+   Tarot Jasy — signos, numerología y la lectura escrita.
+   Arma un texto distinto cada vez mezclando: el signo (elemento, planeta),
+   el número de vida, el año personal, el tema elegido y las cartas que salieron.
+   ===================================================================== */
+(function(){
+const elige = a => a[Math.floor(Math.random()*a.length)];
+const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+
+/* ---------- signos del zodíaco ---------- */
+const SIGNOS = [
+ {n:'Capricornio',s:'♑',d:[12,22],el:'tierra',pl:'Saturno',arc:15,r:'la ambición paciente y el sentido de la responsabilidad'},
+ {n:'Acuario',s:'♒',d:[1,20],el:'aire',pl:'Saturno',arc:17,r:'la originalidad y el amor por la libertad'},
+ {n:'Piscis',s:'♓',d:[2,19],el:'agua',pl:'Júpiter',arc:18,r:'la sensibilidad y una imaginación sin límites'},
+ {n:'Aries',s:'♈',d:[3,21],el:'fuego',pl:'Marte',arc:4,r:'el impulso de quien abre caminos'},
+ {n:'Tauro',s:'♉',d:[4,20],el:'tierra',pl:'Venus',arc:5,r:'la paciencia y el amor por lo seguro y lo lindo'},
+ {n:'Géminis',s:'♊',d:[5,21],el:'aire',pl:'Mercurio',arc:6,r:'la curiosidad y la palabra rápida'},
+ {n:'Cáncer',s:'♋',d:[6,21],el:'agua',pl:'la Luna',arc:7,r:'la ternura y el instinto de proteger a los suyos'},
+ {n:'Leo',s:'♌',d:[7,23],el:'fuego',pl:'el Sol',arc:8,r:'el brillo propio y la generosidad del corazón'},
+ {n:'Virgo',s:'♍',d:[8,23],el:'tierra',pl:'Mercurio',arc:9,r:'el detalle, el orden y las ganas de ayudar'},
+ {n:'Libra',s:'♎',d:[9,23],el:'aire',pl:'Venus',arc:11,r:'la búsqueda de armonía y belleza'},
+ {n:'Escorpio',s:'♏',d:[10,23],el:'agua',pl:'Marte',arc:13,r:'la intensidad y el poder de transformarse'},
+ {n:'Sagitario',s:'♐',d:[11,22],el:'fuego',pl:'Júpiter',arc:14,r:'el optimismo y las ganas de aventura'}
+];
+// índice por la fecha de inicio de cada signo (mes, día)
+function signo(dia, mes){
+  // SIGNOS[k] empieza en d=[mes,dia]; recorrer de atrás hacia adelante
+  const orden = [...SIGNOS].sort((a,b)=> (a.d[0]*100+a.d[1]) - (b.d[0]*100+b.d[1]));
+  const v = mes*100+dia; let s = orden[orden.length-1]; // antes del 20/1 → Capricornio
+  for(const o of orden) if(v >= o.d[0]*100+o.d[1]) s = o;
+  return s;
+}
+
+const ELEM = {
+ fuego:{desc:'fuego, que da coraje y entusiasmo', clave:'poner pasión y tomar la iniciativa', color:'rojo o dorado', piedra:'el ámbar'},
+ tierra:{desc:'tierra, que da constancia y los pies bien plantados', clave:'construir paso a paso, sin apuro pero sin pausa', color:'verde o marrón', piedra:'el jaspe'},
+ aire:{desc:'aire, que da ideas claras y facilidad de palabra', clave:'hablar con claridad y pensar antes de actuar', color:'celeste o amarillo', piedra:'el cuarzo transparente'},
+ agua:{desc:'agua, que da intuición y un corazón sensible', clave:'dejarte guiar por la intuición y lo que sentís', color:'azul o plateado', piedra:'la amatista'}
+};
+const DIAS = {'Marte':'martes','Venus':'viernes','Mercurio':'miércoles','la Luna':'lunes','el Sol':'domingo','Júpiter':'jueves','Saturno':'sábado'};
+const PALO_ELEM = {bastos:'fuego', copas:'agua', espadas:'aire', oros:'tierra'};
+const AMIGOS = {fuego:'aire', aire:'fuego', agua:'tierra', tierra:'agua'};
+
+/* ---------- numerología ---------- */
+function reducir(n, maestros=true){
+  while(n>9 && !(maestros && (n===11||n===22||n===33))) n = String(n).split('').reduce((a,b)=>a+ +b,0);
+  return n;
+}
+function numeroVida(d,m,a){ return reducir(reducir(d)+reducir(m)+reducir(a)); }
+function anioPersonal(d,m,anio){ return reducir(reducir(d)+reducir(m)+reducir(anio), false); }
+const NUM = {
+ 1:'el número de quien lidera y abre caminos propios',
+ 2:'el número del alma sensible, con el don de unir y conciliar',
+ 3:'el número de la creatividad, la alegría y la facilidad para expresarse',
+ 4:'el número de la constancia, el orden y las bases firmes',
+ 5:'el número de la libertad, la curiosidad y el gusto por el cambio',
+ 6:'el número del amor a la familia y las ganas de cuidar',
+ 7:'el número de la mente profunda, la intuición y la búsqueda de la verdad',
+ 8:'el número del poder de concretar y el talento para lo material',
+ 9:'el número de la generosidad y la sabiduría de quien ya vivió mucho',
+ 11:'un número maestro: intuición finísima e inspiración para los demás',
+ 22:'un número maestro: el de quien construye sueños grandes',
+ 33:'un número maestro: el del amor que enseña y sana'
+};
+const ANIO = {
+ 1:'un año de comienzos: lo que siembres ahora marca los próximos nueve años',
+ 2:'un año de paciencia y alianzas, donde los vínculos pesan más que la prisa',
+ 3:'un año de expresión, vida social y alegría',
+ 4:'un año de trabajo y de poner bases firmes',
+ 5:'un año de cambios, movimiento y sorpresas',
+ 6:'un año de hogar, amor y responsabilidades',
+ 7:'un año de introspección, estudio y crecimiento interior',
+ 8:'un año de cosecha, logros y asuntos de plata',
+ 9:'un año de cierres y limpieza, para dejar lugar a lo nuevo'
+};
+
+/* ---------- temas ---------- */
+const TEMAS = {
+ amor:{t:'Amor',gn:'Mborayhu',e:'❤️',palo:'copas',nom:'el amor',
+  pos:['En el amor esto se traduce en {k}: un viento a favor para tu corazón.','Para tu vida afectiva, esta carta trae {k}; abrí la puerta sin miedo.','En lo sentimental anuncia {k}, y eso se siente en el pecho.'],
+  neu:['En el amor, {k} pide atención: no es bueno ni malo, depende de cómo lo vivas.','En lo afectivo aparece {k}; tomate tu tiempo para entender qué sentís.'],
+  neg:['En el amor marca {k}; conviene hablar claro y no guardarse nada.','En tu corazón esto se nota como {k}: cuidate, pero no te cierres.'],
+  cierre:{pos:'El amor viene con buena estrella: hay ternura, encuentro y ganas compartidas en tu camino.',
+          mix:'El amor está en movimiento: hay cosas lindas y otras por acomodar. La sinceridad va a ser la llave.',
+          neg:'El corazón pide pausa y cuidado. No es un “no” para siempre: es un “todavía no”, mientras sanás y te elegís primero.'},
+  extra:['Escribile a esa persona que te viene a la mente cuando ves la luna.','Regalate algo lindo: el amor propio también cuenta.','Compartí un tereré y una charla sin apuro: ahí florece lo verdadero.']},
+ salud:{t:'Salud',gn:'Tesãi',e:'🌿',palo:'oros',nom:'tu salud y tu bienestar',
+  pos:['Para tu bienestar significa {k}: el cuerpo responde cuando lo escuchás.','En la salud trae {k}, una energía que renueva.'],
+  neu:['En tu bienestar aparece {k}: buen momento para revisar hábitos.','Para el cuerpo y la mente habla de {k}; escuchá lo que te pide.'],
+  neg:['En la salud señala {k}; no lo dejes pasar y date el descanso que merecés.','Para tu bienestar avisa de {k}: bajá un cambio y cuidate.'],
+  cierre:{pos:'Tu energía vital está fuerte: buen tiempo para moverte, comer rico y sano, y dormir mejor.',
+          mix:'Tu cuerpo te habla en voz baja: pequeños cambios de rutina harán una gran diferencia.',
+          neg:'Las cartas piden pausa: descansá, tomá agua, y si algo te preocupa, consultá a quien sabe.'},
+  extra:['Un yuyo fresco en el tereré y una caminata al atardecer te van a caer de diez.','Dormí una horita más esta semana.','Respirá hondo tres veces cuando sientas el pecho apretado.']},
+ dinero:{t:'Dinero y trabajo',gn:'Pirapire ha tembiapo',e:'💰',palo:'oros',nom:'el dinero y el trabajo',
+  pos:['En lo laboral y económico anuncia {k}: buena señal para tus bolsillos.','En el trabajo esto trae {k}; aprovechá la racha.','Para tu plata y tus proyectos significa {k}.'],
+  neu:['En el trabajo aparece {k}: momento de ordenar números y prioridades.','En lo económico habla de {k}; ni gastes de más ni te paralices.'],
+  neg:['En la plata marca {k}: cuidá los gastos y no firmes nada a las apuradas.','En lo laboral señala {k}; paciencia, que esto también pasa.'],
+  cierre:{pos:'Se abre una puerta para la prosperidad: tu esfuerzo empieza a dar frutos y puede llegar una oportunidad concreta.',
+          mix:'El panorama económico se mueve: hay oportunidades, pero piden orden y buenas decisiones.',
+          neg:'Es tiempo de ajustar el cinturón y planificar. Lo que hoy cuesta, mañana se convierte en experiencia.'},
+  extra:['Anotá tus gastos durante una semana: te vas a sorprender.','Guardá una monedita para la suerte en tu billetera.','Hablá de ese proyecto con alguien de confianza: puede abrirte una puerta.']},
+ familia:{t:'Familia',gn:'Ogaygua',e:'🏡',palo:'copas',nom:'tu familia',
+  pos:['En la familia esto trae {k}: la casa se llena de buena energía.','Para los tuyos significa {k}, y eso une.'],
+  neu:['En la familia aparece {k}: escuchá a cada uno antes de opinar.','En casa habla de {k}; un poco de paciencia hace milagros.'],
+  neg:['En la familia señala {k}; vale la pena sentarse a hablar con calma.','En casa marca {k}: no tomes partido apurado.'],
+  cierre:{pos:'Tu familia es tu fuerza: se vienen encuentros, abrazos y algo para celebrar alrededor de la mesa.',
+          mix:'En la familia hay cariño, pero también temas pendientes. Una charla sincera puede destrabar mucho.',
+          neg:'Hay tensiones en el hogar que piden paciencia. Poner límites con amor también es cuidar.'},
+  extra:['Organizá un almuerzo de domingo, aunque sea sencillo.','Llamá a esa tía o abuela que hace mucho no escuchás.','Una sopa paraguaya compartida arregla más de lo que parece.']},
+ amistad:{t:'Amistad',gn:'Angirũ',e:'🤝',palo:'copas',nom:'tus amistades',
+  pos:['En la amistad anuncia {k}: buena gente cerca tuyo.','Con tus amigos esto trae {k}, y la ronda se agranda.'],
+  neu:['En la amistad aparece {k}: fijate quién está de verdad.','Con tus amistades habla de {k}; elegí bien tus confidentes.'],
+  neg:['En la amistad marca {k}; no todos merecen tus secretos.','Con los amigos señala {k}: cuidá tu energía.'],
+  cierre:{pos:'Tus amistades son un tesoro: llegan reencuentros, risas y alguien nuevo que suma.',
+          mix:'Hay amistades que crecen y otras que se enfrían. Es natural: quedate con las que te hacen bien.',
+          neg:'Hay alguien cerca que no juega limpio. Escuchá tu intuición y guardate un poco.'},
+  extra:['Armá una ronda de tereré con quienes más querés.','Mandale un audio a ese amigo de siempre.','Decí que no a quien solo aparece cuando necesita algo.']},
+ estudios:{t:'Estudios',gn:'Mbo\'e',e:'📚',palo:'espadas',nom:'tus estudios',
+  pos:['En los estudios trae {k}: la mente está despierta.','Para tu aprendizaje significa {k}; buen momento para rendir.'],
+  neu:['En los estudios aparece {k}: organizá bien tus tiempos.','Para aprender habla de {k}; constancia antes que velocidad.'],
+  neg:['En los estudios señala {k}; pedí ayuda sin vergüenza.','Para tu aprendizaje marca {k}: repasá con calma.'],
+  cierre:{pos:'Tu mente está en su mejor momento: lo que estudies ahora se queda, y los exámenes vienen con buena estrella.',
+          mix:'Vas bien, aunque hay temas que cuestan. La constancia le gana al talento cuando el talento no estudia.',
+          neg:'El camino del estudio se puso cuesta arriba, pero no es imposible. Cambiá de método y pedí una mano.'},
+  extra:['Estudiá en bloques cortos con mate o tereré al lado.','Explicale el tema a alguien: si lo podés contar, lo sabés.','Dormí bien antes del examen; la memoria trabaja de noche.']},
+ cambios:{t:'Viajes y cambios',gn:'Jeguata',e:'🧭',palo:'bastos',nom:'los viajes y los cambios',
+  pos:['Para tus cambios anuncia {k}: el camino se abre.','En viajes y mudanzas trae {k}; buena época para moverse.'],
+  neu:['En los cambios aparece {k}: planificá antes de saltar.','Para los viajes habla de {k}; revisá bien cada detalle.'],
+  neg:['En los cambios señala {k}; quizás convenga esperar un poco.','Para moverte marca {k}: no fuerces lo que no fluye.'],
+  cierre:{pos:'El viento sopla a favor: un cambio, un viaje o una mudanza puede traer justo lo que buscás.',
+          mix:'El cambio llega, pero a su ritmo. Prepará la valija sin desesperar.',
+          neg:'Las cartas aconsejan prudencia: no es momento de saltar sin red. Prepará bien el terreno.'},
+  extra:['Escribí en un papel adónde querés estar dentro de un año.','Ordená un cajón: mover cosas chicas mueve energías grandes.','Mirá el atardecer sobre el río y preguntale qué sigue.']},
+ general:{t:'Pregunta general',gn:'Porandu',e:'🔮',palo:null,nom:'tu consulta',
+  pos:['Para tu consulta esto trae {k}: una buena señal.','En lo que preguntás aparece {k}, una energía que empuja hacia adelante.'],
+  neu:['En tu consulta aparece {k}: todavía hay cosas que dependen de vos.','Para lo que preguntás habla de {k}; mirá todos los lados.'],
+  neg:['En tu consulta señala {k}; conviene ir con cuidado.','Para lo que preguntás marca {k}: no es el final, es un aviso.'],
+  cierre:{pos:'La respuesta de las cartas es luminosa: el camino se abre y lo que buscás está más cerca de lo que creés.',
+          mix:'La respuesta es un “sí, pero…”: hay luz al final, aunque el camino pide paciencia y decisiones claras.',
+          neg:'Las cartas piden prudencia: hoy no es el momento de forzar las cosas. Esperá, observá, y la puerta va a aparecer.'},
+  extra:['Esta noche, antes de dormir, hacé tu pregunta en voz baja: la respuesta puede llegar en un sueño.','Prendé una vela y escribí lo que te preocupa; después soltalo.','Prestá atención a las señales de los próximos tres días.']}
+};
+
+/* ---------- tiradas ---------- */
+const TIRADAS = {
+ 1:{n:'Una carta',d:'Mensaje del día',pos:[{n:'Tu mensaje',f:'Para tu consulta'}]},
+ 3:{n:'Tres cartas',d:'Pasado · presente · futuro',pos:[{n:'Pasado',f:'En tu pasado'},{n:'Presente',f:'En tu presente'},{n:'Futuro',f:'Hacia el futuro'}]},
+ 5:{n:'La cruz',d:'Cinco cartas en cruz',pos:[{n:'Tu situación',f:'En el centro de tu situación'},{n:'A tu favor',f:'Como aliada'},{n:'En contra',f:'Como obstáculo'},{n:'El consejo',f:'Como consejo'},{n:'Resultado',f:'Como resultado probable'}]}
+};
+const VERBO = ['aparece','se muestra','sale','se presenta'];
+
+function polaridad(t){ return t.inv ? t.c.q : t.c.p; }
+function banda(v){ return v>0.35 ? 'pos' : v<-0.05 ? 'neg' : 'neu'; }
+
+/* perfil a partir de nombre y fecha */
+function perfil(nombre, d, m, a){
+  const s = signo(d,m), nv = numeroVida(d,m,a), hoy = new Date();
+  const ap = anioPersonal(d,m,hoy.getFullYear());
+  return {nombre:(nombre||'').trim(), d, m, a, signo:s, nv, ap, anio:hoy.getFullYear(),
+    arcSigno:s.arc, arcNum: nv===22?0 : nv>21 ? reducir(nv,false) : nv};
+}
+
+/* ---------- la lectura ---------- */
+function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores){
+  const T = TEMAS[temaId], TI = TIRADAS[tiradaId], M = window.TAROT.MAZO;
+  const nom = pf.nombre;
+  const out = [];   // párrafos (HTML)
+  const saludo = nom
+    ? elige([`${esc(nom)}, Jasy ya iluminó tus cartas.`, `Mba'éichapa, ${esc(nom)}. Las cartas se abrieron para vos.`, `${esc(nom)}, el ñandutí de tu destino empezó a mostrar su dibujo.`])
+    : elige(['Alma curiosa: Jasy ya iluminó tus cartas.', 'Mba\'éichapa. Las cartas se abrieron para vos.', 'El ñandutí de tu destino empezó a mostrar su dibujo.']);
+  const preg = pregunta ? ` Tu pregunta, <i>“${esc(pregunta)}”</i>, quedó flotando sobre la mesa mientras barajábamos.` : '';
+  out.push({cls:'intro', h:`${saludo} Consultaste por <b>${T.t.toLowerCase()}</b> <span class="gn">(${T.gn})</span>.${preg}`});
+
+  const E = ELEM[pf.signo.el];
+  out.push({cls:'astro', h:`Naciste bajo <b>${pf.signo.s}︎ ${pf.signo.n}</b>, signo de ${E.desc}, regido por ${pf.signo.pl}. Llevás en vos ${pf.signo.r}. `
+    + `Tu número de vida es el <b>${pf.nv}</b>, ${NUM[pf.nv]}, y este ${pf.anio} es para vos ${ANIO[pf.ap]}. `
+    + `En ${T.nom}, tu elemento te dice que la clave es ${E.clave}.`});
+
+  // cada carta
+  sacadas.forEach((t,k)=>{
+    const c=t.c, P=TI.pos[k], pol=polaridad(t), b=banda(pol);
+    const kw = elige(t.inv ? c.ki : c.kn);
+    const apl = elige(T[b]).replace('{k}', `<b>${kw}</b>`);
+    const nombreC = `${art(c)}<b class="cn">${c.nombre}</b>${t.inv?' <span class="inv">(invertida)</span>':''}`;
+    let pre = TI.pos.length>1 ? `${P.f} ${elige(VERBO)} ${nombreC}.` : `Para vos ${elige(VERBO)} ${nombreC}.`;
+    out.push({cls:'carta', pos:P.n, id:c.id, h:`${pre} ${t.inv?c.i:c.n} ${apl}`});
+  });
+
+  // síntesis
+  const sint = [];
+  const nMay = sacadas.filter(t=>t.c.mayor).length, nInv = sacadas.filter(t=>t.inv).length, N = sacadas.length;
+  if(soloMayores) sint.push(N>1 ? 'Tiraste solo con los Arcanos Mayores, las cartas del destino: cada una pesa fuerte en tu camino.' : 'Tu carta es un Arcano Mayor, una carta del destino: el mensaje viene con fuerza.');
+  else if(N>1 && nMay >= Math.ceil(N/2)) sint.push(`Que salgan ${nMay} Arcanos Mayores no es casualidad: son fuerzas grandes del destino moviéndose a tu alrededor, y lo que pasa ahora tiene peso para tu camino.`);
+  else if(N>1 && nMay===0) sint.push('No salió ningún Arcano Mayor: la situación está en tus manos y depende de las decisiones de todos los días.');
+  else if(N===1 && nMay===1) sint.push('Que tu única carta sea un Arcano Mayor le da un peso especial: es un mensaje del destino, no de un día cualquiera.');
+  // palo dominante
+  const cuenta = {}; sacadas.forEach(t=>{ if(!t.c.mayor) cuenta[t.c.palo]=(cuenta[t.c.palo]||0)+1; });
+  const dom = Object.keys(cuenta).sort((a,b)=>cuenta[b]-cuenta[a])[0];
+  if(dom && cuenta[dom]>=2){
+    const P = window.TAROT.PALOS[dom], el = PALO_ELEM[dom];
+    let rel = el===pf.signo.el ? `Es tu mismo elemento: las cartas hablan tu idioma, y eso te da ventaja.`
+      : AMIGOS[el]===pf.signo.el ? `Se lleva bien con tu ${pf.signo.el}, así que la energía fluye a tu favor.`
+      : `No es tu elemento (sos de ${pf.signo.el}), así que te toca salir un poco de tu forma de ser habitual.`;
+    sint.push(`Predominan las <b>${P.n}</b>, que representan ${P.desc}. ${rel}`);
+  } else if(T.palo && cuenta[T.palo]){
+    sint.push(`Salieron ${window.TAROT.PALOS[T.palo].n}, el palo que mejor habla de ${T.nom}: las cartas fueron directo al grano.`);
+  }
+  if(N>1 && nInv >= Math.ceil(N/2)) sint.push('Varias cartas salieron invertidas: hay energía trabada que pide paciencia y mirar las cosas con otros ojos.');
+  else if(N>2 && nInv===0) sint.push('Ninguna carta salió invertida: la energía corre derecha y sin vueltas.');
+  // arcanos personales
+  const ids = sacadas.map(t=>t.c.id);
+  const aS = M[pf.arcSigno], aN = M[pf.arcNum];
+  if(ids.includes(aS.id)) sint.push(`¡Salió <b>${aS.nombre}</b>, el arcano de ${pf.signo.n}! Tu signo se metió en la tirada para reforzar el mensaje.`);
+  if(ids.includes(aN.id) && aN.id!==aS.id) sint.push(`¡Salió <b>${aN.nombre}</b>, el arcano de tu número de vida! Eso confirma que esta lectura es muy tuya.`);
+  if(sint.length) out.push({cls:'sint', h:sint.join(' ')});
+
+  // tono general: pesa más el futuro / resultado
+  let tot=0, peso=0;
+  sacadas.forEach((t,k)=>{ const w = (N===3&&k===2)||(N===5&&k===4) ? 1.6 : (N===5&&k===2) ? 0.7 : 1; tot+=polaridad(t)*w; peso+=w; });
+  const tono = tot/peso > 0.3 ? 'pos' : tot/peso < -0.15 ? 'neg' : 'mix';
+  const clave = N===5 ? sacadas[3] : sacadas[N-1];
+  const consejo = clave.c.consejo || elige(T.extra);
+  const numSuerte = ((pf.nv*7 + sacadas.reduce((a,t)=>a+t.c.num,0)) % 90) + 1;
+  out.push({cls:'final', h:`<b>${T.cierre[tono]}</b> ${N===5?'La carta del consejo':'Tu carta clave'}, ${art(clave.c)}${clave.c.nombre}, te susurra: <i>«${consejo}»</i> ${elige(T.extra)}`});
+  out.push({cls:'suerte', h:`Tu número de la suerte: <b>${numSuerte}</b> · Color: <b>${E.color}</b> · Día favorable: <b>${DIAS[pf.signo.pl]}</b> · Piedra: <b>${E.piedra}</b>`});
+  out.push({cls:'despedida', h:elige(['Que Jasy y Kuarahy te acompañen. ¡Jajotopata!','Guardá esta lectura en el corazón y volvé cuando la luna cambie. ¡Jajotopata!','Las cartas muestran caminos, pero quien camina sos vos. ¡Jajotopata!'])});
+
+  return {parrafos:out, tono, resumen:T.cierre[tono], numSuerte};
+}
+function art(c){ return c.mayor ? '' : (c.rango===10||c.rango===12 ? 'la ' : 'el '); }
+function esc(s){ return String(s).replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+
+window.LECTURA = { SIGNOS, TEMAS, TIRADAS, ELEM, perfil, leer, signo, numeroVida, esc };
+})();
