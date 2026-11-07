@@ -328,7 +328,7 @@ async function onDevices() {
 
 /* ---------------- por dónde se escucha ---------------- */
 const canSink = 'setSinkId' in HTMLMediaElement.prototype;
-function applySink(el) { if (canSink && el && cfg.out) el.setSinkId(cfg.out).catch(() => {}); }
+function applySink(el) { if (canSink && el && cfg.out && !TV) el.setSinkId(cfg.out).catch(() => {}); }
 function applySinkAll() {
   S.remote.forEach(r => r.el && (canSink ? r.el.setSinkId(cfg.out || '').catch(() => {}) : 0));
   if (A.ctx && A.ctx.setSinkId) A.ctx.setSinkId(cfg.out || '').catch(() => {});
@@ -747,7 +747,7 @@ async function shareScreen() {
     (l.stream.getVideoTracks()[0] || { getSettings: () => ({}) }).getSettings().displaySurface === 'monitor');
   const opts = audio => ({
     video: { frameRate: { ideal: q.fps, max: q.fps }, width: { ideal: q.w, max: q.w }, height: { ideal: q.h, max: q.h } },
-    audio: audio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false, restrictOwnAudio: true } : false,
+    audio: audio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: tvOn(), restrictOwnAudio: true } : false,
     systemAudio: sysAudioBusy ? 'exclude' : 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
   });
   try {
@@ -1311,12 +1311,31 @@ const tvOn = () => !!(tvOut.win && !tvOut.win.closed);
 function tvStop() {
   try { tvOn() && tvOut.win.close(); } catch (e) {}
   tvOut.win = null;
+  clearInterval(tvOut.iv);
   $('#btnTv').classList.remove('act');
+  tvLocalAudio(false);
+}
+// mientras la tele muestra lo que comparto, su sonido no suena también en la PC (se escucharía doble);
+// a la sala le sigue llegando igual
+async function tvLocalAudio(on) {
+  let ok = true;
+  for (const ls of S.local.values()) {
+    if (ls.kind !== 'screen') continue;
+    for (const t of ls.stream.getAudioTracks()) {
+      try { await t.applyConstraints({ ...t.getConstraints(), suppressLocalAudioPlayback: on }); } catch (e) {}
+      const s = t.getSettings();
+      if (s.suppressLocalAudioPlayback !== undefined && s.suppressLocalAudioPlayback !== on) ok = false;
+    }
+  }
+  if (on && !ok) toast('Lo que ya estabas compartiendo sigue sonando en la PC: para no escucharlo doble, dejá de compartir y compartilo de nuevo.', 9000);
 }
 function tvTab() {
   tvOut.win = window.open(tvUrl(), 'salas-tv');
   if (!tvOut.win) { toast('Chrome bloqueó la ventana nueva: permití las ventanas emergentes para esta página.', 7000); return; }
   $('#btnTv').classList.add('act');
+  tvLocalAudio(true);
+  clearInterval(tvOut.iv);
+  tvOut.iv = setInterval(() => { if (!tvOn()) tvStop(); }, 2000);   // si cerraron la pestaña de la TV, vuelve el sonido a la PC
 }
 $('#btnTv').onclick = e => {
   e.stopPropagation();
