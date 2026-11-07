@@ -193,6 +193,81 @@ const TIRADAS = {
 };
 const VERBO = ['aparece','se muestra','sale','se presenta'];
 
+/* ---------- el mensaje de Jasy: lo que hace distinta a cada lectura ----------
+   Se elige según el tono de las cartas, las cartas que salieron, el tema y el azar. */
+const ARQ = [
+ {id:'alerta', e:'⚠️', t:'Cuidado: algo se acerca', ton:['neg'], cartas:['M15','M16','M18','E3','E5','E7','E9','E10'],
+  v:['Las cartas encienden una luz de alerta: alguien cerca tuyo no es tan sincero como parece. No cuentes tus planes a cualquiera y fijate quién se alegra de verdad con tus logros.',
+     'Se asoma un tropiezo en el camino: un gasto inesperado, una discusión o una noticia que no esperabas. No es para asustarse, es para estar alerta: el que avisa no traiciona.',
+     'Hay una energía pesada dando vueltas a tu alrededor. Cuidá tu salud, tu plata y tus palabras en los próximos días, y no firmes ni prometas nada a las apuradas.',
+     'Jasy ve nubes negras en el horizonte, pero también ve que tenés con qué enfrentarlas. Prestá atención a las señales chicas: ellas avisan antes de la tormenta.']},
+ {id:'proteccion', e:'🛡️', t:'Protegé tu energía', ton:['neg','mix'], cartas:['M15','E8','E9','B9','M9'],
+  v:['Hay envidia rondando. Una ramita de ruda en el bolsillo o en la puerta de tu casa, como hacían las abuelas, y menos detalles de tu vida en las redes.',
+     'Estás dando mucho y recibiendo poco. Aprendé a decir “no” sin culpa: cuidar tu energía también es una forma de quererte.',
+     'Alejate de las personas que solo aparecen para quejarse o pedir. Rodeate de gente que suma y tu suerte va a cambiar sola.']},
+ {id:'amorpropio', e:'💗', t:'El amor empieza en vos', ton:['mix','neg','pos'], temas:['amor','amistad','salud'], cartas:['M3','M8','M14','M17','C1','C9','O9'],
+  v:['Antes de buscar amor afuera, las cartas te piden que lo busques adentro. Mirate al espejo con ternura: nadie te va a querer bien si vos no te querés primero.',
+     'Te pasaste mucho tiempo cuidando a los demás. Ahora toca cuidarte a vos: un paseo sin apuro, tu comida favorita, un rato de silencio. Te lo merecés.',
+     'El corazón que buscás empieza en el tuyo. Cuando te elegís, atraés a quien también te elige. No te conformes con migajas.']},
+ {id:'renacer', e:'🦋', t:'Renacer', ton:['mix','neg'], cartas:['M13','M16','M20','M12','E10','C5'],
+  v:['Algo se termina, y está bien que así sea. Como el lapacho que pierde sus hojas antes de florecer, estás por renacer con más fuerza.',
+     'Un ciclo se cierra para que otro empiece. Lo que hoy duele es la puerta de algo mejor: no la sostengas cerrada con miedo.',
+     'Te estás transformando, aunque todavía no lo veas. Dentro de un tiempo vas a mirar atrás y agradecer este momento.']},
+ {id:'bendicion', e:'🌟', t:'Una bendición en camino', ton:['pos'], cartas:['M19','M17','M21','M10','C10','O10','C1'],
+  v:['Se viene una alegría que no esperabas: una noticia linda, un mensaje, un abrazo. Dejá la puerta abierta y el celular cerca.',
+     'Las estrellas se alinearon a tu favor. Lo que pediste con fe está por llegar, quizás no como lo imaginaste, pero sí como lo necesitás.',
+     'Hay buena suerte acompañándote. Animate a ese paso que venías postergando: ahora el viento sopla a favor.',
+     'Jasy y Kuarahy te sonríen: se acerca un tiempo de alivio, de risas y de cosas que por fin salen bien.']},
+ {id:'abundancia', e:'💰', t:'Abundancia', ton:['pos','mix'], temas:['dinero','estudios'], cartas:['O1','O3','O6','O8','O9','O10','M1','M4'],
+  v:['Las cartas huelen a prosperidad: una entrada de plata, un trabajo nuevo o un negocio que empieza a rendir. Tené tus papeles en orden.',
+     'Tu esfuerzo está por dar frutos. Lo que sembraste con paciencia empieza a crecer: no aflojes justo ahora.',
+     'Alguien va a reconocer lo que valés. Cuando llegue la oportunidad, no te achiques: pedí lo que corresponde.']},
+ {id:'sorpresa', e:'🎲', t:'Una sorpresa', ton:['pos','mix'], cartas:['M0','M10','M7','B8','E6','B3'],
+  v:['Algo inesperado va a mover tu rutina: una invitación, un viaje, una persona nueva. Decí que sí a lo que te dé curiosidad.',
+     'La rueda gira y te toca a vos. Un cambio que no planeaste puede ser justo lo que tu vida pedía.',
+     'Preparate para sorprenderte: lo que parecía trabado se destraba de golpe, y por donde menos lo esperabas.']},
+ {id:'paciencia', e:'⏳', t:'Todavía no: paciencia', ton:['mix','neg'], cartas:['M12','M9','M14','O4','O7','B4','E4'],
+  v:['La semilla ya está plantada, pero todavía está bajo la tierra. No la desentierres para ver si creció: dale tiempo.',
+     'No es un “no”, es un “todavía no”. Lo que esperás llega, pero a su ritmo. Mientras tanto, preparate para recibirlo.',
+     'Bajá un cambio. Forzar las cosas ahora las puede romper; esperar un poco las va a acomodar solas.']},
+ {id:'decision', e:'⚖️', t:'Una decisión importante', ton:['mix'], cartas:['M6','M11','E2','C7','M7'],
+  v:['Estás frente a dos caminos y no podés tomar los dos. Escuchá a tu cabeza, pero decidí con el corazón.',
+     'Hay una decisión que venís postergando. Las cartas dicen que ya es hora: lo que no se decide, se decide solo.',
+     'Pesá bien las cosas, como la balanza de la justicia. La respuesta correcta es la que te deja dormir en paz.']},
+ {id:'soltar', e:'🍃', t:'Soltá lo que pesa', ton:['neg','mix'], cartas:['C5','C8','E3','B10','M13','M9'],
+  v:['Estás cargando algo que ya no te corresponde: un rencor, una culpa o una persona que no suma. Soltalo y vas a respirar distinto.',
+     'Hay un capítulo que ya terminó, aunque te cueste aceptarlo. Darlo vuelta no es olvidar: es dejar lugar para lo nuevo.',
+     'No todo lo que se va es una pérdida. A veces la vida te saca de lugares donde ya no podías crecer.']},
+ {id:'reencuentro', e:'🔄', t:'Alguien vuelve', ton:['pos','mix'], temas:['amor','familia','amistad'], cartas:['C6','C2','C3','M6','C10'],
+  v:['Alguien del pasado va a reaparecer: un mensaje, una visita o un cruce casual. Fijate qué te despierta antes de abrir la puerta.',
+     'Se viene un reencuentro con alguien querido. Puede ser una charla pendiente que por fin se da, con tereré de por medio.',
+     'Un lazo que parecía cortado se vuelve a tejer, como un ñandutí que se arregla hilo por hilo.']},
+ {id:'intuicion', e:'🌙', t:'Escuchá tu intuición', ton:['mix','neg','pos'], cartas:['M2','M18','M17','C7','E8'],
+  v:['Tu intuición está más despierta que nunca. Ese presentimiento que tuviste no es casualidad: hacele caso.',
+     'Prestá atención a tus sueños de estas noches: traen respuestas que la cabeza todavía no entiende.',
+     'No todo lo que te dicen es verdad. Cuando algo no te cierra, confiá en esa vocecita interior.']},
+ {id:'sanacion', e:'🌿', t:'Tiempo de sanar', ton:['mix','pos'], temas:['salud','familia','amor'], cartas:['M14','M17','C6','O4','B6'],
+  v:['Una herida vieja empieza a cerrar. Date permiso para estar bien, aunque todavía duela un poquito.',
+     'Tu cuerpo y tu alma piden descanso. Un yuyo en el tereré, una siesta larga y menos preocupaciones: así empieza a sanar todo.',
+     'Perdonar, aunque sea en silencio, te va a quitar un peso enorme de encima. No es por el otro: es por vos.']},
+ {id:'camino', e:'🧭', t:'Camino abierto', ton:['pos'], temas:['cambios','estudios','dinero'], cartas:['M7','M0','B8','B3','B6','E6'],
+  v:['Se abre un camino que antes estaba cerrado. Es momento de moverse: lo que esperás no va a tocar tu puerta, hay que ir a buscarlo.',
+     'Un viaje, una mudanza o un proyecto nuevo te está llamando. Prepará la valija, aunque sea la del alma.',
+     'Todo empuja hacia adelante. Si estabas por arrancar algo, este es el momento.']}
+];
+function elegirArq(tono, sacadas, temaId){
+  const ids = sacadas.map(t=>t.c.id);
+  const pesos = ARQ.map(a=>{
+    let w = a.ton.includes(tono) ? (a.ton[0]===tono ? 3 : 1.5) : 0.15;
+    if(a.cartas && ids.some(i=>a.cartas.includes(i))) w *= 4;
+    if(a.temas && a.temas.includes(temaId)) w *= 2;
+    return w;
+  });
+  let x = rnd()*pesos.reduce((a,b)=>a+b,0);
+  for(let i=0;i<ARQ.length;i++){ x -= pesos[i]; if(x<=0) return ARQ[i]; }
+  return ARQ[0];
+}
+
 function polaridad(t){ return t.inv ? t.c.q : t.c.p; }
 function banda(v){ return v>0.35 ? 'pos' : v<-0.05 ? 'neg' : 'neu'; }
 
@@ -223,13 +298,18 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
   const nom = pf.nombre;
   const out = [];   // párrafos (HTML)
   const saludo = nom
-    ? elige([`${esc(nom)}, Jasy ya iluminó tus cartas.`, `Mba'éichapa, ${esc(nom)}. Las cartas se abrieron para vos.`, `${esc(nom)}, el ñandutí de tu destino empezó a mostrar su dibujo.`])
-    : elige(['Alma curiosa: Jasy ya iluminó tus cartas.', 'Mba\'éichapa. Las cartas se abrieron para vos.', 'El ñandutí de tu destino empezó a mostrar su dibujo.']);
+    ? elige([`${esc(nom)}, Jasy ya iluminó tus cartas.`, `Mba'éichapa, ${esc(nom)}. Las cartas se abrieron para vos.`, `${esc(nom)}, el ñandutí de tu destino empezó a mostrar su dibujo.`,
+        `${esc(nom)}, la luna bajó a mirar tu mesa y las cartas hablaron.`, `Bienvenida tu alma, ${esc(nom)}: las cartas tienen algo para decirte.`, `${esc(nom)}, entre el humo del palo santo y la luz de Jasy, tus cartas se revelaron.`])
+    : elige(['Alma curiosa: Jasy ya iluminó tus cartas.', 'Mba\'éichapa. Las cartas se abrieron para vos.', 'El ñandutí de tu destino empezó a mostrar su dibujo.',
+        'La luna bajó a mirar tu mesa y las cartas hablaron.', 'Bienvenida tu alma: las cartas tienen algo para decirte.', 'Entre el humo del palo santo y la luz de Jasy, tus cartas se revelaron.']);
   const preg = pregunta ? ` Tu pregunta, <i>“${esc(pregunta)}”</i>, quedó flotando sobre la mesa mientras barajábamos.` : '';
   out.push({cls:'intro', h:`${saludo} Consultaste por <b>${T.t.toLowerCase()}</b> <span class="gn">(${T.gn})</span>${cuandoTxt?` para <b>${cuandoTxt}</b>`:''}.${preg}`});
 
   const E = ELEM[pf.signo.el];
-  out.push({cls:'astro', h:`Naciste bajo <b>${pf.signo.s}︎ ${pf.signo.n}</b>, signo de ${E.desc}, regido por ${pf.signo.pl}. Llevás en vos ${pf.signo.r}. `
+  out.push({cls:'astro', h:elige([
+      `Naciste bajo <b>${pf.signo.s}︎ ${pf.signo.n}</b>, signo de ${E.desc}, regido por ${pf.signo.pl}. Llevás en vos ${pf.signo.r}. `,
+      `Tu signo es <b>${pf.signo.s}︎ ${pf.signo.n}</b>: ${pf.signo.pl} te gobierna y el elemento ${E.desc.replace(/,.*/,'')} corre por tus venas. Por eso tenés ${pf.signo.r}. `,
+      `Las estrellas te marcaron con <b>${pf.signo.s}︎ ${pf.signo.n}</b>, con la fuerza del ${E.desc.replace(/,.*/,'')} y la guía de ${pf.signo.pl}. Tu don es ${pf.signo.r}. `])
     + `Tu número de vida es el <b>${pf.nv}</b>, ${NUM[pf.nv]}, y este ${pf.anio} es para vos ${ANIO[pf.ap]}. `
     + (per==='dia'||per==='semana'||per==='mes' ? `Para ${PR.ese} tu número personal es el <b>${numPlazo(pf,per,fecha)}</b>, que anuncia ${PR.un} ${ENERGIA[numPlazo(pf,per,fecha)]}. ` : '')
     + `En ${T.nom}, tu elemento te dice que la clave es ${E.clave}.`});
@@ -275,18 +355,22 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
   // tono general: pesa más el futuro / resultado
   let tot=0, peso=0;
   sacadas.forEach((t,k)=>{ const w = (N===3&&k===2)||(N===5&&k===4) ? 1.6 : (N===5&&k===2) ? 0.7 : 1; tot+=polaridad(t)*w; peso+=w; });
-  const tono = tot/peso > 0.3 ? 'pos' : tot/peso < -0.15 ? 'neg' : 'mix';
+  const prom = tot/peso + (rnd()-0.5)*0.12;   // un poco de azar para que no siempre caiga igual
+  const tono = prom > 0.38 ? 'pos' : prom < 0.06 ? 'neg' : 'mix';
   const clave = N===5 ? sacadas[3] : sacadas[N-1];
   const consejo = clave.c.consejo || elige(T.extra);
   const numSuerte = ((pf.nv*7 + sacadas.reduce((a,t)=>a+t.c.num,0)) % 90) + 1;
   const cierre = cuandoTxt ? `${cap(cuandoTxt.replace(/^el año /,''))}: ${T.cierre[tono].charAt(0).toLowerCase()+T.cierre[tono].slice(1)}` : T.cierre[tono];
-  out.push({cls:'final', h:`<b>${cierre}</b> ${N===5?'La carta del consejo':'Tu carta clave'}, ${art(clave.c)}${clave.c.nombre}, te susurra: <i>«${consejo}»</i> ${elige(T.extra)}`});
+  const arq = elegirArq(tono, sacadas, temaId), arqTxt = elige(arq.v);
+  out.push({cls:'arq', h:`<span class="pos">${arq.e} El mensaje de Jasy: ${arq.t}</span>${arqTxt}`});
+  out.push({cls:'final', h:`<b>${cierre}</b> ${N===5?'La carta del consejo':'Tu carta clave'}, ${art(clave.c)}${clave.c.nombre}, te susurra: <i>«${consejo}»</i> ${elige(T.extra.filter(e=>e!==consejo))}`});
   out.push({cls:'suerte', h:`Tu número de la suerte: <b>${numSuerte}</b> · Color: <b>${E.color}</b> · ${per==='dia' ? `Hora de suerte: <b>${(numSuerte*7)%12+9} h</b>` : `Día favorable: <b>${DIAS[pf.signo.pl]}</b>`} · Piedra: <b>${E.piedra}</b>`});
-  out.push({cls:'despedida', h:elige(['Que Jasy y Kuarahy te acompañen. ¡Jajotopata!','Guardá esta lectura en el corazón y volvé cuando la luna cambie. ¡Jajotopata!','Las cartas muestran caminos, pero quien camina sos vos. ¡Jajotopata!'])});
+  out.push({cls:'despedida', h:elige(['Que Jasy y Kuarahy te acompañen. ¡Jajotopata!','Guardá esta lectura en el corazón y volvé cuando la luna cambie. ¡Jajotopata!','Las cartas muestran caminos, pero quien camina sos vos. ¡Jajotopata!',
+    'Que el ñandutí de tu destino se teja con hilos de oro. ¡Jajotopata!','Andá en paz, que las estrellas cuidan a quien se anima a preguntar. ¡Jajotopata!','Volvé cuando el corazón te lo pida: la mesa siempre te espera. ¡Jajotopata!'])});
 
   rnd = Math.random;
   return {parrafos:out, tono, resumen:T.cierre[tono], cierre, numSuerte, cuando:cuandoTxt, pos:TI.pos, consejo,
-    color:E.color, clave:N===5?3:N-1};
+    color:E.color, clave:N===5?3:N-1, arq:{e:arq.e, t:arq.t, txt:arqTxt}};
 }
 function art(c){ return c.mayor ? '' : (c.rango===10||c.rango===12 ? 'la ' : 'el '); }
 function esc(s){ return String(s).replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }

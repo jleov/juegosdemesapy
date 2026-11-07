@@ -319,7 +319,7 @@ function linkDe(datos){
 }
 function textoDe(u){
   const {pf, T, r} = u;
-  return `🔮 ${pf.nombre?`La lectura de Tarot de ${pf.nombre}`:'Mi lectura de Tarot'} · ${T.e} ${T.t}${r.cuando?` · ${L.cap(r.cuando)}`:''}\n✨ ${r.resumen}\n\nMirá la lectura completa y tirá tus cartas:`;
+  return `🔮 ${pf.nombre?`La lectura de Tarot de ${pf.nombre}`:'Mi lectura de Tarot'} · ${T.e} ${T.t}${r.cuando?` · ${L.cap(r.cuando)}`:''}\n${r.arq?`${r.arq.e} ${r.arq.t}\n`:''}✨ ${r.resumen}\n\nMirá la lectura completa y tirá tus cartas:`;
 }
 function cargarImg(svg){
   return new Promise((ok,mal)=>{ const im=new Image(); im.onload=()=>ok(im); im.onerror=mal; im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg); });
@@ -360,7 +360,7 @@ async function hacerImagen(u){
   for(const l of partir(x, `${T.e} ${T.t}${r.cuando?` · ${L.cap(r.cuando)}`:''}`, W-160)){ x.fillText(l, W/2, y); y+=46; }
   x.fillStyle=SU; x.font=`500 34px ${COR}`; x.fillText(`${pf.signo.s}︎ ${pf.signo.n} · Nº de vida ${pf.nv}`, W/2, y+2); y+=40;
   // cartas
-  const N=sacadas.length, cw = N===1?380:N===3?300:174, gap = N===5?16:32, ch=cw*1.7;
+  const N=sacadas.length, cw = N===1?350:N===3?290:174, gap = N===5?16:32, ch=cw*1.7;
   const tot = N*cw+(N-1)*gap, x0=(W-tot)/2, top=y+64;
   const ims = await Promise.all(sacadas.map(t=>cargarImg(frenteSVG(t.c)).catch(()=>null)));
   sacadas.forEach((t,k)=>{
@@ -381,18 +381,17 @@ async function hacerImagen(u){
     nm.forEach(l=>{ x.fillText(l, cx+cw/2, ny); ny+=N===5?27:33; });
     if(t.inv){ x.fillStyle='#ff9d8a'; x.font=`italic 500 ${N===5?22:27}px ${COR}`; x.fillText('invertida', cx+cw/2, ny); }
   });
-  // el mensaje, el consejo y la suerte, centrados entre las cartas y el pie
+  // el mensaje de Jasy y la suerte, centrados entre las cartas y el pie
   const ini = top+ch+(N===5?110:120), fin = H-280;
-  x.font=`italic 500 46px ${COR}`;
-  const lin = partir(x, r.cierre, W-220).slice(0, 7);
-  x.font=`500 36px ${COR}`;
-  const con = r.consejo ? partir(x, `«${r.consejo}»`, W-220).slice(0, 3) : [];
-  const alto = lin.length*56+40, total = alto + (con.length ? 30+con.length*44 : 0) + 70;
-  y = ini + Math.max(0, (fin-ini-total)/2) + 50;
+  const tit = r.arq ? `${r.arq.e} ${r.arq.t}` : '', txt = r.arq ? r.arq.txt : r.cierre;
+  x.font=`italic 500 42px ${COR}`;
+  const lin = partir(x, txt, W-220).slice(0, 7);
+  const alto = lin.length*52+40, total = (tit?56:0) + alto + 70;
+  y = ini + Math.max(0, (fin-ini-total)/2) + (tit?56:0) + 46;
+  if(tit){ x.fillStyle=G; x.font=`700 32px ${CIN}`; x.fillText(tit, W/2, y-84); }
   x.fillStyle='rgba(242,193,78,.09)'; x.strokeStyle='rgba(242,193,78,.45)'; x.lineWidth=2;
-  if(x.roundRect){ x.beginPath(); x.roundRect(80, y-60, W-160, alto, 28); x.fill(); x.stroke(); } else { x.fillRect(80, y-60, W-160, alto); x.strokeRect(80, y-60, W-160, alto); }
-  x.fillStyle=GL; x.font=`italic 500 46px ${COR}`; lin.forEach((l,i)=>x.fillText(l, W/2, y+i*56)); y += alto - 10;
-  if(con.length){ y += 30; x.fillStyle='#fff'; x.font=`500 36px ${COR}`; con.forEach(l=>{ x.fillText(l, W/2, y); y+=44; }); }
+  if(x.roundRect){ x.beginPath(); x.roundRect(80, y-56, W-160, alto, 28); x.fill(); x.stroke(); } else { x.fillRect(80, y-56, W-160, alto); x.strokeRect(80, y-56, W-160, alto); }
+  x.fillStyle=GL; x.font=`italic 500 42px ${COR}`; lin.forEach((l,i)=>x.fillText(l, W/2, y+i*52)); y += alto - 10;
   x.fillStyle=SU; x.font=`500 34px ${COR}`;
   x.fillText(`Número de la suerte ${r.numSuerte} · Color ${r.color}`, W/2, y+24);
   // pie

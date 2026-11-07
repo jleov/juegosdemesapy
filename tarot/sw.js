@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Tarot Jasy como app y abrirlo sin conexión.
-const CACHE = 'tarot-v2';
+const CACHE = 'tarot-v3';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './cartas.js', './lectura.js', './juego.js'];
 
 self.addEventListener('install', e => {
