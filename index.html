@@ -330,5 +330,9 @@ if(location.hash==="#panel-dueno") location.replace("dueno/");   // panel del du
 refreshInstall();
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
+<!-- chat de jugadores (botón 💬 abajo a la derecha) -->
+<script src="chat/peerjs.min.js"></script>
+<script src="ice.js"></script>
+<script src="chat/chat.js?v=2"></script>
 </body>
 </html>
