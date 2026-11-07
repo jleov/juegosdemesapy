@@ -223,7 +223,7 @@ async function enterTv() {
   const receiver = !!(navigator.presentation && navigator.presentation.receiver);
   document.body.insertAdjacentHTML('beforeend', `
     <div id="tvBar"><button id="tvVoices"></button><button id="tvFull">⛶ Pantalla completa</button></div>
-    ${receiver ? '' : `<div id="tvHelp">📺 <b>Para verlo en la tele:</b> tocá el menú <b>⋮</b> de Chrome → <b>Transmitir…</b> → elegí tu Chromecast.
+    ${receiver ? '' : `<div id="tvHelp">📺 <b>Para verlo en la tele:</b> tocá el menú <b>⋮</b> de Chrome (arriba a la derecha) → <b>Transmitir, guardar y compartir</b> → <b>Transmitir…</b> → elegí tu Chromecast.
       Si aparece «Fuentes», elegí <b>«Transmitir pestaña»</b>. Así va la imagen y el sonido de lo que se comparte.<br>
       <button class="btn">Entendido</button></div>`}`);
   const paintVoices = () => { $('#tvVoices').textContent = tvVoices.on ? '🔊 Voces de la sala: sí' : '🔇 Voces de la sala: no'; };
@@ -1303,27 +1303,15 @@ $('#btnShare').onclick = shareScreen;
 
 /* ---------------- 📺 mandar a la TV (Chromecast) ----------------
    La vista TV es otra página que entra a la sala solo a mirar: muestra lo compartido con su sonido.
-   Se manda al Chromecast directo (Presentation API de Chrome) o se abre en una pestaña para transmitirla. */
-const tvOut = { conn: null, win: null };
+   Se abre en una pestaña y esa pestaña se transmite con el menú ⋮ → Transmitir… de Chrome
+   (Chrome no ofrece el Chromecast para mandar una página directo desde la página). */
+const tvOut = { win: null };
 const tvUrl = () => new URL(`${location.pathname}?sala=${encodeURIComponent(S.room)}&tv=1&de=${encodeURIComponent(S.name)}`, location.origin).href;
-const tvOn = () => !!((tvOut.conn && tvOut.conn.state !== 'terminated' && tvOut.conn.state !== 'closed') || (tvOut.win && !tvOut.win.closed));
+const tvOn = () => !!(tvOut.win && !tvOut.win.closed);
 function tvStop() {
-  try { tvOut.conn && tvOut.conn.terminate(); } catch (e) {}
-  try { tvOut.win && !tvOut.win.closed && tvOut.win.close(); } catch (e) {}
-  tvOut.conn = tvOut.win = null;
+  try { tvOn() && tvOut.win.close(); } catch (e) {}
+  tvOut.win = null;
   $('#btnTv').classList.remove('act');
-}
-async function tvCast() {
-  try {
-    const conn = await new PresentationRequest([tvUrl()]).start();
-    tvOut.conn = conn;
-    $('#btnTv').classList.add('act');
-    toast('📺 Mandando a la TV. Lo que se comparte en la sala se ve allá con su sonido.', 6000);
-    conn.addEventListener('terminate', () => { if (tvOut.conn === conn) { tvOut.conn = null; $('#btnTv').classList.remove('act'); toast('📺 Se dejó de mandar a la TV.'); } });
-  } catch (e) {
-    if (e && e.name === 'NotAllowedError') return;   // cerró la lista sin elegir
-    toast('Así no se pudo conectar con la TV. Probá con «Abrir vista TV en una pestaña».', 7000);
-  }
 }
 function tvTab() {
   tvOut.win = window.open(tvUrl(), 'salas-tv');
@@ -1335,9 +1323,10 @@ $('#btnTv').onclick = e => {
   const old = $('#tvMenu'); if (old) { old.remove(); return; }
   const m = document.createElement('div'); m.id = 'tvMenu';
   const item = (title, sub, fn) => { const b = document.createElement('button'); b.innerHTML = `${title}<small>${sub}</small>`; b.onclick = () => { m.remove(); fn(); }; m.appendChild(b); };
-  if (tvOn()) item('⏹ Dejar de mandar a la TV', 'Cierra la vista TV.', tvStop);
-  if (window.PresentationRequest) item('📡 Elegir mi Chromecast', 'Lo compartido en la sala se ve en la tele con su sonido.', tvCast);
-  item('🗗 Abrir vista TV en una pestaña', 'Después, en esa pestaña: menú ⋮ → Transmitir… → tu Chromecast.', tvTab);
+  if (tvOn()) {
+    item('🗗 Ir a la vista TV', 'La pestaña que se transmite a la tele.', () => tvOut.win.focus());
+    item('⏹ Dejar de mandar a la TV', 'Cierra la vista TV.', tvStop);
+  } else item('🗗 Abrir vista TV', 'Se abre una pestaña: ahí tocá el menú ⋮ de Chrome → Transmitir… → tu Chromecast.', tvTab);
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', function close(ev) { if (!m.contains(ev.target)) { m.remove(); document.removeEventListener('click', close); } }), 0);
 };
