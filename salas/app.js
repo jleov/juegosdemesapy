@@ -41,6 +41,11 @@ const cfg = Object.assign({
 }, (() => { try { return JSON.parse(localStorage.getItem('salas_cfg') || '{}'); } catch (e) { return {}; } })());
 const saveCfg = () => { try { localStorage.setItem('salas_cfg', JSON.stringify(cfg)); } catch (e) {} };
 
+// vista TV (?tv=1): entra a la sala sin micrófono y muestra solo lo compartido, para mandarla al Chromecast
+const TV = new URLSearchParams(location.search).get('tv') === '1';
+const tvVoices = { on: new URLSearchParams(location.search).get('voces') === '1' };
+const isTvName = n => /^📺/.test(String(n || ''));
+
 /* ---------------- estado ---------------- */
 const S = {
   room: '', name: '', me: null, reg: null, regConn: null, regTimer: 0, left: false,
@@ -84,6 +89,7 @@ function netState(txt, ok) { const n = $('#netState'); n.textContent = txt; n.cl
    PANTALLA DE ENTRADA
    ===================================================================== */
 (function home() {
+  if (TV) { setTimeout(() => enterTv().catch(e => { console.error(e); toast('No se pudo abrir la vista TV: ' + (e && e.message || e), 8000); })); return; }
   const params = new URLSearchParams(location.search);
   let pick = slug(params.get('sala')) || 'general';
   $('#inName').value = cfg.name || '';
@@ -201,6 +207,40 @@ async function enter(name, room) {
   netStart();
   mediaSession();
   sysMsg('Entraste a la sala.');
+}
+
+// la vista TV: no manda nada, solo recibe las pantallas (con su sonido) y, si se quiere, las voces
+async function enterTv() {
+  const p = new URLSearchParams(location.search);
+  S.room = slug(p.get('sala')) || 'general';
+  S.name = ('📺 TV' + (p.get('de') ? ' de ' + String(p.get('de')).trim() : '')).slice(0, 24);
+  S.muted = true;
+  document.body.classList.add('tv');
+  $('#home').classList.add('hidden');
+  $('#room').classList.remove('hidden');
+  document.title = '📺 TV · Salas de Voz';
+  $('#roomName').textContent = 'TV';
+  const receiver = !!(navigator.presentation && navigator.presentation.receiver);
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="tvBar"><button id="tvVoices"></button><button id="tvFull">⛶ Pantalla completa</button></div>
+    ${receiver ? '' : `<div id="tvHelp">📺 <b>Para verlo en la tele:</b> tocá el menú <b>⋮</b> de Chrome → <b>Transmitir…</b> → elegí tu Chromecast.
+      Si aparece «Fuentes», elegí <b>«Transmitir pestaña»</b>. Así va la imagen y el sonido de lo que se comparte.<br>
+      <button class="btn">Entendido</button></div>`}`);
+  const paintVoices = () => { $('#tvVoices').textContent = tvVoices.on ? '🔊 Voces de la sala: sí' : '🔇 Voces de la sala: no'; };
+  paintVoices();
+  $('#tvVoices').onclick = () => { tvVoices.on = !tvVoices.on; paintVoices(); S.remote.forEach(applyVolume); };
+  $('#tvFull').onclick = () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); };
+  if ($('#tvHelp')) $('#tvHelp button').onclick = () => $('#tvHelp').remove();
+  // los botones de arriba se esconden solos; reaparecen al mover el mouse
+  let hideT = 0;
+  const wake = () => { $('#tvBar').classList.remove('hide'); clearTimeout(hideT); hideT = setTimeout(() => $('#tvBar').classList.add('hide'), 3500); };
+  document.addEventListener('pointermove', wake); document.addEventListener('pointerdown', wake); wake();
+  // al tocar en cualquier lado se destraban los videos que el navegador no dejó arrancar con sonido
+  document.addEventListener('pointerdown', () => { document.querySelectorAll('video,audio').forEach(v => v.paused && v.play().catch(() => {})); A.ctx && A.ctx.resume().catch(() => {}); });
+  try { A.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}   // solo para ver quién habla
+  setInterval(talkTick, 120);
+  render();
+  netStart();
 }
 
 /* =====================================================================
@@ -368,7 +408,7 @@ function setDeaf(v) {
 }
 function applyVolume(r) {
   if (!r.el) return;
-  r.el.muted = S.deaf;
+  r.el.muted = S.deaf || (TV && r.kind === 'mic' && !tvVoices.on);
   const v = r.kind === 'mic' ? (cfg.vols[r.peerName || ''] ?? 100) : (r.vol ?? 100);
   r.el.volume = Math.max(0, Math.min(1, v / 100));
 }
@@ -672,7 +712,7 @@ function addRemote(key, call, md, st) {
   const r = { key, peer, sid, kind: md.kind === 'screen' ? 'screen' : 'mic', stream: st, call, label: String(md.label || 'Pantalla').slice(0, 40), hasAudio: !!md.audio, peerName: p && p.name, vol: 100 };
   if (r.kind === 'mic') {
     r.el = new Audio(); r.el.autoplay = true; r.el.srcObject = st; applySink(r.el);
-    r.el.play().catch(() => toast('Tocá la pantalla para escuchar a los demás.'));
+    r.el.play().catch(() => { if (!TV) toast('Tocá la pantalla para escuchar a los demás.'); });
     try { const src = A.ctx.createMediaStreamSource(st); r.an = A.ctx.createAnalyser(); r.an.fftSize = 1024; src.connect(r.an); } catch (e) {}
   } else {
     sysMsg(`${p ? p.name : 'Alguien'} compartió ${r.label.toLowerCase()}.`);
@@ -1038,10 +1078,10 @@ const PEOPLE_TIP = {
   off: 'Personas: ocultas (tocá para ver a todos)',
 };
 function paintPeople() {
-  const list = [{ id: 'me', name: S.name, muted: S.muted }];
-  S.peers.forEach(p => list.push({ id: p.id, name: p.name, muted: p.muted }));
+  const list = TV ? [] : [{ id: 'me', name: S.name, muted: S.muted }];
+  S.peers.forEach(p => { if (!isTvName(p.name)) list.push({ id: p.id, name: p.name, muted: p.muted }); });
   const html = list.map(m => `<div class="pchip${talking.get(m.id) ? ' talk' : ''}" data-talk="${esc(m.id)}">${avatar(m.name, '')}<span>${esc(m.name)}</span>${m.muted ? ICON.micOff : ''}</div>`).join('');
-  const mode = cfg.fsPeople || 'all';
+  const mode = TV ? 'talk' : cfg.fsPeople || 'all';
   document.querySelectorAll('.people').forEach(el => {
     el.className = 'people' + (mode === 'off' ? ' off' : mode === 'talk' ? ' onlytalk' : '');
     el.innerHTML = html;
@@ -1113,8 +1153,8 @@ function renderTiles() {
     (S.hidden.has(r.key) ? hidden : screens).push(s);
   });
   if (S.focus && !screens.some(s => s.key === S.focus)) S.focus = '';
-  const users = [{ id: 'me', name: S.name, muted: S.muted }];
-  S.peers.forEach(p => users.push({ id: p.id, name: p.name, muted: p.muted }));
+  const users = TV ? [] : [{ id: 'me', name: S.name, muted: S.muted }];
+  S.peers.forEach(p => { if (!isTvName(p.name)) users.push({ id: p.id, name: p.name, muted: p.muted }); });
 
   const mk = s => {
     // si el cuadro no cambió se reutiliza tal cual (así el video no parpadea)
@@ -1133,6 +1173,8 @@ function renderTiles() {
     main.forEach(s => big.appendChild(mk(s)));
     screens.filter(s => !main.includes(s)).forEach(s => strip.appendChild(mk(s)));
     users.forEach(u => strip.appendChild(userTile(u.id, u.name, u.muted)));
+  } else if (TV) {
+    big.innerHTML = `<div id="tvWait"><b>📺 Sala de Voz</b>${S.peers.size ? 'Esperando que alguien comparta pantalla…' : 'Conectando con la sala…'}</div>`;
   } else {
     users.forEach(u => big.appendChild(userTile(u.id, u.name, u.muted)));
   }
@@ -1258,6 +1300,47 @@ $('#setSubSize').onchange = e => { cfg.subSize = e.target.value; saveCfg(); docu
 $('#btnMic').onclick = () => { if (S.deaf) setDeaf(false); else setMuted(!S.muted); };
 $('#btnDeaf').onclick = () => setDeaf(!S.deaf);
 $('#btnShare').onclick = shareScreen;
+
+/* ---------------- 📺 mandar a la TV (Chromecast) ----------------
+   La vista TV es otra página que entra a la sala solo a mirar: muestra lo compartido con su sonido.
+   Se manda al Chromecast directo (Presentation API de Chrome) o se abre en una pestaña para transmitirla. */
+const tvOut = { conn: null, win: null };
+const tvUrl = () => new URL(`${location.pathname}?sala=${encodeURIComponent(S.room)}&tv=1&de=${encodeURIComponent(S.name)}`, location.origin).href;
+const tvOn = () => !!((tvOut.conn && tvOut.conn.state !== 'terminated' && tvOut.conn.state !== 'closed') || (tvOut.win && !tvOut.win.closed));
+function tvStop() {
+  try { tvOut.conn && tvOut.conn.terminate(); } catch (e) {}
+  try { tvOut.win && !tvOut.win.closed && tvOut.win.close(); } catch (e) {}
+  tvOut.conn = tvOut.win = null;
+  $('#btnTv').classList.remove('act');
+}
+async function tvCast() {
+  try {
+    const conn = await new PresentationRequest([tvUrl()]).start();
+    tvOut.conn = conn;
+    $('#btnTv').classList.add('act');
+    toast('📺 Mandando a la TV. Lo que se comparte en la sala se ve allá con su sonido.', 6000);
+    conn.addEventListener('terminate', () => { if (tvOut.conn === conn) { tvOut.conn = null; $('#btnTv').classList.remove('act'); toast('📺 Se dejó de mandar a la TV.'); } });
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError') return;   // cerró la lista sin elegir
+    toast('Así no se pudo conectar con la TV. Probá con «Abrir vista TV en una pestaña».', 7000);
+  }
+}
+function tvTab() {
+  tvOut.win = window.open(tvUrl(), 'salas-tv');
+  if (!tvOut.win) { toast('Chrome bloqueó la ventana nueva: permití las ventanas emergentes para esta página.', 7000); return; }
+  $('#btnTv').classList.add('act');
+}
+$('#btnTv').onclick = e => {
+  e.stopPropagation();
+  const old = $('#tvMenu'); if (old) { old.remove(); return; }
+  const m = document.createElement('div'); m.id = 'tvMenu';
+  const item = (title, sub, fn) => { const b = document.createElement('button'); b.innerHTML = `${title}<small>${sub}</small>`; b.onclick = () => { m.remove(); fn(); }; m.appendChild(b); };
+  if (tvOn()) item('⏹ Dejar de mandar a la TV', 'Cierra la vista TV.', tvStop);
+  if (window.PresentationRequest) item('📡 Elegir mi Chromecast', 'Lo compartido en la sala se ve en la tele con su sonido.', tvCast);
+  item('🗗 Abrir vista TV en una pestaña', 'Después, en esa pestaña: menú ⋮ → Transmitir… → tu Chromecast.', tvTab);
+  document.body.appendChild(m);
+  setTimeout(() => document.addEventListener('click', function close(ev) { if (!m.contains(ev.target)) { m.remove(); document.removeEventListener('click', close); } }), 0);
+};
 $('#btnSet').onclick = openSettings;
 $('#btnSide').onclick = () => $('#side').classList.toggle('open');
 const toggleChat = show => {
@@ -1282,6 +1365,7 @@ $('#btnInvite').onclick = async () => {
 $('#btnLeave').onclick = () => {
   S.left = true;
   S.local.forEach(ls => { if (ls.kind === 'screen') stopShare(ls.sid); });
+  tvStop();
   try { S.me && S.me.destroy(); } catch (e) {}
   try { S.reg && (clearInterval(S.reg._iv), S.reg.destroy()); } catch (e) {}
   location.href = location.pathname + '?sala=' + S.room;
@@ -1372,6 +1456,7 @@ window.INICIO = {
   salir() {
     S.left = true;
     S.local.forEach(ls => { if (ls.kind === 'screen') stopShare(ls.sid); });
+    tvStop();
     try { S.me && S.me.destroy(); } catch (e) {}
     try { S.reg && (clearInterval(S.reg._iv), S.reg.destroy()); } catch (e) {}
   },

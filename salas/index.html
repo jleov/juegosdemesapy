@@ -197,6 +197,27 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
   .cb{width:44px;height:44px}
 }
 @media (min-width:901px){ #btnSide{display:none} }
+
+/* 📺 mandar a la TV: menú en la sala y la vista limpia que se transmite */
+#tvMenu{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;width:min(360px,calc(100% - 32px));box-shadow:0 8px 28px #000a}
+#tvMenu button{text-align:left;background:var(--panel2);border:0;color:var(--text);border-radius:8px;padding:10px 12px;font:inherit;cursor:pointer}
+#tvMenu button:hover{background:var(--hover)}
+#tvMenu small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+#btnTv.act{color:var(--green)}
+body.tv #room{grid-template-columns:1fr}
+body.tv #inicioBtn,body.tv #inicioTip,body.tv #esquina,body.tv #side,body.tv #bar,body.tv #strip,body.tv #chat,body.tv #update,body.tv .tile .tools,body.tv .tile .badge,body.tv .tile .tag{display:none!important}
+body.tv #stage{padding:0}
+body.tv #big{gap:2px}
+body.tv .tile{border-radius:0}
+body.tv .tile .people{display:flex}
+body.tv,body.tv #main{background:#000}
+#tvWait{color:#aaa;font-size:22px;text-align:center;align-self:center;justify-self:center;padding:20px}
+#tvWait b{display:block;font-size:32px;color:#fff;margin-bottom:8px}
+#tvBar{position:fixed;top:10px;right:10px;z-index:50;display:flex;gap:8px;transition:opacity .4s}
+#tvBar.hide{opacity:0;pointer-events:none}
+#tvBar button{background:#000a;color:#fff;border:1px solid #fff3;border-radius:20px;padding:8px 14px;font:inherit;cursor:pointer}
+#tvHelp{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:50;background:#111214f2;color:#fff;border-radius:12px;padding:14px 16px;width:max-content;max-width:min(560px,calc(100% - 32px));font-size:15px;line-height:1.45;box-shadow:0 8px 28px #000a}
+#tvHelp button{margin-top:10px}
 </style>
 </head>
 <body>
@@ -249,6 +270,7 @@ dialog footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;ba
       <button class="cb" id="btnMic" data-tip="Silenciar (M)"></button>
       <button class="cb" id="btnDeaf" data-tip="Ensordecer"></button>
       <button class="cb" id="btnShare" data-tip="Compartir pantalla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M12 7v6M9 10l3-3 3 3"/></svg><span class="count hidden" id="shareCount"></span></button>
+      <button class="cb" id="btnTv" data-tip="Mandar a la TV (Chromecast)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M6 13a3 3 0 0 1 3 3M6 10a6 6 0 0 1 6 6"/></svg></button>
       <button class="cb" id="btnSet" data-tip="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
       <button class="cb" id="btnChat" data-tip="Chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="count hidden" id="unread"></span></button>
       <button class="cb red" id="btnLeave" data-tip="Salir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.7 13.3a16 16 0 0 0 3.4 2.6l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2V20a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3.2a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.4 2.1L8.1 9.6"/><path d="M22 2 2 22"/></svg></button>
