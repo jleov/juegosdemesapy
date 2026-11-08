@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- SEO (buscadores y vista previa al compartir) -->
+<title>Versículo del Día: tu versículo de la Biblia para hoy, la semana, el mes o el año | Juegos PY</title>
+<meta name="description" content="Recibí el versículo del día o pedí el tuyo: abrí la Biblia, dejá que se hojee sola y descubrí una palabra de fortaleza, paz, amor, familia, trabajo, salud, esperanza o un Salmo, con una reflexión corta para compartir en tu estado.">
+<link rel="canonical" href="https://juegospy.com/versiculo/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Juegos Paraguay Digitales">
+<meta property="og:title" content="Versículo del Día: tu versículo de la Biblia | Juegos PY">
+<meta property="og:description" content="Abrí la Biblia y recibí tu versículo para hoy, la semana, el mes o el año, con una reflexión corta para compartir.">
+<meta property="og:url" content="https://juegospy.com/versiculo/">
+<meta property="og:image" content="https://juegospy.com/versiculo/icon-512.png">
+<meta property="og:locale" content="es_PY">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Versículo del Día", "url": "https://juegospy.com/versiculo/", "description": "Versículo de la Biblia del día y versículos personales por tema y plazo, con reflexión corta e imagen para compartir. Texto de la Reina-Valera 1909 (dominio público).", "image": "https://juegospy.com/versiculo/icon-512.png", "inLanguage": "es", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "jleovgames", "url": "https://juegospy.com/"}, "isPartOf": {"@type": "WebSite", "name": "Juegos Paraguay Digitales", "url": "https://juegospy.com/"}, "applicationCategory": "LifestyleApplication", "operatingSystem": "Cualquiera (navegador)"}</script>
+<!-- /SEO -->
+<meta name="theme-color" content="#14182e">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&display=swap" rel="stylesheet">
+<style>
+:root{--g:#e9c46a;--gl:#fff0c2;--noche:#14182e;--txt:#f4ecdc;--suave:#c9bda6;--papel:#f6edd6;--papel2:#e8d9b5;--tinta:#4a3520}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(ellipse at 50% -12%,#7a5a2e 0%,#3a2f45 30%,#191c35 62%,#0b0d1c 100%) fixed;color:var(--txt);
+  font-family:"Cormorant Garamond",Georgia,serif;font-size:18px;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+#cielo{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+#app{position:relative;z-index:1;max-width:720px;margin:0 auto;min-height:calc(100vh - 70px);min-height:calc(100dvh - 70px);padding:max(14px,env(safe-area-inset-top)) 16px 20px}
+.pant{display:none}.pant.on{display:block;animation:aparece .7s ease}
+@keyframes aparece{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+h1,h2,h3{font-family:Cinzel,Georgia,serif;font-weight:700}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+.oculto{display:none!important}
+/* ---------- portada ---------- */
+.logo{text-align:center;margin:34px 0 10px}
+.logo svg{width:96px;height:72px;filter:drop-shadow(0 0 18px rgba(233,196,106,.5));animation:flota 6s ease-in-out infinite}
+@keyframes flota{50%{transform:translateY(-5px)}}
+.logo h1{margin:6px 0 0;font-size:clamp(28px,8vw,46px);letter-spacing:3px;color:var(--gl);text-shadow:0 0 22px rgba(233,196,106,.45)}
+.logo p{margin:4px 0 0;color:var(--suave);font-style:italic;font-size:19px}
+.box{background:rgba(22,24,48,.72);border:1px solid rgba(233,196,106,.32);border-radius:18px;padding:18px 16px;margin:14px 0;
+  box-shadow:0 10px 40px rgba(0,0,0,.4),inset 0 0 30px rgba(233,196,106,.06);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.box h3{margin:0 0 10px;font-size:15px;letter-spacing:2px;color:var(--g);text-transform:uppercase}
+label.l{display:block;font-family:Cinzel,serif;font-size:12px;letter-spacing:1.5px;color:var(--suave);margin:14px 0 6px;text-transform:uppercase}
+input[type=text]{width:100%;padding:11px 12px;border-radius:12px;border:1px solid rgba(233,196,106,.35);background:rgba(8,9,22,.7);color:var(--txt);font:inherit;font-size:18px;outline:none}
+input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(233,196,106,.18)}
+/* versículo del día */
+#dia{position:relative;overflow:hidden;background:linear-gradient(160deg,rgba(246,237,214,.97),rgba(232,217,181,.97));color:var(--tinta);border:0;
+  box-shadow:0 14px 40px rgba(0,0,0,.45),0 0 0 1px rgba(233,196,106,.6),0 0 40px rgba(233,196,106,.18)}
+#dia:before{content:"";position:absolute;inset:8px;border:1px solid rgba(140,100,40,.3);border-radius:12px;pointer-events:none}
+#dia h3{color:#8a6420;text-align:center}
+#dia .fec{text-align:center;font-style:italic;color:#7d6544;margin:-6px 0 10px;font-size:16px}
+#dia blockquote{margin:0 4px;font-size:clamp(20px,5.2vw,24px);line-height:1.38;font-style:italic;font-weight:600;text-align:center}
+#dia blockquote:before{content:"“";color:#b78a2e}#dia blockquote:after{content:"”";color:#b78a2e}
+#dia .cita{text-align:center;font-family:Cinzel,serif;font-weight:700;color:#8a6420;letter-spacing:1px;margin:10px 0 2px;font-size:16px}
+#dia .refl{text-align:center;font-size:17px;color:#5d4a33;margin:10px 6px 0;line-height:1.35}
+#dia .acciones{margin:14px 0 2px}
+#dia .btn.sec{background:rgba(255,255,255,.4);color:#6b4c1a;border-color:rgba(138,100,32,.45)}
+.plazos{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.opt{background:rgba(8,9,22,.6);border:1px solid rgba(233,196,106,.25);border-radius:14px;padding:10px 3px 8px;color:var(--txt);text-align:center;transition:.2s}
+.opt .e{display:block;font-size:22px;line-height:1.2}
+.opt b{display:block;font-family:Cinzel,serif;font-size:12px;letter-spacing:.3px;margin-top:3px}
+.opt.sel{border-color:var(--g);background:linear-gradient(160deg,rgba(233,196,106,.28),rgba(120,80,40,.3));box-shadow:0 0 16px rgba(233,196,106,.32);transform:translateY(-2px)}
+.temas{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.temas .opt b{font-size:11px}
+#vistaPlazo{margin-top:8px;text-align:center;color:var(--suave);font-style:italic;font-size:16px;min-height:22px}
+.btn{display:inline-block;border:0;border-radius:40px;padding:14px 22px;font-family:Cinzel,serif;font-weight:700;letter-spacing:1.3px;font-size:15px;
+  color:#3a250a;background:linear-gradient(180deg,#fff0c2,#e9c46a 55%,#b98a32);box-shadow:0 6px 22px rgba(233,196,106,.32),inset 0 1px 0 #fff8;text-align:center}
+.btn:active{transform:scale(.97)}
+.btn.sec{background:rgba(22,24,48,.8);color:var(--gl);border:1px solid rgba(233,196,106,.55);box-shadow:none}
+.btn.wide{display:block;width:100%}
+.btn.brilla{animation:brilla 2s ease-in-out infinite}
+@keyframes brilla{50%{box-shadow:0 0 34px rgba(233,196,106,.7),inset 0 1px 0 #fff8}}
+.acciones{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.acciones .btn{font-size:13.5px;padding:12px 16px}
+#btnSnd{position:absolute;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));width:40px;height:40px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.55);background:rgba(15,14,30,.72);color:#fff;font-size:18px;padding:0;z-index:5}
+/* ---------- la Biblia ---------- */
+#cab{text-align:center;margin:50px 0 0}
+#cab h2{margin:0;color:var(--gl);font-size:clamp(19px,5.6vw,26px);letter-spacing:1.5px}
+#cab p{margin:3px 0 0;color:var(--suave);font-style:italic}
+#msg{text-align:center;font-family:Cinzel,serif;color:var(--gl);font-size:clamp(14px,4vw,18px);letter-spacing:.8px;min-height:50px;
+  display:flex;align-items:center;justify-content:center;margin:8px 0 4px;text-shadow:0 0 12px rgba(233,196,106,.4);padding:0 8px;transition:opacity .4s}
+#escena{position:relative;width:min(94vw,600px);margin:0 auto;padding:10px 0 26px;user-select:none;-webkit-user-select:none;touch-action:none}
+#halo{position:absolute;left:50%;top:46%;width:130%;height:150%;transform:translate(-50%,-50%);pointer-events:none;
+  background:radial-gradient(ellipse at center,rgba(255,226,150,.32),rgba(255,226,150,0) 60%);opacity:.6;transition:opacity 1s}
+#escena.luz #halo{opacity:1;animation:late 3s ease-in-out infinite}
+@keyframes late{50%{opacity:.75}}
+#libro{position:relative;width:100%;aspect-ratio:1.5/1;perspective:1600px;cursor:grab;transform:rotateX(8deg);transform-style:preserve-3d}
+#libro:active{cursor:grabbing}
+/* tapa (debajo de las páginas) */
+#libro .tapa{position:absolute;inset:-2.2% -2.6% -4.5%;border-radius:10px 10px 14px 14px;background:linear-gradient(90deg,#3d1d12,#5e2d1b 48%,#2a120a 50%,#5e2d1b 52%,#3d1d12);
+  box-shadow:0 22px 40px rgba(0,0,0,.6),inset 0 0 0 2px rgba(233,196,106,.35)}
+/* bloque de hojas: se ve el canto */
+#libro .canto{position:absolute;left:1%;right:1%;bottom:-2.6%;height:5%;background:repeating-linear-gradient(180deg,#e9dcb8 0 1px,#cbb68a 1px 2px);border-radius:0 0 6px 6px}
+.pag{position:absolute;top:0;bottom:0;width:50%;overflow:hidden;background-color:var(--papel)}
+.pag.izq{left:0;border-radius:6px 2px 2px 6px;background-image:linear-gradient(90deg,rgba(120,90,40,.06),rgba(0,0,0,0) 70%,rgba(90,60,20,.28))}
+.pag.der{right:0;border-radius:2px 6px 6px 2px;background-image:linear-gradient(270deg,rgba(120,90,40,.06),rgba(0,0,0,0) 70%,rgba(90,60,20,.28))}
+/* "texto" falso de la página */
+.lineas{position:absolute;inset:11% 12% 10%;display:flex;flex-direction:column;gap:0}
+.lineas .tit{font-family:Cinzel,serif;font-size:clamp(8px,2.2vw,13px);color:#8a6420;text-align:center;letter-spacing:1px;margin-bottom:5%}
+.lineas .col{flex:1;background:repeating-linear-gradient(180deg,rgba(74,53,32,.42) 0 1.5px,transparent 1.5px 9px);
+  -webkit-mask-image:linear-gradient(90deg,#000 0 82%,rgba(0,0,0,.6) 100%);mask-image:linear-gradient(90deg,#000 0 82%,rgba(0,0,0,.6) 100%);opacity:.55}
+.pag .num{position:absolute;bottom:4.5%;font-size:clamp(8px,2vw,12px);color:#8a7350}
+.pag.izq .num{left:9%}.pag.der .num{right:9%}
+/* la hoja que pasa */
+.hoja{position:absolute;top:0;bottom:0;left:50%;width:50%;transform-origin:0 50%;transform-style:preserve-3d;pointer-events:none;will-change:transform}
+.hoja .f,.hoja .d{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--papel);overflow:hidden}
+.hoja .f{border-radius:2px 6px 6px 2px;background-image:linear-gradient(270deg,rgba(120,90,40,.06),rgba(0,0,0,0) 70%,rgba(90,60,20,.25))}
+.hoja .d{transform:rotateY(180deg);border-radius:6px 2px 2px 6px;background-image:linear-gradient(90deg,rgba(120,90,40,.06),rgba(0,0,0,0) 70%,rgba(90,60,20,.25))}
+.hoja .sombra{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.25),rgba(0,0,0,0));opacity:0;pointer-events:none}
+/* el versículo en la página */
+.verso{position:absolute;inset:9% 10% 9%;display:flex;flex-direction:column;justify-content:center;color:var(--tinta);text-align:center}
+.verso .ref{font-family:Cinzel,serif;font-weight:700;font-size:clamp(9px,2.6vw,15px);color:#8a6420;letter-spacing:.5px;margin-bottom:6%}
+.verso .tx{font-size:clamp(10.5px,2.9vw,17px);line-height:1.3;font-style:italic;font-weight:600;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden}
+.verso mark{color:inherit;background:linear-gradient(transparent 52%,rgba(255,206,84,.75) 52%,rgba(255,206,84,.75) 92%,transparent 92%) no-repeat 0 0/0% 100%;
+  transition:background-size 1.6s ease .3s;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.verso.ve mark{background-size:100% 100%}
+.cinta{position:absolute;left:50%;top:-3%;width:3.2%;height:42%;margin-left:-1.6%;background:linear-gradient(90deg,#8c1d1d,#c0392b 50%,#8c1d1d);
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 88%,0 100%);transform-origin:50% 0;opacity:.9;transition:transform .9s cubic-bezier(.3,1.6,.5,1)}
+#escena.fin .cinta{transform:translateX(-260%) rotate(7deg)}
+#gesto{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);font-size:14px;color:var(--suave);font-style:italic;white-space:nowrap;pointer-events:none;transition:opacity .4s}
+#medidor{position:absolute;left:12%;right:12%;bottom:6px;height:5px;border-radius:5px;background:rgba(255,255,255,.12);overflow:hidden;opacity:0;transition:opacity .3s}
+#medidor i{display:block;height:100%;width:0;background:linear-gradient(90deg,#b98a32,#fff0c2);border-radius:5px}
+#escena.apretando #medidor{opacity:1}
+.chispa{position:absolute;width:6px;height:6px;border-radius:50%;background:var(--gl);box-shadow:0 0 8px 2px var(--g);pointer-events:none;z-index:60}
+/* resultado */
+#res{margin-top:6px}
+#res .box{padding:22px 18px 18px}
+#res .tema{text-align:center;font-family:Cinzel,serif;font-size:12.5px;letter-spacing:2px;color:var(--g);text-transform:uppercase;margin-bottom:10px}
+#res blockquote{margin:0;font-size:clamp(21px,5.6vw,27px);line-height:1.4;font-style:italic;font-weight:600;color:var(--gl);text-align:center;text-shadow:0 0 18px rgba(233,196,106,.2)}
+#res blockquote:before{content:"“";color:var(--g)}#res blockquote:after{content:"”";color:var(--g)}
+#res .cita{text-align:center;font-family:Cinzel,serif;font-weight:700;color:var(--g);letter-spacing:1px;margin:12px 0 0;font-size:17px}
+#res .sep{text-align:center;color:var(--g);letter-spacing:8px;margin:16px 0 10px;opacity:.7}
+#res .refl p{margin:0 0 12px;font-size:19px;line-height:1.5}
+#res .refl p.ora{background:rgba(233,196,106,.08);border:1px solid rgba(233,196,106,.28);border-radius:12px;padding:12px 14px;font-style:italic}
+#res .refl p.ora b{display:block;font-style:normal;font-family:Cinzel,serif;font-size:12px;letter-spacing:1.5px;color:var(--g);margin-bottom:4px}
+#res .anim{opacity:0;transform:translateY(8px);transition:opacity .9s,transform .9s}
+#res .anim.ve{opacity:1;transform:none}
+/* modal */
+#modal{position:fixed;inset:0;z-index:9500;background:rgba(6,6,16,.86);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+#modal.on{display:flex;animation:aparece .3s}
+#modal .in{max-width:420px;width:100%;max-height:92vh;overflow:auto;text-align:center}
+#modal h3{margin:0 0 10px;color:var(--gl);font-size:22px}
+#modal .prev{display:block;width:min(60vw,240px);margin:0 auto 12px;border-radius:12px;box-shadow:0 0 30px rgba(233,196,106,.35);aspect-ratio:9/16;background:#1a1c34}
+#modal p{margin:8px 0;line-height:1.4}
+#modal .otra{color:var(--suave);font-size:16px}
+#toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#1d1f3a;border:1px solid var(--g);color:var(--gl);padding:10px 18px;border-radius:30px;z-index:9600;opacity:0;transition:opacity .3s;pointer-events:none;font-size:16px;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+#aviso{position:relative;z-index:1;text-align:center;font-family:system-ui,sans-serif;font-size:9.5px;line-height:1.4;color:rgba(210,200,180,.36);
+  max-width:520px;margin:18px auto 0;padding:0 16px max(14px,env(safe-area-inset-bottom))}
+@media (max-width:420px){.temas{gap:5px}.temas .opt b{font-size:9.6px}.opt .e{font-size:20px}.plazos .opt b{font-size:11px}#res .refl p{font-size:18px}}
+@media (min-width:700px){.temas{grid-template-columns:repeat(6,1fr)}}
+@media (prefers-reduced-motion:reduce){.logo svg{animation:none}#escena.luz #halo{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="cielo"></canvas>
+<button id="btnSnd" title="Música" aria-label="Música">🎵</button>
+<div id="app">
+
+<!-- ===================== portada ===================== -->
+<section id="pInicio" class="pant on">
+  <div class="logo">
+    <svg viewBox="0 0 120 90" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6d6"/><stop offset="1" stop-color="#e9c46a"/></linearGradient></defs>
+      <g fill="none" stroke="#e9c46a" stroke-width="1.2" opacity=".7"><path d="M60 10v-8M42 14l-4-7M78 14l4-7M28 24l-7-4M92 24l7-4"/></g>
+      <path d="M60 34C48 26 26 24 10 28v46c16-4 38-2 50 6 12-8 34-10 50-6V28c-16-4-38-2-50 6z" fill="url(#lg)"/>
+      <path d="M60 34v46" stroke="#8a6420" stroke-width="1.6"/>
+      <g stroke="#8a6420" stroke-width="1.1" opacity=".55"><path d="M18 40c10-2 24-1 34 3M18 48c10-2 24-1 34 3M18 56c10-2 24-1 34 3M18 64c10-2 24-1 34 3M68 43c10-4 24-5 34-3M68 51c10-4 24-5 34-3M68 59c10-4 24-5 34-3M68 67c10-4 24-5 34-3"/></g></svg>
+    <h1>VERSÍCULO DEL DÍA</h1>
+    <p>Una palabra de la Biblia para vos</p>
+  </div>
+
+  <div class="box" id="dia"></div>
+
+  <div class="box">
+    <h3>✦ Pedí tu versículo</h3>
+    <label class="l" for="fNombre">¿Para quién es? (opcional)</label>
+    <input type="text" id="fNombre" maxlength="30" autocomplete="given-name" placeholder="Tu nombre o el de alguien querido">
+    <label class="l">¿Para cuándo?</label>
+    <div class="plazos" id="plazos"></div>
+    <div id="vistaPlazo"></div>
+    <label class="l">¿Sobre qué? (opcional)</label>
+    <div class="temas" id="temas"></div>
+  </div>
+
+  <button class="btn wide brilla" id="btnAbrir">📖 Abrir la Biblia</button>
+</section>
+
+<!-- ===================== la Biblia ===================== -->
+<section id="pBiblia" class="pant">
+  <div id="cab"></div>
+  <div id="msg"></div>
+  <div id="escena">
+    <div id="halo"></div>
+    <div id="libro" role="button" tabindex="0" aria-label="Biblia abierta: mantené apretado y soltá para hojearla">
+      <div class="tapa"></div>
+      <div class="canto"></div>
+      <div class="pag izq" id="pIzq"></div>
+      <div class="pag der" id="pDer"></div>
+      <div class="cinta"></div>
+    </div>
+    <div id="medidor"><i></i></div>
+    <div id="gesto"></div>
+  </div>
+  <div id="res"></div>
+  <div class="acciones oculto" id="finBtns">
+    <button class="btn" id="btnCompartir">📤 Compartir</button>
+    <button class="btn sec" id="btnCopiar">📋 Copiar texto</button>
+    <button class="btn sec" id="btnOtra">📖 Otra vez</button>
+    <button class="btn sec" id="btnVolver">✎ Cambiar</button>
+  </div>
+  <div class="acciones oculto" id="verBtns">
+    <button class="btn brilla" id="btnMio">📖 Quiero mi propio versículo</button>
+  </div>
+</section>
+</div>
+
+<div id="modal"><div class="in" id="modalIn"></div></div>
+<div id="toast"></div>
+
+<footer id="aviso">Textos bíblicos de la traducción Reina-Valera 1909, de dominio público, con la ortografía actualizada. Los versículos se eligen al azar y las reflexiones son breves palabras de aliento, no la enseñanza de ninguna iglesia en particular.</footer>
+
+<script src="versiculos.js?v=1"></script>
+<script src="app.js?v=1"></script>
+<script>window.INICIO={sonidos:['#btnSnd']};</script>
+<script src="../inicio.js?v=2"></script>
+</body>
+</html>
