@@ -76,5 +76,10 @@
   window.DuenoLink = {
     start(cfg){ L.cfg=cfg; setTimeout(tick, 1500); },
     report(){ send(); },   // para avisar enseguida un cambio importante
+    info(){ return info(); },                  // la sala de este aparato (la usa chat/invitar.js)
+    juego(){ return L.cfg && L.cfg.game; },
   };
+  // botón para invitar al chat global de la portada (chat/invitar.js, al lado de este archivo)
+  try{ const yo=document.currentScript && document.currentScript.src;
+    if(yo){ const sc=document.createElement('script'); sc.src=new URL('chat/invitar.js', yo).href; sc.async=true; (document.head||document.documentElement).appendChild(sc); } }catch(e){}
 })();

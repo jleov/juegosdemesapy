@@ -127,6 +127,7 @@
     cl.visto = Date.now();
     if(d.t === 'hola' || d.t === 'nom'){
       if(d.t === 'hola' && typeof d.dv === 'string') cl.dv = d.dv.slice(0, 40);
+      if(d.t === 'hola' && d.oculto) cl.oculto = true;   // un juego que solo viene a dejar una invitación: no se muestra en la lista
       const ban = cl.dv && bans.find(b => b.d === cl.dv && b.h > Date.now());
       if(ban){ try{ cl.c.send({ t:'echado', h:ban.h }); }catch(e){} setTimeout(() => { try{ cl.c.close(); }catch(e){} }, 400); R.clientes.delete(id); return; }
       let n = limpiaNom(d.n);
@@ -138,6 +139,9 @@
     } else if(d.t === 'msg'){
       if(!cl.n) return;
       hubMensaje(id, cl.n, d.x, cl);
+    } else if(d.t === 'inv'){
+      if(!cl.n) return;
+      hubInvitar(id, cl.n, { g:String(d.g || ''), c:String(d.c || '') }, cl);
     } else if(d.t === 'dueno' && cl.no && typeof d.sig === 'string'){
       const no = cl.no; cl.no = null;
       if(await verificar(no, d.sig)){ cl.dueno = true; try{ cl.c.send({ t:'eresDueno' }); }catch(e){} avisarGente(); }
@@ -173,6 +177,20 @@
     difundir({ t:'msg', m });
     return true;
   }
+  // invitación de un juego: una por minuto por persona, y la misma sala solo una vez cada 2 minutos
+  function hubInvitar(id, n, v, cl){
+    const no = x => { try{ cl.c.send({ t:'aviso', x }); }catch(e){} };
+    if(!okInv(v)) return no('Esa sala no se puede invitar.');
+    const ahora = Date.now();
+    if(ahora - (cl.inv || 0) < 60000) return no('Esperá un minuto antes de invitar otra vez.');
+    if(hist.some(m => m.inv && m.inv.g === v.g && m.inv.c === v.c && ahora - m.ts < 120000)) return no('Esa sala ya está en el chat.');
+    cl.inv = ahora;
+    const m = { id, n, x:'📣 ¡Vengan a jugar ' + INV[v.g][0] + '! Sala ' + v.c, ts:ahora, k:rid(), inv:{ g:v.g, c:v.c } };
+    if(cl.dueno) m.d = 1;
+    agregar(m);
+    difundir({ t:'msg', m });
+    try{ cl.c.send({ t:'invOk', n:gente.length }); }catch(e){}
+  }
   function hubBorrar(k){ quitar(m => m.k === k); difundir({ t:'borrar', k }); }
   function hubEchar(id, ms){
     const h = Date.now() + (ms || BAN_MS);
@@ -188,7 +206,7 @@
     R.clientes.delete(id); avisarGente();
   }
   function avisarGente(){
-    gente = [{ id:yo, n:nombre || 'Invitado', d:soyDueno ? 1 : 0 }].concat([...R.clientes].filter(([,o]) => o.n).map(([id,o]) => ({ id, n:o.n, d:o.dueno ? 1 : 0 })));
+    gente = [{ id:yo, n:nombre || 'Invitado', d:soyDueno ? 1 : 0 }].concat([...R.clientes].filter(([,o]) => o.n && !o.oculto).map(([id,o]) => ({ id, n:o.n, d:o.dueno ? 1 : 0 })));
     difundir({ t:'gente', l:gente });
     pintarGente();
   }
@@ -224,6 +242,14 @@
     else if(d.t === 'chau'){ const c = R.conn; R.conn = null; R.intento = 0; try{ c && c.close(); }catch(e){} reintentar(); }
   }
   const okMsg = m => m && typeof m.n === 'string' && typeof m.x === 'string' && typeof m.id === 'string';
+  // invitaciones que mandan los juegos (chat/invitar.js): carpeta del juego → nombre y cómo se entra a la sala
+  const INV = { banquero:['Banquero Paraguayo','#'], loteria:['Lotería','?sala='], kombate:['Face Punch','?sala='], petei:['Peteĩ','#'],
+    escoba:['Escoba de 15','#'], impostor:['El Impostor','#'], billar:['Billar PY','#'], bolos:['Bolos PY','#'], minigolf:['Mini Golf PY','#'],
+    basta:['Basta PY','#'], tejo:['Tejo PY','#'], botones:['Botones PY','#'], naval:['Batalla Naval PY','#'], mavapa:['¿Mávapa?','#'],
+    mavaiko:['¿Mávaiko Ojuka?','#'], ajedrez:['Ajedrez y Damas PY','#'], salon:['Salón de Belleza PY','#'] };
+  const CODIGO = /^[A-Za-z0-9_-]{3,12}$/;
+  const okInv = v => v && typeof v === 'object' && INV[v.g] && CODIGO.test(String(v.c || ''));
+  const enlaceInv = v => v.g + '/' + INV[v.g][1] + encodeURIComponent(v.c);
 
   function mandar(x){
     x = limpiaTxt(x); if(!x) return false;
@@ -306,6 +332,9 @@
 #chatBox form .env{background:#0038a8;color:#fff}
 #chatBox form .bem{background:#efe5c8}
 #chatBox .est{font-size:12px;color:#7a5b00;text-align:center;padding:3px;background:#fff1c2;display:none}
+#chatBox .m.inv{background:#fff1e6;border:1px solid #ffb37a}
+#chatBox .m .unir{display:inline-block;margin-top:5px;background:linear-gradient(180deg,#ff8a3d,#e0531f);color:#fff;font-weight:800;font-size:14px;text-decoration:none;border-radius:999px;padding:5px 14px}
+#chatBox .m .unir:hover{filter:brightness(1.08)}
 #chatBox .m.dueno{background:#fff3c4;border:1px solid #e3b93f}
 #chatBox .m .n.dn{color:#8a5a00}
 #chatBox .m .herr{float:right;margin-left:6px}
@@ -417,6 +446,12 @@
     }
     const x = document.createElement('span'); x.className = 'x'; x.textContent = m.x;
     d.append(n, x);
+    if(okInv(m.inv)){   // invitación de un juego: botón para entrar a la sala
+      d.classList.add('inv');
+      const a = document.createElement('a'); a.className = 'unir'; a.href = enlaceInv(m.inv); a.textContent = '🎮 Unirme';
+      a.title = 'Entrar a la sala ' + m.inv.c + ' de ' + INV[m.inv.g][0];
+      d.appendChild(a);
+    }
     return d;
   }
   function pintarTodo(){
