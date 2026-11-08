@@ -290,6 +290,7 @@ function cabecera(R){
   $('#cab').innerHTML = `<h2>${tit}</h2><p>${t}${cap(R.dia ? `${DIAS[R.fecha.getDay()]} ${fechaTxt(R.fecha)} de ${R.fecha.getFullYear()}` : cuandoTxt(R.plazo, R.fecha))}</p>`;
 }
 function empezar(){
+  try{ window.JPY_CONTAR && window.JPY_CONTAR('p'); }catch(e){}   // contador del panel del dueño
   corrida++;
   R = nuevaConsulta();
   verModo(false);

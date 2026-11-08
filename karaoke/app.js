@@ -139,6 +139,7 @@ function watchRooms() {
 }
 
 async function enter(name, room) {
+  try{ window.JPY_CONTAR && window.JPY_CONTAR('p'); }catch(e){}   // contador del panel del dueño
   if (S.watch) { try { S.watch.destroy(); } catch (e) {} S.watch = null; }
   S.name = name; S.room = room;
   $('#btnEnter').disabled = true;

@@ -115,6 +115,7 @@ let corrida = 0;  // para cortar un ritual viejo si se vuelve a tirar
 const VIS = 14;   // cartas que se ven en el mazo animado
 
 async function ritual(){
+  try{ window.JPY_CONTAR && window.JPY_CONTAR('p'); }catch(e){}   // contador del panel del dueño
   const yo = ++corrida, vivo = ()=>yo===corrida;
   const fecha = new Date(), pf = L.perfil(D.nombre, D.d, D.m, D.a, fecha), T = L.TEMAS[D.tema];
   const TI = {...L.TIRADAS[D.tirada], pos:L.posiciones(D.tirada, D.per, fecha)};

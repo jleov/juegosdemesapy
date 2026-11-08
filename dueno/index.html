@@ -60,6 +60,12 @@ input[type=password]{width:100%;padding:11px 12px;border:1px solid #c9c2a8;borde
 .st-dias{display:flex;align-items:flex-end;gap:2px;height:110px;border-bottom:1px solid #cfc4a0;margin-top:6px}
 .st-dias div{flex:1;background:var(--gold);border-radius:3px 3px 0 0;min-height:1px}
 .st-dias div:hover{background:#d9a52a}
+.st-otras{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.st-otras>div{background:#fff;border:1px solid #e6dcc0;border-radius:10px;padding:8px 10px;display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.35}
+.st-otras img{width:34px;height:34px;border-radius:8px;flex:none}
+.st-otras b{display:block;font-size:14px}
+.st-otras em{font-style:normal;font-weight:900;font-size:18px;color:#7b3fb8}
+.st-otras small{color:var(--muted)}
 .st-ej{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:3px}
 @media(max-width:520px){.st-bar{grid-template-columns:24px 100px 1fr}.st-bar img{width:24px;height:24px}}
 </style>
@@ -215,6 +221,8 @@ function roomHTML(k, r){
 }
 // ---------- 📊 juegos más jugados (datos de /api/stats, solo con la llave del dueño) ----------
 const ST_N = {banquero:['Banquero Paraguayo'], loteria:['Lotería'], kombate:['Face Punch'], petei:['Peteĩ'], escoba:['Escoba de 15'], impostor:['El Impostor'], tarot:['Tarot Jasy'], versiculo:['Versículo del Día'], billar:['Billar PY'], bolos:['Bolos PY'], minigolf:['Mini Golf PY'], basta:['Basta PY'], tejo:['Tejo PY'], botones:['Botones PY'], naval:['Batalla Naval PY'], mavapa:['¿Mávapa?'], mavaiko:['¿Mávaiko Ojuka?'], ajedrez:['Ajedrez y Damas PY'], salon:['Salón de Belleza PY'], odisea:['Odisea','../icon-192.png'], salas:['Salas de Voz'], karaoke:['Sala de Karaoke','../icon-192.png']};
+// secciones que no son juegos: se muestran aparte, con lo que la gente hizo en cada una
+const OTRAS = {tarot:'lecturas de cartas', versiculo:'versículos pedidos', salas:'entradas a una sala de voz', karaoke:'entradas a una sala de karaoke'};
 const ST = {dias:30, que:'p', datos:null, err:'', cargando:false};
 const ST_API = /(^|\.)juegospy\.com$|\.pages\.dev$/.test(location.hostname) ? '/api/stats' : 'https://juegospy.com/api/stats';
 async function cargarStats(){
@@ -243,10 +251,10 @@ function renderStats(){
   const por={}, dias={}; let tv=0, tp=0, portada=0;
   filas.forEach(f=>{
     if(f.juego==='portada'){ portada+=f.visitas; return; }
-    const o=por[f.juego]=por[f.juego]||{v:0,p:0}; o.v+=f.visitas; o.p+=f.partidas; tv+=f.visitas; tp+=f.partidas;
+    const o=por[f.juego]=por[f.juego]||{v:0,p:0}; o.v+=f.visitas; o.p+=f.partidas; if(OTRAS[f.juego]) return; tv+=f.visitas; tp+=f.partidas;
     const dd=dias[f.dia]=dias[f.dia]||{v:0,p:0}; dd.v+=f.visitas; dd.p+=f.partidas; });
   const k=ST.que;
-  const lista=Object.entries(por).filter(([g,o])=>o[k]>0).sort((a,b)=>b[1][k]-a[1][k]);
+  const lista=Object.entries(por).filter(([g,o])=>!OTRAS[g] && o[k]>0).sort((a,b)=>b[1][k]-a[1][k]);
   const max=lista.length?lista[0][1][k]:1;
   h+='<div class="st-tabs">'+stTab('dias',1,'Hoy')+stTab('dias',7,'7 días')+stTab('dias',30,'30 días')+stTab('dias',3650,'Todo')+'</div>';
   h+='<div class="st-tabs">'+stTab('que','p','🎲 Partidas empezadas')+stTab('que','v','🚪 Entradas a cada juego')+'</div>';
@@ -255,6 +263,12 @@ function renderStats(){
       return '<div class="st-bar"><img src="'+ic+'" alt="" onerror="this.style.visibility=\'hidden\'"><span class="nm" title="'+esc(n[0])+'">'+(i<3?['🥇','🥈','🥉'][i]+' ':'')+esc(n[0])+'</span>'
         +'<div class="tr"><div class="fi'+(i===0?' top':'')+'" style="width:'+Math.max(2,Math.round(o[k]/max*100))+'%"></div><span class="vl">'+o[k]+'</span></div></div>'; }).join('')
     : '<div class="empty">Todavía no hay '+(k==='p'?'partidas':'entradas')+' anotadas en este período.</div>';
+  // ✨ otras secciones (tarot, versículo, salas de voz, karaoke): entradas y usos
+  const otras=Object.keys(OTRAS).map(g=>[g, por[g]||{v:0,p:0}]).sort((a,b)=>(b[1].p-a[1].p)||(b[1].v-a[1].v));
+  h+='<h3 style="margin:16px 0 6px;font-size:15px">✨ Otras secciones</h3><div class="st-otras">'
+    + otras.map(([g,o])=>{ const n=ST_N[g]||[g]; const ic=n[1]||('../'+g+'/icon-192.png');
+      return '<div><img src="'+ic+'" alt="" onerror="this.style.visibility=\'hidden\'"><span><b>'+esc(n[0])+'</b>'
+        +'<em>'+o.p+'</em> '+OTRAS[g]+'<br><small>'+o.v+' entradas</small></span></div>'; }).join('') + '</div>';
   if(ST.dias>1){   // barritas por día (total de todos los juegos)
     const primero=Object.keys(dias).sort()[0];
     const n = ST.dias>=3650 ? Math.min(90, Math.max(7, primero ? Math.round((Date.parse(hoy)-Date.parse(primero))/86400e3)+1 : 7)) : ST.dias;
@@ -265,7 +279,7 @@ function renderStats(){
       +'<div class="st-dias">'+ds.map(d=>{ const v=(dias[d]||{})[k]||0; return '<div style="height:'+Math.round(v/mx*100)+'%" title="'+f(d)+': '+v+'"></div>'; }).join('')+'</div>'
       +'<div class="st-ej"><span>'+f(ds[0])+'</span><span>máximo en un día: '+mx+'</span><span>'+f(ds[ds.length-1])+'</span></div>';
   }
-  h+='<p class="muted" style="margin-bottom:0">Se cuenta desde que se agregó el contador. “Partida” = una sala que pasó de la espera a jugar (también contra bots). “Entrada” = alguien abrió el juego (una vez por pestaña). No se guarda nada de las personas.</p>';
+  h+='<p class="muted" style="margin-bottom:0">Se cuenta desde que se agregó el contador. “Partida” = una sala que pasó de la espera a jugar (también contra bots). “Entrada” = alguien abrió el juego o la sección (una vez por pestaña). En otras secciones se cuenta cada lectura, versículo o entrada a una sala. No se guarda nada de las personas.</p>';
   el.innerHTML=h;
 }
 
