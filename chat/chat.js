@@ -6,14 +6,15 @@
    y sigue con el historial que tenía guardado.
    La central pone el nombre de quién escribió (nadie puede escribir como otro),
    corta los mensajes largos, frena al que manda demasiados seguidos o repite lo mismo,
-   y guarda solo los últimos 50 mensajes (los más viejos se borran).
+   y guarda solo los últimos 30 mensajes; los de más de 1 hora se borran solos.
    El dueño (el aparato donde se entró al panel del dueño: guarda la llave en bnq_owner)
    firma un desafío de la central y puede borrar mensajes y echar gente por 24 horas.
    ===================================================================== */
 (function(){
   if(!window.Peer) return;
   const HUB = 'jpychat26-central', PREF = 'jpychat26-';
-  const MAXT = 200, MAXN = 20, HIST = 50, BAN_MS = 24*3600e3;
+  const MAXT = 200, MAXN = 20, HIST = 30, VIDA = 3600e3, BAN_MS = 24*3600e3;
+  const vigentes = l => l.filter(m => Date.now() - (+m.ts || 0) < VIDA).slice(-HIST);   // los últimos 30 de la última hora
   const $ = s => document.querySelector(s);
   const load = (k, d) => { try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(e){ return d; } };
   const store = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
@@ -46,7 +47,7 @@
 
   // nombre: el del chat, o el que ya usa en algún juego
   let nombre = limpiaNom(load('jpy_chat_nombre', '') || ['bnq_name','petei_name','uno_name','billar_name','bolos_name','ajedrez_name','basta_name'].map(k => load(k, '')).find(Boolean));
-  let hist = []; try{ hist = JSON.parse(load('jpy_chat_hist', '[]')).slice(-HIST); }catch(e){}
+  let hist = []; try{ hist = vigentes(JSON.parse(load('jpy_chat_hist', '[]'))); }catch(e){}
   let mudos = []; try{ mudos = JSON.parse(load('jpy_chat_mudos', '[]')); }catch(e){}
   // echados: cada aparato tiene una marca propia; la lista viaja a todos para que la próxima central también la cumpla
   let DEV = load('jpy_chat_dev', ''); if(!DEV){ DEV = rid() + rid(); store('jpy_chat_dev', DEV); }
@@ -203,7 +204,7 @@
   function recibir(d){
     if(!d || typeof d !== 'object') return;
     if(d.t === 'hist' && Array.isArray(d.m)){
-      hist = d.m.filter(okMsg).slice(-HIST); yo = String(d.yo || yo); guardar(); pintarTodo();
+      hist = vigentes(d.m.filter(okMsg)); yo = String(d.yo || yo); guardar(); pintarTodo();
       if(Array.isArray(d.b)){ bans = limpiarBans(d.b); guardarBans(); }
       if(llave && typeof d.no === 'string') firmar(d.no).then(sig => enviar({ t:'dueno', sig })).catch(() => {});
     }
@@ -292,7 +293,6 @@
 #chatBox .m.mio{align-self:flex-end;background:#d7ecff;border-radius:12px 12px 4px 12px}
 #chatBox .m .n{font-weight:800;font-size:12px;color:#0038a8;cursor:pointer;margin-right:6px}
 #chatBox .m.mio .n{cursor:default}
-#chatBox .m .h{font-size:11px;color:#888}
 #chatBox .m .x{display:block;font-size:15px}
 #chatBox .m.solo .x{font-size:30px;line-height:1.2}
 #chatBox .vacio{color:#777;text-align:center;margin:auto;font-size:14px;padding:20px}
@@ -398,6 +398,9 @@
     if(abajo || m.id === yo) lista.scrollTop = lista.scrollHeight;
     if(!abierto && m.id !== yo){ sinLeer++; pintarBoton(); }
   }
+  setInterval(() => {   // se van borrando los mensajes de más de 1 hora
+    const v = vigentes(hist); if(v.length !== hist.length){ hist = v; guardar(); pintarTodo(); }
+  }, 30000);
   function guardar(){ store('jpy_chat_hist', JSON.stringify(hist.slice(-HIST))); }
   function burbuja(m){
     const d = document.createElement('div');
@@ -412,10 +415,8 @@
       });
       d.appendChild(her);
     }
-    const h = document.createElement('span'); h.className = 'h';
-    const t = new Date(+m.ts || Date.now()); h.textContent = t.toLocaleTimeString('es-PY', { hour:'2-digit', minute:'2-digit' });
     const x = document.createElement('span'); x.className = 'x'; x.textContent = m.x;
-    d.append(n, h, x);
+    d.append(n, x);
     return d;
   }
   function pintarTodo(){
@@ -448,8 +449,9 @@
   }
   function estado(t){ const e = $('#chatBox .est'); if(e){ e.textContent = t; e.style.display = t ? 'block' : 'none'; } }
   function mostrarEchado(){
-    const h = new Date(+load('jpy_chat_ban', 0)), hoy = h.toDateString() === new Date().toDateString();
-    estado(`⛔ Te sacaron del chat. Vas a poder volver ${hoy ? 'hoy' : 'mañana'} a las ${h.toLocaleTimeString('es-PY', { hour:'2-digit', minute:'2-digit' })}`);
+    const h = +load('jpy_chat_ban', 0);
+    const horas = Math.max(1, Math.ceil((h - Date.now()) / 3600e3));
+    estado(`⛔ Te sacaron del chat. Vas a poder volver en ${horas === 1 ? '1 hora' : horas + ' horas'}.`);
     const f = $('#chatBox form'); if(f) f.style.display = 'none';
     gente = []; pintarCabeza(); pintarBoton();
   }
