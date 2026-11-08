@@ -239,9 +239,11 @@ async function cargarStats(){
     const ts=Date.now(), sig=b64u(await crypto.subtle.sign(SIG, A.key, new TextEncoder().encode('stats:'+ts)));
     const r=await fetch(ST_API+'?dias=3650&ts='+ts+'&sig='+sig, {cache:'no-store'});
     const d=await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(r.status===503 ? 'falta-db' : (d.error||('error '+r.status)));
+    if(!r.ok) throw new Error(d.error==='cupo' ? 'cupo:'+(d.x||'') : r.status===503 ? 'falta-db' : (d.error||('error '+r.status)));
     ST.datos=d;
-  }catch(e){ ST.err = e.message==='falta-db' ? 'falta-db' : 'No se pudieron traer los números ('+e.message+').'; }
+  }catch(e){ ST.err = e.message==='falta-db' ? 'falta-db'
+    : e.message.startsWith('cupo:') ? '⏳ '+(e.message.slice(5)||'Se llenó el cupo diario gratis de la base de datos.')+' Mientras tanto no se pueden ver ni anotar los números.'
+    : 'No se pudieron traer los números ('+e.message+').'; }
   ST.cargando=false; renderStats();
 }
 // lista de partidas con sus jugadores (se filtra por nombre o juego sin volver a pedir los datos)

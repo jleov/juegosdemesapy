@@ -14,16 +14,17 @@ const OWNER_PUB = { kty: 'EC', crv: 'P-256', x: 'eLdK1LWh1LGyAlt0IW6Apa9bnuRt1Lw
 const diaPY = (t = Date.now()) => new Date(t - 3 * 3600e3).toISOString().slice(0, 10);
 const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 
-let tablaLista = false;
+// Las tablas se crean solo si faltan (antes se hacía en cada arranque y gastaba escrituras del cupo diario).
 async function tabla(db) {
-  if (tablaLista) return;
   await db.batch([
     db.prepare('CREATE TABLE IF NOT EXISTS uso (dia TEXT NOT NULL, juego TEXT NOT NULL, visitas INTEGER NOT NULL DEFAULT 0, partidas INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (dia, juego))'),
     db.prepare('CREATE TABLE IF NOT EXISTS partidas (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, juego TEXT NOT NULL, jugadores TEXT NOT NULL)'),
     db.prepare('CREATE INDEX IF NOT EXISTS partidas_ts ON partidas (ts)'),
   ]);
-  tablaLista = true;
 }
+// La cuenta gratis de Cloudflare tiene un cupo diario de D1 (5 millones de filas leídas y 100 mil escritas)
+// que comparten TODAS las bases de la cuenta (también Predi Jahuga). Se renueva a las 00:00 UTC = 21:00 en Paraguay.
+const esCupo = e => /limit|exceeded|quota|too many/i.test(String(e && e.message || e));
 async function esDueno(ts, sig) {
   if (!ts || !sig || Math.abs(Date.now() - Number(ts)) > 10 * 60e3) return false;
   try {
@@ -47,9 +48,18 @@ export async function onRequest({ request, env }) {
   const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
   if (!okOrigin) return json({ error: 'origen no permitido' }, 403);
   if (!env.DB) return json({ error: 'falta conectar la base D1 con el nombre DB' }, 503);
-  const db = env.DB;
-  await tabla(db);
+  try {
+    return await atender(request, env.DB, json);
+  } catch (e) {
+    if (/no such table/i.test(String(e && e.message))) {   // primera vez: crear las tablas y probar de nuevo
+      try { await tabla(env.DB); return await atender(request, env.DB, json); } catch (e2) { e = e2; }
+    }
+    if (esCupo(e)) return json({ error: 'cupo', x: 'Se llenó el cupo diario gratis de la base de datos de Cloudflare. Se renueva a las 21:00 (hora de Paraguay).' }, 503);
+    return json({ error: 'base: ' + String(e && e.message || e).slice(0, 160) }, 500);
+  }
+}
 
+async function atender(request, db, json) {
   if (request.method === 'POST') {
     let d = null;
     try { d = JSON.parse((await request.text()).slice(0, 2000)); } catch (e) {}
