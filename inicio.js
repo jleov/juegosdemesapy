@@ -101,3 +101,27 @@
   }
   if(document.body) poner(); else document.addEventListener('DOMContentLoaded', poner);
 })();
+
+/* =====================================================================
+   Contador para el panel del dueño (gráfico de los juegos más jugados).
+   Solo manda el nombre del juego y si fue una entrada (v) o una partida (p):
+   nada de la persona. Una entrada por pestaña; las partidas las avisa
+   dueno-link.js cuando una sala pasa de la espera a jugar.
+   ===================================================================== */
+(function(){
+  const h = location.hostname;
+  if(!h || /^(localhost|127\.|\[::1\])/.test(h)) return;   // probando en la PC: no cuenta
+  const API = /(^|\.)juegospy\.com$|\.pages\.dev$/.test(h) ? '/api/stats' : 'https://juegospy.com/api/stats';
+  const partes = location.pathname.split('/').filter(Boolean).filter(x => !/\.html?$/.test(x));
+  const JUEGO = partes.length ? partes[partes.length-1] : 'portada';
+  function contar(e){
+    try{
+      const body = JSON.stringify({g:JUEGO, e});
+      if(navigator.sendBeacon && navigator.sendBeacon(API, new Blob([body], {type:'text/plain'}))) return;
+      fetch(API, {method:'POST', body, keepalive:true}).catch(()=>{});
+    }catch(err){}
+  }
+  window.JPY_CONTAR = contar;
+  let ya = false; try{ ya = sessionStorage.getItem('jpy_cnt_' + JUEGO) === '1'; sessionStorage.setItem('jpy_cnt_' + JUEGO, '1'); }catch(e){}
+  if(!ya) setTimeout(() => contar('v'), 2500);
+})();

@@ -344,5 +344,10 @@ if('serviceWorker' in navigator && location.protocol==='https:') navigator.servi
 <script src="ice.js"></script>
 <script src="chat/filtro.js?v=1"></script>
 <script src="chat/chat.js?v=4"></script>
+<!-- contador de entradas para el panel del dueño (solo el nombre de la página, nada de la persona) -->
+<script>(function(){ const h=location.hostname; if(!h||/^(localhost|127\.|\[::1\])/.test(h)) return;
+  try{ if(sessionStorage.getItem('jpy_cnt_portada')) return; sessionStorage.setItem('jpy_cnt_portada','1'); }catch(e){}
+  const API=/(^|\.)juegospy\.com$|\.pages\.dev$/.test(h)?'/api/stats':'https://juegospy.com/api/stats', b=JSON.stringify({g:'portada',e:'v'});
+  setTimeout(()=>{ try{ if(!(navigator.sendBeacon&&navigator.sendBeacon(API,new Blob([b],{type:'text/plain'})))) fetch(API,{method:'POST',body:b,keepalive:true}).catch(()=>{}); }catch(e){} },2500); })();</script>
 </body>
 </html>

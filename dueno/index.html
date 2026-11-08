@@ -43,12 +43,32 @@ input[type=password]{width:100%;padding:11px 12px;border:1px solid #c9c2a8;borde
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:9;max-width:92%;text-align:center}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#2a9d3f;margin-right:6px;animation:p 1.6s infinite}
 @keyframes p{50%{opacity:.3}}
+/* estadísticas: juegos más jugados */
+.st-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.st-tabs button{border:1px solid #d8cfae;background:#fff;border-radius:999px;padding:6px 12px;font-weight:700;font-size:13px;cursor:pointer;color:#333}
+.st-tabs button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.st-tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px}
+.st-tot div{background:#fff;border:1px solid #e6dcc0;border-radius:10px;padding:8px 10px}
+.st-tot b{display:block;font-size:22px;color:var(--blue)}
+.st-bar{display:grid;grid-template-columns:28px minmax(90px,170px) 1fr;align-items:center;gap:8px;margin:5px 0}
+.st-bar img{width:28px;height:28px;border-radius:7px}
+.st-bar .nm{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-bar .tr{background:#efe6c9;border-radius:6px;height:22px;position:relative}
+.st-bar .fi{background:var(--blue);height:100%;border-radius:6px;min-width:2px}
+.st-bar .fi.top{background:var(--red)}
+.st-bar .vl{position:absolute;left:8px;top:2px;font-size:13px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.st-dias{display:flex;align-items:flex-end;gap:2px;height:110px;border-bottom:1px solid #cfc4a0;margin-top:6px}
+.st-dias div{flex:1;background:var(--gold);border-radius:3px 3px 0 0;min-height:1px}
+.st-dias div:hover{background:#d9a52a}
+.st-ej{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:3px}
+@media(max-width:520px){.st-bar{grid-template-columns:24px 100px 1fr}.st-bar img{width:24px;height:24px}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>👑 Panel del <span>dueño</span></h1>
   <div class="sub">Todas las salas abiertas de Juegos Paraguay Digitales: Banquero, Lotería, Face Punch, Peteĩ y los demás.</div>
+  <div id="stats" class="box" style="display:none"></div>
   <div id="body"></div>
 </div>
 <div id="toast"></div>
@@ -143,7 +163,7 @@ setInterval(()=>{   // pulso con cada sala y limpieza de las que ya no responden
   if(gone) render(); else if(A.key) refreshAgo();
 }, 5000);
 function retry(){ if(A.peer){ try{ A.peer.destroy(); }catch(e){} A.peer=null; } const s=load('bnq_owner'); if(s) start(s); }
-function logout(){ if(A.peer) try{ A.peer.destroy(); }catch(e){} Object.assign(A,{peer:null, key:null, rooms:{}, err:''}); store('bnq_owner', undefined); render(); }
+function logout(){ if(A.peer) try{ A.peer.destroy(); }catch(e){} Object.assign(A,{peer:null, key:null, rooms:{}, err:''}); Object.assign(ST,{datos:null, err:''}); store('bnq_owner', undefined); render(); }
 
 const ago = t => { if(!t) return ''; const m=Math.round((Date.now()-t)/60000); return m<1?'recién':m<60?`hace ${m} min`:`hace ${Math.floor(m/60)} h ${m%60} min`; };
 function refreshAgo(){ document.querySelectorAll('[data-at]').forEach(e=>e.textContent=ago(+e.dataset.at)); }
@@ -193,7 +213,64 @@ function roomHTML(k, r){
     ${btns?`<div class="row">${btns}</div>`:''}
     ${i.local?'<div class="muted" style="margin-top:4px">Se juega en un solo celular o PC: no tiene sala para entrar.</div>':''}</div>`;
 }
+// ---------- 📊 juegos más jugados (datos de /api/stats, solo con la llave del dueño) ----------
+const ST_N = {banquero:['Banquero Paraguayo'], loteria:['Lotería'], kombate:['Face Punch'], petei:['Peteĩ'], escoba:['Escoba de 15'], impostor:['El Impostor'], tarot:['Tarot Jasy'], versiculo:['Versículo del Día'], billar:['Billar PY'], bolos:['Bolos PY'], minigolf:['Mini Golf PY'], basta:['Basta PY'], tejo:['Tejo PY'], botones:['Botones PY'], naval:['Batalla Naval PY'], mavapa:['¿Mávapa?'], mavaiko:['¿Mávaiko Ojuka?'], ajedrez:['Ajedrez y Damas PY'], salon:['Salón de Belleza PY'], odisea:['Odisea','../icon-192.png'], salas:['Salas de Voz'], karaoke:['Sala de Karaoke','../icon-192.png']};
+const ST = {dias:30, que:'p', datos:null, err:'', cargando:false};
+const ST_API = /(^|\.)juegospy\.com$|\.pages\.dev$/.test(location.hostname) ? '/api/stats' : 'https://juegospy.com/api/stats';
+async function cargarStats(){
+  if(!A.key || ST.cargando) return;
+  ST.cargando=true; ST.err=''; renderStats();
+  try{
+    const ts=Date.now(), sig=b64u(await crypto.subtle.sign(SIG, A.key, new TextEncoder().encode('stats:'+ts)));
+    const r=await fetch(ST_API+'?dias=3650&ts='+ts+'&sig='+sig, {cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(r.status===503 ? 'falta-db' : (d.error||('error '+r.status)));
+    ST.datos=d;
+  }catch(e){ ST.err = e.message==='falta-db' ? 'falta-db' : 'No se pudieron traer los números ('+e.message+').'; }
+  ST.cargando=false; renderStats();
+}
+function diaMenos(hoy, n){ const d=new Date(hoy+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()-n); return d.toISOString().slice(0,10); }
+function stTab(k, v, t){ return '<button class="'+(ST[k]===v?'on':'')+'" data-k="'+k+'" data-v="'+v+'">'+t+'</button>'; }
+document.addEventListener('click', e=>{ const b=e.target.closest('#stats [data-k]'); if(!b) return; const k=b.dataset.k; ST[k] = k==='dias' ? +b.dataset.v : b.dataset.v; renderStats(); });
+function renderStats(){
+  const el=$('#stats'); el.style.display = A.key ? '' : 'none'; if(!A.key) return;
+  let h='<h2 style="margin:0 0 10px;font-size:20px;display:flex;justify-content:space-between;align-items:center">📊 Juegos más jugados <button class="btn sm gray" onclick="cargarStats()">🔄 Actualizar</button></h2>';
+  if(ST.err==='falta-db'){ el.innerHTML=h+'<p>Falta conectar la base de datos en Cloudflare (se hace una sola vez). Cuando esté, acá aparece el gráfico.</p>'; return; }
+  if(ST.err){ el.innerHTML=h+'<p>'+esc(ST.err)+'</p>'; return; }
+  if(!ST.datos){ el.innerHTML=h+'<p class="muted">'+(ST.cargando?'Cargando…':'')+'</p>'; return; }
+  const hoy=ST.datos.hoy, desde = ST.dias>=3650 ? '' : diaMenos(hoy, ST.dias-1);
+  const filas=(ST.datos.filas||[]).filter(f=>f.dia>=desde);
+  const por={}, dias={}; let tv=0, tp=0, portada=0;
+  filas.forEach(f=>{
+    if(f.juego==='portada'){ portada+=f.visitas; return; }
+    const o=por[f.juego]=por[f.juego]||{v:0,p:0}; o.v+=f.visitas; o.p+=f.partidas; tv+=f.visitas; tp+=f.partidas;
+    const dd=dias[f.dia]=dias[f.dia]||{v:0,p:0}; dd.v+=f.visitas; dd.p+=f.partidas; });
+  const k=ST.que;
+  const lista=Object.entries(por).filter(([g,o])=>o[k]>0).sort((a,b)=>b[1][k]-a[1][k]);
+  const max=lista.length?lista[0][1][k]:1;
+  h+='<div class="st-tabs">'+stTab('dias',1,'Hoy')+stTab('dias',7,'7 días')+stTab('dias',30,'30 días')+stTab('dias',3650,'Todo')+'</div>';
+  h+='<div class="st-tabs">'+stTab('que','p','🎲 Partidas empezadas')+stTab('que','v','🚪 Entradas a cada juego')+'</div>';
+  h+='<div class="st-tot"><div><b>'+tp+'</b><span class="muted">partidas</span></div><div><b>'+tv+'</b><span class="muted">entradas a juegos</span></div><div><b>'+portada+'</b><span class="muted">visitas a la portada</span></div></div>';
+  h+= lista.length ? lista.map(([g,o],i)=>{ const n=ST_N[g]||[g]; const ic=n[1]||('../'+g+'/icon-192.png');
+      return '<div class="st-bar"><img src="'+ic+'" alt="" onerror="this.style.visibility=\'hidden\'"><span class="nm" title="'+esc(n[0])+'">'+(i<3?['🥇','🥈','🥉'][i]+' ':'')+esc(n[0])+'</span>'
+        +'<div class="tr"><div class="fi'+(i===0?' top':'')+'" style="width:'+Math.max(2,Math.round(o[k]/max*100))+'%"></div><span class="vl">'+o[k]+'</span></div></div>'; }).join('')
+    : '<div class="empty">Todavía no hay '+(k==='p'?'partidas':'entradas')+' anotadas en este período.</div>';
+  if(ST.dias>1){   // barritas por día (total de todos los juegos)
+    const primero=Object.keys(dias).sort()[0];
+    const n = ST.dias>=3650 ? Math.min(90, Math.max(7, primero ? Math.round((Date.parse(hoy)-Date.parse(primero))/86400e3)+1 : 7)) : ST.dias;
+    const ds=[]; for(let i=n-1;i>=0;i--) ds.push(diaMenos(hoy,i));
+    const mx=Math.max(1, ...ds.map(d=>(dias[d]||{})[k]||0));
+    const f=d=>d.slice(8,10)+'/'+d.slice(5,7);
+    h+='<h3 style="margin:16px 0 0;font-size:15px">'+(k==='p'?'Partidas':'Entradas')+' por día, todos los juegos'+(n===90&&ST.dias>=3650?' (últimos 90 días)':'')+'</h3>'
+      +'<div class="st-dias">'+ds.map(d=>{ const v=(dias[d]||{})[k]||0; return '<div style="height:'+Math.round(v/mx*100)+'%" title="'+f(d)+': '+v+'"></div>'; }).join('')+'</div>'
+      +'<div class="st-ej"><span>'+f(ds[0])+'</span><span>máximo en un día: '+mx+'</span><span>'+f(ds[ds.length-1])+'</span></div>';
+  }
+  h+='<p class="muted" style="margin-bottom:0">Se cuenta desde que se agregó el contador. “Partida” = una sala que pasó de la espera a jugar (también contra bots). “Entrada” = alguien abrió el juego (una vez por pestaña). No se guarda nada de las personas.</p>';
+  el.innerHTML=h;
+}
+
 function render(){
+  renderStats(); if(A.key && !ST.datos && !ST.cargando && !ST.err) cargarStats();
   const el=$('#body');
   if(!A.key){
     el.innerHTML=`<div class="box"><p style="margin-top:0">Escribí la contraseña del dueño (la misma del panel del Banquero). Se pide una sola vez en cada aparato.</p>

@@ -30,9 +30,20 @@
     if(!i || !L.ok || !c || !c.open) return;
     try{ c.send({t:'room', game:L.cfg.game, code:i.code, info:i}); }catch(e){}
   }
+  // cuenta una partida cada vez que una sala pasa de la espera a jugar (para el gráfico del panel)
+  const jugando = {};
+  function contarPartida(i){
+    if(!i || !i.code || !window.JPY_CONTAR) return;
+    const g = L.cfg.game;
+    const ya = g==='kombate' ? (i.kind!=='duel' || !!i.guest) : (!!i.phase && i.phase!=='lobby');
+    if(ya && !jugando[i.code]) window.JPY_CONTAR('p');
+    jugando[i.code] = ya;
+  }
   function tick(){
-    if(!L.cfg || typeof Peer==='undefined') return;
+    if(!L.cfg) return;
     const i=info();
+    contarPartida(i);
+    if(typeof Peer==='undefined') return;
     if(!i){   // no hay sala abierta en este aparato: no hace falta la conexión
       if(L.peer){ drop(); try{ L.peer.destroy(); }catch(e){} L.peer=null; }
       return;
