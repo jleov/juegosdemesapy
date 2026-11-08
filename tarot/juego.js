@@ -70,7 +70,7 @@ function marcar(){
   document.querySelectorAll('#tiradas .opt').forEach(b=>b.classList.toggle('sel', +b.dataset.n===D.tirada));
   document.querySelectorAll('#mazos .opt').forEach(b=>b.classList.toggle('sel', +b.dataset.m===D.mazo));
   document.querySelectorAll('#plazos .opt').forEach(b=>b.classList.toggle('sel', b.dataset.p===D.per));
-  const c = L.cuando(D.per, new Date());
+  const c = L.cuando(D.per, L.momento(D.per, new Date()).f);
   $('#vistaPlazo').textContent = c ? `Las cartas van a hablar ${("de "+c).replace(/^de el /,"del ")}` : 'Una lectura sin fecha: el mensaje que tu alma necesita ahora';
 }
 if(!L.PERIODOS[D.per]) D.per='dia';
@@ -117,7 +117,7 @@ const VIS = 14;   // cartas que se ven en el mazo animado
 async function ritual(){
   const yo = ++corrida, vivo = ()=>yo===corrida;
   const fecha = new Date(), pf = L.perfil(D.nombre, D.d, D.m, D.a, fecha), T = L.TEMAS[D.tema];
-  const TI = {...L.TIRADAS[D.tirada], pos:L.posiciones(D.tirada, D.per)};
+  const TI = {...L.TIRADAS[D.tirada], pos:L.posiciones(D.tirada, D.per, fecha)};
   verModo(false);
   chips(pf, T, D.per);
   voz.parar(); $('#lectura').innerHTML=''; $('#finBtns').classList.add('oculto'); $('#btnLeer').classList.add('oculto'); $('#btnTodas').classList.add('oculto');
@@ -348,7 +348,7 @@ async function mostrarLectura(pf, sacadas, fecha){
   // lo que viaja en el link: sin fecha de nacimiento ni la pregunta (son privadas)
   const datos = {v:1, n:pf.nombre, s:pf.si, nv:pf.nv, ap:pf.ap, t:D.tema, r:D.tirada, z:D.mazo, p:D.per,
     f:`${fecha.getFullYear()}${String(fecha.getMonth()+1).padStart(2,'0')}${String(fecha.getDate()).padStart(2,'0')}`,
-    c:sacadas.map(t=>t.c.id+(t.inv?'i':'')).join('.'), k:seed};
+    h:fecha.getHours(), c:sacadas.map(t=>t.c.id+(t.inv?'i':'')).join('.'), k:seed};
   ultima = {pf, sacadas, r, T, TI, datos, img:null};
   const box = cajaLectura(r, T, TI, 'Tu lectura');
   sonido.revelar(5);
@@ -496,7 +496,7 @@ function abrirCompartida(){
   if(!o || !L.TEMAS[o.t] || !L.TIRADAS[o.r] || !L.PERIODOS[o.p]) return false;
   const sacadas = String(o.c||'').split('.').map(s=>{ const c = MAZO.find(m=>m.id===s.replace(/i$/,'')); return c && {c, inv:/i$/.test(s)}; });
   if(sacadas.length!==+o.r || sacadas.some(t=>!t)) return false;
-  const m = /^(\d{4})(\d{2})(\d{2})$/.exec(o.f||''); const fecha = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date();
+  const m = /^(\d{4})(\d{2})(\d{2})$/.exec(o.f||''); const fecha = m ? new Date(+m[1], +m[2]-1, +m[3], o.h>=0 && o.h<24 ? +o.h : 9) : new Date();
   const pf = L.perfilDe({n:o.n, s:o.s, nv:o.nv, ap:o.ap, anio:fecha.getFullYear()}), T = L.TEMAS[o.t];
   const TI = {...L.TIRADAS[o.r]};
   const r = L.leer(pf, o.t, +o.r, sacadas, '', o.z===22, {per:o.p, fecha, seed:o.k>>>0});

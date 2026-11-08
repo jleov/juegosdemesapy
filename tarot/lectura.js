@@ -165,11 +165,58 @@ const ENERGIA = {
  8:'de logros y cosecha: lo que sembraste empieza a rendir',
  9:'de cierres y limpieza: soltá lo que ya no va'
 };
-function hoyMismo(f){ const h=new Date(); return f.getFullYear()===h.getFullYear() && f.getMonth()===h.getMonth() && f.getDate()===h.getDate(); }
+function difDias(f){ const h=new Date(); return Math.round((new Date(f.getFullYear(),f.getMonth(),f.getDate()) - new Date(h.getFullYear(),h.getMonth(),h.getDate()))/864e5); }
+// según la hora y el día de la consulta: para qué fecha hablan las cartas y qué partes del plazo quedan por delante
+function momento(per, fecha){
+  const h = fecha.getHours(), dd = fecha.getDate(), y = fecha.getFullYear(), m = fecha.getMonth();
+  const P = PERIODOS[per] || PERIODOS.libre, sel = (a)=>a[dd % a.length];
+  let o = {f:new Date(y, m, dd, 12), tres:P.tres, tresF:P.tresF, carta:P.carta, nota:'', lo:9, hi:20};
+  if(per==='dia'){
+    if(h>=22){
+      o.f = new Date(y, m, dd+1, 12); o.carta = 'Tu carta de mañana';
+      o.nota = sel(['El día ya está por terminar, así que las cartas hablan de lo que trae mañana.', 'A esta hora el día ya se despide: lo que se abre en la mesa es para mañana.', 'La noche ya está avanzada: Jasy mira el día que viene.']);
+    } else if(h<5){
+      o.nota = sel(['Es de madrugada: las cartas hablan del día que recién empieza.', 'Mientras todos duermen, las cartas miran el día que está por amanecer.']);
+    } else if(h>=18){
+      o.tres = ['Esta noche','Antes de dormir','Mañana']; o.tresF = ['Esta noche','Antes de dormir','Para mañana'];
+      o.carta = 'Tu carta de esta noche';
+      o.nota = sel(['El día ya va cayendo: las cartas hablan de lo que queda de esta noche y de lo que se viene.', 'Con el sol ya escondido, las cartas miran lo que queda del día y lo que asoma para mañana.']);
+      o.lo = Math.min(h+1, 23); o.hi = 23;
+    } else if(h>=12){
+      o.tres = ['Esta tarde','Esta noche','Mañana temprano']; o.tresF = ['Lo que queda de la tarde','Cuando caiga la noche','Al despertar mañana'];
+      o.carta = 'Tu carta para lo que queda del día';
+      o.lo = h+1; o.hi = 23;
+    } else { o.lo = Math.max(9, h+1); o.hi = 21; }
+  } else if(per==='semana'){
+    const dow = (fecha.getDay()+6)%7;   // 0 = lunes … 6 = domingo
+    if(dow===6 || (dow===5 && h>=20)){
+      o.f = new Date(y, m, dd + (7-dow), 12);
+      o.nota = sel(['La semana ya se está cerrando: las cartas miran la semana que empieza.', 'Esta semana ya se despide, así que Jasy mira la que viene.']);
+    } else if(dow===5){
+      o.tres = ['Hoy sábado','El domingo','La semana que viene']; o.tresF = ['Hoy sábado','El domingo','Ya en la semana que viene'];
+    } else if(dow>=3){
+      o.tres = ['Estos días','El fin de semana','La semana que viene']; o.tresF = ['Lo que queda de la semana','Para el fin de semana','Ya en la semana que viene'];
+    }
+  } else if(per==='mes'){
+    const ult = new Date(y, m+1, 0).getDate();
+    if(dd >= ult-2){
+      o.f = new Date(y, m+1, 1, 12);
+      o.nota = sel(['El mes ya se despide: las cartas hablan del mes que empieza.', 'A pocos días de cerrar el mes, Jasy mira el que viene.']);
+    } else if(dd > 10){
+      o.tres = ['Estos días','El cierre del mes','El mes que viene']; o.tresF = ['En estos días','Para el cierre del mes','Ya en el mes que viene'];
+    }
+  } else if(per==='anio'){
+    if(m===11 && dd>=20){
+      o.f = new Date(y+1, 0, 1, 12);
+      o.nota = sel(['El año ya se despide: las cartas miran el año que llega.', 'Con el año a punto de terminar, Jasy mira lo que trae el nuevo.']);
+    }
+  }
+  return o;
+}
 // el texto del plazo, con la fecha escrita (así un link visto otro día sigue siendo correcto)
 function cuando(per, f){
   const dm = x => `${x.getDate()} de ${MESES[x.getMonth()]}`;
-  if(per==='dia') return (hoyMismo(f) ? 'hoy, ' : 'el ') + `${DIAS_S[f.getDay()]} ${dm(f)}`;
+  if(per==='dia') return ({0:'hoy, ', 1:'mañana, '}[difDias(f)] || 'el ') + `${DIAS_S[f.getDay()]} ${dm(f)}`;
   if(per==='semana'){
     const lu = new Date(f.getFullYear(), f.getMonth(), f.getDate() - (f.getDay()+6)%7), dom = new Date(lu.getFullYear(), lu.getMonth(), lu.getDate()+6);
     return `la semana del ${lu.getDate()}${lu.getMonth()!==dom.getMonth()?' de '+MESES[lu.getMonth()]:''} al ${dm(dom)}`;
@@ -196,15 +243,24 @@ const VERBO = ['aparece','se muestra','sale','se presenta'];
 /* ---------- el mensaje de Jasy: lo que hace distinta a cada lectura ----------
    Se elige según el tono de las cartas, las cartas que salieron, el tema y el azar. */
 const ARQ = [
- {id:'alerta', e:'⚠️', t:'Cuidado: algo se acerca', ton:['neg'], cartas:['M15','M16','M18','E3','E5','E7','E9','E10'],
+ {id:'alerta', e:'⚠️', t:'Cuidado: algo se acerca', ton:['neg','mix'], cartas:['M15','M16','M18','E3','E5','E7','E9','E10'],
   v:['Las cartas encienden una luz de alerta: alguien cerca tuyo no es tan sincero como parece. No cuentes tus planes a cualquiera y fijate quién se alegra de verdad con tus logros.',
      'Se asoma un tropiezo en el camino: un gasto inesperado, una discusión o una noticia que no esperabas. No es para asustarse, es para estar alerta: el que avisa no traiciona.',
      'Hay una energía pesada dando vueltas a tu alrededor. Cuidá tu salud, tu plata y tus palabras en los próximos días, y no firmes ni prometas nada a las apuradas.',
-     'Jasy ve nubes negras en el horizonte, pero también ve que tenés con qué enfrentarlas. Prestá atención a las señales chicas: ellas avisan antes de la tormenta.']},
+     'Jasy ve nubes negras en el horizonte, pero también ve que tenés con qué enfrentarlas. Prestá atención a las señales chicas: ellas avisan antes de la tormenta.',
+     'Ojo con una persona cercana: no todo el que te sonríe te quiere bien. Guardá tus secretos y tus planes, y mirá bien quién pregunta demasiado.',
+     'No firmes nada ni prestes plata por ahora. Lo que parece un buen negocio puede esconder una trampa: si te apuran, desconfiá.',
+     'Cuidá tu bolsillo: se viene un gasto que no tenías en cuenta. Guardá algo por si acaso y no gastes en lo que no hace falta.',
+     'Puede haber una discusión fuerte con alguien de tu casa o del trabajo. Antes de responder, contá hasta diez: una palabra de más puede costar caro.',
+     'Alguien habla de vos a tus espaldas. No hace falta enfrentarlo, pero no le des más información: el tiempo pone a cada uno en su lugar.',
+     'Andá con calma en la calle y en el tránsito, sin apuro y con los ojos bien abiertos. Jasy pide prudencia: mejor llegar tarde que no llegar.',
+     'Una promesa que te hicieron puede no cumplirse. No pongas todas tus esperanzas en una sola persona y tené siempre un plan B.']},
  {id:'proteccion', e:'🛡️', t:'Protegé tu energía', ton:['neg','mix'], cartas:['M15','E8','E9','B9','M9'],
   v:['Hay envidia rondando. Una ramita de ruda en el bolsillo o en la puerta de tu casa, como hacían las abuelas, y menos detalles de tu vida en las redes.',
      'Estás dando mucho y recibiendo poco. Aprendé a decir “no” sin culpa: cuidar tu energía también es una forma de quererte.',
-     'Alejate de las personas que solo aparecen para quejarse o pedir. Rodeate de gente que suma y tu suerte va a cambiar sola.']},
+     'Alejate de las personas que solo aparecen para quejarse o pedir. Rodeate de gente que suma y tu suerte va a cambiar sola.',
+     'Hay alguien que te tiene envidia y lo disimula muy bien. No muestres todo lo que tenés ni todo lo que planeás.',
+     'Tu cuerpo te está avisando algo: no ignores ese cansancio o ese dolor. Hacete un control y no lo dejes para después.']},
  {id:'amorpropio', e:'💗', t:'El amor empieza en vos', ton:['mix','neg','pos'], temas:['amor','amistad','salud'], cartas:['M3','M8','M14','M17','C1','C9','O9'],
   v:['Antes de buscar amor afuera, las cartas te piden que lo busques adentro. Mirate al espejo con ternura: nadie te va a querer bien si vos no te querés primero.',
      'Te pasaste mucho tiempo cuidando a los demás. Ahora toca cuidarte a vos: un paseo sin apuro, tu comida favorita, un rato de silencio. Te lo merecés.',
@@ -255,10 +311,15 @@ const ARQ = [
      'Un viaje, una mudanza o un proyecto nuevo te está llamando. Prepará la valija, aunque sea la del alma.',
      'Todo empuja hacia adelante. Si estabas por arrancar algo, este es el momento.']}
 ];
+const AVISOS = ['no es momento de arriesgar: pensalo dos veces antes de decir que sí.', 'cuidá tu bolsillo y no prestes lo que no te sobra.',
+  'no le cuentes tus planes a cualquiera.', 'evitá las discusiones: no todo merece tu respuesta.', 'andá sin apuro en la calle y en el tránsito.',
+  'escuchá a tu cuerpo: si pide descanso, dáselo.', 'desconfiá de las promesas demasiado lindas.', 'no tomes decisiones grandes con la cabeza caliente.',
+  'cuidá lo que escribís en el celular: un mensaje mal leído puede traer problemas.'];
 function elegirArq(tono, sacadas, temaId){
   const ids = sacadas.map(t=>t.c.id);
   const pesos = ARQ.map(a=>{
     let w = a.ton.includes(tono) ? (a.ton[0]===tono ? 3 : 1.5) : 0.15;
+    if(a.id==='alerta') w *= tono==='neg' ? 6 : tono==='mix' ? 3 : 1;   // los avisos tienen que salir de verdad
     if(a.cartas && ids.some(i=>a.cartas.includes(i))) w *= 4;
     if(a.temas && a.temas.includes(temaId)) w *= 2;
     return w;
@@ -284,17 +345,18 @@ function perfilDe(o){
 }
 
 /* ---------- la lectura ---------- */
-function posiciones(tiradaId, per){
-  const TI = TIRADAS[tiradaId], P = PERIODOS[per] || PERIODOS.libre;
-  if(+tiradaId===1) return [{n:P.carta, f:'Para vos'}];
-  if(+tiradaId===3 && P.tres) return P.tres.map((n,k)=>({n, f:P.tresF[k]}));
+function posiciones(tiradaId, per, fecha){
+  const TI = TIRADAS[tiradaId], MO = momento(per, fecha||new Date());
+  if(+tiradaId===1) return [{n:MO.carta, f:'Para vos'}];
+  if(+tiradaId===3 && MO.tres) return MO.tres.map((n,k)=>({n, f:MO.tresF[k]}));
   return TI.pos;
 }
 function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
   const per = PERIODOS[opc.per] ? opc.per : 'libre', fecha = opc.fecha || new Date(), PR = PERIODOS[per];
   rnd = mulberry(opc.seed!=null ? opc.seed : Math.random()*4294967296>>>0);
-  const T = TEMAS[temaId], TI = {...TIRADAS[tiradaId], pos:posiciones(tiradaId, per)}, M = window.TAROT.MAZO;
-  const cuandoTxt = cuando(per, fecha);
+  const MO = momento(per, fecha), fp = MO.f;
+  const T = TEMAS[temaId], TI = {...TIRADAS[tiradaId], pos:posiciones(tiradaId, per, fecha)}, M = window.TAROT.MAZO;
+  const cuandoTxt = cuando(per, fp);
   const nom = pf.nombre;
   const out = [];   // párrafos (HTML)
   const saludo = nom
@@ -303,7 +365,7 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
     : elige(['Alma curiosa: Jasy ya iluminó tus cartas.', 'Mba\'éichapa. Las cartas se abrieron para vos.', 'El ñandutí de tu destino empezó a mostrar su dibujo.',
         'La luna bajó a mirar tu mesa y las cartas hablaron.', 'Bienvenida tu alma: las cartas tienen algo para decirte.', 'Entre el humo del palo santo y la luz de Jasy, tus cartas se revelaron.']);
   const preg = pregunta ? ` Tu pregunta, <i>“${esc(pregunta)}”</i>, quedó flotando sobre la mesa mientras barajábamos.` : '';
-  out.push({cls:'intro', h:`${saludo} Consultaste por <b>${T.t.toLowerCase()}</b> <span class="gn">(${T.gn})</span>${cuandoTxt?` para <b>${cuandoTxt}</b>`:''}.${preg}`});
+  out.push({cls:'intro', h:`${saludo} Consultaste por <b>${T.t.toLowerCase()}</b> <span class="gn">(${T.gn})</span>${cuandoTxt?` para <b>${cuandoTxt}</b>`:''}.${MO.nota?' '+MO.nota:''}${preg}`});
 
   const E = ELEM[pf.signo.el];
   out.push({cls:'astro', h:elige([
@@ -311,7 +373,7 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
       `Tu signo es <b>${pf.signo.s}︎ ${pf.signo.n}</b>: ${pf.signo.pl} te gobierna y el elemento ${E.desc.replace(/,.*/,'')} corre por tus venas. Por eso tenés ${pf.signo.r}. `,
       `Las estrellas te marcaron con <b>${pf.signo.s}︎ ${pf.signo.n}</b>, con la fuerza del ${E.desc.replace(/,.*/,'')} y la guía de ${pf.signo.pl}. Tu don es ${pf.signo.r}. `])
     + `Tu número de vida es el <b>${pf.nv}</b>, ${NUM[pf.nv]}, y este ${pf.anio} es para vos ${ANIO[pf.ap]}. `
-    + (per==='dia'||per==='semana'||per==='mes' ? `Para ${PR.ese} tu número personal es el <b>${numPlazo(pf,per,fecha)}</b>, que anuncia ${PR.un} ${ENERGIA[numPlazo(pf,per,fecha)]}. ` : '')
+    + (per==='dia'||per==='semana'||per==='mes' ? `Para ${PR.ese} tu número personal es el <b>${numPlazo(pf,per,fp)}</b>, que anuncia ${PR.un} ${ENERGIA[numPlazo(pf,per,fp)]}. ` : '')
     + `En ${T.nom}, tu elemento te dice que la clave es ${E.clave}.`});
 
   // cada carta
@@ -363,8 +425,10 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
   const cierre = cuandoTxt ? `${cap(cuandoTxt.replace(/^el año /,''))}: ${T.cierre[tono].charAt(0).toLowerCase()+T.cierre[tono].slice(1)}` : T.cierre[tono];
   const arq = elegirArq(tono, sacadas, temaId), arqTxt = elige(arq.v);
   out.push({cls:'arq', h:`<span class="pos">${arq.e} El mensaje de Jasy: ${arq.t}</span>${arqTxt}`});
-  out.push({cls:'final', h:`<b>${cierre}</b> ${N===5?'La carta del consejo':'Tu carta clave'}, ${art(clave.c)}${clave.c.nombre}, te susurra: <i>«${consejo}»</i> ${elige(T.extra.filter(e=>e!==consejo))}`});
-  out.push({cls:'suerte', h:`Tu número de la suerte: <b>${numSuerte}</b> · Color: <b>${E.color}</b> · ${per==='dia' ? `Hora de suerte: <b>${(numSuerte*7)%12+9} h</b>` : `Día favorable: <b>${DIAS[pf.signo.pl]}</b>`} · Piedra: <b>${E.piedra}</b>`});
+  const quien = per==='dia' ? (difDias(fp)===1 ? 'Mañana' : 'Hoy') : per==='libre' ? 'Por ahora' : cap(PR.ese);
+  const aviso = (tono==='neg' || (tono==='mix' && rnd()<0.35)) ? ` <b>⚠️ Ojo:</b> ${quien.toLowerCase()==='por ahora'?'por ahora':quien.toLowerCase()} ${elige(AVISOS)}` : '';
+  out.push({cls:'final', h:`<b>${cierre}</b>${aviso} ${N===5?'La carta del consejo':'Tu carta clave'}, ${art(clave.c)}${clave.c.nombre}, te susurra: <i>«${consejo}»</i> ${elige(T.extra.filter(e=>e!==consejo))}`});
+  out.push({cls:'suerte', h:`Tu número de la suerte: <b>${numSuerte}</b> · Color: <b>${E.color}</b> · ${per==='dia' ? `Hora de suerte: <b>${MO.lo + (numSuerte*7) % (MO.hi-MO.lo+1)} h</b>` : `Día favorable: <b>${DIAS[pf.signo.pl]}</b>`} · Piedra: <b>${E.piedra}</b>`});
   out.push({cls:'despedida', h:elige(['Que Jasy y Kuarahy te acompañen. ¡Jajotopata!','Guardá esta lectura en el corazón y volvé cuando la luna cambie. ¡Jajotopata!','Las cartas muestran caminos, pero quien camina sos vos. ¡Jajotopata!',
     'Que el ñandutí de tu destino se teja con hilos de oro. ¡Jajotopata!','Andá en paz, que las estrellas cuidan a quien se anima a preguntar. ¡Jajotopata!','Volvé cuando el corazón te lo pida: la mesa siempre te espera. ¡Jajotopata!'])});
 
@@ -375,5 +439,5 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
 function art(c){ return c.mayor ? '' : (c.rango===10||c.rango===12 ? 'la ' : 'el '); }
 function esc(s){ return String(s).replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
-window.LECTURA = { SIGNOS, TEMAS, TIRADAS, PERIODOS, ELEM, perfil, perfilDe, leer, posiciones, cuando, signo, numeroVida, esc, cap };
+window.LECTURA = { momento, SIGNOS, TEMAS, TIRADAS, PERIODOS, ELEM, perfil, perfilDe, leer, posiciones, cuando, signo, numeroVida, esc, cap };
 })();
