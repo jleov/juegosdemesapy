@@ -66,6 +66,13 @@ input[type=password]{width:100%;padding:11px 12px;border:1px solid #c9c2a8;borde
 .st-otras b{display:block;font-size:14px}
 .st-otras em{font-style:normal;font-weight:900;font-size:18px;color:#7b3fb8}
 .st-otras small{color:var(--muted)}
+.st-busca{width:100%;padding:9px 12px;border:1px solid #c9c2a8;border-radius:10px;margin:4px 0 8px}
+.st-par{border-top:1px solid #e6dcc0;padding:7px 2px;display:grid;grid-template-columns:30px 1fr;gap:8px;align-items:start}
+.st-par img{width:30px;height:30px;border-radius:7px}
+.st-par .cu{font-size:12px;color:var(--muted)}
+.st-par .js span{display:inline-block;background:#fff;border:1px solid #e0d5b5;border-radius:999px;padding:1px 9px;margin:2px 4px 0 0;font-size:13px;font-weight:700}
+.st-par .js span.bot{opacity:.55;font-weight:400}
+.st-par .js span.hit{background:var(--gold);border-color:#d9a52a}
 .st-ej{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:3px}
 @media(max-width:520px){.st-bar{grid-template-columns:24px 100px 1fr}.st-bar img{width:24px;height:24px}}
 </style>
@@ -223,7 +230,7 @@ function roomHTML(k, r){
 const ST_N = {banquero:['Banquero Paraguayo'], loteria:['Lotería'], kombate:['Face Punch'], petei:['Peteĩ'], escoba:['Escoba de 15'], impostor:['El Impostor'], tarot:['Tarot Jasy'], versiculo:['Versículo del Día'], billar:['Billar PY'], bolos:['Bolos PY'], minigolf:['Mini Golf PY'], basta:['Basta PY'], tejo:['Tejo PY'], botones:['Botones PY'], naval:['Batalla Naval PY'], mavapa:['¿Mávapa?'], mavaiko:['¿Mávaiko Ojuka?'], ajedrez:['Ajedrez y Damas PY'], salon:['Salón de Belleza PY'], odisea:['Odisea','../icon-192.png'], salas:['Salas de Voz'], karaoke:['Sala de Karaoke','../icon-192.png']};
 // secciones que no son juegos: se muestran aparte, con lo que la gente hizo en cada una
 const OTRAS = {tarot:'lecturas de cartas', versiculo:'versículos pedidos', salas:'entradas a una sala de voz', karaoke:'entradas a una sala de karaoke'};
-const ST = {dias:30, que:'p', datos:null, err:'', cargando:false};
+const ST = {dias:30, que:'p', datos:null, err:'', cargando:false, busca:'', ver:40};
 const ST_API = /(^|\.)juegospy\.com$|\.pages\.dev$/.test(location.hostname) ? '/api/stats' : 'https://juegospy.com/api/stats';
 async function cargarStats(){
   if(!A.key || ST.cargando) return;
@@ -237,6 +244,23 @@ async function cargarStats(){
   }catch(e){ ST.err = e.message==='falta-db' ? 'falta-db' : 'No se pudieron traer los números ('+e.message+').'; }
   ST.cargando=false; renderStats();
 }
+// lista de partidas con sus jugadores (se filtra por nombre o juego sin volver a pedir los datos)
+const sinAcento = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function partidasHTML(){
+  const desdeTs = ST.dias>=3650 ? 0 : Date.parse(diaMenos(ST.datos.hoy, ST.dias-1)+'T03:00:00Z');
+  const b = sinAcento(ST.busca).trim();
+  const todas = (ST.datos.partidas||[]).filter(p=>p.ts>=desdeTs);
+  const ps = !b ? todas : todas.filter(p=>sinAcento((ST_N[p.juego]||[p.juego])[0]).includes(b) || p.j.some(x=>sinAcento(x.n).includes(b)));
+  if(!ps.length) return '<div class="empty">'+(b?'No hay partidas con “'+esc(ST.busca)+'” en este período.':'Todavía no hay partidas anotadas en este período.')+'</div>';
+  const cuando = t => new Date(t).toLocaleString('es-PY', {timeZone:'America/Asuncion', weekday:'short', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+  return (b?'<div class="muted">'+ps.length+' partida'+(ps.length===1?'':'s')+' con “'+esc(ST.busca)+'”</div>':'')
+    + ps.slice(0, ST.ver).map(p=>{ const n=ST_N[p.juego]||[p.juego]; const ic=n[1]||('../'+p.juego+'/icon-192.png');
+      return '<div class="st-par"><img src="'+ic+'" alt="" onerror="this.style.visibility=\'hidden\'"><div><div class="cu"><b style="color:#333">'+esc(n[0])+'</b> · '+esc(cuando(p.ts))+'</div><div class="js">'
+        + p.j.map(x=>'<span class="'+(x.b?'bot':'')+(b&&sinAcento(x.n).includes(b)?' hit':'')+'">'+(x.b?'🤖 ':'')+esc(x.n)+'</span>').join('') + '</div></div></div>'; }).join('')
+    + (ps.length>ST.ver ? '<button class="btn sm gray wide" style="margin-top:8px" data-mas="1">Ver más ('+(ps.length-ST.ver)+')</button>' : '');
+}
+document.addEventListener('input', e=>{ if(e.target.id!=='stBusca') return; ST.busca=e.target.value; ST.ver=40; const el=$('#stPartidas'); if(el) el.innerHTML=partidasHTML(); });
+document.addEventListener('click', e=>{ if(!e.target.closest('#stats [data-mas]')) return; ST.ver+=60; const el=$('#stPartidas'); if(el) el.innerHTML=partidasHTML(); });
 function diaMenos(hoy, n){ const d=new Date(hoy+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()-n); return d.toISOString().slice(0,10); }
 function stTab(k, v, t){ return '<button class="'+(ST[k]===v?'on':'')+'" data-k="'+k+'" data-v="'+v+'">'+t+'</button>'; }
 document.addEventListener('click', e=>{ const b=e.target.closest('#stats [data-k]'); if(!b) return; const k=b.dataset.k; ST[k] = k==='dias' ? +b.dataset.v : b.dataset.v; renderStats(); });
@@ -279,12 +303,15 @@ function renderStats(){
       +'<div class="st-dias">'+ds.map(d=>{ const v=(dias[d]||{})[k]||0; return '<div style="height:'+Math.round(v/mx*100)+'%" title="'+f(d)+': '+v+'"></div>'; }).join('')+'</div>'
       +'<div class="st-ej"><span>'+f(ds[0])+'</span><span>máximo en un día: '+mx+'</span><span>'+f(ds[ds.length-1])+'</span></div>';
   }
-  h+='<p class="muted" style="margin-bottom:0">Se cuenta desde que se agregó el contador. “Partida” = una sala que pasó de la espera a jugar (también contra bots). “Entrada” = alguien abrió el juego o la sección (una vez por pestaña). En otras secciones se cuenta cada lectura, versículo o entrada a una sala. No se guarda nada de las personas.</p>';
+  h+='<h3 style="margin:18px 0 2px;font-size:15px">🕑 Quiénes jugaron</h3><input class="st-busca" id="stBusca" placeholder="Buscar un nombre (ej.: Juan) o un juego" value="'+esc(ST.busca)+'"><div id="stPartidas">'+partidasHTML()+'</div>';
+  h+='<p class="muted" style="margin-bottom:0">Se cuenta desde que se agregó el contador. “Partida” = una sala que pasó de la espera a jugar (también contra bots). “Entrada” = alguien abrió el juego o la sección (una vez por pestaña). En otras secciones se cuenta cada lectura, versículo o entrada a una sala. De las personas solo se guarda el nombre que pusieron en el juego (las partidas con nombres se borran solas a los 90 días).</p>';
   el.innerHTML=h;
 }
 
 function render(){
-  renderStats(); if(A.key && !ST.datos && !ST.cargando && !ST.err) cargarStats();
+  // el recuadro de estadísticas se arma solo al entrar o salir (si no, se borraría lo que se escribe en el buscador)
+  if(!!A.key !== ST.mostrado){ ST.mostrado=!!A.key; renderStats(); }
+  if(A.key && !ST.datos && !ST.cargando && !ST.err) cargarStats();
   const el=$('#body');
   if(!A.key){
     el.innerHTML=`<div class="box"><p style="margin-top:0">Escribí la contraseña del dueño (la misma del panel del Banquero). Se pide una sola vez en cada aparato.</p>

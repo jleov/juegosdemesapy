@@ -114,9 +114,11 @@
   const API = /(^|\.)juegospy\.com$|\.pages\.dev$/.test(h) ? '/api/stats' : 'https://juegospy.com/api/stats';
   const partes = location.pathname.split('/').filter(Boolean).filter(x => !/\.html?$/.test(x));
   const JUEGO = partes.length ? partes[partes.length-1] : 'portada';
-  function contar(e){
+  function contar(e, j){
     try{
-      const body = JSON.stringify({g:JUEGO, e});
+      const o = {g:JUEGO, e};
+      if(Array.isArray(j) && j.length) o.j = j.slice(0, 12).map(p => ({n:String(p.n||'').slice(0, 24), b:p.b ? 1 : 0}));
+      const body = JSON.stringify(o);
       if(navigator.sendBeacon && navigator.sendBeacon(API, new Blob([body], {type:'text/plain'}))) return;
       fetch(API, {method:'POST', body, keepalive:true}).catch(()=>{});
     }catch(err){}

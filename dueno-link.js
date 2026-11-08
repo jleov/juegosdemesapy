@@ -36,7 +36,7 @@
     if(!i || !i.code || !window.JPY_CONTAR) return;
     const g = L.cfg.game;
     const ya = g==='kombate' ? (i.kind!=='duel' || !!i.guest) : (!!i.phase && i.phase!=='lobby');
-    if(ya && !jugando[i.code]) window.JPY_CONTAR('p');
+    if(ya && !jugando[i.code]) window.JPY_CONTAR('p', (i.players||[]).filter(p=>p && p.n).map(p=>({n:p.n, b:!!p.bot})));
     jugando[i.code] = ya;
   }
   function tick(){
