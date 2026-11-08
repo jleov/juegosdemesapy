@@ -93,6 +93,7 @@ $('#btnConsultar').onclick = ()=>{
   ir('pMesa'); ritual();
 };
 function ir(id){
+  try{ voz.parar(); }catch(e){}
   document.querySelectorAll('.pant').forEach(p=>p.classList.toggle('on', p.id===id));
   window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
 }
@@ -119,7 +120,7 @@ async function ritual(){
   const TI = {...L.TIRADAS[D.tirada], pos:L.posiciones(D.tirada, D.per)};
   verModo(false);
   chips(pf, T, D.per);
-  $('#lectura').innerHTML=''; $('#finBtns').classList.add('oculto'); $('#btnLeer').classList.add('oculto'); $('#btnTodas').classList.add('oculto');
+  voz.parar(); $('#lectura').innerHTML=''; $('#finBtns').classList.add('oculto'); $('#btnLeer').classList.add('oculto'); $('#btnTodas').classList.add('oculto');
   const zona = $('#zonaMazo'); zona.classList.remove('chica');
   zona.querySelectorAll('.mz,.pila').forEach(e=>e.remove());
   const tir = $('#tirada'); tir.innerHTML=''; tir.className='t'+D.tirada;
@@ -290,8 +291,55 @@ function cajaLectura(r, T, TI, titulo){
   box.innerHTML = `<h2>${titulo}</h2><div class="sub">${T.e} ${T.t} · ${TI.n}${r.cuando?` · ${L.cap(r.cuando)}`:''}</div><div class="sep">✦ ✦ ✦</div>`
     + r.parrafos.map(p=>`<p class="${p.cls}">${p.pos?`<span class="pos">${p.pos}</span>`:''}${p.h}</p>`).join('');
   $('#lectura').innerHTML=''; $('#lectura').appendChild(box);
+  voz.boton(box);
   return box;
 }
+/* ---------- que te lea Jasy: voz del navegador (sin servidores) ---------- */
+const voz = (function(){
+  const ok = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  let activa=false, corrida=0, btn=null, vozSel=null;
+  function elegirVoz(){
+    const vs = speechSynthesis.getVoices().filter(v=>/^es/i.test(v.lang));
+    const pts = v => (/es[-_](AR|PY|UY)/i.test(v.lang)?40 : /es[-_](419|US|MX|CO|CL|PE)/i.test(v.lang)?25 : /es[-_]ES/i.test(v.lang)?10 : 5)
+      + (/natural|online|neural|google/i.test(v.name)?20:0) + (/sabina|helena|laura|paulina|elena|dalia|elvira|m[oó]nica|lupe|camila|valentina|female/i.test(v.name)?8:0);
+    return vs.sort((a,b)=>pts(b)-pts(a))[0] || null;
+  }
+  if(ok){ vozSel = elegirVoz(); speechSynthesis.addEventListener?.('voiceschanged', ()=>{ vozSel = elegirVoz(); }); }
+  const limpiar = t => t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\uFE0E\uFE0F✦»«]/gu,' ').replace(/\s*·\s*/g,'. ').replace(/(\d) h\b/g,'$1 horas').replace(/\s+/g,' ').trim();
+  const quitar = ()=> document.querySelectorAll('#lectura .habla').forEach(x=>x.classList.remove('habla'));
+  function pintar(){ if(btn) btn.textContent = activa ? '⏹ Parar la voz' : '🔊 Que me lo lea Jasy'; }
+  function parar(){ activa=false; corrida++; if(ok) speechSynthesis.cancel(); quitar(); pintar(); }
+  function leer(box){
+    parar(); activa=true; pintar();
+    const yo = corrida, items=[];
+    box.querySelectorAll('h2, p').forEach(p=>{
+      (limpiar(p.innerText||p.textContent).match(/[^.!?…]+[.!?…]*/g)||[]).forEach(fr=>{ fr=fr.trim(); if(fr.length>1) items.push({p, fr}); });
+    });
+    let i=0, ant=null;
+    const sig = ()=>{
+      if(!activa || yo!==corrida) return;
+      if(i>=items.length){ parar(); return; }
+      const it = items[i++];
+      if(it.p!==ant){ quitar(); it.p.classList.add('habla'); it.p.scrollIntoView({behavior:MOV?'smooth':'auto', block:'center'}); ant=it.p; }
+      const u = new SpeechSynthesisUtterance(it.fr);
+      u.lang = vozSel ? vozSel.lang : 'es-AR'; if(vozSel) u.voice = vozSel; u.rate = .95; u.pitch = 1.05;
+      u.onend = ()=>{ if(yo===corrida) sig(); };
+      u.onerror = e=>{ if(yo===corrida && !/interrupted|canceled/.test(e.error)) sig(); };
+      speechSynthesis.speak(u);
+    };
+    sig();
+  }
+  function boton(box){
+    parar(); btn=null;
+    if(!ok) return;
+    btn = document.createElement('button'); btn.type='button'; btn.className='btn sec escuchar';
+    btn.onclick = ()=>{ sonido.toque(); activa ? parar() : leer(box); };
+    box.querySelector('.sep').after(btn); pintar();
+  }
+  window.addEventListener('pagehide', parar);
+  return {boton, parar};
+})();
+
 async function mostrarLectura(pf, sacadas, fecha){
   const T=L.TEMAS[D.tema], TI=L.TIRADAS[D.tirada];
   const preg = ($('#fPreg').value||'').trim().slice(0,160);
