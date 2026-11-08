@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Versículo del Día como app y abrirlo sin conexión.
-const CACHE = 'versiculo-v1';
+const CACHE = 'versiculo-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './versiculos.js', './app.js'];
 
 self.addEventListener('install', e => {

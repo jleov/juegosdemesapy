@@ -187,43 +187,86 @@ pintarDia();
 // si la página queda abierta y pasa la medianoche, se actualiza
 setInterval(()=>{ if(hoyR && fechaCod(new Date())!==hoyR.o.f) pintarDia(); }, 60000);
 
-/* ---------- la Biblia: páginas ---------- */
-const LIBROS_AT = ['Génesis','Éxodo','Rut','1 Samuel','Salmos','Proverbios','Eclesiastés','Isaías','Jeremías','Miqueas'];
-const LIBROS_NT = ['Mateo','Marcos','Lucas','Juan','Hechos','Romanos','1 Corintios','Efesios','Filipenses','Hebreos'];
-let numPag = 400 + Math.floor(Math.random()*300);
-function paginaFalsa(n){
-  const lib = (n<700 ? LIBROS_AT : LIBROS_NT)[Math.floor(n/37)%10];
-  return `<div class="lineas"><div class="tit">${lib.toUpperCase()}</div><div class="col"></div></div><span class="num">${n}</span>`;
-}
+/* ---------- la Biblia: páginas con texto real (dos columnas, como una Biblia impresa) ---------- */
+const ORDEN = ['GEN','EXO','LEV','NUM','DEU','JOS','JDG','RUT','1SA','2SA','1KI','2KI','1CH','2CH','EZR','NEH','EST','JOB','PSA','PRO','ECC','SOL','ISA','JER','LAM','EZE','DAN','HOS','JOE','AMO','OBA','JON','MIC','NAH','HAB','ZEP','HAG','ZEC','MAL',
+  'MAT','MAR','LUK','JOH','ACT','ROM','1CO','2CO','GAL','EPH','PHI','COL','1TH','2TH','1TI','2TI','TIT','PHM','HEB','JAM','1PE','2PE','1JO','2JO','3JO','JUD','REV'];
+const libCod = id => id.slice(0,3);
+const capDe = id => +id.slice(3).split(':')[0];
+// pasajes de cada libro, ordenados por capítulo y versículo
+const PORLIB = {};
+IDS.forEach(id=>{ (PORLIB[libCod(id)] = PORLIB[libCod(id)] || []).push(id); });
+for(const k in PORLIB) PORLIB[k].sort((a,b)=>capDe(a)-capDe(b) || V[a][3]-V[b][3]);
+const LIBS = Object.keys(PORLIB).sort((a,b)=>ORDEN.indexOf(a)-ORDEN.indexOf(b));
+// toda la base en el orden de la Biblia (para llenar páginas seguidas)
+const SEQ = [].concat(...LIBS.map(l=>PORLIB[l]));
+const POS = Object.fromEntries(SEQ.map((id,i)=>[id,i]));
+const nomLib = id => libroDe(V[id][0]);
 function libroDe(cita){ return cita.replace(/\s+\d+:[\d-]+$/,''); }
+
+function bloqueHTML(id){
+  const v = V[id], c = capDe(id), a = v[3], esSal = libCod(id)==='PSA';
+  let h = '<p>';
+  if(a===1) h = (esSal ? `<span class="st">Salmo ${c}</span>` : '') + `<p><span class="cn">${c}</span>`;
+  v[4].forEach((t,i)=>{ h += (a===1 && i===0 ? '' : `<sup>${a+i}</sup>`) + esc(t) + ' '; });
+  return h + '</p>';
+}
+// arma el cuerpo de una página juntando pasajes seguidos del mismo libro
+function cuerpoDesde(desde, hacia, max){
+  const L = SEQ, out = []; let n = 0, i = desde;
+  while(n < max && i >= 0 && i < L.length){ const b = bloqueHTML(L[i]); hacia>0 ? out.push(b) : out.unshift(b); n += V[L[i]][1].length; i += hacia; }
+  return {html: out.join(''), primero: L[Math.max(0, hacia>0 ? desde : i+1)]};
+}
+function hojaHTML(cab, num, cuerpo, lado, extra=''){
+  const izq = lado==='izq';
+  return `<div class="tx${extra}"><div class="cb">${izq?`<b>${num}</b><span>${cab}</span>`:`<span>${cab}</span><b>${num}</b>`}</div><div class="cols">${cuerpo}</div></div><div class="brillo"></div>`;
+}
+let numPag = 300 + Math.floor(Math.random()*500);
+function paginaFalsa(n, lado){
+  const i = Math.floor(Math.random()*(SEQ.length-12));
+  const c = cuerpoDesde(i, 1, 3300);
+  return hojaHTML(`${esc(nomLib(c.primero))} ${capDe(c.primero)}`, n, c.html, lado);
+}
 function paginaVerso(R){
-  return `<div class="verso"><div class="ref">${esc(R.cita)}</div><div class="tx"><mark>${esc(R.txt)}</mark></div></div><span class="num">${numPag+1}</span>`;
+  const v = V[R.id], lib = libCod(R.id), i = POS[R.id], c = capDe(R.id), a = v[3];
+  let h = '';
+  if(a===1 && lib==='PSA') h += `<span class="st">Salmo ${c}</span>`;
+  h += '<p>' + (a===1 ? `<span class="cn">${c}</span>` : '') + (v[5] ? `<sup>${a-1}</sup>${esc(v[5])} ` : '');
+  h += v[4].map((t,k)=>`<mark>${a===1 && k===0 ? '' : `<sup>${a+k}</sup>`}${esc(t)}</mark>`).join(' ');
+  h += (v[6] ? ` <sup>${a+v[4].length}</sup>${esc(v[6])}` : '') + '</p>';
+  h += cuerpoDesde(i+1, 1, 2200 - v[1].length*1.3).html;
+  return hojaHTML(`${esc(libroDe(v[0]))} ${c}`, numPag+1, h, 'der', ' final');
 }
-function paginaTitulo(R){
-  const lib = libroDe(R.cita), c = R.cita.match(/(\d+):/)[1];
-  return `<div class="lineas"><div class="tit" style="font-size:clamp(11px,3.4vw,20px);margin:8% 0 3%">${esc(lib.toUpperCase())}</div>
-    <div class="tit" style="font-size:clamp(8px,2vw,12px);color:#9a7a48;margin-bottom:8%">${lib==='Salmos'?'SALMO':'CAPÍTULO'} ${c}</div><div class="col"></div></div><span class="num">${numPag}</span>`;
+function paginaAntes(R){
+  const i = POS[R.id];
+  const c = cuerpoDesde(i>8 ? i-1 : SEQ.length-1, -1, 3300);
+  return hojaHTML(`${esc(nomLib(c.primero))} ${capDe(c.primero)}`, numPag, c.html, 'izq');
 }
-function libroInicial(){ $('#pIzq').innerHTML = paginaFalsa(numPag); $('#pDer').innerHTML = paginaFalsa(numPag+1); }
+function ajustar(){
+  const p = $('#pDer'); if(!p) return;
+  const w = p.offsetWidth; if(w) $('#libro').style.setProperty('--k', (w/300).toFixed(4));
+}
+addEventListener('resize', ajustar);
+function libroInicial(){ $('#pIzq').innerHTML = paginaFalsa(numPag, 'izq'); $('#pDer').innerHTML = paginaFalsa(numPag+1, 'der'); ajustar(); }
 
 /* una hoja que pasa de derecha a izquierda */
 let hojasVivas = 0;
 function pasarHoja(dur, siguienteDer, siguienteIzq){
-  const libro = $('#libro'), h = document.createElement('div');
+  const base = $('#base'), h = document.createElement('div');
   h.className = 'hoja';
-  h.innerHTML = `<div class="f">${$('#pDer').innerHTML}<div class="sombra"></div></div><div class="d">${siguienteIzq}<div class="sombra"></div></div>`;
-  libro.appendChild(h);
+  h.innerHTML = `<div class="f papel">${$('#pDer').innerHTML}<div class="sombra"></div></div><div class="d papel">${siguienteIzq}<div class="sombra"></div></div>`;
+  base.insertBefore(h, base.querySelector('.lomo'));
   $('#pDer').innerHTML = siguienteDer;   // lo que queda debajo de la hoja que se levanta
   hojasVivas++;
   const fin = ()=>{ $('#pIzq').innerHTML = siguienteIzq; h.remove(); hojasVivas--; };
   if(!MOV || !h.animate){ fin(); return Promise.resolve(); }
-  const curva = 'cubic-bezier(.45,.05,.35,1)';
+  const curva = 'cubic-bezier(.42,.08,.32,1)';
   const a = h.animate([
-    {transform:'rotateY(0deg)'},
-    {transform:'rotateY(-90deg) skewY(-2deg)', offset:.5},
-    {transform:'rotateY(-180deg)'}
+    {transform:'rotateY(-5deg) translateZ(1px)'},
+    {transform:'rotateY(-60deg) translateZ(14px) skewY(-1.5deg)', offset:.3},
+    {transform:'rotateY(-120deg) translateZ(14px) skewY(1.5deg)', offset:.7},
+    {transform:'rotateY(-175deg) translateZ(1px)'}
   ], {duration:dur, easing:curva, fill:'forwards'});
-  h.querySelectorAll('.sombra').forEach(s=>s.animate([{opacity:0},{opacity:.9,offset:.5},{opacity:0}], {duration:dur, easing:curva}));
+  h.querySelectorAll('.sombra').forEach(s=>s.animate([{opacity:0},{opacity:1,offset:.5},{opacity:0}], {duration:dur, easing:curva}));
   return a.finished.then(fin, fin);
 }
 
@@ -252,13 +295,14 @@ function empezar(){
   verModo(false);
   cabecera(R);
   $('#res').innerHTML=''; $('#finBtns').classList.add('oculto');
-  const esc_ = $('#escena'); esc_.classList.remove('fin','luz');
-  libroInicial();
+  $('#escena').classList.remove('fin','luz');
   estado='listo'; vel=0; acum=0;
   msg(R.nombre ? `${esc(R.nombre)}, pensá en lo que llevás en el corazón…` : 'Pensá en lo que llevás en el corazón…');
   $('#gesto').style.opacity=1;
   $('#gesto').textContent = matchMedia('(pointer:coarse)').matches ? 'Mantené apretada la Biblia y soltá · o deslizá la página' : 'Mantené apretado el clic y soltá · o arrastrá la página';
   ir('pBiblia');
+  libroInicial();
+  sonido.abrir();
 }
 $('#btnAbrir').onclick = ()=>{ sonido.toque(); empezar(); };
 $('#btnOtra').onclick = ()=>{ sonido.toque(); empezar(); };
@@ -310,10 +354,10 @@ function bucle(){
       if(vel < 1.5){ ultimaHoja(mi); return; }
     }
     acum += vel*dt;
-    if(acum >= 1 && hojasVivas < 9){
+    if(acum >= 1 && hojasVivas < 8){
       acum -= 1; numPag += 2;
-      const dur = Math.max(230, Math.min(1000, 1700/vel));
-      pasarHoja(dur, paginaFalsa(numPag+1), paginaFalsa(numPag));
+      const dur = Math.max(260, Math.min(1000, 1800/vel));
+      pasarHoja(dur, paginaFalsa(numPag+1, 'der'), paginaFalsa(numPag, 'izq'));
       sonido.hoja(Math.min(1, 3/vel+.25));
     }
     requestAnimationFrame(paso);
@@ -323,28 +367,28 @@ function bucle(){
 async function ultimaHoja(mi){
   estado = 'revelando'; numPag += 2;
   sonido.hoja(1);
-  await pasarHoja(1300, paginaVerso(R), paginaTitulo(R));
+  await pasarHoja(1400, paginaVerso(R), paginaAntes(R));
   if(mi!==corrida) return;
   revelar(mi);
 }
 function revelar(mi){
-  const esc_ = $('#escena'); esc_.classList.add('fin','luz');
+  $('#escena').classList.add('fin','luz');
   sonido.revelar();
-  setTimeout(()=>{ const vs = $('#pDer .verso'); if(vs) vs.classList.add('ve'); }, 60);
+  setTimeout(()=>{ const tx = $('#pDer .tx'); if(tx) tx.classList.add('ve'); }, 80);
   chispas($('#pDer'));
   msg(R.nombre ? `Este es el versículo para ${esc(R.nombre)} ✦` : 'Este es tu versículo ✦');
-  setTimeout(()=>{ if(mi===corrida) mostrarResultado(R, true); }, MOV?900:0);
+  setTimeout(()=>{ if(mi===corrida) mostrarResultado(R, true); }, MOV?1100:0);
   estado = 'fin';
 }
 function chispas(el){
   if(!MOV) return;
   const esc_ = $('#escena'), rb = el.getBoundingClientRect(), re = esc_.getBoundingClientRect();
-  for(let i=0;i<22;i++){
+  for(let i=0;i<26;i++){
     const c=document.createElement('div'); c.className='chispa'; esc_.appendChild(c);
-    const x = rb.left-re.left + rb.width*(.2+Math.random()*.6), y = rb.top-re.top + rb.height*(.3+Math.random()*.4);
-    const ang = Math.random()*6.283, d = 40+Math.random()*90;
-    c.animate([{transform:`translate(${x}px,${y}px) scale(1)`,opacity:1},{transform:`translate(${x+Math.cos(ang)*d}px,${y+Math.sin(ang)*d-30}px) scale(.2)`,opacity:0}],
-      {duration:900+Math.random()*700, easing:'cubic-bezier(.2,.7,.3,1)'}).finished.then(()=>c.remove(), ()=>c.remove());
+    const x = rb.left-re.left + rb.width*(.15+Math.random()*.7), y = rb.top-re.top + rb.height*(.2+Math.random()*.5);
+    const ang = Math.random()*6.283, d = 40+Math.random()*100;
+    c.animate([{transform:`translate(${x}px,${y}px) scale(1)`,opacity:1},{transform:`translate(${x+Math.cos(ang)*d}px,${y+Math.sin(ang)*d-40}px) scale(.2)`,opacity:0}],
+      {duration:1000+Math.random()*800, easing:'cubic-bezier(.2,.7,.3,1)'}).finished.then(()=>c.remove(), ()=>c.remove());
   }
 }
 
@@ -361,7 +405,7 @@ function mostrarResultado(R, animar, bajar=true){
   if(!animar || !MOV) els.forEach(e=>e.classList.add('ve'));
   else els.forEach((e,i)=>setTimeout(()=>e.classList.add('ve'), 150+i*260));
   $('#finBtns').classList.toggle('oculto', $('#app').classList.contains('ver'));
-  if(animar && bajar) setTimeout(()=>{ const b=$('#res .box'); if(b && b.getBoundingClientRect().top > innerHeight*.7) b.scrollIntoView({behavior:MOV?'smooth':'auto', block:'start'}); }, 700);
+  if(animar && bajar) setTimeout(()=>{ const b=$('#res .box'); if(b && b.getBoundingClientRect().top > innerHeight*.7) b.scrollIntoView({behavior:MOV?'smooth':'auto', block:'start'}); }, 900);
 }
 
 /* ---------- compartir ---------- */
@@ -391,61 +435,83 @@ function partir(ctx, txt, ancho){
   for(const w of txt.split(/\s+/)){ const p = lin ? lin+' '+w : w; if(ctx.measureText(p).width>ancho && lin){ out.push(lin); lin=w; } else lin=p; }
   if(lin) out.push(lin); return out;
 }
+/* nube: muchas bolitas blancas con borde suave (sirve para el fondo y para la imagen) */
+function nube(x, cx, cy, w, sem, alfa=1){
+  let s = sem>>>0 || 1; const rr=()=>((s=Math.imul(s^s>>>15,2246822507)+0x6D2B79F5|0)>>>0)/4294967296;
+  const n = 9 + Math.floor(rr()*6);
+  for(let i=0;i<n;i++){
+    const t = i/(n-1), px = cx + (t-.5)*w*(.9+rr()*.15), alto = Math.sin(t*Math.PI);
+    const r = w*(.1 + alto*.16 + rr()*.06), py = cy - alto*w*.08 + rr()*w*.03;
+    const g = x.createRadialGradient(px, py-r*.3, r*.1, px, py, r);
+    g.addColorStop(0, `rgba(255,255,255,${.95*alfa})`); g.addColorStop(.55, `rgba(255,255,255,${.75*alfa})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, 6.283); x.fill();
+  }
+  // base con sombra celeste suave
+  const g2 = x.createRadialGradient(cx, cy+w*.08, w*.05, cx, cy+w*.08, w*.5);
+  g2.addColorStop(0, `rgba(190,215,240,${.35*alfa})`); g2.addColorStop(1, 'rgba(190,215,240,0)');
+  x.fillStyle = g2; x.beginPath(); x.ellipse(cx, cy+w*.08, w*.5, w*.1, 0, 0, 6.283); x.fill();
+}
+function rayos(x, cx, cy, largo, n, ancho, alfa, giro=0){
+  x.save(); x.translate(cx, cy); x.globalCompositeOperation='lighter';
+  for(let i=0;i<n;i++){
+    x.save(); x.rotate(giro + i/n*6.283);
+    const g = x.createLinearGradient(0,0,0,largo); g.addColorStop(0,`rgba(255,240,190,${alfa})`); g.addColorStop(1,'rgba(255,240,190,0)');
+    x.fillStyle = g; x.beginPath(); x.moveTo(-ancho*.15,0); x.lineTo(ancho*.15,0); x.lineTo(ancho,largo); x.lineTo(-ancho,largo); x.closePath(); x.fill();
+    x.restore();
+  }
+  x.restore();
+}
 async function hacerImagen(R){
   const W=1080, H=1920, cv=document.createElement('canvas'); cv.width=W; cv.height=H;
   const x=cv.getContext('2d');
-  try{ await Promise.all(['700 40px Cinzel','italic 600 40px "Cormorant Garamond"','500 40px "Cormorant Garamond"','italic 500 40px "Cormorant Garamond"'].map(f=>document.fonts.load(f))); }catch(e){}
-  const CIN='Cinzel,Georgia,serif', COR='"Cormorant Garamond",Georgia,serif', G='#e9c46a', GL='#fff0c2', SU='#d8ccb4';
-  // fondo: amanecer cálido sobre la noche
-  let g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#5a3f22'); g.addColorStop(.28,'#33294a'); g.addColorStop(.7,'#171a33'); g.addColorStop(1,'#0a0c1a');
+  try{ await Promise.all(['700 40px Cinzel','italic 600 40px "Cormorant Garamond"','600 40px "Cormorant Garamond"','italic 500 40px "Cormorant Garamond"'].map(f=>document.fonts.load(f))); }catch(e){}
+  const CIN='Cinzel,Georgia,serif', COR='"Cormorant Garamond",Georgia,serif';
+  // cielo
+  let g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3f93e0'); g.addColorStop(.3,'#7cbcf2'); g.addColorStop(.62,'#c4e3fa'); g.addColorStop(1,'#fff3d8');
   x.fillStyle=g; x.fillRect(0,0,W,H);
-  g=x.createRadialGradient(W/2,-80,40,W/2,-80,1100); g.addColorStop(0,'rgba(255,214,140,.55)'); g.addColorStop(1,'rgba(255,214,140,0)');
+  // sol y rayos
+  rayos(x, W/2, 120, 1500, 22, 70, .13, .05);
+  g=x.createRadialGradient(W/2,120,10,W/2,120,620); g.addColorStop(0,'rgba(255,255,245,1)'); g.addColorStop(.18,'rgba(255,246,200,.9)'); g.addColorStop(.5,'rgba(255,230,160,.35)'); g.addColorStop(1,'rgba(255,230,160,0)');
   x.fillStyle=g; x.fillRect(0,0,W,H);
-  // rayos de luz
-  x.save(); x.translate(W/2,-120); x.globalCompositeOperation='lighter';
-  for(let i=-6;i<=6;i++){ x.save(); x.rotate(i*.11); const gr=x.createLinearGradient(0,0,0,1500); gr.addColorStop(0,'rgba(255,225,160,.16)'); gr.addColorStop(1,'rgba(255,225,160,0)');
-    x.fillStyle=gr; x.beginPath(); x.moveTo(-14,0); x.lineTo(14,0); x.lineTo(70,1500); x.lineTo(-70,1500); x.closePath(); x.fill(); x.restore(); }
-  x.restore();
-  // polvo dorado
-  let s=(R.o.k>>>0)||7; const rr=()=>((s=Math.imul(s^s>>>15,2246822507)+0x6D2B79F5|0)>>>0)/4294967296;
-  for(let i=0;i<160;i++){ x.globalAlpha=.15+rr()*.6; x.fillStyle=rr()<.4?GL:'#fff'; x.beginPath(); x.arc(rr()*W, rr()*H, rr()*2.4+.4, 0, 6.283); x.fill(); }
+  // nubes
+  const sem = (R.o.k>>>0)||7;
+  nube(x, 150, 470, 420, sem+1, .85); nube(x, 960, 600, 460, sem+2, .8); nube(x, 120, 1180, 380, sem+3, .7); nube(x, 1000, 1290, 420, sem+4, .7);
+  for(let i=0;i<5;i++) nube(x, i*270, 1820, 560, sem+10+i, 1);
+  for(let i=0;i<4;i++) nube(x, 130+i*280, 1700, 460, sem+20+i, .9);
+  // brillitos
+  let s=sem; const rr=()=>((s=Math.imul(s^s>>>15,2246822507)+0x6D2B79F5|0)>>>0)/4294967296;
+  for(let i=0;i<70;i++){ const px=rr()*W, py=rr()*H*.8, r=rr()*2.6+.8; x.globalAlpha=.4+rr()*.6; x.fillStyle='#fff'; x.beginPath(); x.arc(px,py,r,0,6.283); x.fill(); }
   x.globalAlpha=1;
-  // marco
-  x.strokeStyle='rgba(233,196,106,.55)'; x.lineWidth=3; x.strokeRect(34,34,W-68,H-68);
-  x.strokeStyle='rgba(233,196,106,.22)'; x.lineWidth=1.5; x.strokeRect(48,48,W-96,H-96);
   x.textAlign='center'; x.textBaseline='alphabetic';
-  // librito abierto
-  x.save(); x.translate(W/2, 205); x.scale(1.6,1.6);
-  x.fillStyle=GL; x.shadowColor='rgba(233,196,106,.7)'; x.shadowBlur=24;
-  x.beginPath(); x.moveTo(0,-20); x.bezierCurveTo(-12,-28,-34,-30,-50,-26); x.lineTo(-50,20); x.bezierCurveTo(-34,16,-12,18,0,26); x.bezierCurveTo(12,18,34,16,50,20); x.lineTo(50,-26); x.bezierCurveTo(34,-30,12,-28,0,-20); x.fill();
-  x.shadowBlur=0; x.strokeStyle='#8a6420'; x.lineWidth=1.4; x.beginPath(); x.moveTo(0,-20); x.lineTo(0,26); x.stroke();
-  x.restore();
   // título
-  x.shadowColor='rgba(233,196,106,.55)'; x.shadowBlur=22; x.fillStyle=GL; x.font=`700 54px ${CIN}`;
-  x.fillText(R.dia ? 'VERSÍCULO DEL DÍA' : 'UNA PALABRA PARA VOS', W/2, 330); x.shadowBlur=0;
-  x.fillStyle=SU; x.font=`italic 500 42px ${COR}`;
+  x.shadowColor='rgba(220,160,40,.9)'; x.shadowBlur=26; x.fillStyle='#fff'; x.font=`700 60px ${CIN}`;
+  x.fillText(R.dia ? 'VERSÍCULO DEL DÍA' : 'UNA PALABRA PARA VOS', W/2, 300); x.shadowBlur=0;
+  x.shadowColor='rgba(30,70,140,.55)'; x.shadowBlur=12; x.fillStyle='#fff'; x.font=`italic 600 44px ${COR}`;
   const sub = R.dia ? cap(`${DIAS[R.fecha.getDay()]} ${fechaTxt(R.fecha)} de ${R.fecha.getFullYear()}`)
     : (R.nombre ? `${R.nombre}, ${cuandoCorto(R.plazo, R.fecha)}` : cap(cuandoTxt(R.plazo, R.fecha)));
-  let y = 392; for(const l of partir(x, sub, W-200).slice(0,2)){ x.fillText(l, W/2, y); y+=48; }
-  x.fillStyle=G; x.font=`700 26px ${CIN}`; x.fillText('✦   ✦   ✦', W/2, y+8);
+  let y = 366; for(const l of partir(x, sub, W-200).slice(0,2)){ x.fillText(l, W/2, y); y+=50; }
+  x.shadowBlur=0;
+  // tarjeta de papel con el versículo
+  const top = y + 30, fondo = H - 330, cxx = 80, cw = W-160;
+  x.save(); x.shadowColor='rgba(40,90,160,.35)'; x.shadowBlur=50; x.shadowOffsetY=16;
+  g=x.createLinearGradient(0,top,0,fondo); g.addColorStop(0,'rgba(255,253,246,.95)'); g.addColorStop(1,'rgba(251,241,214,.95)'); x.fillStyle=g;
+  x.beginPath(); x.roundRect ? x.roundRect(cxx, top, cw, fondo-top, 40) : x.rect(cxx, top, cw, fondo-top); x.fill(); x.restore();
+  x.strokeStyle='rgba(200,150,42,.55)'; x.lineWidth=3; x.beginPath(); x.roundRect ? x.roundRect(cxx+18, top+18, cw-36, fondo-top-36, 28) : x.rect(cxx+18, top+18, cw-36, fondo-top-36); x.stroke();
+  x.fillStyle='#c8962a'; x.font=`700 30px ${CIN}`; x.fillText('✦   ✦   ✦', W/2, top+80);
   // el versículo: busca el tamaño que entra
-  const top = y + 70, fondo = H - 560, alto = fondo - top;
-  let fs = 74, lin, lh;
-  for(; fs>=34; fs-=2){ x.font=`italic 600 ${fs}px ${COR}`; lin = partir(x, `“${R.txt}”`, W-210); lh = fs*1.28; if(lin.length*lh <= alto) break; }
-  const bloque = lin.length*lh; let yy = top + (alto - bloque)/2 + fs*.9;
-  x.fillStyle='#fffaf0'; x.shadowColor='rgba(0,0,0,.35)'; x.shadowBlur=10;
-  lin.forEach(l=>{ x.fillText(l, W/2, yy); yy+=lh; }); x.shadowBlur=0;
-  // cita
-  x.fillStyle=G; x.font=`700 50px ${CIN}`; x.shadowColor='rgba(233,196,106,.5)'; x.shadowBlur=16;
-  x.fillText(R.cita, W/2, fondo + 92); x.shadowBlur=0;
-  // reflexión corta
-  x.font=`italic 500 36px ${COR}`; x.fillStyle=SU;
-  const rl = partir(x, R.nucleo, W-240).slice(0,3); let ry = fondo + 170;
-  rl.forEach(l=>{ x.fillText(l, W/2, ry); ry+=44; });
-  // pie
-  x.fillStyle='#fff'; x.font=`italic 500 40px ${COR}`; x.fillText('Pedí tu versículo en', W/2, H-178);
-  x.shadowColor='rgba(233,196,106,.6)'; x.shadowBlur=18; x.fillStyle=G; x.font=`700 54px ${CIN}`; x.fillText('juegospy.com/versiculo', W/2, H-112); x.shadowBlur=0;
-  x.fillStyle='rgba(216,204,180,.5)'; x.font=`500 24px ${COR}`; x.fillText('Reina-Valera 1909 · dominio público', W/2, H-68);
+  const vTop = top + 110, vFin = fondo - 300, alto = vFin - vTop;
+  let fs = 72, lin, lh;
+  for(; fs>=32; fs-=2){ x.font=`italic 600 ${fs}px ${COR}`; lin = partir(x, `“${R.txt}”`, cw-130); lh = fs*1.27; if(lin.length*lh <= alto) break; }
+  let yy = vTop + (alto - lin.length*lh)/2 + fs*.9;
+  x.fillStyle='#2b2140'; lin.forEach(l=>{ x.fillText(l, W/2, yy); yy+=lh; });
+  x.fillStyle='#9a6a14'; x.font=`700 48px ${CIN}`; x.fillText(R.cita, W/2, vFin + 80);
+  x.font=`italic 500 35px ${COR}`; x.fillStyle='#5d4a33';
+  const rl = partir(x, R.nucleo, cw-150).slice(0,3); let ry = vFin + 150;
+  rl.forEach(l=>{ x.fillText(l, W/2, ry); ry+=43; });
+  // pie sobre las nubes
+  x.fillStyle='#2f4a7a'; x.font=`italic 600 40px ${COR}`; x.fillText('Pedí tu versículo en', W/2, H-200);
+  x.shadowColor='rgba(255,255,255,1)'; x.shadowBlur=16; x.fillStyle='#9a6a14'; x.font=`700 56px ${CIN}`; x.fillText('juegospy.com/versiculo', W/2, H-130); x.shadowBlur=0;
+  x.fillStyle='rgba(70,90,120,.7)'; x.font=`500 25px ${COR}`; x.fillText('Reina-Valera 1909 · dominio público', W/2, H-80);
   return new Promise(ok=>cv.toBlob(ok, 'image/png'));
 }
 function cerrarModal(){ $('#modal').classList.remove('on'); }
@@ -504,12 +570,12 @@ function abrirCompartido(){
   corrida++; estado = 'fin';
   verModo(true);
   cabecera(R);
-  $('#pIzq').innerHTML = paginaTitulo(R); $('#pDer').innerHTML = paginaVerso(R);
+  ir('pBiblia');
+  $('#pIzq').innerHTML = paginaAntes(R); $('#pDer').innerHTML = paginaVerso(R); ajustar();
   $('#escena').classList.add('fin','luz'); $('#gesto').style.opacity=0;
-  setTimeout(()=>{ const vs=$('#pDer .verso'); if(vs) vs.classList.add('ve'); }, 400);
+  setTimeout(()=>{ const tx=$('#pDer .tx'); if(tx) tx.classList.add('ve'); }, 500);
   $('#msg').innerHTML = R.dia ? 'Una palabra para este día ✦' : R.nombre ? `Un versículo para ${esc(R.nombre)} ✦` : 'Alguien te compartió este versículo ✦';
   mostrarResultado(R, true, false);
-  ir('pBiblia');
   document.title = `${R.cita} · Versículo del Día`;
   return true;
 }
@@ -520,30 +586,39 @@ $('#btnMio').onclick = ()=>{
   estado='quieto'; ir('pInicio');
 };
 
-/* ---------- fondo: luz cálida y polvo dorado que flota ---------- */
+/* ---------- fondo: cielo con nubes que pasan, rayos de sol y destellos ---------- */
 (function cielo(){
-  const cv=$('#cielo'), ctx=cv.getContext('2d'); let W,H,ps=[],dpr=1;
-  function tam(){ dpr=Math.min(2,devicePixelRatio||1); W=cv.width=innerWidth*dpr; H=cv.height=innerHeight*dpr;
-    const n=Math.round(Math.min(110, innerWidth*innerHeight/9000));
-    ps=[...Array(n)].map(()=>({x:Math.random()*W,y:Math.random()*H,r:(Math.random()*1.6+.4)*dpr,f:Math.random()*6.28,v:(.08+Math.random()*.25)*dpr,o:.2+Math.random()*.6})); }
+  const cv=$('#cielo'), ctx=cv.getContext('2d'); let W,H,dpr=1,nubes=[],brillos=[];
+  function sprite(w, sem, alfa){
+    const c=document.createElement('canvas'); c.width=Math.ceil(w*1.25); c.height=Math.ceil(w*.55);
+    nube(c.getContext('2d'), c.width/2, c.height*.62, w, sem, alfa); return c;
+  }
+  function tam(){
+    dpr=Math.min(2,devicePixelRatio||1); W=cv.width=innerWidth*dpr; H=cv.height=innerHeight*dpr;
+    const base = Math.max(W, H*.8);
+    nubes = [...Array(9)].map((_,i)=>{
+      const capa = i<3 ? 0 : i<6 ? 1 : 2, w = base*(capa===0?.32:capa===1?.42:.55)*(.8+Math.random()*.4);
+      return {s:sprite(w, 1+i*97+Math.floor(Math.random()*1000), capa===0?.55:capa===1?.75:.92), x:Math.random()*W*1.3-W*.15,
+        y: capa===0 ? H*(.15+Math.random()*.25) : capa===1 ? H*(.4+Math.random()*.3) : H*(.75+Math.random()*.2), v:(capa+1)*.06*dpr};
+    });
+    brillos = [...Array(Math.round(Math.min(70, innerWidth*innerHeight/14000)))].map(()=>({x:Math.random()*W,y:Math.random()*H,r:(Math.random()*1.6+.6)*dpr,f:Math.random()*6.28,v:.4+Math.random()*1.2,sube:(.05+Math.random()*.2)*dpr}));
+  }
   tam(); addEventListener('resize', tam);
   function cuadro(t){
     if(document.hidden){ requestAnimationFrame(cuadro); return; }
     ctx.clearRect(0,0,W,H);
-    // rayos suaves desde arriba
-    ctx.save(); ctx.translate(W/2, -H*.08); ctx.globalCompositeOperation='lighter';
-    for(let i=-4;i<=4;i++){
-      const a = i*.16 + (MOV?Math.sin(t/9000+i)*.02:0);
-      ctx.save(); ctx.rotate(a);
-      const g=ctx.createLinearGradient(0,0,0,H*.9); g.addColorStop(0,'rgba(255,220,150,.07)'); g.addColorStop(1,'rgba(255,220,150,0)');
-      ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(-8*dpr,0); ctx.lineTo(8*dpr,0); ctx.lineTo(60*dpr,H*.9); ctx.lineTo(-60*dpr,H*.9); ctx.closePath(); ctx.fill();
-      ctx.restore();
+    // rayos de sol que giran muy despacio
+    rayos(ctx, W/2, -H*.04, Math.hypot(W,H), 18, 60*dpr, .085, MOV ? t/90000 : 0);
+    for(const n of nubes){
+      if(MOV){ n.x += n.v; if(n.x > W+20) n.x = -n.s.width; }
+      ctx.drawImage(n.s, n.x, n.y - n.s.height/2);
     }
-    ctx.restore();
-    for(const p of ps){
-      if(MOV){ p.y -= p.v; p.x += Math.sin(t/2000+p.f)*.15*dpr; if(p.y < -5){ p.y = H+5; p.x = Math.random()*W; } }
-      ctx.globalAlpha = p.o*(MOV ? .55+.45*Math.sin(p.f+t/1300) : .7);
-      ctx.fillStyle = '#ffe6a8'; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.283); ctx.fill();
+    for(const b of brillos){
+      if(MOV){ b.y -= b.sube; if(b.y < -5){ b.y = H+5; b.x = Math.random()*W; } }
+      const a = MOV ? Math.max(0, Math.sin(b.f + t/1000*b.v)) : .6;
+      ctx.globalAlpha = a; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.283); ctx.fill();
+      if(a > .85){ ctx.globalAlpha = (a-.85)*4; ctx.fillRect(b.x-b.r*4, b.y-.5*dpr, b.r*8, dpr); ctx.fillRect(b.x-.5*dpr, b.y-b.r*4, dpr, b.r*8); }
     }
     ctx.globalAlpha=1;
     requestAnimationFrame(cuadro);
@@ -551,35 +626,64 @@ $('#btnMio').onclick = ()=>{
   requestAnimationFrame(cuadro);
 })();
 
-/* ---------- sonido: ambiente suave + papel + campanitas (todo sintetizado) ---------- */
+/* ---------- sonido: alabanza suave (coro, arpa, trompetas) + papel. Todo sintetizado ---------- */
 const sonido = (function(){
-  let ctx=null, master=null, efx=null, musica=null, on=true, timer=null;
+  let ctx=null, master=null, efx=null, rev=null, musica=null, on=true;
   try{ on = localStorage.getItem('ver_musica')!=='0'; }catch(e){}
   const btn = $('#btnSnd');
   function pintar(){ btn.textContent = on?'🎵':'🔇'; btn.title = on?'Silenciar la música':'Activar la música'; }
   pintar();
+  const hz = m => 440*Math.pow(2,(m-69)/12);
   function crear(){
     if(ctx) return true;
     try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return false; }
-    master = ctx.createGain(); master.gain.value = on?1:0; master.connect(ctx.destination);
-    efx = ctx.createGain(); efx.gain.value = 1; efx.connect(ctx.destination);   // el papel suena aunque la música esté apagada
-    const del = ctx.createDelay(1.5); del.delayTime.value=.5; const fb=ctx.createGain(); fb.gain.value=.35; const wet=ctx.createGain(); wet.gain.value=.3;
-    del.connect(fb); fb.connect(del); del.connect(wet); wet.connect(ctx.destination); master.connect(del);
+    // reverberación de iglesia/catedral: respuesta al impulso hecha con ruido que se apaga
+    rev = ctx.createConvolver();
+    const largo = ctx.sampleRate*3.6, ir = ctx.createBuffer(2, largo, ctx.sampleRate);
+    for(let c=0;c<2;c++){ const d=ir.getChannelData(c); for(let i=0;i<largo;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/largo, 2.6); }
+    rev.buffer = ir;
+    const revOut = ctx.createGain(); revOut.gain.value=.55; rev.connect(revOut); revOut.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = on?1:0; master.connect(ctx.destination); master.connect(rev);
+    efx = ctx.createGain(); efx.gain.value = 1; efx.connect(ctx.destination); efx.connect(rev);   // efectos suenan aunque la música esté apagada
     return true;
   }
-  // acordes mayores cálidos: Do, Fa, La menor, Sol
-  const ACORDES = [[130.81,196,261.63,329.63],[87.31,174.61,261.63,349.23],[110,164.81,261.63,329.63],[98,196,246.94,293.66]];
-  function arrancarMusica(){
-    if(musica || !ctx) return;
-    const out = ctx.createGain(); out.gain.value=0; out.connect(master); out.gain.setTargetAtTime(.05, ctx.currentTime, 3);
-    const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=900; lp.Q.value=.5; lp.connect(out);
-    const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value=.05; lg.gain.value=300; lfo.connect(lg); lg.connect(lp.frequency); lfo.start();
-    const osc = ACORDES[0].map((fq,i)=>{ const o=ctx.createOscillator(); o.type=i%2?'triangle':'sine'; o.frequency.value=fq; o.detune.value=(i-1.5)*5;
-      const g=ctx.createGain(); g.gain.value=i===0?.45:.3; o.connect(g); g.connect(lp); o.start(); return o; });
-    let ac=0; const cada = setInterval(()=>{ ac=(ac+1)%ACORDES.length; osc.forEach((o,i)=>o.frequency.setTargetAtTime(ACORDES[ac][i], ctx.currentTime, 2)); }, 12000);
-    const NOTAS=[523.25,587.33,659.25,783.99,880,1046.5];   // pentatónica de Do
-    const arpa = ()=>{ if(musica){ campanita(NOTAS[Math.floor(Math.random()*NOTAS.length)], .02, 3.2); timer=setTimeout(arpa, 2600+Math.random()*4800); } };
-    musica = {out, osc, lfo, cada}; timer = setTimeout(arpa, 2500);
+  /* arpa: cuerda pulsada (Karplus-Strong) pre-calculada por nota */
+  const cuerdas = {};
+  function cuerda(m){
+    if(cuerdas[m]) return cuerdas[m];
+    const sr = ctx.sampleRate, f = hz(m), N = Math.round(sr/f), dur = Math.min(4, 1.6 + (84-m)*.06), len = Math.floor(sr*dur);
+    const b = ctx.createBuffer(1, len, sr), d = b.getChannelData(0), buf = new Float32Array(N);
+    for(let i=0;i<N;i++) buf[i] = (Math.random()*2-1);
+    let k = 0, prev = 0; const dec = .996 - (m-60)*.00012;
+    for(let i=0;i<len;i++){ const a = buf[k], nb = buf[(k+1)%N]; const v = (a+nb)*.5*dec; buf[k] = v; d[i] = a*.6 + prev*.4; prev = a; k = (k+1)%N; }
+    return cuerdas[m] = b;
+  }
+  function arpa(m, vol, cuando=0, dest){
+    if(!ctx) return;
+    const s = ctx.createBufferSource(); s.buffer = cuerda(m);
+    const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 3800;
+    const g = ctx.createGain(); g.gain.value = vol;
+    s.connect(lp); lp.connect(g); g.connect(dest||master); s.start(ctx.currentTime + cuando);
+  }
+  /* trompeta: diente de sierra con filtro que se abre al soplar y vibrato */
+  function trompeta(m, vol, dur, cuando=0, dest){
+    if(!ctx) return;
+    const t = ctx.currentTime + cuando, o = ctx.createOscillator(), o2 = ctx.createOscillator();
+    o.type='sawtooth'; o2.type='square'; o.frequency.value = hz(m); o2.frequency.value = hz(m); o2.detune.value = 4;
+    const vib = ctx.createOscillator(), vg = ctx.createGain(); vib.frequency.value = 5.2; vg.gain.setValueAtTime(0,t); vg.gain.linearRampToValueAtTime(hz(m)*.006, t+.35);
+    vib.connect(vg); vg.connect(o.frequency); vg.connect(o2.frequency);
+    const mix = ctx.createGain(); const g2 = ctx.createGain(); g2.gain.value=.35; o.connect(mix); o2.connect(g2); g2.connect(mix);
+    const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.Q.value = 2;
+    lp.frequency.setValueAtTime(300, t); lp.frequency.exponentialRampToValueAtTime(2600, t+.07); lp.frequency.exponentialRampToValueAtTime(1500, t+.3);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t+.05); g.gain.setTargetAtTime(vol*.75, t+.1, .1);
+    g.gain.setTargetAtTime(0, t+dur, .08);
+    mix.connect(lp); lp.connect(g); g.connect(dest||master);
+    [o,o2,vib].forEach(x=>{ x.start(t); x.stop(t+dur+.6); });
+  }
+  function fanfarria(dest, vol=.05){
+    // ta-ta-taaa de alabanza (tónica Re mayor)
+    const notas = [[69,.16],[69,.16],[74,.9]], arm = [[66,.16],[66,.16],[69,.9]];
+    let c = 0; notas.forEach(([m,d],i)=>{ trompeta(m, vol, d, c, dest); trompeta(arm[i][0], vol*.7, d, c, dest); c += d + .04; });
   }
   function campanita(fq, vol, dur, cuando=0, dest){
     if(!ctx) return;
@@ -589,16 +693,52 @@ const sonido = (function(){
     g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.015); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
     o.connect(g); g.connect(dest||master); o.start(t); o2.start(t); o.stop(t+dur+.05); o2.stop(t+dur+.05);
   }
+  /* coro "aaah": dientes de sierra por un banco de filtros con las formantes de la vocal a */
+  // progresión de alabanza en Re: Re – La – Si menor – Sol (I–V–vi–IV)
+  const ACORDES = [{b:50, v:[62,66,69,74]}, {b:45, v:[61,64,69,73]}, {b:47, v:[62,66,71,74]}, {b:43, v:[62,67,71,74]}];
+  function arrancarMusica(){
+    if(musica || !ctx) return;
+    const out = ctx.createGain(); out.gain.value=0; out.connect(master); out.gain.setTargetAtTime(1, ctx.currentTime, 2.5);
+    const coro = ctx.createGain(); coro.gain.value = .05; coro.connect(out);
+    const formantes = [[730,1,8],[1090,.55,10],[2440,.25,12]].map(([f,gv,q])=>{ const b=ctx.createBiquadFilter(); b.type='bandpass'; b.frequency.value=f; b.Q.value=q; const g=ctx.createGain(); g.gain.value=gv*3.2; b.connect(g); g.connect(coro); return b; });
+    const vib = ctx.createOscillator(), vg = ctx.createGain(); vib.frequency.value = 4.6; vg.gain.value = 3.5; vib.connect(vg); vib.start();
+    const voces = ACORDES[0].v.map((m,i)=>[-8,7].map(det=>{
+      const o = ctx.createOscillator(); o.type='sawtooth'; o.frequency.value = hz(m); o.detune.value = det + (i-1.5)*2; vg.connect(o.detune);
+      const g = ctx.createGain(); g.gain.value = .5; o.connect(g); formantes.forEach(f=>g.connect(f)); o.start(); return o;
+    }));
+    // bajo suave (cuerdas graves)
+    const bajo = ctx.createOscillator(); bajo.type='triangle'; bajo.frequency.value = hz(ACORDES[0].b);
+    const bg = ctx.createGain(); bg.gain.value = .06; const blp = ctx.createBiquadFilter(); blp.type='lowpass'; blp.frequency.value=380;
+    bajo.connect(blp); blp.connect(bg); bg.connect(out); bajo.start();
+    let ac = 0, vueltas = 0;
+    const tocarAcorde = ()=>{
+      const A = ACORDES[ac], now = ctx.currentTime;
+      voces.forEach((par,i)=>par.forEach(o=>o.frequency.setTargetAtTime(hz(A.v[i]), now, .35)));
+      bajo.frequency.setTargetAtTime(hz(A.b), now, .2);
+      coro.gain.cancelScheduledValues(now); coro.gain.setTargetAtTime(.06, now, .6); coro.gain.setTargetAtTime(.04, now+3, 1.5);
+      // arpa: arpegio que sube y baja sobre el acorde
+      const notas = [A.b+12, A.v[0], A.v[1], A.v[2], A.v[3], A.v[1]+12, A.v[2]+12, A.v[3]+12];
+      const patron = Math.random()<.5 ? notas : notas.concat(notas.slice(1,-1).reverse());
+      patron.forEach((m,i)=>arpa(m, .22, i*.17 + Math.random()*.015));
+      // trompetas de vez en cuando, al volver al primer acorde
+      if(ac===0 && vueltas>0 && Math.random()<.6) fanfarria(out, .03);
+      ac = (ac+1) % ACORDES.length; if(ac===0) vueltas++;
+    };
+    tocarAcorde();
+    const cada = setInterval(tocarAcorde, 6000);
+    musica = {cada};
+  }
   let ruidoBuf=null;
   function papel(vol){
     if(!ctx) return;
-    if(!ruidoBuf){ const n=ctx.sampleRate*.4; ruidoBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=ruidoBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; }
-    const t=ctx.currentTime, dur=.12+Math.random()*.1;
-    const s=ctx.createBufferSource(); s.buffer=ruidoBuf; s.playbackRate.value=.8+Math.random()*.4;
-    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=900;
-    const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=.7; bp.frequency.setValueAtTime(1800+Math.random()*800,t); bp.frequency.exponentialRampToValueAtTime(4200,t+dur);
-    const g=ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol*.2,t+dur*.35); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
-    s.connect(hp); hp.connect(bp); bp.connect(g); g.connect(efx); s.start(t, Math.random()*.2); s.stop(t+dur+.02);
+    if(!ruidoBuf){ const n=ctx.sampleRate*.5; ruidoBuf=ctx.createBuffer(1,n,ctx.sampleRate); const d=ruidoBuf.getChannelData(0); let b=0; for(let i=0;i<n;i++){ b = b*.6 + (Math.random()*2-1)*.4; d[i]=b + (Math.random()*2-1)*.5*(Math.random()<.08?1:.3); } }
+    const t=ctx.currentTime, dur=.16+Math.random()*.12;
+    const s=ctx.createBufferSource(); s.buffer=ruidoBuf; s.playbackRate.value=.85+Math.random()*.3;
+    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=700;
+    const bp=ctx.createBiquadFilter(); bp.type='peaking'; bp.frequency.value=3000; bp.gain.value=6;
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.setValueAtTime(2500,t); lp.frequency.linearRampToValueAtTime(7000,t+dur*.4); lp.frequency.linearRampToValueAtTime(3000,t+dur);
+    const g=ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol*.32,t+dur*.3); g.gain.linearRampToValueAtTime(vol*.12,t+dur*.6); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    s.connect(hp); hp.connect(bp); bp.connect(lp); lp.connect(g); g.connect(efx); s.start(t, Math.random()*.3); s.stop(t+dur+.02);
   }
   return {
     activar(){ if(!crear()) return; if(ctx.state==='suspended') ctx.resume(); if(on) arrancarMusica(); },
@@ -607,9 +747,15 @@ const sonido = (function(){
       if(crear()){ if(ctx.state==='suspended') ctx.resume(); master.gain.setTargetAtTime(on?1:0, ctx.currentTime, .15); if(on) arrancarMusica(); }
       pintar();
     },
-    toque(){ if(ctx&&on) campanita(1046.5,.025,.7); },
+    toque(){ if(ctx) arpa(81, .16, 0, efx); },
+    abrir(){ if(!ctx) return; [62,66,69,74,78,81].forEach((m,i)=>arpa(m, .14, i*.06, efx)); },
     hoja(v){ papel(v); },
-    revelar(){ if(!ctx) return; [523.25,659.25,783.99,1046.5].forEach((f,i)=>campanita(f,.045,2.6,i*.11,efx)); }
+    revelar(){
+      if(!ctx) return;
+      [62,64,66,69,71,74,76,78,81,83,86].forEach((m,i)=>arpa(m, .2, i*.045, efx));   // glissando de arpa
+      fanfarria(efx, on ? .045 : .03);
+      [74,78,81,86].forEach((m,i)=>campanita(hz(m), .03, 3, .5+i*.12, efx));
+    }
   };
 })();
 $('#btnSnd').onclick = ()=>sonido.alternar();
