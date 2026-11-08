@@ -173,8 +173,9 @@ function momento(per, fecha){
   let o = {f:new Date(y, m, dd, 12), tres:P.tres, tresF:P.tresF, carta:P.carta, nota:'', lo:9, hi:20};
   if(per==='dia'){
     if(h>=22){
-      o.f = new Date(y, m, dd+1, 12); o.carta = 'Tu carta de mañana';
-      o.nota = sel(['El día ya está por terminar, así que las cartas hablan de lo que trae mañana.', 'A esta hora el día ya se despide: lo que se abre en la mesa es para mañana.', 'La noche ya está avanzada: Jasy mira el día que viene.']);
+      o.tres = ['Lo que queda de hoy','La madrugada','Mañana']; o.tresF = ['En el ratito que le queda a este día','Durante la madrugada','Para mañana'];
+      o.carta = 'Tu carta para esta noche y mañana'; o.manana = true;
+      o.nota = sel(['El día ya está por terminar: las cartas hablan del ratito que queda y de lo que trae mañana.', 'A esta hora el día ya se despide, así que Jasy mira lo poco que queda de hoy y el día que viene.', 'La noche ya está avanzada: las cartas cierran tu día y abren la puerta de mañana.']);
     } else if(h<5){
       o.nota = sel(['Es de madrugada: las cartas hablan del día que recién empieza.', 'Mientras todos duermen, las cartas miran el día que está por amanecer.']);
     } else if(h>=18){
@@ -428,7 +429,7 @@ function leer(pf, temaId, tiradaId, sacadas, pregunta, soloMayores, opc={}){
   const quien = per==='dia' ? (difDias(fp)===1 ? 'Mañana' : 'Hoy') : per==='libre' ? 'Por ahora' : cap(PR.ese);
   const aviso = (tono==='neg' || (tono==='mix' && rnd()<0.35)) ? ` <b>⚠️ Ojo:</b> ${quien.toLowerCase()==='por ahora'?'por ahora':quien.toLowerCase()} ${elige(AVISOS)}` : '';
   out.push({cls:'final', h:`<b>${cierre}</b>${aviso} ${N===5?'La carta del consejo':'Tu carta clave'}, ${art(clave.c)}${clave.c.nombre}, te susurra: <i>«${consejo}»</i> ${elige(T.extra.filter(e=>e!==consejo))}`});
-  out.push({cls:'suerte', h:`Tu número de la suerte: <b>${numSuerte}</b> · Color: <b>${E.color}</b> · ${per==='dia' ? `Hora de suerte: <b>${MO.lo + (numSuerte*7) % (MO.hi-MO.lo+1)} h</b>` : `Día favorable: <b>${DIAS[pf.signo.pl]}</b>`} · Piedra: <b>${E.piedra}</b>`});
+  out.push({cls:'suerte', h:`Tu número de la suerte: <b>${numSuerte}</b> · Color: <b>${E.color}</b> · ${per==='dia' ? `Hora de suerte: <b>${MO.manana?'mañana a las ':''}${MO.lo + (numSuerte*7) % (MO.hi-MO.lo+1)} h</b>` : `Día favorable: <b>${DIAS[pf.signo.pl]}</b>`} · Piedra: <b>${E.piedra}</b>`});
   out.push({cls:'despedida', h:elige(['Que Jasy y Kuarahy te acompañen. ¡Jajotopata!','Guardá esta lectura en el corazón y volvé cuando la luna cambie. ¡Jajotopata!','Las cartas muestran caminos, pero quien camina sos vos. ¡Jajotopata!',
     'Que el ñandutí de tu destino se teja con hilos de oro. ¡Jajotopata!','Andá en paz, que las estrellas cuidan a quien se anima a preguntar. ¡Jajotopata!','Volvé cuando el corazón te lo pida: la mesa siempre te espera. ¡Jajotopata!'])});
 
