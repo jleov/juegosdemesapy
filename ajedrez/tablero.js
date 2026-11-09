@@ -8,19 +8,22 @@ let SEL=null;          // casilla elegida para mover
 let REVIEW=null;       // si se está mirando una jugada vieja: cuántas jugadas se ven
 let FLIP=false;        // el jugador dio vuelta el tablero a mano
 let HINT=null;         // la pista que dio el juego {pos, from, to}
-const PREF=Object.assign({tema:'clasico', vista:'2d', coords:true, girar:true, sonidoReloj:true,
+const PREF=Object.assign({tema:'verde', vista:'2d', coords:true, girar:true, sonidoReloj:true,
   colores:{claro:'#f0d9b5', oscuro:'#5d8a4e', pb:'#fdf6e3', pn:'#7a1f2b'}}, load('ajedrez_pref')||{});
 const savePref = () => store('ajedrez_pref', PREF);
+// desde la versión 2 el tablero de entrada es el verde con crema (también para los que ya tenían guardado otro)
+if(!PREF.v2){ PREF.v2=1; if(PREF.tema==='clasico') PREF.tema='verde'; savePref(); }
 
 /* ====================== ESTILOS DE TABLERO ====================== */
 const TEMAS={
+  verde:    {n:'Verde y crema',          e:'🟩', claro:'#eeeed2', oscuro:'#769656', pb:'#f9f9f4', pn:'#3a3a3a', marco:'#3e4d2c', fondo:'#262b22'},
   clasico:  {n:'Clásico blanco y negro', e:'⚪⚫', claro:'#f2f2f2', oscuro:'#5b5b5b', pb:'#ffffff', pn:'#161616', marco:'#1d1d1d', fondo:'#23272e'},
   madera:   {n:'Madera',                 e:'🪵', claro:'#e7c393', oscuro:'#9c5f33', pb:'#f3dfb8', pn:'#47260f', marco:'#4a2a12', fondo:'#2a1c12', wood:true},
   futurista:{n:'Futurista',              e:'🚀', claro:'#1c2c74', oscuro:'#090d30', pb:'#3ff6ff', pn:'#ff3fd8', marco:'#05061a', fondo:'#03040f', neon:true},
   personal: {n:'A tu gusto',             e:'🎨', marco:'#2b2b2b', fondo:'#1f2430'},
 };
 function tema(){
-  const t=Object.assign({id:PREF.tema}, TEMAS[PREF.tema]||TEMAS.clasico);
+  const t=Object.assign({id:PREF.tema}, TEMAS[PREF.tema]||TEMAS.verde);
   if(PREF.tema==='personal') Object.assign(t, PREF.colores, {marco:mix(PREF.colores.oscuro,'#000000',.45)});
   return t;
 }
@@ -64,7 +67,12 @@ const SHAPES={
 function pieceSVG(code, th){
   const fill = code[0]==='w' ? th.pb : th.pn, ln=lineCol(fill);
   const glow = th.neon ? `filter:drop-shadow(0 0 4px ${fill}) drop-shadow(0 0 1px ${fill})` : '';
-  return `<svg viewBox="0 0 100 100" style="${glow}"><g fill="${fill}" stroke="${ln}" stroke-width="2.6" stroke-linejoin="round">${SHAPES[code[1]]||''}</g>`
+  // relieve: luz arriba a la izquierda y sombra abajo a la derecha, con un brillo encima
+  const id='g'+(pieceSVG.n=(pieceSVG.n||0)+1), hi=mix(fill,'#ffffff',lum(fill)<.3?.38:.55), lo=mix(fill,'#000000',lum(fill)<.3?.25:.32);
+  const grad=`<defs><linearGradient id="${id}" x1="0" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".45" stop-color="${fill}"/><stop offset="1" stop-color="${lo}"/></linearGradient>`
+    + `<linearGradient id="${id}h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".35" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>`;
+  return `<svg viewBox="0 0 100 100" style="${glow}">${grad}<g fill="url(#${id})" stroke="${ln}" stroke-width="2.8" stroke-linejoin="round">${SHAPES[code[1]]||''}</g>`
+    + `<g fill="url(#${id}h)" stroke="none" transform="translate(-1 -1)">${(SHAPES[code[1]]||'').replace(/class="(ln|dot)"/g,'style="display:none"')}</g>`
     + `<style>.ln{fill:none}.dot{fill:${ln};stroke:none}</style></svg>`;
 }
 // la madera de los tableros (se dibuja una vez)
