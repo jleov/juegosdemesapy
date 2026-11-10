@@ -1,0 +1,16 @@
+{
+  "name": "Ludo PY",
+  "short_name": "Ludo",
+  "description": "El Ludo de siempre con toque paraguayo para jugar en línea con amigos: de 2 a 6 jugadores, tablero de 4 o 6 colores, equipos, chat, voz y bots.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1b2a5a",
+  "theme_color": "#1b2a5a",
+  "lang": "es-PY",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

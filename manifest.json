@@ -19,6 +19,7 @@
     { "name": "Lotería", "short_name": "Lotería", "url": "loteria/", "icons": [{ "src": "loteria/icon-192.png", "sizes": "192x192" }] },
     { "name": "Peteĩ", "short_name": "Peteĩ", "url": "petei/", "icons": [{ "src": "petei/icon-192.png", "sizes": "192x192" }] },
     { "name": "Escoba de 15", "short_name": "Escoba", "url": "escoba/", "icons": [{ "src": "escoba/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Ludo PY", "short_name": "Ludo", "url": "ludo/", "icons": [{ "src": "ludo/icon-192.png", "sizes": "192x192" }] },
     { "name": "El Impostor", "short_name": "Impostor", "url": "impostor/", "icons": [{ "src": "impostor/icon-192.png", "sizes": "192x192" }] },
     { "name": "Tarot Jasy", "short_name": "Tarot", "url": "tarot/", "icons": [{ "src": "tarot/icon-192.png", "sizes": "192x192" }] },
     { "name": "Versículo del Día", "short_name": "Versículo", "url": "versiculo/", "icons": [{ "src": "versiculo/icon-192.png", "sizes": "192x192" }] },

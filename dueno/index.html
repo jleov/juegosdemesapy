@@ -123,6 +123,7 @@ const GAMES = {
   adivina: {n:'¿Mávapa?',          ico:'../mavapa/icon-192.png',  phase:{lobby:'⏳ En la sala de espera', pick:'🤫 Eligiendo personajes', play:'🕵️ Jugando', roundEnd:'🏆 Entre rondas', over:'🏁 Terminada'}},
   mavaiko: {n:'¿Mávaiko Ojuka?',   ico:'../mavaiko/icon-192.png', phase:{lobby:'⏳ En la sala de espera', play:'🔎 Investigando', over:'🏁 Caso cerrado'}},
   escoba:  {n:'Escoba de 15',      ico:'../escoba/icon-192.png',  phase:{lobby:'⏳ En la sala de espera', play:'🧹 Jugando', roundEnd:'🧮 Contando la mano', over:'🏁 Terminada'}},
+  ludo:    {n:'Ludo PY',           ico:'../ludo/icon-192.png',     phase:{lobby:'⏳ En la sala de espera', play:'🎲 Jugando', over:'🏁 Terminada'}},
   impostor:{n:'El Impostor',       ico:'../impostor/icon-192.png', phase:{lobby:'⏳ En la sala de espera', reveal:'🎴 Mirando las tarjetas', clues:'🧉 Dando pistas', discuss:'🗣️ Discutiendo', vote:'🗳️ Votando', result:'🚪 Echaron a alguien', guess:'🎯 El impostor adivina', roundEnd:'🏁 Entre rondas', over:'🏆 Terminada'}},
 };
 const KIND = {duel:'🥊 Pelea entre dos', bots:'🤖 Sala de bots (con público)', tour:'🏆 Torneo'};
@@ -185,8 +186,8 @@ function tokenOf(key){ let t=load(key); if(!t){ t=Math.random().toString(36).sli
 // entrar como dueño (a la vista de todos): la sala anota este aparato y después se abre el juego
 function enter(k){
   const r=A.rooms[k]; if(!r || !r.conn.open) return toast('Esa sala ya no responde.');
-  const tok = r.game==='uno' ? tokenOf('uno_token') : r.game==='billar' ? tokenOf('billar_token') : r.game==='bolos' ? tokenOf('bolos_token') : r.game==='minigolf' ? tokenOf('golf_token') : r.game==='basta' ? tokenOf('basta_token') : r.game==='tejo' ? tokenOf('tejo_token') : r.game==='botones' ? tokenOf('boton_token') : r.game==='naval' ? tokenOf('naval_token') : r.game==='adivina' ? tokenOf('adivina_token') : r.game==='mavaiko' ? tokenOf('mvk_token') : r.game==='ajedrez' ? tokenOf('ajedrez_token') : r.game==='salon' ? tokenOf('salon_token') : r.game==='escoba' ? tokenOf('esc_token') : r.game==='impostor' ? tokenOf('imp_token') : tokenOf('bnq_token');
-  const url = r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='minigolf' || r.game==='basta' || r.game==='tejo' || r.game==='botones' || r.game==='naval' || r.game==='adivina' || r.game==='mavaiko' || r.game==='ajedrez' || r.game==='salon' || r.game==='escoba' || r.game==='impostor' ? `../${r.game==='uno'?'petei':r.game==='adivina'?'mavapa':r.game}/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
+  const tok = r.game==='uno' ? tokenOf('uno_token') : r.game==='billar' ? tokenOf('billar_token') : r.game==='bolos' ? tokenOf('bolos_token') : r.game==='minigolf' ? tokenOf('golf_token') : r.game==='basta' ? tokenOf('basta_token') : r.game==='tejo' ? tokenOf('tejo_token') : r.game==='botones' ? tokenOf('boton_token') : r.game==='naval' ? tokenOf('naval_token') : r.game==='adivina' ? tokenOf('adivina_token') : r.game==='mavaiko' ? tokenOf('mvk_token') : r.game==='ajedrez' ? tokenOf('ajedrez_token') : r.game==='salon' ? tokenOf('salon_token') : r.game==='escoba' ? tokenOf('esc_token') : r.game==='impostor' ? tokenOf('imp_token') : r.game==='ludo' ? tokenOf('ludo_token') : tokenOf('bnq_token');
+  const url = r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='minigolf' || r.game==='basta' || r.game==='tejo' || r.game==='botones' || r.game==='naval' || r.game==='adivina' || r.game==='mavaiko' || r.game==='ajedrez' || r.game==='salon' || r.game==='escoba' || r.game==='impostor' || r.game==='ludo' ? `../${r.game==='uno'?'petei':r.game==='adivina'?'mavapa':r.game}/?dueno=1#${r.code}` : `../banquero/#${r.code}`;
   const tab = window.open('about:blank', '_blank');
   A.pending[k]={url, tab};
   try{ r.conn.send({t:'iam', token:tok}); }catch(e){}
@@ -198,7 +199,7 @@ function roomHTML(k, r){
   const i=r.info||{}, G=GAMES[r.game];
   const phase = r.game==='kombate' ? (KIND[i.kind]||'🥊 Sala') : (G.phase[i.phase]||i.phase||'');
   const players=(i.players||[]).map(p=>{
-    const extra = r.game==='impostor' ? ` ${p.imp?'🎭':''}${p.out?'🚪':''} · ${p.pts||0} pts` : p.cards!=null ? ` (${p.cards}🂠${i.opts&&i.opts.target?' · '+p.pts+' pts':''})` : '';
+    const extra = r.game==='ludo' ? ` · 🏁 ${p.home||0}/${p.of||4}${p.place?' · '+p.place+'º':''}` : r.game==='impostor' ? ` ${p.imp?'🎭':''}${p.out?'🚪':''} · ${p.pts||0} pts` : p.cards!=null ? ` (${p.cards}🂠${i.opts&&i.opts.target?' · '+p.pts+' pts':''})` : '';
     return `<span style="${p.bk?'opacity:.5;text-decoration:line-through':''}">${esc(p.e||'')} ${p.bot?'🤖':''}${esc(p.n)}${!i.local&&p.n===i.host?' 👑':''}${!i.local&&!p.bot&&!p.conn?' ⚠️':''}${extra}</span>`;
   }).join('');
   let det='';
@@ -213,7 +214,7 @@ function roomHTML(k, r){
   if(r.game==='banquero'){
     if(!i.local) btns+=`<button class="btn sm green" onclick="enter('${k}')">👑 Entrar a la vista</button>`;
     btns+=`<a class="btn sm gray" href="../banquero/#panel-dueno" target="_blank" rel="noopener">🕵️ Mirar sin que me vean (panel del Banquero)</a>`;
-  } else if(r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='minigolf' || r.game==='basta' || r.game==='tejo' || r.game==='botones' || r.game==='naval' || r.game==='adivina' || r.game==='mavaiko' || r.game==='ajedrez' || r.game==='salon' || r.game==='escoba' || r.game==='impostor'){
+  } else if(r.game==='uno' || r.game==='billar' || r.game==='bolos' || r.game==='minigolf' || r.game==='basta' || r.game==='tejo' || r.game==='botones' || r.game==='naval' || r.game==='adivina' || r.game==='mavaiko' || r.game==='ajedrez' || r.game==='salon' || r.game==='escoba' || r.game==='impostor' || r.game==='ludo'){
     if(!i.local) btns+=`<button class="btn sm green" onclick="enter('${k}')">👑 Entrar a mirar</button>`;
   } else if(r.game==='loteria'){
     btns+=`<a class="btn sm" href="../loteria/?sala=${encodeURIComponent(r.code)}" target="_blank" rel="noopener">👀 Abrir la sala</a><span class="muted" style="align-self:center">(ahí tocá “Entrar solo a mirar”)</span>`;
@@ -227,7 +228,7 @@ function roomHTML(k, r){
     ${i.local?'<div class="muted" style="margin-top:4px">Se juega en un solo celular o PC: no tiene sala para entrar.</div>':''}</div>`;
 }
 // ---------- 📊 juegos más jugados (datos de /api/stats, solo con la llave del dueño) ----------
-const ST_N = {banquero:['Banquero Paraguayo'], loteria:['Lotería'], kombate:['Face Punch'], petei:['Peteĩ'], escoba:['Escoba de 15'], impostor:['El Impostor'], tarot:['Tarot Jasy'], versiculo:['Versículo del Día'], billar:['Billar PY'], bolos:['Bolos PY'], minigolf:['Mini Golf PY'], basta:['Basta PY'], tejo:['Tejo PY'], botones:['Botones PY'], naval:['Batalla Naval PY'], mavapa:['¿Mávapa?'], mavaiko:['¿Mávaiko Ojuka?'], ajedrez:['Ajedrez y Damas PY'], salon:['Salón de Belleza PY'], odisea:['Odisea','../icon-192.png'], salas:['Salas de Voz'], karaoke:['Sala de Karaoke','../icon-192.png']};
+const ST_N = {banquero:['Banquero Paraguayo'], loteria:['Lotería'], kombate:['Face Punch'], petei:['Peteĩ'], escoba:['Escoba de 15'], impostor:['El Impostor'], ludo:['Ludo PY'], tarot:['Tarot Jasy'], versiculo:['Versículo del Día'], billar:['Billar PY'], bolos:['Bolos PY'], minigolf:['Mini Golf PY'], basta:['Basta PY'], tejo:['Tejo PY'], botones:['Botones PY'], naval:['Batalla Naval PY'], mavapa:['¿Mávapa?'], mavaiko:['¿Mávaiko Ojuka?'], ajedrez:['Ajedrez y Damas PY'], salon:['Salón de Belleza PY'], odisea:['Odisea','../icon-192.png'], salas:['Salas de Voz'], karaoke:['Sala de Karaoke','../icon-192.png']};
 // secciones que no son juegos: se muestran aparte, con lo que la gente hizo en cada una
 const OTRAS = {tarot:'lecturas de cartas', versiculo:'versículos pedidos', salas:'entradas a una sala de voz', karaoke:'entradas a una sala de karaoke'};
 const ST = {dias:30, que:'p', datos:null, err:'', cargando:false, busca:'', ver:40};

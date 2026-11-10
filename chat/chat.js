@@ -244,7 +244,7 @@
   const okMsg = m => m && typeof m.n === 'string' && typeof m.x === 'string' && typeof m.id === 'string';
   // invitaciones que mandan los juegos (chat/invitar.js): carpeta del juego → nombre y cómo se entra a la sala
   const INV = { banquero:['Banquero Paraguayo','#'], loteria:['Lotería','?sala='], kombate:['Face Punch','?sala='], petei:['Peteĩ','#'],
-    escoba:['Escoba de 15','#'], impostor:['El Impostor','#'], billar:['Billar PY','#'], bolos:['Bolos PY','#'], minigolf:['Mini Golf PY','#'],
+    escoba:['Escoba de 15','#'], impostor:['El Impostor','#'], ludo:['Ludo PY','#'], billar:['Billar PY','#'], bolos:['Bolos PY','#'], minigolf:['Mini Golf PY','#'],
     basta:['Basta PY','#'], tejo:['Tejo PY','#'], botones:['Botones PY','#'], naval:['Batalla Naval PY','#'], mavapa:['¿Mávapa?','#'],
     mavaiko:['¿Mávaiko Ojuka?','#'], ajedrez:['Ajedrez y Damas PY','#'], salon:['Salón de Belleza PY','#'] };
   const CODIGO = /^[A-Za-z0-9_-]{3,12}$/;
