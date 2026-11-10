@@ -155,6 +155,23 @@ h1{margin:4px 0 0;font-size:clamp(54px,15vw,84px);line-height:.95;letter-spacing
   font-size:15px;opacity:0;transition:.3s;pointer-events:none;max-width:90vw;text-align:center}
 #toast.on{opacity:1;transform:translateX(-50%)}
 #btnSnd,#btnMus{display:none}
+#bRecMapa{border:0;background:rgba(0,0,0,.35);border-radius:99px;color:#fff;font-size:17px;padding:2px 10px;line-height:1.4}
+.campo{width:100%;padding:12px 14px;border-radius:14px;border:3px solid #f2c14e;font:inherit;font-size:20px;font-weight:700;color:#4a1a2a;background:#fff;outline:none;text-align:center;margin-top:6px}
+.campo:focus{border-color:#ff8a1a;box-shadow:0 0 0 4px rgba(255,170,40,.25)}
+.aviso-nom{color:#c8102a;text-align:center;min-height:20px;margin:6px 0 0;font-weight:700}
+.sub2{margin:0 0 8px;opacity:.8}
+.reclista ol,.toprec ol{list-style:none;padding:0;margin:6px 0}
+.reclista li,.toprec li{display:flex;align-items:center;gap:8px;background:#fff;border-radius:12px;padding:6px 10px;margin:4px 0;box-shadow:0 2px 0 rgba(90,20,40,.12)}
+.reclista li.yo,.toprec li.yo{background:#fff1a8;box-shadow:0 0 0 2px #f2a20a}
+.pu{min-width:30px;font-weight:800;font-size:18px;text-align:center}
+.no{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.no i{font-weight:500;opacity:.7}
+.va{text-align:right;line-height:1.1}.va b{font-size:17px;display:block}.va small{font-size:12px;opacity:.75}
+.mipuesto{text-align:center;font-size:15px;margin:8px 0 0}
+.tit-rec{margin:12px 0 2px;font-weight:800;text-align:center}
+.chico{font-size:14px;opacity:.85;margin:6px 0}
+.btn.chico{font-size:15px;padding:9px 16px;opacity:1}
+.puesto{font-size:18px;margin:6px 0}
+.lnk{border:0;background:none;color:#c8361a;text-decoration:underline;font-weight:700;padding:0 4px}
 body:not(.listo) .pant{visibility:hidden}
 @media (min-width:900px){ .chip img{width:36px;height:36px} }
 </style>
@@ -168,6 +185,7 @@ body:not(.listo) .pant{visibility:hidden}
   <p class="sub">El camino de las frutas<small>Uní 3 iguales y recorré Paraguay de Asunción al Chaco</small></p>
   <div id="resumen"></div>
   <button class="btn grande" id="bJugar">▶ Jugar</button>
+  <button class="btn sec" id="bRec">🏆 Récords</button>
   <button class="btn sec" id="bComo">❓ Cómo se juega</button>
   <div class="seo">
     <h2>Un juego de unir frutas bien paraguayo</h2>
@@ -178,7 +196,7 @@ body:not(.listo) .pant{visibility:hidden}
 
 <section id="pMapa" class="pant">
   <div id="mapa"><div id="mapaIn"></div></div>
-  <div class="mbar"><h2>Recorrido</h2><span id="mEst"></span></div>
+  <div class="mbar"><h2>Recorrido</h2><span id="mEst"></span><button id="bRecMapa" aria-label="Récords">🏆</button></div>
   <button class="btn sec" id="bVolverT" aria-label="Volver a la portada del juego">◀</button>
 </section>
 
@@ -198,9 +216,10 @@ body:not(.listo) .pant{visibility:hidden}
 <button id="btnMus" title="Música">🎵</button>
 <button id="btnSnd" title="Sonido">🔊</button>
 
+<script src="../chat/filtro.js?v=1"></script>
 <script src="arte.js?v=1"></script>
 <script src="niveles.js?v=7"></script>
-<script src="juego.js?v=9"></script>
+<script src="juego.js?v=11"></script>
 <script>window.INICIO=Object.assign(window.INICIO||{},{sonidos:['#btnMus','#btnSnd']});</script>
 <script src="../inicio.js?v=2"></script>
 </body>

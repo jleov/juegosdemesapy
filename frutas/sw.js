@@ -1,6 +1,6 @@
 // Service worker de Yva Rape: permite instalar el juego como app y jugarlo sin conexión.
-const CACHE = 'frutas-v1';
-const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './arte.js', './niveles.js', './juego.js', '../inicio.js'];
+const CACHE = 'frutas-v2';
+const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './arte.js', './niveles.js', './juego.js', '../inicio.js', '../chat/filtro.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -10,7 +10,7 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin || !(url.pathname.includes('/frutas/') || url.pathname.endsWith('/inicio.js'))) return;
+  if (e.request.method !== 'GET' || url.origin !== location.origin || !(url.pathname.includes('/frutas/') || url.pathname.endsWith('/inicio.js') || url.pathname.endsWith('/chat/filtro.js'))) return;
   // red primero, caché si no hay conexión
   e.respondWith(fetch(e.request).then(r => {
     const copy = r.clone();

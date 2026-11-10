@@ -24,6 +24,84 @@ let datos = {max:0, est:{}, pts:{}};
 try{ const d = JSON.parse(localStorage.getItem(CLAVE) || 'null'); if(d && typeof d.max === 'number') datos = Object.assign(datos, d); }catch(e){}
 const guardar = () => { try{ localStorage.setItem(CLAVE, JSON.stringify(datos)); }catch(e){} };
 const totalEstrellas = () => Object.values(datos.est).reduce((a, b) => a + b, 0);
+/* ------------------------------ récords en línea ------------------------------ */
+// Cada aparato tiene un código al azar (no es de la persona) y el nombre que elige mostrar.
+const API_REC = /(^|\.)juegospy\.com$|\.pages\.dev$/.test(location.hostname) ? '/api/records' : 'https://juegospy.com/api/records';
+const PRUEBA_LOCAL = location.protocol === 'file:' || /^(localhost|127\.|\[::1\])/.test(location.hostname);   // probando en la PC: no sube nada
+const lsLeer = (k, d) => { try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(e){ return d; } };
+const lsPoner = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
+let miId = lsLeer('yva_id', '');
+if(!/^[a-z0-9]{12,32}$/.test(miId)){ miId = Array.from({length: 20}, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[azar(36)]).join(''); lsPoner('yva_id', miId); }
+let miNombre = lsLeer('yva_nombre', '');
+if(!datos.sub) datos.sub = {};
+const limpiaNombre = n => String(n || '').replace(/[\u0000-\u001f<>"'`\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18);
+const esOfensivo = n => !!(window.FILTRO_CHAT && FILTRO_CHAT.ofensivo(n));
+const totalPuntos = () => Object.values(datos.pts).reduce((a, b) => a + b, 0);
+const escHtml = t => String(t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+async function subirRecords(){
+  if(!miNombre || PRUEBA_LOCAL) return false;
+  const lista = Object.keys(datos.pts).filter(i => (datos.sub[i] || 0) < datos.pts[i]).map(i => [+i, datos.pts[i]]);
+  const cuerpo = {g: 'frutas', id: miId, n: miNombre, lista, tot: totalPuntos(), est: totalEstrellas(), max: Object.keys(datos.est).length};
+  try{
+    const r = await fetch(API_REC, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cuerpo)});
+    if(!r.ok) return false;
+    lista.forEach(([i, p]) => datos.sub[i] = p); guardar(); return true;
+  }catch(e){ return false; }
+}
+async function leerRecords(niv){
+  try{
+    const r = await fetch(API_REC + '?g=frutas&id=' + miId + (niv !== undefined ? '&niv=' + niv : ''));
+    const d = await r.json(); return r.ok ? d : null;
+  }catch(e){ return null; }
+}
+// pide (o cambia) el nombre que se muestra en los récords
+function pedirNombre(listo){
+  modal(`<h2>🏆 Tu nombre</h2><p class="centro">Así vas a aparecer en la tabla de récords de todos.</p>
+    <input id="nomRec" class="campo" maxlength="18" placeholder="Tu nombre o apodo" value="${escHtml(miNombre || limpiaNombre(lsLeer('jpy_chat_nombre', '')))}" autocomplete="nickname">
+    <p class="aviso-nom" id="nomAviso"></p>
+    <div class="acciones"><button class="btn grande" id="bNomOk">Guardar</button><button class="btn sec" id="bNomNo">Ahora no</button></div>`, true);
+  const inp = $('#nomRec'); setTimeout(() => inp.focus(), 100);
+  const ok = async () => {
+    const n = limpiaNombre(inp.value);
+    if(n.length < 2){ $('#nomAviso').textContent = 'Poné al menos 2 letras.'; return; }
+    if(esOfensivo(n)){ $('#nomAviso').textContent = '🚫 Ese nombre tiene palabras ofensivas.'; return; }
+    miNombre = n; lsPoner('yva_nombre', n);
+    datos.sub = {}; guardar();   // con nombre nuevo se vuelve a subir todo
+    son('toc'); cerrarModal();
+    await subirRecords();
+    if(listo) listo();
+  };
+  $('#bNomOk').onclick = ok; inp.onkeydown = e => { if(e.key === 'Enter') ok(); };
+  $('#bNomNo').onclick = () => { cerrarModal(); if(listo) listo(); };
+}
+function filaRec(x, k, valor){
+  const med = ['🥇', '🥈', '🥉'][k] || (k + 1) + '.';
+  return `<li class="${x.yo ? 'yo' : ''}"><span class="pu">${med}</span><span class="no">${escHtml(x.n)}${x.yo ? ' <i>(vos)</i>' : ''}</span>${valor}</li>`;
+}
+async function verRecords(){
+  son('toc');
+  modal(`<h2>🏆 Récords</h2><p class="centro sub2">Los que más puntos juntaron en todo el recorrido</p><div id="recLista" class="reclista"><p class="centro">Cargando…</p></div>
+    <div class="acciones"><button class="btn sec" id="bNom">${miNombre ? '✏️ ' + escHtml(miNombre) : '✏️ Poné tu nombre'}</button><button class="btn" id="bRecOk">Listo</button></div>`, true);
+  $('#bRecOk').onclick = cerrarModal;
+  $('#bNom').onclick = () => pedirNombre(verRecords);
+  if(miNombre) await subirRecords();
+  const d = await leerRecords();
+  const el = $('#recLista'); if(!el) return;
+  if(!d){ el.innerHTML = '<p class="centro">No se pudo cargar la tabla. Fijate si tenés internet.</p>'; return; }
+  if(!d.lista.length){ el.innerHTML = '<p class="centro">Todavía nadie está en la tabla. ¡Sé el primero!</p>'; return; }
+  let h = '<ol>' + d.lista.map((x, k) => filaRec(x, k, `<span class="va"><b>${fmt(x.tot)}</b><small>⭐ ${x.est} · ${x.max} niv.</small></span>`)).join('') + '</ol>';
+  if(d.yo && !d.lista.some(x => x.yo)) h += `<p class="mipuesto">Vos estás en el puesto <b>${d.yo.puesto}</b> con ${fmt(d.yo.tot)} puntos</p>`;
+  if(!miNombre) h += '<p class="mipuesto">Poné tu nombre para entrar en la tabla 👇</p>';
+  el.innerHTML = h;
+}
+async function topNivel(i, sel){
+  const el = $(sel); if(!el) return;
+  const d = await leerRecords(i); if(!$(sel)) return;
+  if(!d){ el.innerHTML = ''; return; }
+  if(!d.lista.length){ el.innerHTML = '<p class="centro chico">🏆 Nadie tiene récord en este nivel todavía.</p>'; return; }
+  el.innerHTML = '<p class="tit-rec">🏆 Mejores de este nivel</p><ol>' + d.lista.slice(0, 5).map((x, k) => filaRec(x, k, `<span class="va"><b>${fmt(x.pts)}</b></span>`)).join('') + '</ol>'
+    + (d.yo && !d.lista.slice(0, 5).some(x => x.yo) ? `<p class="mipuesto">Tu puesto en este nivel: <b>${d.yo.puesto}</b></p>` : '');
+}
 let conSonido = true, conMusica = true;
 try{ conSonido = localStorage.getItem('yva_snd') !== '0'; conMusica = localStorage.getItem('yva_mus') !== '0'; }catch(e){}
 
@@ -202,6 +280,8 @@ function armarTitulo(){
 }
 $('#bJugar').onclick = () => { audio(); son('toc'); musica(true); pantallaCompleta(); verPantalla('#pMapa'); };
 $('#bComo').onclick = () => { son('toc'); comoJugar(); };
+$('#bRec').onclick = () => verRecords();
+$('#bRecMapa').onclick = () => verRecords();
 $('#bVolverT').onclick = () => { son('toc'); armarTitulo(); verPantalla('#pTitulo'); };
 function comoJugar(){
   const im = k => `<img src="${svgUrl(FRUTAS[k].svg)}" alt="">`;
@@ -284,8 +364,10 @@ function previaNivel(i){
       <li>${n.s ? `⏱ en ${n.s} segundos` : `👆 en ${n.m} movidas`}</li></ul>
     ${n.tip ? `<p class="tip">💡 ${n.tip}</p>` : ''}
     <div class="eprev">${[1, 2, 3].map(k => `<span class="${k <= est ? 'si' : ''}">★</span>`).join('')}${datos.pts[i] ? `<small>Mejor: ${fmt(datos.pts[i])}</small>` : ''}</div>
-    <div class="acciones"><button class="btn grande" id="bIr">¡A jugar!</button><button class="btn sec" onclick="this.closest('#modal').classList.remove('on')">Volver</button></div></div>`, true);
+    <div class="acciones"><button class="btn grande" id="bIr">¡A jugar!</button><button class="btn sec" onclick="this.closest('#modal').classList.remove('on')">Volver</button></div>
+    <div class="toprec" id="topNiv"></div></div>`, true);
   $('#bIr').onclick = () => { cerrarModal(); audio(); son('toc'); musica(true); empezar(i); };
+  topNivel(i, '#topNiv');
 }
 
 /* ------------------------------ motor ------------------------------ */
@@ -683,6 +765,7 @@ function ganar(){
   modal(`<div class="res gano"><h2>${ult ? '¡Llegaste al Chaco!' : ['¡Muy bien!', '¡Iporã!', '¡Mbarete!'][est - 1]}</h2>
     <div class="estrellas">${[1, 2, 3].map(k => `<span class="st" id="st${k}">★</span>`).join('')}</div>
     <p class="pts">${fmt(pts)} puntos${nuevoRec && datos.pts[i] ? ' <small>¡récord!</small>' : ''}</p>
+    <div class="recgano" id="recGano"></div>
     ${ult ? '<p>¡Terminaste todo el recorrido por Paraguay! Volvé a jugar los niveles para sacar 3 estrellas en todos.</p>' : nCiu && !yaAbierto ? `<p>🚌 Próxima parada: <b>${nCiu.n}</b></p>` : ''}
     <div class="acciones">${!ult ? '<button class="btn grande" id="bSig">Siguiente nivel ▶</button>' : ''}
       <button class="btn sec" id="bRep">↻ Repetir</button><button class="btn sec" id="bMapa">🗺️ Mapa</button><button class="btn sec" id="bComp">📤 Compartir</button></div></div>`);
@@ -691,6 +774,31 @@ function ganar(){
   $('#bRep').onclick = () => { cerrarModal(); son('toc'); empezar(i); };
   $('#bMapa').onclick = () => { cerrarModal(); son('toc'); G = null; verPantalla('#pMapa'); };
   $('#bComp').onclick = () => compartir(i, pts, est);
+  recordGanado(i, nCiu && !yaAbierto, ult);
+}
+// después de ganar: sube el récord y muestra el puesto (o invita a poner el nombre)
+async function recordGanado(i, cambiaCiudad, ult){
+  const el = $('#recGano'); if(!el) return;
+  if(!miNombre){
+    el.innerHTML = '<button class="btn sec chico" id="bNomGano">🏆 Poné tu nombre y entrá en los récords</button>';
+    $('#bNomGano').onclick = () => pedirNombre(() => verNivelRec(i, cambiaCiudad, ult));
+    return;
+  }
+  el.innerHTML = '<p class="chico">🏆 Subiendo tu récord…</p>';
+  const subio = await subirRecords();
+  const d = subio ? await leerRecords(i) : null;
+  if(!$('#recGano')) return;
+  if(d && d.yo) el.innerHTML = `<p class="puesto">🏆 Puesto <b>${d.yo.puesto}</b> en este nivel <button class="lnk" id="bVerNiv">ver tabla</button></p>`;
+  else el.innerHTML = PRUEBA_LOCAL ? '<p class="chico">(probando en la PC: no se suben récords)</p>' : '<p class="chico">No se pudo subir el récord ahora; se sube la próxima vez que haya internet.</p>';
+  const b = $('#bVerNiv'); if(b) b.onclick = () => verNivelRec(i, cambiaCiudad, ult);
+}
+function verNivelRec(i, cambiaCiudad, ult){
+  modal(`<h2>🏆 ${CIUDADES[NIVELES[i].ciudad].n} · nivel ${i + 1}</h2><div class="toprec" id="topNiv2"><p class="centro">Cargando…</p></div>
+    <div class="acciones">${!ult ? '<button class="btn grande" id="bSig2">Siguiente nivel ▶</button>' : ''}<button class="btn sec" id="bMapa2">🗺️ Mapa</button><button class="btn sec" id="bTodos2">🏆 Tabla general</button></div>`);
+  topNivel(i, '#topNiv2');
+  const sig = $('#bSig2'); if(sig) sig.onclick = () => { cerrarModal(); son('toc'); if(cambiaCiudad){ G = null; verPantalla('#pMapa'); setTimeout(() => previaNivel(i + 1), 500); } else previaNivel(i + 1); };
+  $('#bMapa2').onclick = () => { cerrarModal(); son('toc'); G = null; verPantalla('#pMapa'); };
+  $('#bTodos2').onclick = () => verRecords();
 }
 function perder(){
   son('pierde');
@@ -984,6 +1092,7 @@ function fondoCuadro(){
 listos.then(() => {
   $('#logoFrutas').innerHTML = ['mango', 'frutilla', 'pina', 'guayaba', 'mburukuja'].map(k => `<img src="${svgUrl(FRUTAS[k].svg)}" alt="">`).join('') + `<img class="gu" src="${svgUrl(GUAMPA)}" alt="">`;
   armarTitulo(); requestAnimationFrame(cuadro); requestAnimationFrame(fondoCuadro);
+  setTimeout(subirRecords, 3000);
   document.body.classList.add('listo');
 });
 window.INICIO = Object.assign(window.INICIO || {}, {enJuego: () => !!G && !G.fin, pregunta: '¿Dejar el nivel y volver a todos los juegos?'});
