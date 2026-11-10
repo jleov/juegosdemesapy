@@ -804,15 +804,16 @@ function bigText(t, sub){ const d=document.createElement('div'); d.className='bi
 function renderSeats(){
   if(!V || V.phase==='lobby') return;
   const L=curLayout(); if(!L) return;
-  const lay=$('#lay'), cp=curP();
-  $$('#lay .ylab').forEach(x=>x.remove());
+  const v3=VIEW.mode==='3d', lay=v3?$('#ov3'):$('#lay'), cp=curP();
+  $$('#lay .ylab, #ov3 .ylab').forEach(x=>x.remove());
   V.players.forEach(p=>{
     const [x,y]=L.yardC(p.arm), d=document.createElement('div');
     const b=BUB[p.id], bub = b && Date.now()-b.at<4500 ? `<div class="bub">${esc(b.x.slice(0,90))}</div>` : '';
     const off=!p.bot && !p.conn;
     d.className='ylab'+(cp===p && V.phase==='play'?' turn':''); d.style.setProperty('--pc', colOf(p).hex);
     d.innerHTML=`${bub}${headHTML(p) || `<span class="em">${esc(p.emoji)}</span>`}<span class="nmb">${p.place?MEDAL[p.place-1]+' ':''}${esc(p.name)}${p.id===me()?' (vos)':''}${p.bot?' 🤖':''}${off?' ⚠️':''}</span>`;
-    placeEl(d, [x,y], L); d.style.zIndex=4;
+    if(v3){ d.dataset.x=x; d.dataset.y=y; } else placeEl(d, [x,y], L);
+    d.style.zIndex=4;
     lay.appendChild(d);
   });
   headsAfterRender();
@@ -1001,38 +1002,24 @@ function shareRoom(){
 }
 
 /* ====================== VISTA 2D / 3D ====================== */
-const VIEW=Object.assign({mode:'2d', tilt:48, spin:0, zoom:.9}, load('ludo_view')||{});
-function saveView(){ store('ludo_view', {mode:VIEW.mode, tilt:VIEW.tilt, zoom:VIEW.zoom}); }
+// el 3D de verdad (luces, sombras, fichas torneadas) está en tres.js, igual que en el ajedrez
+const VIEW=Object.assign({mode:'2d'}, load('ludo_view')||{});
+function saveView(){ store('ludo_view', {mode:VIEW.mode}); }
 function applyView(){
+  if(VIEW.mode==='3d' && !(window.L3 && L3.init())) VIEW.mode='2d';
   $('#game').classList.toggle('v3d', VIEW.mode==='3d');
-  const m=$('#tablero'); m.style.setProperty('--tilt', VIEW.tilt+'deg'); m.style.setProperty('--spin', VIEW.spin+'deg'); m.style.setProperty('--zoom', VIEW.zoom);
   $('#btnView').textContent = VIEW.mode==='3d' ? '🗺️ 2D' : '🧊 3D';
   sizeBoard();
+  if(window.L3) L3.view();
 }
 function toggleView(){
-  VIEW.mode = VIEW.mode==='3d' ? '2d' : '3d'; VIEW.spin=0; saveView(); applyView();
-  toast(VIEW.mode==='3d' ? '🧊 Vista 3D: arrastrá el tablero para girarlo. Botones de cámara a la derecha.' : '🗺️ Vista 2D (desde arriba).');
+  VIEW.mode = VIEW.mode==='3d' ? '2d' : '3d'; saveView(); applyView();
+  if(V && V.phase!=='lobby') renderSeats();
+  toast(VIEW.mode==='3d' ? '🧊 Vista 3D: arrastrá para girar, pellizcá o usá la ruedita para acercar. Tocá las fichas que brillan para moverlas.' : '🗺️ Vista 2D (desde arriba).');
 }
-function cam(k, d){
-  if(k==='spin') VIEW.spin+=d;
-  else if(k==='tilt') VIEW.tilt=Math.max(15, Math.min(64, VIEW.tilt+d));
-  else if(k==='zoom') VIEW.zoom=Math.max(.5, Math.min(1.4, +(VIEW.zoom+d).toFixed(2)));
-  else if(k==='reset'){ VIEW.spin=0; VIEW.tilt=48; VIEW.zoom=.9; }
-  saveView(); applyView();
-}
+function cam(k, d){ if(window.L3) L3.cam(k, d); }
 const DRAG={on:false, moved:false};
-(function(){
-  const stage=$('#stage');
-  stage.addEventListener('pointerdown', e=>{ DRAG.moved=false; if(VIEW.mode!=='3d' || e.target.closest('.cam3d')) return; Object.assign(DRAG,{on:true, x:e.clientX, y:e.clientY, spin:VIEW.spin, tilt:VIEW.tilt}); });
-  window.addEventListener('pointermove', e=>{
-    if(!DRAG.on) return; const dx=e.clientX-DRAG.x, dy=e.clientY-DRAG.y;
-    if(!DRAG.moved && Math.hypot(dx,dy)<8) return;
-    if(!DRAG.moved){ DRAG.moved=true; $('#tablero').classList.add('dragging'); }
-    VIEW.spin=DRAG.spin+dx*.35; VIEW.tilt=Math.max(15, Math.min(64, DRAG.tilt+dy*.15)); applyView();
-  });
-  window.addEventListener('pointerup', ()=>{ if(!DRAG.on) return; DRAG.on=false; $('#tablero').classList.remove('dragging'); if(DRAG.moved){ saveView(); setTimeout(()=>DRAG.moved=false, 50); } });
-})();
-window.addEventListener('resize', ()=>{ if(V && V.phase!=='lobby') sizeBoard(); });
+window.addEventListener('resize', ()=>{ if(V && V.phase!=='lobby'){ sizeBoard(); if(window.L3) L3.resize(); } });
 
 /* ====================== REGLAS ====================== */
 function showRules(){

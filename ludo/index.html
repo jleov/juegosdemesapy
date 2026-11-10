@@ -22,9 +22,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<!-- librería de conexión entre jugadores (PeerJS 1.5.4), guardada junto al juego para no depender de otro sitio -->
+<!-- librería de conexión entre jugadores (PeerJS 1.5.4) y la de 3D (three.js r128), guardadas junto al juego -->
 <script src="peerjs.min.js"></script>
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="three.min.js"></script>
 <script src="../ice.js"></script>
 <style>
 :root{--cream:#fbf4e4;--ink:#1d1d1d;--muted:#6b6b6b;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#1f9a46;--wood:#6b3a1d}
@@ -152,6 +153,11 @@ html,body{overflow-x:clip}
 @keyframes hop3{50%{transform:translateZ(14px)}}
 .v3d .pz.can .pawn{filter:drop-shadow(0 0 5px #fff) drop-shadow(0 0 6px var(--gold))}
 .v3d .ylab{transform:translate(-50%,-50%) rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1)) translateY(-40%)}
+#c3d{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#ov3{position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none}
+.v3d #ov3{display:block}
+.v3d .tablero{display:none}
+#ov3 .ylab{transform:translate(-50%,-100%)}
 .cam3d{position:absolute;right:8px;top:8px;display:none;flex-direction:column;gap:4px;z-index:8}
 .v3d .cam3d{display:flex}
 .cam3d button{width:38px;height:38px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:17px;cursor:pointer}
@@ -363,6 +369,8 @@ html,body{overflow-x:clip}
           <svg class="bd" id="boardSvg"></svg>
           <div class="lay" id="lay"></div>
         </div>
+        <canvas id="c3d" style="display:none"></canvas>
+        <div id="ov3"></div>
         <div class="cam3d">
           <button onclick="cam('spin',-30)" title="Girar">⟲</button>
           <button onclick="cam('spin',30)" title="Girar">⟳</button>
@@ -421,10 +429,11 @@ html,body{overflow-x:clip}
 <div id="modal"><div class="mbox" id="mbox"></div></div>
 <div id="toast"></div>
 
-<script src="reglas.js?v=1"></script>
-<script src="tablero.js?v=1"></script>
-<script src="juego.js?v=1"></script>
-<script src="caras.js?v=1"></script>
+<script src="reglas.js?v=2"></script>
+<script src="tablero.js?v=2"></script>
+<script src="juego.js?v=2"></script>
+<script src="tres.js?v=2"></script>
+<script src="caras.js?v=2"></script>
 <script src="../dueno-link.js"></script>
 <script src="../inicio.js?v=2"></script>
 <script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', sonidos:['#btnSnd','.btnMusic'], ocultar:['[onclick="leaveClick()"]'], barra:'.topbar'};</script>
