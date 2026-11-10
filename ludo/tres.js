@@ -61,6 +61,7 @@ const L3 = (function(){
     marco.position.y=-.21; marco.castShadow=true; marco.receiveShadow=true; sc.add(marco);
     // el tablero: el mismo dibujo del 2D, pintado como textura
     const cv=document.createElement('canvas'); cv.width=cv.height=2048;
+    { const g=cv.getContext('2d'); g.fillStyle='#f6ecd4'; g.fillRect(0,0,2048,2048); }   // mientras carga el dibujo, crema y no negro
     const tex=new THREE.CanvasTexture(cv); tex.anisotropy=8;
     const img=new Image();
     img.onload=()=>{ const g=cv.getContext('2d'); g.drawImage(img,0,0,2048,2048); tex.needsUpdate=true; };
@@ -149,14 +150,19 @@ const L3 = (function(){
   function resize(){
     if(!R.ok) return;
     const st=$('#stage'), w=st.clientWidth, h=st.clientHeight; if(!w||!h) return;
+    if(R.w===w && R.h===h && R.dE===R.E) return;   // mismo tamaño: no se toca (cambiar el tamaño borra el dibujo)
+    R.w=w; R.h=h; R.dE=R.E;
     R.renderer.setSize(w,h,false); R.cam.aspect=w/h; R.cam.updateProjectionMatrix();
     const fov=R.cam.fov*Math.PI/180, hfov=2*Math.atan(Math.tan(fov/2)*R.cam.aspect), half=((R.E||7.5)+.6)*.98;
     R.dist=Math.max(half/Math.tan(hfov/2), half*1.05/Math.tan(fov/2));
   }
+  // solo hace algo cuando se pasa de 2D a 3D o al revés (si no, en cada jugada se rearmaba todo y parpadeaba)
   function view(){
     const on=VIEW.mode==='3d';
+    if(on===R.shown){ if(on) resize(); return; }
+    R.shown=on;
     $('#c3d').style.display = on ? 'block' : 'none';
-    if(on){ resize(); R.key=null; }
+    if(on) resize();
   }
   function wire(cv){
     const pts=new Map(); let drag=null, pinch=null;

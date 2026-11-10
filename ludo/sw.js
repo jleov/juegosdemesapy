@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Ludo como app.
-const CACHE = 'ludo-v2';
+const CACHE = 'ludo-v3';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './reglas.js', './juego.js', './caras.js', './tablero.js', './tres.js', './three.min.js'];
 
 self.addEventListener('install', e => {
