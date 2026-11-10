@@ -1,0 +1,16 @@
+{
+  "name": "Yva Rape: uní frutas por Paraguay",
+  "short_name": "Yva Rape",
+  "description": "Juego de unir 3 frutas paraguayas: recorré 28 ciudades de Asunción al Chaco en 66 niveles.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#d8452a",
+  "theme_color": "#d8452a",
+  "lang": "es-PY",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -8,7 +8,7 @@
 // Necesita una base D1 conectada al proyecto de Cloudflare Pages con el nombre de variable DB.
 // De las personas solo guarda el nombre que escribieron en el juego (nada de IP ni aparato).
 const ALLOWED = [/^https:\/\/(www\.)?juegospy\.com$/, /^https:\/\/juegosdemesapy\.pages\.dev$/, /^https:\/\/[a-z0-9-]+\.juegosdemesapy\.pages\.dev$/, /^https:\/\/jleov\.github\.io$/, /^https?:\/\/localhost(:\d+)?$/];
-const JUEGOS = ['portada', 'banquero', 'loteria', 'kombate', 'petei', 'escoba', 'impostor', 'ludo', 'tarot', 'versiculo', 'billar', 'bolos', 'minigolf', 'basta', 'tejo', 'botones', 'naval', 'mavapa', 'mavaiko', 'ajedrez', 'salon', 'odisea', 'salas', 'karaoke'];
+const JUEGOS = ['portada', 'banquero', 'loteria', 'kombate', 'petei', 'escoba', 'impostor', 'ludo', 'frutas', 'tarot', 'versiculo', 'billar', 'bolos', 'minigolf', 'basta', 'tejo', 'botones', 'naval', 'mavapa', 'mavaiko', 'ajedrez', 'salon', 'odisea', 'salas', 'karaoke'];
 const OWNER_PUB = { kty: 'EC', crv: 'P-256', x: 'eLdK1LWh1LGyAlt0IW6Apa9bnuRt1LwLi3D1MQtqtHk', y: 'XPx_IfKocm2ZANCG_As4PxsgjToAMnZMEaWlzZWWBKk' };
 // día de Paraguay (UTC-3)
 const diaPY = (t = Date.now()) => new Date(t - 3 * 3600e3).toISOString().slice(0, 10);
