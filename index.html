@@ -165,6 +165,19 @@ a.game:hover .cover::before,a.game:focus-visible .cover::before{opacity:.34}
 @keyframes pgira{to{transform:rotate(360deg)}}
 @keyframes pflota{from{transform:translateY(3px)}to{transform:translateY(-5px)}}
 @media (prefers-reduced-motion:reduce){.cover::before,header::before,.cover>*{animation:none!important}}
+
+/* tarjeta de Batalla Naval: escena con un buque al atardecer */
+.cover>.scene{position:absolute;inset:0;width:100%;height:100%;display:block}
+.cover.nav::before{display:none}
+.scene .nvcBob{animation:nvcbob 4.2s ease-in-out infinite alternate;transform-origin:210px 116px}
+@keyframes nvcbob{from{transform:translateY(.8px) rotate(-.5deg)}to{transform:translateY(-1.6px) rotate(.5deg)}}
+.scene .nvcOla{animation:nvcola 5s linear infinite}.scene .nvcOla2{animation:nvcola 8s linear infinite reverse}
+@keyframes nvcola{to{transform:translateX(-80px)}}
+.scene .nvcHumo{animation:nvchumo 5s ease-in-out infinite alternate}
+@keyframes nvchumo{to{transform:translate(-10px,-3px)}}
+.scene .nvcBand{animation:nvcband 1.3s ease-in-out infinite alternate;transform-origin:75px 82px}
+@keyframes nvcband{to{transform:skewY(7deg) scaleX(.92)}}
+@media (prefers-reduced-motion:reduce){.scene *{animation:none!important}}
 </style>
 </head>
 <body>
@@ -277,7 +290,58 @@ a.game:hover .cover::before,a.game:focus-visible .cover::before{opacity:.34}
         <span class="btn botbtn">Jugar a los Botones</span></div>
     </a>
     <a class="game" href="naval/">
-      <div class="cover nav"><img src="naval/icon-192.png" alt=""></div>
+      <div class="cover nav"><svg class="scene" viewBox="0 0 400 160" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="nvcSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a2344"/><stop offset=".45" stop-color="#2b5f93"/><stop offset=".8" stop-color="#e9976a"/><stop offset="1" stop-color="#ffd08a"/></linearGradient>
+<linearGradient id="nvcSea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d6f9c"/><stop offset=".35" stop-color="#124a75"/><stop offset="1" stop-color="#041c33"/></linearGradient>
+<radialGradient id="nvcSun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff6d0"/><stop offset=".25" stop-color="#ffd98a" stop-opacity=".9"/><stop offset="1" stop-color="#ffb060" stop-opacity="0"/></radialGradient>
+<linearGradient id="nvcHull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c3ccd4"/><stop offset=".55" stop-color="#8b98a5"/><stop offset="1" stop-color="#525e6a"/></linearGradient>
+<linearGradient id="nvcHullX" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffcf9a" stop-opacity=".45"/><stop offset=".3" stop-color="#fff" stop-opacity="0"/><stop offset=".8" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></linearGradient>
+<linearGradient id="nvcSup" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e3c9ac"/><stop offset=".25" stop-color="#c9d1d8"/><stop offset="1" stop-color="#7c8996"/></linearGradient>
+<linearGradient id="nvcFun" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b9c1c9"/><stop offset="1" stop-color="#5d6975"/></linearGradient>
+<filter id="nvcBlur" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter>
+<filter id="nvcSmk" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+</defs>
+<rect width="400" height="104" fill="url(#nvcSky)"/>
+<circle cx="92" cy="96" r="58" fill="url(#nvcSun)"/><circle cx="92" cy="96" r="13" fill="#fff3c4"/>
+<g fill="#fff" opacity=".9"><circle cx="330" cy="18" r=".9"/><circle cx="364" cy="34" r=".7"/><circle cx="286" cy="10" r=".7"/><circle cx="246" cy="26" r=".6"/><circle cx="380" cy="12" r=".8"/></g>
+<g fill="#ffd9b0" opacity=".5"><ellipse cx="170" cy="58" rx="52" ry="4"/><ellipse cx="214" cy="64" rx="30" ry="2.6"/><ellipse cx="44" cy="46" rx="40" ry="3.4"/><ellipse cx="330" cy="72" rx="46" ry="3"/></g>
+<g fill="#3d2f52" opacity=".55"><ellipse cx="300" cy="50" rx="60" ry="5"/><ellipse cx="110" cy="30" rx="48" ry="4"/></g>
+<path d="M0,101 q30,-9 62,-5 q30,-10 70,-2 q40,-4 60,3 q70,-8 110,0 q50,-6 98,2 V106 H0Z" fill="#1d3550" opacity=".85"/>
+<rect y="102" width="400" height="58" fill="url(#nvcSea)"/>
+<g fill="#ffd08a"><rect x="62" y="105" width="60" height="1.6" rx=".8" opacity=".9"/><rect x="70" y="110" width="44" height="1.6" rx=".8" opacity=".75"/><rect x="58" y="116" width="52" height="1.8" rx=".9" opacity=".55"/><rect x="74" y="123" width="34" height="2" rx="1" opacity=".4"/><rect x="64" y="132" width="40" height="2.2" rx="1.1" opacity=".28"/></g>
+<g class="nvcBob">
+<path d="M70,118 H330 q-30,16 -130,16 q-100,0 -130,-16z" fill="#02101e" opacity=".5" filter="url(#nvcBlur)"/>
+<g class="nvcHumo" filter="url(#nvcSmk)" fill="#2a2f36"><ellipse cx="166" cy="50" rx="10" ry="5" opacity=".5"/><ellipse cx="146" cy="43" rx="15" ry="6" opacity=".35"/><ellipse cx="118" cy="37" rx="20" ry="7" opacity=".22"/></g>
+<g stroke="#3a444e" stroke-width="1.1" fill="none"><path d="M224,58 V16M216,26 H232M218,34 H230M224,16 l-10,26M224,16 l10,26M214,42 H234"/><path d="M224,16 L346,84" opacity=".45" stroke-width=".6"/><path d="M224,16 L74,96" opacity=".45" stroke-width=".6"/></g>
+<rect x="213" y="20" width="22" height="4" rx="1" fill="#dfe5ea" stroke="#3a444e" stroke-width=".8"/><circle cx="224" cy="13" r="2.2" fill="#e24a3a"/>
+<path d="M170,82 L173,56 H190 L189,82Z" fill="url(#nvcFun)" stroke="#39434d" stroke-width=".8"/><path d="M172.600,60 L173,56 H190 V60Z" fill="#20262c"/><path d="M171.800,66 H189.600 V69 H171.500Z" fill="#d52b1e" opacity=".9"/>
+<circle cx="200" cy="60" r="7" fill="#e8edf1" stroke="#56616c" stroke-width=".8"/><path d="M194.600,64 a7,7 0 0 0 10.800,0" fill="#000" opacity=".18"/><rect x="197" y="66" width="6" height="8" fill="#8b98a5"/>
+<rect x="208" y="56" width="26" height="10" rx="1" fill="url(#nvcSup)" stroke="#39434d" stroke-width=".8"/>
+<path d="M204,66 H244 L248,80 H204Z" fill="url(#nvcSup)" stroke="#39434d" stroke-width=".8"/><path d="M207,69 H244.600 L245.800,73 H207Z" fill="#13283c"/><g stroke="#8b98a5" stroke-width=".8"><path d="M214,69 v4M221,69 v4M228,69 v4M235,69 v4M241,69 v4"/></g>
+<rect x="150" y="78" width="100" height="14" fill="url(#nvcSup)" stroke="#39434d" stroke-width=".8"/>
+<g fill="#13283c"><rect x="158" y="82" width="5" height="3.400" rx=".8"/><rect x="170" y="82" width="5" height="3.400" rx=".8"/><rect x="182" y="82" width="5" height="3.400" rx=".8"/><rect x="194" y="82" width="5" height="3.400" rx=".8"/><rect x="206" y="82" width="5" height="3.400" rx=".8"/><rect x="218" y="82" width="5" height="3.400" rx=".8"/><rect x="230" y="82" width="5" height="3.400" rx=".8"/></g>
+<rect x="152" y="73" width="16" height="5" rx="2.5" fill="#e9692c" stroke="#7a3410" stroke-width=".7"/>
+<rect x="112" y="84" width="38" height="13" fill="url(#nvcSup)" stroke="#39434d" stroke-width=".8"/><rect x="118" y="78" width="16" height="6" fill="#aab4be" stroke="#39434d" stroke-width=".8"/>
+<path d="M122,78 L98,72" stroke="#2f3840" stroke-width="2" stroke-linecap="round"/>
+<path d="M258,91 L262,80 H280 L287,91Z" fill="#a9b4be" stroke="#39434d" stroke-width=".8"/><path d="M276,80 H280 L287,91 H280Z" fill="#000" opacity=".2"/><path d="M283,84 L316,78" stroke="#2f3840" stroke-width="2.4" stroke-linecap="round"/>
+<rect x="244" y="84" width="12" height="7" fill="#96a2ae" stroke="#39434d" stroke-width=".8"/>
+<path d="M74,97 V78" stroke="#3a444e" stroke-width="1.1"/><g class="nvcBand"><rect x="75" y="78" width="14" height="3" fill="#d52b1e"/><rect x="75" y="81" width="14" height="3" fill="#fff"/><rect x="75" y="84" width="14" height="3" fill="#0038a8"/></g>
+<g stroke="#56616c" stroke-width=".6" opacity=".8"><path d="M70,93 H112M250,87.500 L346,82.800"/><path d="M78,93 v4M86,93 v4M94,93 v4M102,93 v4M298,85.200 v4.500M310,84.600 v4.600M322,84 v4.700M334,83.400 v4.500"/></g>
+<path d="M66,97 H214 L220,91 L354,85 Q342,102 328,116 H76 Q69,108 66,97Z" fill="url(#nvcHull)"/>
+<path d="M66,97 H214 L220,91 L354,85 Q342,102 328,116 H76 Q69,108 66,97Z" fill="url(#nvcHullX)"/>
+<path d="M66,97 H214 L220,91 L354,85" fill="none" stroke="#e9eef2" stroke-width="1" opacity=".8"/>
+<path d="M72.500,110 H333.500 L328,116 H76Z" fill="#1c2126"/>
+<g fill="#1b2a38" opacity=".8"><circle cx="100" cy="103" r="1"/><circle cx="116" cy="103" r="1"/><circle cx="132" cy="103" r="1"/><circle cx="148" cy="103" r="1"/><circle cx="164" cy="103" r="1"/><circle cx="180" cy="103" r="1"/><circle cx="196" cy="103" r="1"/><circle cx="236" cy="100" r="1"/><circle cx="252" cy="100" r="1"/><circle cx="268" cy="99" r="1"/></g>
+<text x="296" y="104" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="10" fill="#f4f6f8" opacity=".92" transform="skewX(-8)" style="letter-spacing:.5px">P 02</text>
+<path d="M330,92 v8 m-3,-3 q3,5 6,0" stroke="#2f3840" stroke-width="1.1" fill="none"/>
+</g>
+<path d="M352,108 q-14,2 -22,9 q-10,-1 -18,3 h-240 q-30,2 -60,-1 q30,6 70,5 h250 q14,-6 26,-8 q-2,-4 -6,-8z" fill="#fff" opacity=".8"/>
+<path d="M348,110 q-9,3 -14,8 l10,1 q6,-3 8,-5z" fill="#fff"/>
+<g stroke="#fff" stroke-linecap="round" opacity=".55"><path d="M10,121 h30M48,124 h22M84,122 h40M140,125 h30M190,123 h44M250,125 h26" stroke-width="1.4"/></g>
+<path class="nvcOla" d="M-80,132 q20,-3 40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 V170 H-80Z" fill="#0c3d63"/><path class="nvcOla2" d="M-80,146 q20,-4 40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 V170 H-80Z" fill="#072b49"/>
+<g stroke="#9fd0ee" stroke-linecap="round" opacity=".35" stroke-width="1"><path d="M30,138 h18M120,141 h26M230,137 h20M310,142 h30M360,134 h16"/></g>
+</svg></div>
       <div class="body"><h2>🚢 Batalla Naval PY</h2>
         <p>La batalla naval de siempre: cada uno pone sus barcos sin que el otro mire y se tiran bombas por letra y número (B7). Agua, tocado, hundido. Duelo, todos contra todos o por equipos, salva, 2D o 3D, chat, voz y bots.</p>
         <span class="btn navbtn">Jugar a la Batalla Naval</span></div>
