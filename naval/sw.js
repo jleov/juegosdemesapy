@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar la Batalla Naval PY como app.
-const CACHE = 'naval-v5';
+const CACHE = 'naval-v6';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './reglas.js', './juego.js', './tablero.js', './mar3d.js'];
 
 self.addEventListener('install', e => {
