@@ -223,6 +223,29 @@ body>.side{display:none}
   #rival{width:86px;height:100px}
   .cat,.tool{min-width:54px;font-size:11px}
 }
+
+.logo{text-align:center;color:#fff;margin:6px 0 18px}
+.logo h1{margin:0;font-size:clamp(30px,9.5vw,42px);letter-spacing:2px;font-weight:900;text-shadow:0 3px 0 #000;line-height:1.05}
+.logo h1 span{color:#ffd66b;font-size:.4em;letter-spacing:3px;display:block;margin-top:6px;text-shadow:0 2px 0 #000}
+.bandera{display:inline-block;margin-top:10px;border-radius:5px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.45);line-height:1}
+.bandera i{display:block;height:7px}.bandera i.rojo{background:#d52b1e}.bandera i.azul{background:#0038a8}
+.bandera b{display:block;background:#fff;color:#1b2a5a;font-weight:900;letter-spacing:5px;font-size:14px;padding:5px 11px 5px 16px}
+/* ---------- portada: ilustración propia con ñandutí de fondo ---------- */
+.arte{position:relative;width:min(300px,84vw);aspect-ratio:300/128;margin:0 auto 6px}
+.arte::before{content:"";position:absolute;left:50%;top:50%;width:62%;aspect-ratio:1;transform:translate(-50%,-50%);background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94' stroke-dasharray='6 5'/%3E%3Ccircle cx='100' cy='100' r='78'/%3E%3Ccircle cx='100' cy='100' r='58' stroke-dasharray='2 4' stroke-width='5'/%3E%3Ccircle cx='100' cy='100' r='38'/%3E%3Ccircle cx='100' cy='100' r='16' stroke-dasharray='3 3' stroke-width='4'/%3E%3Cpath d='M100 6v188M6 100h188M33.5 33.5l133 133M166.5 33.5l-133 133M64 13l72 174M136 13L64 187M13 64l174 72M13 136l174-72'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;opacity:.3;animation:artegira 90s linear infinite}
+.arte svg{position:relative;width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 6px 9px rgba(0,0,0,.45))}
+@keyframes artegira{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.arte .flota{animation:arteflota 3.2s ease-in-out infinite alternate}
+@keyframes arteflota{to{transform:translateY(-5px)}}
+.arte .ola{animation:arteola 4s linear infinite}.arte .ola2{animation:arteola 6.5s linear infinite reverse}
+@keyframes arteola{to{transform:translateX(-60px)}}
+.arte .late{transform-box:fill-box;transform-origin:center;animation:artelate 1.6s ease-in-out infinite alternate}
+@keyframes artelate{to{transform:scale(1.12)}}
+.arte .gira{transform-box:fill-box;transform-origin:center;animation:artespin 5s linear infinite}
+@keyframes artespin{to{transform:rotate(360deg)}}
+.arte .va{animation:arteva 2.6s ease-in-out infinite alternate}
+@keyframes arteva{to{transform:translateX(14px)}}
+@media (prefers-reduced-motion:reduce){.arte::before,.arte *{animation:none!important}}
 </style>
 </head>
 <body>
@@ -231,7 +254,14 @@ body>.side{display:none}
 <!-- ======================= MENÚ ======================= -->
 <div class="screen on" id="menu"><div class="menu">
   <div class="logo">
-    <div class="ico">💇‍♀️💅💄</div>
+    <div class="arte"><svg viewBox="0 0 300 128" aria-hidden="true"><defs><linearGradient id="paM" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf7ff"/><stop offset=".5" stop-color="#bfe3f7"/><stop offset="1" stop-color="#8fc3e6"/></linearGradient></defs>
+<ellipse cx="150" cy="58" rx="46" ry="54" fill="#f2c14e" stroke="#8a6a1a" stroke-width="3"/><ellipse cx="150" cy="58" rx="38" ry="46" fill="url(#paM)"/>
+<path d="M126,40 q10,-18 30,-22" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".8"/>
+<path d="M150,20 q-26,2 -24,34 q0,26 8,40 h32 q8,-14 8,-40 q2,-32 -24,-34z" fill="#5a2d1a"/><ellipse cx="150" cy="60" rx="15" ry="19" fill="#e9b48c"/><path d="M134,54 q6,-16 30,-8 q-2,-14 -15,-14 q-15,0 -15,22z" fill="#5a2d1a"/><circle cx="130" cy="40" r="7" fill="#e6398c"/><circle cx="130" cy="40" r="3" fill="#ffd66b"/>
+<path d="M143,68 q7,5 14,0" stroke="#c0392b" stroke-width="2.5" fill="none" stroke-linecap="round"/><g fill="#3a1c10"><circle cx="144" cy="58" r="1.8"/><circle cx="156" cy="58" r="1.8"/></g>
+<g class="flota"><g transform="rotate(-24 62 70)"><rect x="54" y="30" width="16" height="66" rx="5" fill="#e6398c" stroke="#7a1447" stroke-width="2"/><g stroke="#7a1447" stroke-width="2"><path d="M54,40h16M54,47h16M54,54h16M54,61h16M54,68h16"/></g><rect x="57" y="76" width="10" height="34" rx="5" fill="#ff8cc2" stroke="#7a1447" stroke-width="2"/></g></g>
+<g transform="rotate(18 238 60)"><path d="M238,62 L226,16 q8,-6 12,4z" fill="#dfe5ea" stroke="#56616c" stroke-width="2"/><path d="M238,62 L250,16 q-8,-6 -12,4z" fill="#c9d2da" stroke="#56616c" stroke-width="2"/><circle cx="238" cy="60" r="3" fill="#56616c"/><circle cx="228" cy="86" r="11" fill="none" stroke="#d52b1e" stroke-width="5"/><circle cx="249" cy="86" r="11" fill="none" stroke="#0038a8" stroke-width="5"/><path d="M233,76 l4,-12M244,76 l-4,-12" stroke="#56616c" stroke-width="4"/></g>
+<g class="late" fill="#fff"><path d="M92,18 l3,8 8,3 -8,3 -3,8 -3,-8 -8,-3 8,-3z"/><path d="M206,96 l2,6 6,2 -6,2 -2,6 -2,-6 -6,-2 6,-2z"/></g></svg></div>
     <h1>SALÓN DE BELLEZA<span>PELUQUERÍA JEGUAKA · PARAGUAY</span></h1>
     <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
   </div>

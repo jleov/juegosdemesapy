@@ -284,7 +284,7 @@ setInterval(()=>{   // aviso de "te toca" cuando terminó la animación
 }, 300);
 
 /* ====================== MARES 2D ====================== */
-// dibuja un mar: casillas con agua, tiros y (si se ven) los barcos
+// dibuja un mar: carta náutica (flotas) o pantalla de radar (el mar al que se tira), con tiros y barcos
 function seaHTML(i, kind){
   const s=V.sides[i], n=N(), d=ANIM.disp[i]||s.grid||[];
   const shipAt={};
@@ -294,73 +294,123 @@ function seaHTML(i, kind){
   const cur=ANIM.cur && ANIM.cur.to===i && !ANIM.landed ? ANIM.cur : null;
   const aiming = kind==='target' && myTurn() && AIM.to===i ? AIM : (REMOTE_AIM && REMOTE_AIM.to===i && V.phase==='play' && !mine(curShooter()) ? REMOTE_AIM : null);
   const ghost = kind==='place' ? PL.ghostCells() : null;
+  const now=performance.now();
   // cada casilla va en su lugar fijo de la grilla, así los barcos dibujados se pueden poner encima
   const at=(r,c)=>`grid-row:${r+2};grid-column:${c+2}`;
-  let h=`<div class="sea ${kind}" style="--n:${n}"><i class="corner" style="grid-row:1;grid-column:1"></i>`;
-  for(let c=0;c<n;c++) h+=`<i class="lab" style="grid-row:1;grid-column:${c+2}">${c+1}</i>`;
+  // el barrido del radar sigue por donde iba aunque se redibuje el mar
+  let h=`<div class="sea ${kind}" style="--n:${n};--ad:-${((Date.now()%5000)/1000).toFixed(2)}s"><i class="corner" style="grid-row:1;grid-column:1"></i>`;
+  for(let c=0;c<n;c++) h+=`<i class="lab${aiming&&aiming.c===c?' on':''}" style="grid-row:1;grid-column:${c+2}">${c+1}</i>`;
   const drawn=new Set();
   for(const k in shipAt){ const x=shipAt[k].x; if(drawn.has(x)) continue; drawn.add(x);
     h+=`<div class="shipimg ${x.dir}${shipAt[k].sunk?' sunk':''}${kind==='place'&&PL.sel===x.i?' sel':''}" style="grid-row:${x.r+2} / span ${x.dir==='v'?x.l:1};grid-column:${x.c+2} / span ${x.dir==='h'?x.l:1}">${shipSVG(x.k, x.l, x.dir)}</div>`; }
+  // el barco que se está por poner, medio transparente
+  if(ghost && ghost.fits){ const g=ghost.ship; h+=`<div class="shipimg ghost ${ghost.ok?'':'bad'}" style="grid-row:${g.r+2} / span ${g.dir==='v'?g.l:1};grid-column:${g.c+2} / span ${g.dir==='h'?g.l:1}">${shipSVG(g.k, g.l, g.dir)}</div>`; }
   for(let r=0;r<n;r++){
-    h+=`<i class="lab" style="grid-row:${r+2};grid-column:1">${LETRAS[r]}</i>`;
+    h+=`<i class="lab${aiming&&aiming.r===r?' on':''}" style="grid-row:${r+2};grid-column:1">${LETRAS[r]}</i>`;
     for(let c=0;c<n;c++){
       const k=r*n+c, g=d[k]||0, sa=shipAt[k];
       let cls='cell';
       if(sa) cls+=' ship';
       if(g===1) cls+=' miss'; else if(g===4) cls+=' auto'; else if(g===2) cls+=' hit'; else if(g===3) cls+=' hit dead';
       if(cur && cur.r===r && cur.c===c) cls+=' incoming';
-      if(aiming && aiming.r===r && aiming.c===c) cls+=' aim';
+      if(aiming && aiming.r!=null){ if(aiming.r===r && aiming.c===c) cls+=' aim'; else if(aiming.r===r || aiming.c===c) cls+=' aimrc'; }
       if(ghost && ghost.cells.some(([y,x])=>y===r&&x===c)) cls+= ghost.ok ? ' gok' : ' gbad';
-      const recent=BOOM.find(b=>b.to===i && b.r===r && b.c===c && performance.now()-b.t<900);
-      if(recent) cls+= recent.res==='agua' ? ' splash' : ' boom';
       h+=`<button class="${cls}" style="${at(r,c)}" data-r="${r}" data-c="${c}" aria-label="${coordTxt(r,c)}"></button>`;
     }
   }
+  // chapuzón o explosión del tiro que acaba de caer (sigue por donde iba si el mar se redibuja)
+  BOOM.forEach(b=>{ const age=now-b.t; if(b.to!==i || age>1100) return;
+    h+=`<i class="fx ${b.res==='agua'?'splash':'boom'}" style="${at(b.r,b.c)};--fd:-${Math.round(age)}ms"><b></b><b></b><b></b></i>`; });
   return h+'</div>';
 }
 /* ---------- dibujo de los barcos (vistos desde arriba, la proa a la derecha) ---------- */
+(function(){   // los degradés se definen una sola vez y los usan todos los barcos
+  const d=document.createElement('div'); d.style.cssText='position:absolute;width:0;height:0;overflow:hidden';
+  const lg=(id, st)=>`<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${st.map(([o,c])=>`<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient>`;
+  d.innerHTML=`<svg width="0" height="0" aria-hidden="true"><defs>
+    ${lg('nvHull',[[0,'#4f5c68'],[.28,'#9aa8b4'],[.5,'#c9d2da'],[.72,'#9aa8b4'],[1,'#4f5c68']])}
+    ${lg('nvHullW',[[0,'#8d979f'],[.28,'#e2e8ec'],[.5,'#ffffff'],[.72,'#e2e8ec'],[1,'#8d979f']])}
+    ${lg('nvHullD',[[0,'#101417'],[.5,'#3d4850'],[1,'#101417']])}
+    ${lg('nvSub',[[0,'#10151a'],[.42,'#5b6975'],[.6,'#46535e'],[1,'#10151a']])}
+    ${lg('nvWood',[[0,'#86603a'],[.5,'#c79a63'],[1,'#86603a']])}
+    ${lg('nvDeck',[[0,'#8e99a3'],[.5,'#bcc6ce'],[1,'#8e99a3']])}
+    <radialGradient id="nvSteel" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#b9c4cd"/><stop offset="1" stop-color="#4c5863"/></radialGradient>
+  </defs></svg>`;
+  document.body.appendChild(d);
+})();
 const SHIPCACHE={};
 function shipSVG(k, l, dir){
   const key=k+l+dir; if(SHIPCACHE[key]) return SHIPCACHE[key];
-  const W=l*100;
-  const flag=x=>`<g transform="translate(${x},38)"><rect width="18" height="8" fill="#d52b1e"/><rect y="8" width="18" height="8" fill="#fff"/><rect y="16" width="18" height="8" fill="#0038a8"/><rect width="18" height="24" fill="none" stroke="#222" stroke-width="1.2"/></g>`;
-  const turret=(x, back)=>`<g transform="translate(${x},50)"><rect x="${back?-34:0}" y="-3.5" width="34" height="7" rx="3" fill="#3c4650"/><circle r="13" fill="#6f7c89" stroke="#2d3a45" stroke-width="2.5"/><circle r="5" fill="#4b5763"/></g>`;
-  const hull=`<path d="M10,28 L${W-60},22 Q${W-3},50 ${W-60},78 L10,72 Q3,50 10,28 Z" fill="#97a5b2" stroke="#2b3742" stroke-width="3.5"/><path d="M22,40 L${W-70},37 Q${W-38},50 ${W-70},63 L22,60 Z" fill="#a9b5c0" opacity=".55"/>`;
+  const W=l*100, f=n=>+n.toFixed(1);
+  const hull=(y0,y1,bow,fill,st)=>{ const rr=9, s=6+rr; bow=Math.min(bow, W*.42);
+    return `<path d="M${s},${y0} L${f(W-bow)},${y0} Q${f(W-bow*.35)},${f(y0+(50-y0)*.2)} ${W-5},50 Q${f(W-bow*.35)},${f(y1-(y1-50)*.2)} ${f(W-bow)},${y1} L${s},${y1} Q6,${y1} 6,${y1-rr} L6,${y0+rr} Q6,${y0} ${s},${y0} Z" fill="${fill}" stroke="${st||'#1c2730'}" stroke-width="3" stroke-linejoin="round"/>`; };
+  const deck=(y0,y1,bow,fill)=>{ bow=Math.min(bow, W*.46); return `<path d="M17,${y0} L${f(W-bow)},${y0} Q${f(W-bow*.5)},${f(y0+(50-y0)*.3)} ${W-22},50 Q${f(W-bow*.5)},${f(y1-(y1-50)*.3)} ${f(W-bow)},${y1} L17,${y1} Z" fill="${fill}"/>`; };
+  const planks=(x0,x1,y0,y1)=>{ let s=''; for(let y=y0+6;y<y1-2;y+=7) s+=`<line x1="${f(x0)}" y1="${y}" x2="${f(x1)}" y2="${y}" stroke="#6d4c2a" stroke-width="1" opacity=".55"/>`; return s; };
+  const turret=(x,dr,r,two)=>{ const b=y=>`<rect x="${f(dr>0?x:x-r*2.5)}" y="${f(y-2.6)}" width="${f(r*2.5)}" height="5.2" rx="2.4" fill="#2a333b"/>`;
+    return (two?b(50-r*.42)+b(50+r*.42):b(50))+`<circle cx="${f(x)}" cy="50" r="${r}" fill="url(#nvSteel)" stroke="#1f2932" stroke-width="2"/><circle cx="${f(x-dr*r*.25)}" cy="50" r="${f(r*.34)}" fill="#39434c"/>`; };
+  const funnel=(x,r,col)=>`<ellipse cx="${f(x+2)}" cy="53" rx="${f(r*1.25)}" ry="${r}" fill="rgba(0,0,0,.3)"/><ellipse cx="${f(x)}" cy="50" rx="${f(r*1.25)}" ry="${r}" fill="${col}" stroke="#1a2127" stroke-width="2"/><ellipse cx="${f(x)}" cy="50" rx="${f(r*.7)}" ry="${f(r*.55)}" fill="#111518"/>`;
+  const flag=(x,y)=>`<g transform="translate(${f(x)},${y})"><rect width="15" height="6" fill="#d52b1e"/><rect y="6" width="15" height="6" fill="#fff"/><rect y="12" width="15" height="6" fill="#0038a8"/><rect width="15" height="18" fill="none" stroke="#151515" stroke-width="1"/></g>`;
+  const house=(x,w,y0,y1,fill)=>`<rect x="${f(x+2.5)}" y="${y0+3}" width="${f(w)}" height="${y1-y0}" rx="5" fill="rgba(0,0,0,.3)"/><rect x="${f(x)}" y="${y0}" width="${f(w)}" height="${y1-y0}" rx="5" fill="${fill}" stroke="#25313a" stroke-width="2"/>`;
+  const glass=(x,w,y0,y1)=>`<rect x="${f(x)}" y="${y0}" width="${f(w)}" height="${y1-y0}" rx="2.5" fill="#5fa8d8" stroke="#1d3a52" stroke-width="1.2"/>`;
   let body='';
   if(k==='sub'){
-    body=`<ellipse cx="${W/2}" cy="50" rx="${W/2-8}" ry="20" fill="#3d4853" stroke="#1d252c" stroke-width="3.5"/><ellipse cx="${W/2}" cy="44" rx="${W/2-20}" ry="7" fill="#56626e" opacity=".7"/>
-      <rect x="${W*.42}" y="38" width="${Math.max(26,W*.14)}" height="24" rx="11" fill="#2a333b" stroke="#111" stroke-width="2"/><line x1="${W*.42+10}" y1="50" x2="${W*.42+10}" y2="30" stroke="#111" stroke-width="3"/>
-      <path d="M8,50 L-2,40 L-2,60 Z" fill="#2a333b"/>`;
+    const ry=l>1?20:23, sx=W*.5, sw=Math.max(24, W*.12);
+    body=`<path d="M10,50 L-1,37 L3,50 L-1,63 Z" fill="#1c242b"/>
+      <ellipse cx="${W/2}" cy="50" rx="${W/2-7}" ry="${ry}" fill="url(#nvSub)" stroke="#0e1317" stroke-width="3"/>
+      <ellipse cx="${f(W*.52)}" cy="43" rx="${f(W/2-26)}" ry="4.5" fill="#fff" opacity=".13"/>
+      ${l>1?`<rect x="${f(W*.74)}" y="26" width="9" height="48" rx="4" fill="#232c33"/>`:''}
+      <rect x="${f(sx-sw/2+2)}" y="42" width="${f(sw)}" height="22" rx="11" fill="rgba(0,0,0,.35)"/>
+      <rect x="${f(sx-sw/2)}" y="39" width="${f(sw)}" height="22" rx="11" fill="#28323a" stroke="#0e1317" stroke-width="2"/>
+      <circle cx="${f(sx+sw*.18)}" cy="50" r="3.5" fill="#8a97a2"/><circle cx="${f(sx-sw*.2)}" cy="50" r="2" fill="#0e1317"/>`;
   } else if(k==='porta'){
-    body=`<path d="M6,24 L${W-40},18 Q${W-2},50 ${W-40},82 L6,76 Z" fill="#97a5b2" stroke="#2b3742" stroke-width="3.5"/>
-      <path d="M14,30 L${W-50},26 L${W-30},50 L${W-50},74 L14,70 Z" fill="#4d5862"/>
-      <line x1="24" y1="50" x2="${W-60}" y2="50" stroke="#f2f2f2" stroke-width="3" stroke-dasharray="16 12"/><line x1="40" y1="34" x2="${W*.55}" y2="66" stroke="#f2c14e" stroke-width="2.5" opacity=".8"/>
-      <rect x="${W*.62}" y="10" width="42" height="18" rx="3" fill="#dfe5ea" stroke="#2b3742" stroke-width="2"/>
-      ${[0.2,0.38].map(f=>`<path d="M${W*f},50 l14,-14 l4,0 l-6,14 l6,14 l-4,0 Z" fill="#aab4bd" stroke="#333" stroke-width="1"/>`).join('')}${flag(16)}`;
+    body=hull(9,91,58,'url(#nvHull)')
+      + `<path d="M13,15 L${W-70},15 L${W-34},50 L${W-70},85 L13,85 Z" fill="#3a434a"/>
+      <path d="M13,15 L${W-70},15 L${W-34},50 L${W-70},85 L13,85 Z" fill="none" stroke="#e9eef2" stroke-width="1.6" opacity=".7"/>
+      <line x1="26" y1="45" x2="${W-62}" y2="45" stroke="#f4f6f8" stroke-width="2.6" stroke-dasharray="15 11"/>
+      <line x1="30" y1="26" x2="${f(W*.6)}" y2="66" stroke="#f2c14e" stroke-width="2.4" opacity=".9"/>
+      <rect x="${f(W*.2)}" y="62" width="34" height="18" fill="none" stroke="#cfd6dc" stroke-width="1.4" opacity=".7"/>
+      ${house(W*.56,62,69,88,'#d5dce2')}${glass(W*.56+40,16,72,85)}
+      <circle cx="${f(W*.56+18)}" cy="78" r="5" fill="#2a333b"/>
+      ${[[.14,30],[.3,30],[.74,58]].map(([fx,y])=>`<path transform="translate(${f(W*fx)},${y})" d="M18,0 L4,-3 L1,-12 L-3,-12 L-2,-3 L-10,-2.4 L-12,-6 L-14,-6 L-13,0 L-14,6 L-12,6 L-10,2.4 L-2,3 L-3,12 L1,12 L4,3 Z" fill="#c4ced6" stroke="#20292f" stroke-width="1"/>`).join('')}`
+      + flag(16,56);
   } else if(k==='remo'){
-    body=hull+`<rect x="${W*.28}" y="32" width="${W*.32}" height="36" rx="8" fill="#e8edf2" stroke="#2b3742" stroke-width="2.5"/><rect x="${W*.33}" y="40" width="${W*.1}" height="20" rx="3" fill="#7fb3dc"/>
-      ${[0.15,0.4,0.65].map(f=>`<circle cx="${W*f}" cy="25" r="5" fill="#222"/><circle cx="${W*f}" cy="75" r="5" fill="#222"/>`).join('')}<circle cx="${W*.72}" cy="50" r="9" fill="#c0392b" stroke="#222" stroke-width="2"/>${flag(14)}`;
+    body=hull(17,83,54,'url(#nvHullD)','#0b0e10') + deck(25,75,62,'url(#nvWood)') + planks(20,W-70,25,75)
+      + [.12,.3,.48,.64].map(fx=>`<circle cx="${f(W*fx)}" cy="17" r="6" fill="#0d0f11" stroke="#333" stroke-width="1.5"/><circle cx="${f(W*fx)}" cy="83" r="6" fill="#0d0f11" stroke="#333" stroke-width="1.5"/>`).join('')
+      + `<rect x="24" y="43" width="14" height="14" rx="3" fill="#39434c" stroke="#111" stroke-width="1.5"/>`
+      + funnel(W*.3, 12, '#c0392b') + house(W*.42, W*.24, 31, 69, '#c0392b') + `<rect x="${f(W*.42+5)}" y="36" width="${f(W*.24-10)}" height="28" rx="3" fill="#d94a3a"/>` + glass(W*.66-3, 9, 35, 65)
+      + flag(44, 41);
   } else if(k==='lancha'){
-    body=`<path d="M10,32 L${W-55},28 Q${W-6},50 ${W-55},72 L10,68 Q4,50 10,32 Z" fill="#97a5b2" stroke="#2b3742" stroke-width="3.5"/>
-      <rect x="${W*.35}" y="38" width="${W*.22}" height="24" rx="6" fill="#e8edf2" stroke="#2b3742" stroke-width="2"/><rect x="${W*.52}" y="41" width="10" height="18" rx="2" fill="#7fb3dc"/>${turret(W*.78)}${flag(14)}`;
+    body=hull(23,77,80,'url(#nvHullW)','#0c2f7a') + deck(30,70,90,'url(#nvWood)') + planks(20,W-90,30,70)
+      + `<rect x="14" y="40" width="16" height="20" rx="3" fill="#2a333b"/>`
+      + house(W*.3, W*.2, 34, 66, '#f4f6f8') + glass(W*.5-2, 9, 36, 64) + `<rect x="${f(W*.3+4)}" y="38" width="${f(W*.2-14)}" height="24" rx="3" fill="#c0392b"/>`
+      + turret(W*.7, 1, 8, false) + flag(34, 41);
   } else {
-    // acorazados, cruceros, cañoneros, destructores y patrulleros: puente, chimenea y cañones según el largo
-    const tur = l>=5 ? [[.17,true],[.3,true],[.72,false],[.85,false]] : l===4 ? [[.18,true],[.72,false],[.86,false]] : l===3 ? [[.2,true],[.78,false]] : [[.8,false]];
-    body=hull + tur.map(([f,b])=>turret(W*f,b)).join('')
-      + `<rect x="${W*(l>2?.42:.32)}" y="34" width="${l>2?W*.16:W*.3}" height="32" rx="5" fill="#e8edf2" stroke="#2b3742" stroke-width="2.5"/><rect x="${W*(l>2?.42:.32)+6}" y="42" width="${l>2?W*.16-12:W*.3-12}" height="16" rx="3" fill="#cfd8e0"/>`
-      + (l>2 ? `<ellipse cx="${W*.6}" cy="50" rx="11" ry="9" fill="#2d2d2d" stroke="#111" stroke-width="2"/><ellipse cx="${W*.6}" cy="48" rx="6" ry="4" fill="#555"/>` : '')
-      + flag(14);
+    // acorazados, cruceros, destructores, patrulleros y cañoneros del río: puente, chimeneas y cañones según el largo
+    const river = k==='canpy'||k==='canhu', big = k==='acor'||river;
+    const [y0,y1] = k==='acor'?[15,85] : river?[17,83] : k==='cruc'?[19,81] : [22,78];
+    const fc = river?'#d8b25e':'#6f7b86';
+    body=hull(y0,y1,l>2?70:56, river?'url(#nvHullW)':'url(#nvHull)') + deck(y0+7,y1-7,l>2?84:68, river?'url(#nvWood)':'url(#nvDeck)') + (river?planks(20,W-90,y0+7,y1-7):'');
+    if(l>=4) body+=turret(W*.83, 1, big?12:10, true) + turret(W*.7, 1, big?11:9, true) + turret(W*.14, -1, big?12:10, true);
+    else if(l===3) body+=turret(W*.8, 1, 10, k==='cruc') + turret(W*.16, -1, 9, false);
+    else body+=turret(W*.72, 1, 9, false);
+    const hx=l>2?W*.4:W*.24, hw=l>2?W*.2:W*.3;
+    if(l>=3) body+=funnel(hx-18, big?12:10, fc);
+    if(l>=5 || k==='acor') body+=funnel(hx-48, big?11:9, fc);
+    body+=house(hx, hw, y0+14, y1-14, river?'#f4f6f8':'#dfe5ea') + `<rect x="${f(hx+hw*.28)}" y="${y0+19}" width="${f(hw*.5)}" height="${y1-y0-38}" rx="3" fill="${river?'#e2e7ea':'#c4cdd5'}" stroke="#25313a" stroke-width="1.2"/>`
+      + glass(hx+hw-7, 6, y0+18, y1-18) + `<circle cx="${f(hx+hw*.5)}" cy="50" r="3.2" fill="#1c242b"/><line x1="${f(hx+hw*.5)}" y1="40" x2="${f(hx+hw*.5)}" y2="60" stroke="#1c242b" stroke-width="1.6"/>`;
+    if(k==='patru') body+=`<rect x="${f(W*.12)}" y="40" width="26" height="20" rx="4" fill="#e9692c" stroke="#333" stroke-width="1.5"/>`;
+    body+=flag(l>=4?W*.14+22:l===3&&k!=='patru'?W*.16+18:12, y0+ (l>2?8:16));
   }
-  const inner=`<g transform="translate(0,50) scale(1,1.6) translate(0,-50)">${body}</g>`;   // más ancho: que llene la casilla
   const svg = dir==='v'
-    ? `<svg viewBox="0 0 100 ${W}" preserveAspectRatio="none"><g transform="rotate(90) translate(0,-100)">${inner}</g></svg>`
-    : `<svg viewBox="0 0 ${W} 100" preserveAspectRatio="none">${inner}</svg>`;
+    ? `<svg viewBox="0 0 100 ${W}" preserveAspectRatio="none"><g transform="rotate(90) translate(0,-100)">${body}</g></svg>`
+    : `<svg viewBox="0 0 ${W} 100" preserveAspectRatio="none">${body}</svg>`;
   return SHIPCACHE[key]=svg;
 }
 function renderBoards(){
   if(!V || V.phase==='lobby') return;
   if(V.phase==='place') return renderPlace();
   const big=bigSide(), small=smallSide(), m=mySide();
+  for(const id of ['#seaBig','#seaSmall']) $(id).style.setProperty('--n', N());
   const bigTitle = m>=0 && enemies().includes(big) ? `🎯 Mar de ${esc(sideName(V,big))}` : big===m ? '⚓ Tu flota' : `🌊 Mar de ${esc(sideName(V,big))}`;
   const smallTitle = small===m ? '⚓ Tu flota' : `🌊 ${esc(sideName(V,small))}`;
   $('#seaBig').innerHTML = `<div class="seat">${bigTitle}</div>` + seaHTML(big, m>=0 && enemies().includes(big) ? 'target' : 'view');
@@ -384,9 +434,11 @@ const PL={
   ships(){ const F=this.F(); return this.list.map((s,i)=>s ? {i, k:F.ships[i][0], n:F.ships[i][1], l:F.ships[i][2], r:s.r, c:s.c, dir:s.dir} : null).filter(Boolean); },
   ghostCells(){
     if(this.sel==null || !this.hover) return null;
-    const l=this.F().ships[this.sel][2], s={r:this.hover.r, c:this.hover.c, dir:this.dir, l};
-    const try_=this.list.slice(); try_[this.sel]={r:s.r, c:s.c, dir:s.dir};
-    return {cells:shipCells(s), ok:!partialError(try_, V.opts)};
+    const F=this.F(), k=F.ships[this.sel][0], l=F.ships[this.sel][2], n=F.n; let r=this.hover.r, c=this.hover.c;
+    // igual que al tocar: si se sale por el borde, se corre para adentro
+    if(this.dir==='h' && c+l>n) c=n-l; if(this.dir==='v' && r+l>n) r=n-l;
+    const s={k, l, r, c, dir:this.dir}, try_=this.list.slice(); try_[this.sel]={r, c, dir:this.dir};
+    return {cells:shipCells(s), ok:!partialError(try_, V.opts), ship:s, fits:true};
   },
   tap(r, c){
     if(V.sides[mySide()].ready) return toast('Tu flota ya está lista. Tocá ✏️ Cambiar para moverla.');
@@ -426,6 +478,7 @@ const PL={
 };
 function renderPlace(){
   const m=mySide();
+  $('#placeBox').style.setProperty('--n', N());
   $('#seaBig').innerHTML=''; $('#seaSmall').innerHTML='';
   if(m<0){ $('#placeBox').innerHTML=`<div class="waitbox">⏳ Los jugadores están poniendo sus barcos en secreto…<br><small>${V.sides.map((s,i)=>`${esc(sideName(V,i))}: ${s.ready?'✅':'⏳'}`).join(' · ')}</small></div>`; return; }
   const s=V.sides[m], key=V.round+'|'+m+'|'+viewer();
@@ -438,13 +491,16 @@ function renderPlace(){
       <br><button class="btn sm gray" style="margin-top:8px" onclick="doAct({type:'unready', as:viewer()})">✏️ Cambiar mi flota</button></div>`;
     return;
   }
-  const F=PL.F();
-  const chips=F.ships.map(([k,n,l],i)=>`<button class="chip ${PL.sel===i?'sel':''} ${PL.list[i]?'done':''}" onclick="PL.pick(${i})"><b>${esc(n)}</b><span class="mini" style="--l:${l}">${shipSVG(k, l, 'h')}</span></button>`).join('');
-  $('#placeBox').innerHTML=`<div class="seat">🚢 Poné tus barcos${V.opts.toca===false?' <small>(no se pueden tocar)</small>':''}</div>
+  const F=PL.F(), done=PL.list.filter(Boolean).length, tot=F.ships.length;
+  const chips=F.ships.map(([k,n,l],i)=>`<button class="chip ${PL.sel===i?'sel':''} ${PL.list[i]?'done':''}" onclick="PL.pick(${i})"><b>${esc(n)}</b><small>${l} casilla${l===1?'':'s'}</small><span class="mini" style="--l:${l}">${shipSVG(k, l, 'h')}</span></button>`).join('');
+  const help = PL.sel!=null ? `Ubicando: <b>${esc(F.ships[PL.sel][1])}</b> (${F.ships[PL.sel][2]} casilla${F.ships[PL.sel][2]===1?'':'s'}, ${PL.dir==='h'?'acostado ↔':'parado ↕'}). Tocá la casilla del mar donde empieza.`
+    : done===tot ? '¡Flota completa! Tocá un barco del mar si querés moverlo, o <b>✅ ¡Listo!</b> para empezar.' : 'Tocá un barco del mar para moverlo, o elegí uno de la lista.';
+  $('#placeBox').innerHTML=`<div class="seat">🚢 Poné tus barcos${V.opts.toca===false?' <small>(no se pueden tocar entre sí)</small>':''}</div>
     <div class="placewrap">${seaHTML(m,'place')}
-    <div class="ppanel"><div class="chips">${chips}</div>
-      <p class="muted">${PL.sel!=null?`Ubicando: <b>${esc(F.ships[PL.sel][1])}</b> (${F.ships[PL.sel][2]} casillas, ${PL.dir==='h'?'acostado ↔':'parado ↕'}). Tocá dónde empieza.`:'Tocá un barco del mar para moverlo, o elegí uno de la lista.'}</p>
-      <div class="row wrap"><button class="btn sm" onclick="PL.rotate()">🔄 Girar</button><button class="btn sm gray" onclick="PL.random()">🎲 Al azar</button><button class="btn sm gray" onclick="PL.last()">↩️ Mi última</button><button class="btn sm gray" onclick="PL.clear()">🧹 Sacar todos</button></div>
+    <div class="ppanel"><div class="pprog">⚓ ${done} de ${tot} barcos<i><b style="width:${Math.round(done/tot*100)}%"></b></i></div>
+      <div class="chips">${chips}</div>
+      <p class="muted">${help}</p>
+      <div class="row wrap"><button class="btn sm" onclick="PL.rotate()">🔄 Girar ${PL.dir==='h'?'↕':'↔'}</button><button class="btn sm gold" onclick="PL.random()">🎲 Al azar</button><button class="btn sm gray" onclick="PL.last()">↩️ Mi última</button><button class="btn sm gray" onclick="PL.clear()">🧹 Sacar todos</button></div>
       <button class="btn green wide" style="margin-top:8px" onclick="PL.ready()" ${PL.list.some(x=>!x)?'disabled':''}>✅ ¡Listo!</button></div></div>`;
 }
 document.addEventListener('keydown', e=>{ if(V && V.phase==='place' && (e.key==='r'||e.key==='R') && !/INPUT|TEXTAREA/.test(e.target.tagName)) PL.rotate(); });
@@ -470,353 +526,9 @@ function endModal(){
     <button class="btn gray wide" style="margin-top:6px" onclick="closeModal()">Mirar el mar</button>`);
 }
 
-/* ====================== MAR 3D ====================== */
-const VIEW={mode: load('naval_view')==='3d' ? '3d' : '2d'};
-const R3={ok:false, dirty:true};
-const CAM3=Object.assign({pitch:55, zoom:1, yaw:0}, load('naval_cam3')||{});
-function saveCam3(){ store('naval_cam3', {pitch:CAM3.pitch, zoom:CAM3.zoom, yaw:CAM3.yaw}); }
-const CELL=10;   // tamaño de una casilla en el 3D
-const RADAR_Y=4.6; // altura de la pantalla de radar sobre el agua
-// olas: las mismas en la placa de video y acá (para que los barcos suban y bajen con el agua)
-const WAVES=[[.96,.28,.045,1.0,1.1],[-.37,.93,.06,.7,1.4],[.71,-.71,.11,.3,2.0],[.22,.97,.18,.14,2.6]];
-function waveH(x, z, t){
-  let h=0; for(const [dx,dz,k,a,s] of WAVES) h+=a*Math.sin(k*(dx*x+dz*z)+s*t);
-  const R=R3.calmR||100, u=Math.max(0, Math.min(1, (Math.hypot(x,z)-R*.55)/(R*.9)));
-  return h*(.45+.55*u*u*(3-2*u));
-}
-const WATER_VS=`
-uniform float uT, uCalm;
-varying vec3 vW; varying vec3 vN; varying float vH;
-void wv(vec2 p, vec2 d, float k, float a, float s, inout float h, inout vec2 g){ float ph=k*dot(d,p)+s*uT; h+=a*sin(ph); g+=a*k*d*cos(ph); }
-void main(){
-  vec4 w=modelMatrix*vec4(position,1.0); vec2 p=w.xz; float h=0.0; vec2 g=vec2(0.0);
-  wv(p,vec2(.96,.28),.045,1.0,1.1,h,g); wv(p,vec2(-.37,.93),.06,.7,1.4,h,g); wv(p,vec2(.71,-.71),.11,.3,2.0,h,g); wv(p,vec2(.22,.97),.18,.14,2.6,h,g);
-  float c=.45+.55*smoothstep(uCalm*.55, uCalm*1.45, length(p)); h*=c; g*=c;
-  w.y+=h; vW=w.xyz; vH=h; vN=normalize(vec3(-g.x,1.0,-g.y));
-  gl_Position=projectionMatrix*viewMatrix*w;
-}`;
-const WATER_FS=`
-uniform float uT, uGrid, uN, uCell, uFogN, uFogF;
-uniform vec3 uSun, uDeep, uShallow, uHor, uZen, uFog;
-varying vec3 vW; varying vec3 vN; varying float vH;
-void main(){
-  vec2 p=vW.xz; vec3 n=vN;
-  // ondas chiquitas que brillan
-  n.x+=.09*sin(p.x*.9+uT*3.1)*cos(p.y*.7-uT*2.3)+.05*sin(p.y*1.7+p.x*.4+uT*4.0)+.03*sin(p.x*3.1+p.y*2.3-uT*6.0);
-  n.z+=.09*cos(p.y*.85-uT*2.7)*sin(p.x*.6+uT*1.9)+.05*sin(p.x*1.9-p.y*.5-uT*3.6)+.03*cos(p.y*3.3-p.x*2.1+uT*5.5);
-  n=normalize(n);
-  vec3 V=normalize(cameraPosition-vW);
-  float fr=.04+.96*pow(1.0-max(dot(n,V),0.0),4.0);
-  vec3 R=reflect(-V,n);
-  vec3 sky=mix(uHor,uZen,clamp(R.y*1.6,0.0,1.0));
-  vec3 base=mix(uDeep,uShallow,clamp(vH*.3+.45,0.0,1.0));
-  base+=uShallow*.25*pow(max(dot(n,normalize(vec3(V.x,0.0,V.z)+uSun)),0.0),3.0);
-  vec3 col=mix(base,sky,clamp(fr,0.0,1.0)*.85);
-  float sp=pow(max(dot(R,uSun),0.0),220.0); col+=vec3(1.0,.95,.85)*sp*2.2;
-  col+=vec3(1.0)*pow(max(dot(R,uSun),0.0),24.0)*.12;
-  // espuma en la cresta de las olas
-  float fo=smoothstep(1.15,2.1,vH)*(.55+.45*sin(p.x*1.3+p.y*1.1+uT*2.0)*sin(p.y*1.7-p.x*.9-uT*1.4));
-  col=mix(col,vec3(.93,.97,1.0),clamp(fo,0.0,1.0)*.6);
-  // la grilla pintada sobre el agua (cuando se mira la flota propia)
-  if(uGrid>.5){
-    float hf=uN*uCell*.5; vec2 q=(p+hf)/uCell;
-    if(q.x>=0.0&&q.y>=0.0&&q.x<=uN&&q.y<=uN){
-      vec2 fw=fwidth(q); vec2 gl=1.0-smoothstep(vec2(0.0),fw*1.6,min(fract(q),1.0-fract(q)));
-      col=mix(col,vec3(.88,.96,1.0),max(gl.x,gl.y)*.5);
-      col=mix(col,uShallow*1.2,.12);
-    }
-  }
-  float d=length(cameraPosition-vW); col=mix(col,uFog,smoothstep(uFogN,uFogF,d));
-  gl_FragColor=vec4(col,1.0);
-}`;
-const RADAR_VS=`varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
-const RADAR_FS=`
-uniform float uT, uN, uCell, uAimOn; uniform vec2 uAim; uniform sampler2D uMarks;
-varying vec3 vW;
-const float TAU=6.28318;
-void main(){
-  vec2 p=vW.xz; float hf=uN*uCell*.5; vec2 q=(p+hf)/uCell;
-  float inB=step(0.0,q.x)*step(q.x,uN)*step(0.0,q.y)*step(q.y,uN);
-  vec3 G=vec3(.25,1.0,.5); vec3 col=vec3(0.0,.16,.07); float a=.24*inB;
-  // borde de la pantalla
-  float e=min(min(q.x,uN-q.x),min(q.y,uN-q.y));
-  if(inB<.5){ col=vec3(.02,.07,.05); a=.62; float rim=1.0-smoothstep(0.0,.18,abs(e)); col+=G*rim*.9; a+=rim*.3; gl_FragColor=vec4(col,a); return; }
-  col+=G*(1.0-smoothstep(0.0,.12,e))*.8; a+=(1.0-smoothstep(0.0,.12,e))*.4;
-  // cuadrícula
-  vec2 fw=fwidth(q); vec2 gl=1.0-smoothstep(vec2(0.0),fw*1.5,min(fract(q),1.0-fract(q))); float line=max(gl.x,gl.y);
-  col+=G*line*.45; a+=line*.35;
-  // círculos del radar
-  float rv=length(p)/(hf*.5); float rl=1.0-smoothstep(0.0,fwidth(rv)*1.4,abs(fract(rv+.5)-.5));
-  col+=G*rl*.35; a+=rl*.22;
-  // barrido que gira
-  float sw=mod(uT*1.5,TAU); float ang=atan(p.y,p.x); float da=mod(sw-ang,TAU);
-  float trail=exp(-da*2.4)*smoothstep(hf*1.5,hf*.2,length(p)); float beam=1.0-smoothstep(0.0,.035,da);
-  col+=G*(trail*.5+beam*.9); a+=trail*.28+beam*.45;
-  // marcas: el barrido las hace brillar al pasar
-  vec2 ci=floor(q); vec2 fc=fract(q)-.5; float dd=length(fc);
-  float v=floor(texture2D(uMarks,(ci+.5)/uN).r*255.0+.5);
-  vec2 cc=(ci+.5)*uCell-hf; float lit=.45+.55*exp(-mod(sw-atan(cc.y,cc.x),TAU)*1.3);
-  if(v==1.0||v==4.0){ float k=v==1.0?1.0:.45; float dot=1.0-smoothstep(.1,.16,dd); col+=vec3(.6,1.0,.95)*dot*lit*k; a+=dot*.55*lit*k; }
-  else if(v==2.0){ float pu=.5+.5*sin(uT*6.0+ci.x+ci.y); float dot=1.0-smoothstep(.22,.29,dd); float ring=(1.0-smoothstep(0.0,.04,abs(dd-(.3+pu*.12))))*.8;
-    col=mix(col,vec3(1.0,.2,.15),clamp(dot*lit+ring*.6,0.0,1.0)); a+=dot*.6+ring*.3; }
-  else if(v==3.0){ float x=1.0-smoothstep(.04,.09,min(abs(fc.x-fc.y),abs(fc.x+fc.y))); x*=step(max(abs(fc.x),abs(fc.y)),.36);
-    col=mix(col,vec3(.55,.05,.04),.55); col=mix(col,vec3(1.0,.35,.2),x*lit); a+=.25+x*.4; }
-  // la mira
-  if(uAimOn>.5){
-    float pu=.5+.5*sin(uT*8.0);
-    if(ci.y==uAim.x||ci.x==uAim.y){ col+=vec3(1.0,.85,.3)*.12; a+=.06; }
-    if(ci.y==uAim.x&&ci.x==uAim.y){ float bx=1.0-smoothstep(.0,.06,.5-max(abs(fc.x),abs(fc.y))); col=mix(col,vec3(1.0,.9,.35),bx*.95+.18+pu*.12); a+=bx*.5+.2; }
-  }
-  // líneas de barrido de la pantalla
-  a*=.9+.1*sin(vW.z*2.6-uT*14.0);
-  gl_FragColor=vec4(col,clamp(a,0.0,.92));
-}`;
-function init3D(){
-  if(R3.ok) return true; if(!window.THREE) return false;
-  const T=THREE, canvas=$('#c3d');
-  let renderer; try{ renderer=new T.WebGLRenderer({canvas, antialias:true}); }catch(e){ toast('Este aparato no puede mostrar 3D. Seguimos en 2D.'); return false; }
-  const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, mobile?1.5:2));
-  const scene=new T.Scene();
-  // cielo con degradé
-  const sc=document.createElement('canvas'); sc.width=2; sc.height=256; const sg=sc.getContext('2d'), gr=sg.createLinearGradient(0,0,0,256);
-  gr.addColorStop(0,'#3d7fc4'); gr.addColorStop(.55,'#8fc0e6'); gr.addColorStop(1,'#d6ecf8'); sg.fillStyle=gr; sg.fillRect(0,0,2,256);
-  scene.background=new T.CanvasTexture(sc);
-  const cam=new T.PerspectiveCamera(45, 1, 1, 3000);
-  Object.assign(R3, {T, renderer, scene, cam, ok:true});
-  scene.add(new T.HemisphereLight(0xeaf6ff, 0x1d3550, .85));
-  const sun=new T.DirectionalLight(0xfff2d6, .95); sun.position.set(120, 260, 140); scene.add(sun);
-  // el mar: las olas se calculan en la placa de video
-  const seg=mobile?110:160, geo=new T.PlaneGeometry(1600, 1600, seg, seg); geo.rotateX(-Math.PI/2);
-  R3.wu={ uT:{value:0}, uCalm:{value:100}, uGrid:{value:1}, uN:{value:10}, uCell:{value:CELL}, uFogN:{value:420}, uFogF:{value:1150},
-    uSun:{value:new T.Vector3(120,260,140).normalize()}, uDeep:{value:new T.Color(0x07304f)}, uShallow:{value:new T.Color(0x1c78a6)},
-    uHor:{value:new T.Color(0xcfe6f5)}, uZen:{value:new T.Color(0x4f93cf)}, uFog:{value:new T.Color(0xc4e0f3)} };
-  const wm=new T.ShaderMaterial({uniforms:R3.wu, vertexShader:WATER_VS, fragmentShader:WATER_FS}); wm.extensions.derivatives=true;
-  R3.water=new T.Mesh(geo, wm); R3.water.frustumCulled=false; scene.add(R3.water);
-  // costa paraguaya de fondo: lomas verdes
-  for(let i=0;i<9;i++){ const h=new T.Mesh(new T.SphereGeometry(80+rnd(60), 16, 10), new T.MeshLambertMaterial({color: i%2?0x3f7d3a:0x4f8f45})); h.scale.y=.35; h.position.set(-520+i*130, -12, -620-rnd(80)); scene.add(h); }
-  R3.board=new T.Group(); scene.add(R3.board);
-  R3.ray=new T.Raycaster(); R3.plane=new T.Plane(new T.Vector3(0,1,0), 0);
-  R3.fx=[]; R3.bobs=[];
-  wire3D(canvas); resizeStage();
-  return true;
-}
-function labelSprite(txt, col){
-  const c=document.createElement('canvas'); c.width=64; c.height=64; const g=c.getContext('2d');
-  g.fillStyle=col||'#ffffff'; g.font='bold 40px system-ui'; g.textAlign='center'; g.textBaseline='middle';
-  g.shadowColor='rgba(0,0,0,.6)'; g.shadowBlur=6; g.fillText(txt, 32, 34);
-  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false, depthTest:false})); s.renderOrder=5; s.scale.set(7,7,1); return s;
-}
-// barco 3D: casco con proa, puente, cañones y una banderita paraguaya
-function shipMesh(l, sunk){
-  const T=THREE, g=new T.Group(), L=l*CELL-2.4, W=CELL*.62;
-  const sh=new T.Shape(); sh.moveTo(-L/2, -W/2); sh.lineTo(L/2-W*.8, -W/2); sh.quadraticCurveTo(L/2+W*.2, 0, L/2-W*.8, W/2); sh.lineTo(-L/2, W/2); sh.lineTo(-L/2, -W/2);
-  const hull=new T.Mesh(new T.ExtrudeGeometry(sh, {depth:3.4, bevelEnabled:true, bevelSize:.5, bevelThickness:.5, bevelSegments:1}), new T.MeshStandardMaterial({color: sunk?0x3b2a24:0x6f7d8c, roughness:.6, metalness:.3}));
-  hull.rotation.x=-Math.PI/2; hull.position.y=-1.2; g.add(hull);
-  // franja roja en la línea de flotación
-  const wl=new T.Mesh(new T.BoxGeometry(L*.97, .7, W*1.04), new T.MeshStandardMaterial({color: sunk?0x2a1a14:0x8c2a22, roughness:.7})); wl.position.set(-W*.15, -.9, 0); g.add(wl);
-  const deck=new T.Mesh(new T.BoxGeometry(L*.9, .5, W*.86), new T.MeshStandardMaterial({color: sunk?0x2a1e18:0x9aa6b2})); deck.position.set(-W*.2, 2.6, 0); g.add(deck);
-  if(!sunk){
-    const bridge=new T.Mesh(new T.BoxGeometry(Math.min(8,L*.3), 4, W*.6), new T.MeshStandardMaterial({color:0xe8edf2})); bridge.position.set(-L*.12, 4.8, 0); g.add(bridge);
-    const win=new T.Mesh(new T.BoxGeometry(Math.min(8,L*.3)+.1, .8, W*.62), new T.MeshStandardMaterial({color:0x1d2a36, metalness:.6, roughness:.2})); win.position.set(-L*.12, 6, 0); g.add(win);
-    for(let k=0;k<Math.max(1,l-2);k++){ const tur=new T.Mesh(new T.CylinderGeometry(1.4,1.6,1.2,10), new T.MeshStandardMaterial({color:0x56616d})); tur.position.set(L*.3-k*CELL*.7, 3.4, 0); g.add(tur);
-      const gun=new T.Mesh(new T.CylinderGeometry(.3,.3,4,6), tur.material); gun.rotation.z=Math.PI/2; gun.position.set(L*.3-k*CELL*.7+2.2, 3.6, 0); g.add(gun); }
-    const mast=new T.Mesh(new T.CylinderGeometry(.2,.2,7,6), new T.MeshStandardMaterial({color:0x333333})); mast.position.set(-L*.12, 9.5, 0); g.add(mast);
-    // antena de radar que gira
-    const ant=new T.Mesh(new T.BoxGeometry(3.2,.5,.3), new T.MeshStandardMaterial({color:0xdfe6ec})); ant.position.set(-L*.12, 12.6, 0); g.add(ant); g.userData.ant=ant;
-    const fc=document.createElement('canvas'); fc.width=48; fc.height=30; const fg=fc.getContext('2d'); [['#d52b1e',0],['#ffffff',10],['#0038a8',20]].forEach(([col,y])=>{ fg.fillStyle=col; fg.fillRect(0,y,48,10); });
-    const flag=new T.Mesh(new T.PlaneGeometry(4,2.5), new T.MeshBasicMaterial({map:new T.CanvasTexture(fc), side:T.DoubleSide})); flag.position.set(-L*.12-2, 11.2, 0); g.add(flag); g.userData.flag=flag;
-  }
-  // espuma alrededor del casco
-  const fo=new T.Mesh(new T.CircleGeometry(1, 28), new T.MeshBasicMaterial({color:0xffffff, transparent:true, opacity: sunk?.12:.28, depthWrite:false}));
-  fo.rotation.x=-Math.PI/2; fo.scale.set(L*.62, W*1.05, 1); fo.position.set(-W*.1, .2, 0); g.add(fo);
-  return g;
-}
-function cellPos(r, c, n){ return [(c-(n-1)/2)*CELL, (r-(n-1)/2)*CELL]; }
-function bob(o, k, extra){ o.updateMatrix(); R3.bobs.push(Object.assign({o, x:o.position.x, z:o.position.z, y0:o.position.y, rx:o.rotation.x, rz:o.rotation.z, ph:Math.random()*6, k}, extra||{})); }
-// rehace el tablero 3D (el mar que se ve grande) cuando cambia algo
-function build3D(){
-  const T=R3.T, n=N(), B=R3.board; while(B.children.length) B.remove(B.children[0]);
-  R3.bobs=[]; R3.radar=null; R3.fires=[];
-  if(!V || V.phase==='lobby') return;
-  const i = V.phase==='place' ? mySide() : side3(); R3.side=i;
-  if(i<0 || !V.sides[i]) return;
-  const s=V.sides[i], d=ANIM.disp[i]||s.grid||[], size=n*CELL;
-  // radar: cuando se mira el mar del enemigo durante la batalla
-  const radar = V.phase==='play' && !s.pids.includes(viewer());
-  const lbl=$('#sea3lbl'), myS=s.pids.includes(viewer()), fol=following3();
-  if(lbl){ lbl.className = radar ? 'radar' : myS && fol ? 'mio' : '';
-    lbl.textContent = radar ? `📡 Radar · mar de ${sideName(V,i)}` : myS ? (fol ? '🎯 ¡Te están tirando! · tu flota' : '⚓ Tu flota') : `⚓ Flota de ${sideName(V,i)}`; }
-  R3.isRadar=radar; R3.plane.constant = radar ? -RADAR_Y : 0;
-  R3.calmR=size*.75; R3.wu.uCalm.value=size*.75; R3.wu.uN.value=n; R3.wu.uGrid.value=radar?0:1;
-  // marco alrededor del mar: dorado en tu mar, metal verde en el radar
-  const fm=radar ? new T.MeshStandardMaterial({color:0x22332b, emissive:0x0c3a1c, roughness:.35, metalness:.7}) : new T.MeshStandardMaterial({color:0xf2c14e, roughness:.4, metalness:.3});
-  const fy=radar?RADAR_Y-.4:.8;
-  for(const [w,dd,x,z] of [[size+16,3,0,-size/2-7],[size+16,3,0,size/2+7],[3,size+16,-size/2-7,0],[3,size+16,size/2+7,0]]){ const b=new T.Mesh(new T.BoxGeometry(w,radar?1.2:1.6,dd), fm); b.position.set(x,fy,z); B.add(b); if(!radar) bob(b,.35); }
-  for(let k=0;k<n;k++){ const lc=radar?'#8dffb4':'#ffffff';
-    const a=labelSprite(String(k+1), lc); const [x]=cellPos(0,k,n); a.position.set(x, radar?RADAR_Y+2.5:5, -size/2-3.5); B.add(a);
-    const b=labelSprite(LETRAS[k], lc); const [,z]=cellPos(k,0,n); b.position.set(-size/2-3.5, radar?RADAR_Y+2.5:5, z); B.add(b); }
-  // barcos que se ven
-  const ownOrAll = s.pids.includes(viewer()) || (NET.obs && V.opts.obsVen) || V.phase!=='play';
-  const ships = V.phase==='place' ? PL.ships() : (s.fleet||[]).filter(x=>x.r!=null && !x.hidden && (ownOrAll ? true : sunkDisp(i,x)));
-  ships.forEach(x=>{ const sunk = V.phase!=='place' && sunkDisp(i,x), m=shipMesh(x.l, sunk), [x0,z0]=cellPos(x.r, x.c, n);
-    const ang = x.dir==='v' ? -Math.PI/2 : 0, off=(x.l-1)*CELL/2;
-    m.position.set(x.dir==='h' ? x0+off : x0, sunk?-2.6:0, x.dir==='v' ? z0+off : z0); m.rotation.y=ang; if(sunk){ m.rotation.z=.12; m.rotation.x=.08; } B.add(m);
-    bob(m, sunk?.25:.75, {ship:true}); });
-  // marcas: agua = boya blanca, tocado = estaca roja con fuego y humo
-  const missM=new T.MeshStandardMaterial({color:0xffffff, roughness:.4}), hitM=new T.MeshStandardMaterial({color:0xd52b1e, emissive:0x550000});
-  for(let r=0;r<n;r++) for(let c=0;c<n;c++){ const g=d[r*n+c]; if(!g) continue; const [x,z]=cellPos(r,c,n);
-    if(g===1 || g===4){ const b=new T.Mesh(new T.SphereGeometry(g===4?1:1.6, 10, 8), missM); b.position.set(x, .6, z); if(g===4){ b.material=b.material.clone(); b.material.transparent=true; b.material.opacity=.45; } B.add(b); bob(b,1); }
-    else { const p=new T.Mesh(new T.CylinderGeometry(.9,.9,6,8), hitM); p.position.set(x, 3, z); B.add(p); bob(p,.75);
-      const f=new T.Mesh(new T.ConeGeometry(2.2, 5, 8), new T.MeshBasicMaterial({color:0xff8a00, transparent:true, opacity:.85})); f.position.set(x, 7, z); B.add(f); R3.fires.push(f); bob(f,.75);
-      const f2=new T.Mesh(new T.ConeGeometry(1.2, 3.4, 8), new T.MeshBasicMaterial({color:0xffe066, transparent:true, opacity:.9})); f2.position.set(x, 6.2, z); B.add(f2); R3.fires.push(f2); bob(f2,.75);
-      if(g===2) R3.fires.push({smoke:true, x, z, next:0}); }
-  }
-  // la pantalla de radar semitransparente
-  if(radar){
-    const data=new Uint8Array(n*n*4); for(let k=0;k<n*n;k++){ data[k*4]=d[k]||0; data[k*4+3]=255; }
-    if(R3.marksTex) R3.marksTex.dispose();
-    const tex=new T.DataTexture(data, n, n, T.RGBAFormat); tex.magFilter=tex.minFilter=T.NearestFilter; tex.needsUpdate=true; R3.marksTex=tex;
-    R3.ru={ uT:{value:0}, uN:{value:n}, uCell:{value:CELL}, uMarks:{value:tex}, uAim:{value:new T.Vector2(-1,-1)}, uAimOn:{value:0} };
-    const rm=new T.ShaderMaterial({uniforms:R3.ru, vertexShader:RADAR_VS, fragmentShader:RADAR_FS, transparent:true, depthWrite:false, side:T.DoubleSide}); rm.extensions.derivatives=true;
-    const pg=new T.PlaneGeometry(size+11, size+11); pg.rotateX(-Math.PI/2);
-    R3.radar=new T.Mesh(pg, rm); R3.radar.position.y=RADAR_Y; R3.radar.renderOrder=3; B.add(R3.radar);
-  }
-  // mira
-  R3.aim=new T.Mesh(new T.RingGeometry(3.2, 4.4, 24), new T.MeshBasicMaterial({color:0xffe066, side:T.DoubleSide, transparent:true, opacity:.9, depthTest:!radar})); R3.aim.rotation.x=-Math.PI/2; R3.aim.visible=false; R3.aim.renderOrder=4; B.add(R3.aim);
-  R3.builtKey=bkey3();
-  R3.dirty=false;
-}
-// qué mar se ve en 3D: el que elegiste, salvo mientras cae un misil en otro
-const following3 = () => V && V.phase==='play' && R3.follow!=null && V.sides[R3.follow] && performance.now()<R3.followUntil;
-function side3(){ return following3() ? R3.follow : (R3.showOwn ? smallSide() : bigSide()); }
-const bkey3 = () => { const i=side3(); return [V.phase, V.round, i, following3(), (ANIM.disp[i]||[]).join(''), V.phase==='place'?JSON.stringify(PL.list):''].join('|'); };
-function wire3D(cv){
-  let drag=null;
-  cv.addEventListener('pointerdown', e=>{ cv.setPointerCapture(e.pointerId); drag={x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY}; });
-  cv.addEventListener('pointermove', e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.x=e.clientX; drag.y=e.clientY; CAM3.yaw+=dx*.005; CAM3.pitch=Math.max(20, Math.min(88, CAM3.pitch+dy*.2)); });
-  cv.addEventListener('pointerup', e=>{ if(!drag) return; const tap=Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy)<7; drag=null; saveCam3();
-    if(!tap || !V || V.phase!=='play' || !R3.isRadar) return;
-    const r=cv.getBoundingClientRect(), v=new R3.T.Vector2((e.clientX-r.left)/r.width*2-1, -((e.clientY-r.top)/r.height*2-1));
-    R3.ray.setFromCamera(v, R3.cam); const p=new R3.T.Vector3(); if(!R3.ray.ray.intersectPlane(R3.plane, p)) return;
-    const n=N(), c=Math.floor(p.x/CELL+n/2), rr=Math.floor(p.z/CELL+n/2); if(rr<0||rr>=n||c<0||c>=n) return;
-    aimAt(rr, c, false);
-  });
-  cv.addEventListener('wheel', e=>{ e.preventDefault(); CAM3.zoom=Math.max(.5, Math.min(2.2, CAM3.zoom*(e.deltaY>0?1.08:.93))); saveCam3(); }, {passive:false});
-}
-function cam3(k, d){
-  if(k==='own'){ R3.showOwn=!R3.showOwn; R3.followUntil=0; R3.dirty=true; toast(R3.showOwn?'⚓ Mirando el otro mar (tu flota si jugás)':'📡 Mirando el radar del mar enemigo'); return; }
-  if(k==='zoom') CAM3.zoom=Math.max(.5, Math.min(2.2, CAM3.zoom*(d>0?.85:1.18)));
-  else if(k==='pitch') CAM3.pitch=Math.max(20, Math.min(88, CAM3.pitch+d));
-  else if(k==='reset'){ CAM3.pitch=55; CAM3.zoom=1; CAM3.yaw=0; }
-  saveCam3();
-}
-function draw3D(t){
-  const T=R3.T;
-  if(R3.dirty || R3.builtKey!==bkey3()) build3D();
-  const tt=t/1000, n=N();
-  R3.wu.uT.value=tt;
-  // todo lo que flota sube y baja con las olas
-  for(const b of R3.bobs){ const o=b.o, h=waveH(b.x, b.z, tt);
-    o.position.y=b.y0+h*b.k;
-    if(b.ship){ const sx=waveH(b.x+6, b.z, tt)-waveH(b.x-6, b.z, tt), sz=waveH(b.x, b.z+6, tt)-waveH(b.x, b.z-6, tt);
-      o.rotation.x=b.rx-sz*.035; o.rotation.z=b.rz+sx*.035;
-      const u=o.userData; if(u.ant) u.ant.rotation.y=tt*2.4+b.ph; if(u.flag) u.flag.rotation.y=Math.sin(tt*3+b.ph)*.35; } }
-  (R3.fires||[]).forEach((f,k)=>{
-    if(f.smoke){ if(t>f.next){ f.next=t+380+Math.random()*260; puff(f.x+(Math.random()-.5)*2, 9, f.z+(Math.random()-.5)*2, 0x2b2b2b, .55, 2.6); } return; }
-    const s=1+Math.sin(tt*9+k)*.18; f.scale.set(s, 1+Math.sin(tt*7+k*2)*.25, s); });
-  // mira y bomba en camino
-  const am = myTurn() && AIM.r!=null && AIM.to===R3.side ? AIM : (REMOTE_AIM && REMOTE_AIM.to===R3.side && REMOTE_AIM.r!=null && !mine(curShooter()) ? REMOTE_AIM : null);
-  if(R3.aim){ R3.aim.visible=!!am; if(am){ const [x,z]=cellPos(am.r, am.c, n); R3.aim.position.set(x, (R3.isRadar?RADAR_Y+.3:1.4+waveH(x,z,tt)*.8)+Math.sin(tt*6)*.3, z); } }
-  if(R3.radar){ R3.ru.uT.value=tt; R3.ru.uAimOn.value=am?1:0; if(am) R3.ru.uAim.value.set(am.r, am.c); }
-  const cur=ANIM.cur;
-  if(cur && cur.to===R3.side){
-    if(!R3.bomb){ R3.bomb=missileMesh(); R3.scene.add(R3.bomb); }
-    const k=Math.min(1,(performance.now()-ANIM.t0)/1100), [x,z]=cellPos(cur.r, cur.c, n);
-    const pos=kk=>new T.Vector3(x, 2+130*(1-kk)+45*Math.sin(Math.PI*kk), z+(1-kk)*170);
-    const p=pos(k); R3.bomb.visible=k<1; R3.bomb.position.copy(p); R3.bomb.lookAt(pos(Math.min(1,k+.02)));
-    if(k<1 && t>(R3.trailT||0)){ R3.trailT=t+28; puff(p.x, p.y, p.z, 0xdddddd, .7, 1.6, .9); }
-    if(k>=1 && R3.fxDone!==cur.n){ R3.fxDone=cur.n; spawnFx(x, z, cur.res); }
-  } else if(R3.bomb) R3.bomb.visible=false;
-  if(!cur) R3.fxDone=null;
-  R3.fx=R3.fx.filter(f=>{ const age=(t-f.t0)/1000; if(age>f.life){ R3.scene.remove(f.m); if(f.light) R3.scene.remove(f.light); return false; } f.up(age); return true; });
-  // cámara
-  const size=n*CELL, dist=size*2.05*CAM3.zoom, p=CAM3.pitch*Math.PI/180, yw=CAM3.yaw;
-  R3.cam.position.set(Math.sin(yw)*Math.cos(p)*dist, Math.sin(p)*dist, Math.cos(yw)*Math.cos(p)*dist);
-  R3.cam.lookAt(0, 0, 2);
-  R3.renderer.render(R3.scene, R3.cam);
-}
-function missileMesh(){
-  const T=R3.T, g=new T.Group(), m=new T.MeshStandardMaterial({color:0x4a4f55, metalness:.7, roughness:.35});
-  const body=new T.Mesh(new T.CylinderGeometry(.8,.8,6,10), m); body.rotation.x=Math.PI/2; g.add(body);
-  const nose=new T.Mesh(new T.ConeGeometry(.8,2.2,10), new T.MeshStandardMaterial({color:0xd52b1e})); nose.rotation.x=Math.PI/2; nose.position.z=4.1; g.add(nose);
-  for(let k=0;k<4;k++){ const fin=new T.Mesh(new T.BoxGeometry(.15,2.2,1.6), m); fin.position.z=-2.4; fin.rotation.z=k*Math.PI/2; fin.translateY(1); g.add(fin); }
-  const fl=new T.Mesh(new T.ConeGeometry(.7,3,8), new T.MeshBasicMaterial({color:0xffb347, transparent:true, opacity:.9})); fl.rotation.x=-Math.PI/2; fl.position.z=-4.4; g.add(fl);
-  return g;
-}
-const PUFFGEO={};
-function puff(x, y, z, color, op, sz, life){
-  const T=R3.T; if(R3.fx.length>160) return;
-  const geo=PUFFGEO.s||(PUFFGEO.s=new T.SphereGeometry(1, 8, 6));
-  const m=new T.Mesh(geo, new T.MeshBasicMaterial({color, transparent:true, opacity:op, depthWrite:false})); m.position.set(x,y,z); R3.scene.add(m);
-  const L=life||2.4, dx=(Math.random()-.5)*1.5;
-  R3.fx.push({m, t0:performance.now(), life:L, up(a){ const k=a/L, s=sz*(1+k*2.2); m.scale.set(s,s,s); m.position.y=y+a*5; m.position.x=x+dx*a; m.material.opacity=op*(1-k); }});
-}
-function spawnFx(x, z, res){
-  const T=R3.T, now=performance.now(), sc=R3.scene, add=(m,life,up,light)=>{ sc.add(m); if(light) sc.add(light); R3.fx.push({m, t0:now, life, up, light}); };
-  // onda en el agua
-  const rg=new T.Mesh(new T.RingGeometry(.8, 1.4, 40), new T.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.8, side:T.DoubleSide, depthWrite:false}));
-  rg.rotation.x=-Math.PI/2; rg.position.set(x, 1.6, z);
-  add(rg, 1.8, a=>{ const s=1+a*9; rg.scale.set(s,s,s); rg.material.opacity=.8*(1-a/1.8); });
-  // ping en el radar
-  if(R3.isRadar){ const pr=new T.Mesh(new T.RingGeometry(1.2, 1.9, 40), new T.MeshBasicMaterial({color: res==='agua'?0x8dffb4:0xff5040, transparent:true, opacity:.95, side:T.DoubleSide, depthWrite:false}));
-    pr.rotation.x=-Math.PI/2; pr.position.set(x, RADAR_Y+.2, z); pr.renderOrder=6;
-    add(pr, 1.4, a=>{ const s=1+a*6; pr.scale.set(s,s,s); pr.material.opacity=.95*(1-a/1.4); }); }
-  // gotas o escombros que vuelan y caen
-  const N=res==='agua'?60:45, pos=new Float32Array(N*3), vel=[];
-  for(let k=0;k<N;k++){ const an=Math.random()*Math.PI*2, sp=res==='agua'?4+Math.random()*8:6+Math.random()*14; vel.push([Math.cos(an)*sp, (res==='agua'?18:14)+Math.random()*14, Math.sin(an)*sp]); pos[k*3]=x; pos[k*3+1]=2; pos[k*3+2]=z; }
-  const pg=new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(pos,3));
-  const pts=new T.Points(pg, new T.PointsMaterial({color: res==='agua'?0xeaf7ff:0x2a201a, size: res==='agua'?1.3:1.1, transparent:true, opacity:.95, depthWrite:false}));
-  add(pts, 1.9, a=>{ for(let k=0;k<N;k++){ const v=vel[k]; pos[k*3]=x+v[0]*a; pos[k*3+1]=Math.max(.5, 2+v[1]*a-16*a*a); pos[k*3+2]=z+v[2]*a; } pg.attributes.position.needsUpdate=true; pts.material.opacity=.95*(1-a/1.9); });
-  if(res==='agua'){
-    const m=new T.Mesh(new T.CylinderGeometry(1.5, 4, 14, 14, 1, true), new T.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.8, side:T.DoubleSide, depthWrite:false})); m.position.set(x, 7, z);
-    add(m, 1.6, a=>{ m.scale.set(1+a*.8, Math.max(.01, Math.sin(Math.min(1,a/1.2)*Math.PI)*1.6), 1+a*.8); m.position.y=7*m.scale.y*.6; m.material.opacity=.8*(1-a/1.6); });
-    for(let k=0;k<5;k++) setTimeout(()=>puff(x+(Math.random()-.5)*5, 3, z+(Math.random()-.5)*5, 0xffffff, .5, 2.2, 1.4), k*60);
-  } else {
-    const m=new T.Mesh(new T.SphereGeometry(2.4, 16, 12), new T.MeshBasicMaterial({color:0xffb030, transparent:true, opacity:.95})); m.position.set(x, 5, z);
-    const light=new T.PointLight(0xff8a30, 4, 120); light.position.set(x, 12, z);
-    add(m, 1.3, a=>{ const s=1+Math.min(a,.5)*9; m.scale.set(s,s,s); m.material.opacity=.95*Math.pow(1-a/1.3,.8); m.material.color.setHSL(.11-a*.05, 1, .66-a*.18); light.intensity=Math.max(0, 4-a*6); }, light);
-    const core=new T.Mesh(new T.SphereGeometry(2, 12, 10), new T.MeshBasicMaterial({color:0xfff6c0, transparent:true, opacity:1, depthWrite:false})); core.position.set(x, 6, z); core.renderOrder=7;
-    add(core, .55, a=>{ const s=1+a*7; core.scale.set(s,s,s); core.material.opacity=1-a/.55; });
-    for(let k=0;k<10;k++) setTimeout(()=>puff(x+(Math.random()-.5)*6, 8+Math.random()*4, z+(Math.random()-.5)*6, k<3?0x4a3328:0x262626, .65, 3+Math.random()*2, 3), 450+k*80);
-  }
-}
-function resizeStage(){
-  if(!R3.ok) return;
-  const st=$('#stage'), r=st.getBoundingClientRect();
-  R3.renderer.setSize(r.width, r.height, false); R3.cam.aspect=r.width/Math.max(1,r.height); R3.cam.updateProjectionMatrix();
-}
-window.addEventListener('resize', ()=>{ if($('#game').classList.contains('on')) resizeStage(); });
-function applyView(){
-  const is3 = VIEW.mode==='3d' && R3.ok;
-  $('#game').classList.toggle('v3d', is3);
-  $('#btnView').textContent = is3 ? '🗺️ 2D' : '🧊 3D';
-  if(is3){ R3.dirty=true; requestAnimationFrame(resizeStage); }
-}
-function toggleView(){
-  if(VIEW.mode==='2d'){ if(!init3D()) return; VIEW.mode='3d'; toast('🧊 Vista 3D: tocá una casilla para apuntar y otra vez para tirar. Arrastrá para girar el mar.'); }
-  else VIEW.mode='2d';
-  store('naval_view', VIEW.mode); applyView(); if(V) renderGame();
-}
-function loop(t){
-  requestAnimationFrame(loop);
-  if(!V || V.phase==='lobby' || !$('#game').classList.contains('on')) return;
-  if(VIEW.mode==='3d' && R3.ok && V.phase!=='place') draw3D(t);
-}
-requestAnimationFrame(loop);
+/* El mar en 3D está en mar3d.js */
 // los tiros se animan con un timer y no con cada cuadro: así siguen aunque la pestaña esté escondida
 setInterval(()=>{ if(V && V.phase!=='lobby' && $('#game').classList.contains('on')) animTick(); }, 50);
-setTimeout(()=>{ if(VIEW.mode==='3d' && !init3D()) VIEW.mode='2d'; applyView(); }, 0);
 
 /* ====================== PANEL LATERAL ====================== */
 function renderSidePanels(){ if($('#tab-hist').classList.contains('on')) renderHist(); renderMesaTab(); renderReglasTab(); }

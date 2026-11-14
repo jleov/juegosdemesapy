@@ -274,6 +274,23 @@ html,body{overflow-x:clip}
   .tj{padding:10px 12px 9px}.tjs{font-size:12.5px;margin-top:4px}
   #fase{padding:7px 10px 8px}.fh{font-size:16px}.fs{font-size:13.5px}
 }
+
+/* ---------- portada: ilustración propia con ñandutí de fondo ---------- */
+.arte{position:relative;width:min(300px,84vw);aspect-ratio:300/128;margin:0 auto 6px}
+.arte::before{content:"";position:absolute;left:50%;top:50%;width:62%;aspect-ratio:1;transform:translate(-50%,-50%);background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94' stroke-dasharray='6 5'/%3E%3Ccircle cx='100' cy='100' r='78'/%3E%3Ccircle cx='100' cy='100' r='58' stroke-dasharray='2 4' stroke-width='5'/%3E%3Ccircle cx='100' cy='100' r='38'/%3E%3Ccircle cx='100' cy='100' r='16' stroke-dasharray='3 3' stroke-width='4'/%3E%3Cpath d='M100 6v188M6 100h188M33.5 33.5l133 133M166.5 33.5l-133 133M64 13l72 174M136 13L64 187M13 64l174 72M13 136l174-72'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;opacity:.3;animation:artegira 90s linear infinite}
+.arte svg{position:relative;width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 6px 9px rgba(0,0,0,.45))}
+@keyframes artegira{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.arte .flota{animation:arteflota 3.2s ease-in-out infinite alternate}
+@keyframes arteflota{to{transform:translateY(-5px)}}
+.arte .ola{animation:arteola 4s linear infinite}.arte .ola2{animation:arteola 6.5s linear infinite reverse}
+@keyframes arteola{to{transform:translateX(-60px)}}
+.arte .late{transform-box:fill-box;transform-origin:center;animation:artelate 1.6s ease-in-out infinite alternate}
+@keyframes artelate{to{transform:scale(1.12)}}
+.arte .gira{transform-box:fill-box;transform-origin:center;animation:artespin 5s linear infinite}
+@keyframes artespin{to{transform:rotate(360deg)}}
+.arte .va{animation:arteva 2.6s ease-in-out infinite alternate}
+@keyframes arteva{to{transform:translateX(14px)}}
+@media (prefers-reduced-motion:reduce){.arte::before,.arte *{animation:none!important}}
 </style>
 </head>
 <body>
@@ -282,7 +299,12 @@ html,body{overflow-x:clip}
 <!-- ======================= MENÚ ======================= -->
 <div class="screen on" id="menu"><div class="menu">
   <div class="logo">
-    <div class="mask">🎭</div>
+    <div class="arte"><svg viewBox="0 0 300 128" aria-hidden="true">
+<g fill="#f6e3c5" stroke="#3a1c2a" stroke-width="2.5"><path d="M30,128 q0,-34 22,-34 q22,0 22,34z" fill="#2a9d3f"/><circle cx="52" cy="70" r="17"/><path d="M30,60 q22,-14 44,0 l-5,-3 q-3,-18 -17,-18 q-14,0 -17,18z" fill="#e9d29a"/><g fill="#3a1c2a" stroke="none"><circle cx="46" cy="70" r="2"/><circle cx="58" cy="70" r="2"/></g><path d="M47,78 q5,4 10,0" fill="none"/><path d="M80,128 q0,-34 22,-34 q22,0 22,34z" fill="#0038a8"/><circle cx="102" cy="70" r="17"/><path d="M80,60 q22,-14 44,0 l-5,-3 q-3,-18 -17,-18 q-14,0 -17,18z" fill="#e9d29a"/><g fill="#3a1c2a" stroke="none"><circle cx="96" cy="70" r="2"/><circle cx="108" cy="70" r="2"/></g><path d="M97,78 q5,4 10,0" fill="none"/><path d="M176,128 q0,-34 22,-34 q22,0 22,34z" fill="#e0a100"/><circle cx="198" cy="70" r="17"/><path d="M176,60 q22,-14 44,0 l-5,-3 q-3,-18 -17,-18 q-14,0 -17,18z" fill="#e9d29a"/><g fill="#3a1c2a" stroke="none"><circle cx="192" cy="70" r="2"/><circle cx="204" cy="70" r="2"/></g><path d="M193,78 q5,4 10,0" fill="none"/><path d="M226,128 q0,-34 22,-34 q22,0 22,34z" fill="#7a2fbf"/><circle cx="248" cy="70" r="17"/><path d="M226,60 q22,-14 44,0 l-5,-3 q-3,-18 -17,-18 q-14,0 -17,18z" fill="#e9d29a"/><g fill="#3a1c2a" stroke="none"><circle cx="242" cy="70" r="2"/><circle cx="254" cy="70" r="2"/></g><path d="M243,78 q5,4 10,0" fill="none"/></g>
+<g class="flota"><path d="M124,128 q0,-42 26,-42 q26,0 26,42z" fill="#1c0b22" stroke="#000" stroke-width="2.5"/><circle cx="150" cy="60" r="22" fill="#2a1430" stroke="#000" stroke-width="2.5"/>
+<path d="M120,46 q30,-18 60,0 l-7,-4 q-4,-24 -23,-24 q-19,0 -23,24z" fill="#3a1c44" stroke="#000" stroke-width="2.5"/>
+<path d="M130,54 h40 q0,14 -12,14 q-6,0 -8,-6 q-2,6 -8,6 q-12,0 -12,-14z" fill="#d52b1e" stroke="#000" stroke-width="2"/><g fill="#fff"><ellipse cx="141" cy="60" rx="4.500" ry="3"/><ellipse cx="159" cy="60" rx="4.500" ry="3"/></g></g>
+<g class="late"><circle cx="186" cy="26" r="15" fill="#f2c14e" stroke="#3a1c10" stroke-width="2.5"/><text x="186" y="34" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="900" font-size="22" fill="#3a1c10">?</text></g></svg></div>
     <h1><small>EL</small>IMPOSTOR<span>¿QUIÉN NO SABE LA PALABRA?</span></h1>
     <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
   </div>

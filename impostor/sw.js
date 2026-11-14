@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar El Impostor como app.
-const CACHE = 'impostor-v1';
+const CACHE = 'impostor-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './palabras.js', './reglas.js', './juego.js', './caras.js'];
 
 self.addEventListener('install', e => {

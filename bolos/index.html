@@ -240,6 +240,23 @@ body>.side{display:none}
   #pinhud{width:78px;height:72px;right:52px}
   #ctrl{gap:6px}
 }
+
+/* ---------- portada: ilustración propia con ñandutí de fondo ---------- */
+.arte{position:relative;width:min(300px,84vw);aspect-ratio:300/128;margin:0 auto 6px}
+.arte::before{content:"";position:absolute;left:50%;top:50%;width:62%;aspect-ratio:1;transform:translate(-50%,-50%);background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94' stroke-dasharray='6 5'/%3E%3Ccircle cx='100' cy='100' r='78'/%3E%3Ccircle cx='100' cy='100' r='58' stroke-dasharray='2 4' stroke-width='5'/%3E%3Ccircle cx='100' cy='100' r='38'/%3E%3Ccircle cx='100' cy='100' r='16' stroke-dasharray='3 3' stroke-width='4'/%3E%3Cpath d='M100 6v188M6 100h188M33.5 33.5l133 133M166.5 33.5l-133 133M64 13l72 174M136 13L64 187M13 64l174 72M13 136l174-72'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;opacity:.3;animation:artegira 90s linear infinite}
+.arte svg{position:relative;width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 6px 9px rgba(0,0,0,.45))}
+@keyframes artegira{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.arte .flota{animation:arteflota 3.2s ease-in-out infinite alternate}
+@keyframes arteflota{to{transform:translateY(-5px)}}
+.arte .ola{animation:arteola 4s linear infinite}.arte .ola2{animation:arteola 6.5s linear infinite reverse}
+@keyframes arteola{to{transform:translateX(-60px)}}
+.arte .late{transform-box:fill-box;transform-origin:center;animation:artelate 1.6s ease-in-out infinite alternate}
+@keyframes artelate{to{transform:scale(1.12)}}
+.arte .gira{transform-box:fill-box;transform-origin:center;animation:artespin 5s linear infinite}
+@keyframes artespin{to{transform:rotate(360deg)}}
+.arte .va{animation:arteva 2.6s ease-in-out infinite alternate}
+@keyframes arteva{to{transform:translateX(14px)}}
+@media (prefers-reduced-motion:reduce){.arte::before,.arte *{animation:none!important}}
 </style>
 </head>
 <body>
@@ -248,7 +265,13 @@ body>.side{display:none}
 <!-- ======================= MENÚ ======================= -->
 <div class="screen on" id="menu"><div class="menu">
   <div class="logo">
-    <div class="pins"><span>🎳</span></div>
+    <div class="arte"><svg viewBox="0 0 300 128" aria-hidden="true"><defs><linearGradient id="paL" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b98447"/><stop offset="1" stop-color="#e8c58d"/></linearGradient><radialGradient id="paB" cx=".35" cy=".3"><stop offset="0" stop-color="#8a7cf0"/><stop offset="1" stop-color="#2a1f7a"/></radialGradient></defs>
+<path d="M112,10 H188 L262,128 H38 Z" fill="url(#paL)" stroke="#5a3a18" stroke-width="3" stroke-linejoin="round"/>
+<g stroke="#8a5a26" stroke-width="1.2" opacity=".6"><path d="M131,10 L94,128M150,10 V128M169,10 L206,128"/></g>
+<path d="M96,10 H112 L38,128 H10Z M188,10 H204 L290,128 H262Z" fill="#241a4a"/>
+<g fill="#fff" stroke="#55565e" stroke-width="1.6"><g transform="translate(132,20) scale(0.62)"><path d="M-6,0 q-1,-9 -3,-13 q-2,-5 0,-9 q3,-5 9,-5 q6,0 9,5 q2,4 0,9 q-2,4 -3,13 q3,6 3,16 q0,8 -4,12 h-10 q-4,-4 -4,-12 q0,-10 3,-16z" transform="translate(0,-14)"/><path d="M-5.500,-15 h11" stroke="#d52b1e" stroke-width="3"/></g><g transform="translate(150,20) scale(0.62)"><path d="M-6,0 q-1,-9 -3,-13 q-2,-5 0,-9 q3,-5 9,-5 q6,0 9,5 q2,4 0,9 q-2,4 -3,13 q3,6 3,16 q0,8 -4,12 h-10 q-4,-4 -4,-12 q0,-10 3,-16z" transform="translate(0,-14)"/><path d="M-5.500,-15 h11" stroke="#d52b1e" stroke-width="3"/></g><g transform="translate(168,20) scale(0.62)"><path d="M-6,0 q-1,-9 -3,-13 q-2,-5 0,-9 q3,-5 9,-5 q6,0 9,5 q2,4 0,9 q-2,4 -3,13 q3,6 3,16 q0,8 -4,12 h-10 q-4,-4 -4,-12 q0,-10 3,-16z" transform="translate(0,-14)"/><path d="M-5.500,-15 h11" stroke="#d52b1e" stroke-width="3"/></g><g transform="translate(140,30) scale(0.74)"><path d="M-6,0 q-1,-9 -3,-13 q-2,-5 0,-9 q3,-5 9,-5 q6,0 9,5 q2,4 0,9 q-2,4 -3,13 q3,6 3,16 q0,8 -4,12 h-10 q-4,-4 -4,-12 q0,-10 3,-16z" transform="translate(0,-14)"/><path d="M-5.500,-15 h11" stroke="#d52b1e" stroke-width="3"/></g><g transform="translate(160,30) scale(0.74)"><path d="M-6,0 q-1,-9 -3,-13 q-2,-5 0,-9 q3,-5 9,-5 q6,0 9,5 q2,4 0,9 q-2,4 -3,13 q3,6 3,16 q0,8 -4,12 h-10 q-4,-4 -4,-12 q0,-10 3,-16z" transform="translate(0,-14)"/><path d="M-5.500,-15 h11" stroke="#d52b1e" stroke-width="3"/></g><g transform="translate(150,42) scale(0.9)"><path d="M-6,0 q-1,-9 -3,-13 q-2,-5 0,-9 q3,-5 9,-5 q6,0 9,5 q2,4 0,9 q-2,4 -3,13 q3,6 3,16 q0,8 -4,12 h-10 q-4,-4 -4,-12 q0,-10 3,-16z" transform="translate(0,-14)"/><path d="M-5.500,-15 h11" stroke="#d52b1e" stroke-width="3"/></g></g>
+<g class="flota"><ellipse cx="118" cy="112" rx="24" ry="6" fill="#000" opacity=".25"/><circle cx="118" cy="92" r="24" fill="url(#paB)" stroke="#16104a" stroke-width="2.5"/><g fill="#0d0a26"><circle cx="110" cy="82" r="3.400"/><circle cx="121" cy="79" r="3.400"/><circle cx="117" cy="90" r="3.400"/></g></g>
+<g stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"><path d="M150,96 v-14M146,86 l4,-5 4,5"/></g></svg></div>
     <h1>BOLOS<span>BOWLING · PARAGUAY</span></h1>
     <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
   </div>

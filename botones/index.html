@@ -197,6 +197,23 @@ body>.side{display:none}
 .plclub small{flex-basis:100%}
 .banner.gol{background:rgba(42,157,63,.95)}.banner.falta{background:rgba(210,160,20,.95);color:#111}
 @media (max-width:600px){ .topbar .hidem{display:none} .sbs span{font-size:24px} }
+
+/* ---------- portada: ilustración propia con ñandutí de fondo ---------- */
+.arte{position:relative;width:min(300px,84vw);aspect-ratio:300/128;margin:0 auto 6px}
+.arte::before{content:"";position:absolute;left:50%;top:50%;width:62%;aspect-ratio:1;transform:translate(-50%,-50%);background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94' stroke-dasharray='6 5'/%3E%3Ccircle cx='100' cy='100' r='78'/%3E%3Ccircle cx='100' cy='100' r='58' stroke-dasharray='2 4' stroke-width='5'/%3E%3Ccircle cx='100' cy='100' r='38'/%3E%3Ccircle cx='100' cy='100' r='16' stroke-dasharray='3 3' stroke-width='4'/%3E%3Cpath d='M100 6v188M6 100h188M33.5 33.5l133 133M166.5 33.5l-133 133M64 13l72 174M136 13L64 187M13 64l174 72M13 136l174-72'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;opacity:.3;animation:artegira 90s linear infinite}
+.arte svg{position:relative;width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 6px 9px rgba(0,0,0,.45))}
+@keyframes artegira{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.arte .flota{animation:arteflota 3.2s ease-in-out infinite alternate}
+@keyframes arteflota{to{transform:translateY(-5px)}}
+.arte .ola{animation:arteola 4s linear infinite}.arte .ola2{animation:arteola 6.5s linear infinite reverse}
+@keyframes arteola{to{transform:translateX(-60px)}}
+.arte .late{transform-box:fill-box;transform-origin:center;animation:artelate 1.6s ease-in-out infinite alternate}
+@keyframes artelate{to{transform:scale(1.12)}}
+.arte .gira{transform-box:fill-box;transform-origin:center;animation:artespin 5s linear infinite}
+@keyframes artespin{to{transform:rotate(360deg)}}
+.arte .va{animation:arteva 2.6s ease-in-out infinite alternate}
+@keyframes arteva{to{transform:translateX(14px)}}
+@media (prefers-reduced-motion:reduce){.arte::before,.arte *{animation:none!important}}
 </style>
 </head>
 <body>
@@ -205,7 +222,13 @@ body>.side{display:none}
 <!-- ======================= MENÚ ======================= -->
 <div class="screen on" id="menu"><div class="menu">
   <div class="logo">
-    <div class="ico">⚽</div>
+    <div class="arte"><svg viewBox="0 0 300 128" aria-hidden="true"><defs><clipPath id="paC"><rect x="10" y="8" width="280" height="112" rx="12"/></clipPath><radialGradient id="paB" cx=".35" cy=".3"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+<rect x="10" y="8" width="280" height="112" rx="12" fill="#2a8f45" stroke="#0a2416" stroke-width="3"/>
+<g clip-path="url(#paC)"><g fill="#34a352"><rect x="10" y="8" width="35" height="112"/><rect x="80" y="8" width="35" height="112"/><rect x="150" y="8" width="35" height="112"/><rect x="220" y="8" width="35" height="112"/></g>
+<g fill="none" stroke="#fff" stroke-width="2.5" opacity=".9"><rect x="18" y="16" width="264" height="96"/><path d="M150,16 V112"/><circle cx="150" cy="64" r="20"/><rect x="18" y="38" width="34" height="52"/><rect x="248" y="38" width="34" height="52"/></g></g>
+<g class="flota"><circle cx="96" cy="70" r="21" fill="#7a1810"/><circle cx="96" cy="66" r="21" fill="#d52b1e"/><path d="M75.500,62 a21,21 0 0 1 41,0 v8 a21,21 0 0 1 -41,0z" fill="#fff"/><circle cx="96" cy="66" r="21" fill="none" stroke="#7a1810" stroke-width="2"/><circle cx="96" cy="66" r="12" fill="none" stroke="#7a1810" stroke-width="1.5" opacity=".5"/><g fill="#3a1010"><circle cx="91" cy="61" r="2.6"/><circle cx="101" cy="61" r="2.6"/><circle cx="91" cy="71" r="2.6"/><circle cx="101" cy="71" r="2.6"/></g><circle cx="96" cy="66" r="21" fill="url(#paB)"/></g>
+<g><circle cx="214" cy="52" r="18" fill="#001f66"/><circle cx="214" cy="48" r="18" fill="#0038a8"/><circle cx="214" cy="48" r="10" fill="none" stroke="#9db8ff" stroke-width="1.5" opacity=".6"/><g fill="#001440"><circle cx="210" cy="44" r="2.3"/><circle cx="218" cy="44" r="2.3"/><circle cx="210" cy="52" r="2.3"/><circle cx="218" cy="52" r="2.3"/></g><circle cx="214" cy="48" r="18" fill="url(#paB)"/></g>
+<g class="va"><circle cx="142" cy="92" r="8" fill="#111" opacity=".25"/><circle cx="142" cy="88" r="8" fill="#fff" stroke="#222" stroke-width="1.5"/><path d="M142,84 l4,3 -1.500,5 h-5 l-1.500,-5z" fill="#222"/></g></svg></div>
     <h1>BOTONES<span>FÚTBOL DE MESA · PARAGUAY</span></h1>
     <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
   </div>

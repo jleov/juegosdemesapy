@@ -149,6 +149,22 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
 .about a{color:var(--gold);font-weight:700}
 .foot{text-align:center;color:rgba(255,255,255,.55);font-size:13px;margin-top:30px;line-height:1.6}
 .game h2 small.es{font-size:.62em;font-weight:700;opacity:.75;white-space:nowrap}
+
+/* ---------- tarjetas: ñandutí girando detrás del ícono, cinta tricolor y un vaivén suave ---------- */
+header{position:relative;padding-top:6px}
+header::before{content:"";position:absolute;left:50%;top:-34px;width:230px;height:230px;margin-left:-115px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94' stroke-dasharray='6 5'/%3E%3Ccircle cx='100' cy='100' r='78'/%3E%3Ccircle cx='100' cy='100' r='58' stroke-dasharray='2 4' stroke-width='5'/%3E%3Ccircle cx='100' cy='100' r='38'/%3E%3Ccircle cx='100' cy='100' r='16' stroke-dasharray='3 3' stroke-width='4'/%3E%3Cpath d='M100 6v188M6 100h188M33.5 33.5l133 133M166.5 33.5l-133 133M64 13l72 174M136 13L64 187M13 64l174 72M13 136l174-72'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;opacity:.1;animation:pgira 120s linear infinite;pointer-events:none}
+header>*{position:relative}
+.cover{overflow:hidden;height:158px}
+.cover::before{content:"";position:absolute;left:50%;top:50%;width:250px;height:250px;margin:-125px 0 0 -125px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94' stroke-dasharray='6 5'/%3E%3Ccircle cx='100' cy='100' r='78'/%3E%3Ccircle cx='100' cy='100' r='58' stroke-dasharray='2 4' stroke-width='5'/%3E%3Ccircle cx='100' cy='100' r='38'/%3E%3Ccircle cx='100' cy='100' r='16' stroke-dasharray='3 3' stroke-width='4'/%3E%3Cpath d='M100 6v188M6 100h188M33.5 33.5l133 133M166.5 33.5l-133 133M64 13l72 174M136 13L64 187M13 64l174 72M13 136l174-72'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;opacity:.2;animation:pgira 90s linear infinite}
+.cover::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:linear-gradient(90deg,#d52b1e 0 33.33%,#fff 33.33% 66.66%,#0038a8 66.66%)}
+.cover>*{position:relative}
+.cover img,.cover .tile,.cover .wood.big{animation:pflota 3.6s ease-in-out infinite alternate;transition:transform .2s}
+.cover img,.cover .tile{width:104px;height:104px;border-radius:24px;box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 0 2px rgba(255,255,255,.28)}
+.games a.game:nth-child(2n) .cover>*{animation-delay:-1.2s}.games a.game:nth-child(3n) .cover>*{animation-delay:-2.4s}
+a.game:hover .cover::before,a.game:focus-visible .cover::before{opacity:.34}
+@keyframes pgira{to{transform:rotate(360deg)}}
+@keyframes pflota{from{transform:translateY(3px)}to{transform:translateY(-5px)}}
+@media (prefers-reduced-motion:reduce){.cover::before,header::before,.cover>*{animation:none!important}}
 </style>
 </head>
 <body>
@@ -291,19 +307,19 @@ a.game:hover,a.game:focus-visible{transform:translateY(-4px)}
         <span class="btn slnbtn">Entrar al salón</span></div>
     </a>
     <a class="game" href="odisea/">
-      <div class="cover ody"><span aria-hidden="true" style="font-size:56px">🏃🧉🐄</span></div>
+      <div class="cover ody"><svg class="tile" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#7fc6f2"/><rect y="60" width="96" height="36" fill="#55565e"/><rect y="56" width="96" height="6" fill="#c9c3b8"/><g fill="#f2c14e"><rect x="6" y="76" width="16" height="4"/><rect x="38" y="76" width="16" height="4"/><rect x="70" y="76" width="16" height="4"/></g><circle cx="76" cy="20" r="9" fill="#ffd66b"/><g stroke="#1d1d1d" stroke-width="5" stroke-linecap="round" fill="none"><path d="M44,40 l-4,18 -12,8M40,58 l10,8 -2,12M44,42 l12,6 8,-4M44,42 l-12,2 -4,8"/></g><circle cx="46" cy="30" r="8" fill="#e9b48c" stroke="#1d1d1d" stroke-width="2.5"/><path d="M37,27 q9,-10 18,0z" fill="#d52b1e"/></svg></div>
       <div class="body"><h2>🏃 Odisea Paraguaya</h2>
         <p>Corré por 9 ciudades para llegar a la Nochebuena de la abuela: baches, raudales, motochorros, vacas en la ruta y el Pombero. 5 personajes con habilidades.</p>
         <span class="btn odybtn">Jugar a la Odisea</span></div>
     </a>
     <a class="game" href="salas/">
-      <div class="cover sal"><span aria-hidden="true">🎧</span></div>
+      <div class="cover sal"><svg class="tile" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#4752c4"/><path d="M24,54 v-8 a24,24 0 0 1 48,0 v8" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><rect x="17" y="50" width="15" height="24" rx="7" fill="#fff"/><rect x="64" y="50" width="15" height="24" rx="7" fill="#fff"/><path d="M71,74 q0,10 -18,10" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="84" r="4" fill="#f2c14e"/><g fill="#f2c14e"><rect x="41" y="44" width="4" height="14" rx="2"/><rect x="48" y="38" width="4" height="26" rx="2"/><rect x="55" y="46" width="4" height="10" rx="2"/></g></svg></div>
       <div class="body"><h2>🎧 Salas de Voz</h2>
         <p>Hablá con tus amigos sin ruido de fondo, compartí varias pantallas a la vez y mirá subtítulos en español. Salas abiertas o privadas con código.</p>
         <span class="btn salbtn">Entrar a las salas</span></div>
     </a>
     <a class="game" href="karaoke/">
-      <div class="cover kar"><span aria-hidden="true">🎤</span></div>
+      <div class="cover kar"><svg class="tile" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#b0257a"/><g transform="rotate(35 48 48)"><rect x="42" y="44" width="12" height="40" rx="5" fill="#2a0f4a"/><rect x="40" y="40" width="16" height="8" rx="3" fill="#f2c14e"/><circle cx="48" cy="26" r="17" fill="#e9eef2" stroke="#2a0f4a" stroke-width="3"/><path d="M33,22 h30M32,30 h32M40,11 v30M48,9 v34M56,11 v30" stroke="#9aa6b1" stroke-width="1.6"/></g><g fill="#fff"><path d="M20,22 l2,6 6,2 -6,2 -2,6 -2,-6 -6,-2 6,-2z"/><path d="M78,60 l1.500,4.500 4.500,1.500 -4.500,1.500 -1.500,4.500 -1.500,-4.500 -4.500,-1.500 4.500,-1.500z"/></g><path d="M68,18 v16 a5,4 0 1 1 -3,-4 v-9 l12,-3 v13 a5,4 0 1 1 -3,-4 v-12z" fill="#ffd66b"/></svg></div>
       <div class="body"><h2>🎤 Sala de Karaoke</h2>
         <p>Mirá videos de karaoke de YouTube con tus amigos, todos sincronizados al mismo segundo, y cantá con eco y reverberación como en un karaoke de verdad. Salas abiertas o tu propia sala privada.</p>
         <span class="btn karbtn">Entrar a cantar</span></div>

@@ -188,6 +188,23 @@ body>.side{display:none}
 .ctrlwrap{flex:none;background:rgba(0,0,0,.5);padding:5px 8px 7px;color:#fff}
 .status{text-align:center;font-weight:700;font-size:13.5px;text-shadow:0 1px 2px #000}
 @media (max-width:600px){ .topbar .hidem{display:none} .sbs span{font-size:24px} }
+
+/* ---------- portada: ilustración propia con ñandutí de fondo ---------- */
+.arte{position:relative;width:min(300px,84vw);aspect-ratio:300/128;margin:0 auto 6px}
+.arte::before{content:"";position:absolute;left:50%;top:50%;width:62%;aspect-ratio:1;transform:translate(-50%,-50%);background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94' stroke-dasharray='6 5'/%3E%3Ccircle cx='100' cy='100' r='78'/%3E%3Ccircle cx='100' cy='100' r='58' stroke-dasharray='2 4' stroke-width='5'/%3E%3Ccircle cx='100' cy='100' r='38'/%3E%3Ccircle cx='100' cy='100' r='16' stroke-dasharray='3 3' stroke-width='4'/%3E%3Cpath d='M100 6v188M6 100h188M33.5 33.5l133 133M166.5 33.5l-133 133M64 13l72 174M136 13L64 187M13 64l174 72M13 136l174-72'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;opacity:.3;animation:artegira 90s linear infinite}
+.arte svg{position:relative;width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 6px 9px rgba(0,0,0,.45))}
+@keyframes artegira{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.arte .flota{animation:arteflota 3.2s ease-in-out infinite alternate}
+@keyframes arteflota{to{transform:translateY(-5px)}}
+.arte .ola{animation:arteola 4s linear infinite}.arte .ola2{animation:arteola 6.5s linear infinite reverse}
+@keyframes arteola{to{transform:translateX(-60px)}}
+.arte .late{transform-box:fill-box;transform-origin:center;animation:artelate 1.6s ease-in-out infinite alternate}
+@keyframes artelate{to{transform:scale(1.12)}}
+.arte .gira{transform-box:fill-box;transform-origin:center;animation:artespin 5s linear infinite}
+@keyframes artespin{to{transform:rotate(360deg)}}
+.arte .va{animation:arteva 2.6s ease-in-out infinite alternate}
+@keyframes arteva{to{transform:translateX(14px)}}
+@media (prefers-reduced-motion:reduce){.arte::before,.arte *{animation:none!important}}
 </style>
 </head>
 <body>
@@ -196,7 +213,15 @@ body>.side{display:none}
 <!-- ======================= MENÚ ======================= -->
 <div class="screen on" id="menu"><div class="menu">
   <div class="logo">
-    <div class="ico">🏒</div>
+    <div class="arte"><svg viewBox="0 0 300 128" aria-hidden="true"><defs><linearGradient id="paT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4faff"/><stop offset="1" stop-color="#cfe3f5"/></linearGradient></defs>
+<path d="M62,14 H238 L282,116 H18 Z" fill="#17254f" stroke="#0b1030" stroke-width="3" stroke-linejoin="round"/>
+<path d="M70,22 H230 L266,108 H34 Z" fill="url(#paT)"/>
+<path d="M52,65 H248" stroke="#d52b1e" stroke-width="3"/><ellipse cx="150" cy="65" rx="34" ry="13" fill="none" stroke="#0038a8" stroke-width="3"/>
+<path d="M120,22 h60" stroke="#d52b1e" stroke-width="5"/><path d="M106,108 h88" stroke="#0038a8" stroke-width="6"/>
+<g class="va"><ellipse cx="118" cy="62" rx="12" ry="5" fill="#111" opacity=".25"/><ellipse cx="118" cy="58" rx="12" ry="5" fill="#1b1b1b"/><ellipse cx="118" cy="56" rx="12" ry="5" fill="#3a3a3a"/>
+<path d="M92,50 h12M88,58 h14M94,66 h10" stroke="#8fa9c4" stroke-width="2.5" stroke-linecap="round"/></g>
+<g><ellipse cx="196" cy="42" rx="17" ry="7" fill="#111" opacity=".22"/><ellipse cx="196" cy="38" rx="17" ry="7" fill="#7a1810"/><ellipse cx="196" cy="35" rx="17" ry="7" fill="#d52b1e"/><ellipse cx="196" cy="31" rx="8" ry="3.4" fill="#7a1810"/><ellipse cx="196" cy="27" rx="8" ry="3.4" fill="#f0584a"/></g>
+<g class="flota"><ellipse cx="110" cy="98" rx="22" ry="9" fill="#111" opacity=".22"/><ellipse cx="110" cy="93" rx="22" ry="9" fill="#001f66"/><ellipse cx="110" cy="89" rx="22" ry="9" fill="#0038a8"/><ellipse cx="110" cy="84" rx="10" ry="4.2" fill="#001f66"/><ellipse cx="110" cy="79" rx="10" ry="4.2" fill="#3a6fe0"/></g></svg></div>
     <h1>TEJO<span>DE MESA · PARAGUAY</span></h1>
     <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
   </div>

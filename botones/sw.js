@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Botones PY como app.
-const CACHE = 'botones-v1';
+const CACHE = 'botones-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './reglas.js', './juego.js'];
 
 self.addEventListener('install', e => {

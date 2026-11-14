@@ -236,6 +236,23 @@ body>.side{display:none}
   .btn.basta{font-size:15px;padding:10px 12px}
   .bigL{width:48px;height:48px;font-size:28px}
 }
+
+/* ---------- portada: ilustración propia con ñandutí de fondo ---------- */
+.arte{position:relative;width:min(300px,84vw);aspect-ratio:300/128;margin:0 auto 6px}
+.arte::before{content:"";position:absolute;left:50%;top:50%;width:62%;aspect-ratio:1;transform:translate(-50%,-50%);background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94' stroke-dasharray='6 5'/%3E%3Ccircle cx='100' cy='100' r='78'/%3E%3Ccircle cx='100' cy='100' r='58' stroke-dasharray='2 4' stroke-width='5'/%3E%3Ccircle cx='100' cy='100' r='38'/%3E%3Ccircle cx='100' cy='100' r='16' stroke-dasharray='3 3' stroke-width='4'/%3E%3Cpath d='M100 6v188M6 100h188M33.5 33.5l133 133M166.5 33.5l-133 133M64 13l72 174M136 13L64 187M13 64l174 72M13 136l174-72'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;opacity:.3;animation:artegira 90s linear infinite}
+.arte svg{position:relative;width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 6px 9px rgba(0,0,0,.45))}
+@keyframes artegira{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.arte .flota{animation:arteflota 3.2s ease-in-out infinite alternate}
+@keyframes arteflota{to{transform:translateY(-5px)}}
+.arte .ola{animation:arteola 4s linear infinite}.arte .ola2{animation:arteola 6.5s linear infinite reverse}
+@keyframes arteola{to{transform:translateX(-60px)}}
+.arte .late{transform-box:fill-box;transform-origin:center;animation:artelate 1.6s ease-in-out infinite alternate}
+@keyframes artelate{to{transform:scale(1.12)}}
+.arte .gira{transform-box:fill-box;transform-origin:center;animation:artespin 5s linear infinite}
+@keyframes artespin{to{transform:rotate(360deg)}}
+.arte .va{animation:arteva 2.6s ease-in-out infinite alternate}
+@keyframes arteva{to{transform:translateX(14px)}}
+@media (prefers-reduced-motion:reduce){.arte::before,.arte *{animation:none!important}}
 </style>
 </head>
 <body>
@@ -244,7 +261,14 @@ body>.side{display:none}
 <!-- ======================= MENÚ ======================= -->
 <div class="screen on" id="menu"><div class="menu">
   <div class="logo">
-    <div class="ico">✏️</div>
+    <div class="arte"><svg viewBox="0 0 300 128" aria-hidden="true">
+<g transform="rotate(-5 140 64)"><rect x="52" y="10" width="170" height="112" rx="6" fill="#00000033" transform="translate(4,5)"/><rect x="52" y="10" width="170" height="112" rx="6" fill="#fffdf4" stroke="#b9ab86" stroke-width="2"/>
+<rect x="52" y="10" width="170" height="24" rx="6" fill="#d52b1e"/><g fill="#fff" font-family="system-ui,sans-serif" font-weight="900" font-size="11"><text x="64" y="27">LETRA</text><text x="112" y="27">NOMBRE</text><text x="172" y="27">FRUTA</text></g>
+<g stroke="#9db8e8" stroke-width="1.5"><path d="M52,56 h170M52,78 h170M52,100 h170"/></g><g stroke="#e3a1a1" stroke-width="1.5"><path d="M104,34 v88M164,34 v88"/></g>
+<g font-family="system-ui,sans-serif" font-weight="900" fill="#0038a8"><text x="70" y="52" font-size="17">M</text><text x="70" y="74" font-size="17">P</text></g>
+<g font-family="'Segoe Script','Comic Sans MS',cursive" font-size="12" fill="#1b2a5a"><text x="110" y="51">Marcos</text><text x="170" y="51">mango</text><text x="110" y="73">Perla</text><text x="170" y="73">pomelo</text></g></g>
+<g class="va"><g transform="rotate(38 232 78)"><rect x="224" y="26" width="16" height="72" fill="#f2c14e" stroke="#7a5a12" stroke-width="2"/><rect x="224" y="18" width="16" height="12" rx="3" fill="#f58ab8" stroke="#7a5a12" stroke-width="2"/><rect x="224" y="30" width="16" height="6" fill="#c9d2da" stroke="#7a5a12" stroke-width="1.5"/><path d="M224,98 l8,18 8,-18z" fill="#f6e3c5" stroke="#7a5a12" stroke-width="2"/><path d="M229,109 l3,7 3,-7z" fill="#222"/></g></g>
+<g transform="translate(-14,62)"><g class="late"><circle cx="46" cy="34" r="24" fill="#fff" stroke="#3a1c10" stroke-width="3"/><circle cx="46" cy="34" r="18" fill="#fff8e6" stroke="#d52b1e" stroke-width="2"/><path d="M46,34 V21M46,34 l9,6" stroke="#3a1c10" stroke-width="3" stroke-linecap="round"/><rect x="42" y="4" width="8" height="8" rx="2" fill="#3a1c10"/></g></g></svg></div>
     <h1>¡BASTA!<span>TUTTI FRUTTI · PARAGUAY</span></h1>
     <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
   </div>

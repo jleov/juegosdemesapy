@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Salón de Belleza PY como app.
-const CACHE = 'salon-v1';
+const CACHE = 'salon-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './modelo.js', './reglas.js', './juego.js', './dibujo.js', './vista.js', './vista3d.js'];
 
 self.addEventListener('install', e => {
