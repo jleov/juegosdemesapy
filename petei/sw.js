@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Peteĩ como app.
-const CACHE = 'petei-v1';
+const CACHE = 'petei-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './reglas.js', './juego.js', './caras.js', './musica.mp3'];
 
 self.addEventListener('install', e => {

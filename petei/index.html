@@ -313,6 +313,20 @@ html,body{overflow-x:clip}
   .seat .tag{font-size:11px;padding:2px 7px 2px 2px}.seat .tag .av{width:24px;height:24px;font-size:14px}.seat .tag b{max-width:64px;font-size:11.5px}
   .mesa{inset:9% 2% 7%}
 }
+/* escenas dibujadas (banquero, petei, tejo, bolos) */
+.pescena{width:min(380px,100%);aspect-ratio:400/160;margin:0 auto 12px}
+@media (max-width:560px){.pescena{margin-top:46px}}
+.pescena svg{width:100%;height:100%;display:block;overflow:hidden;border-radius:18px;box-shadow:0 10px 26px rgba(0,0,0,.5),0 0 0 2px rgba(233,185,73,.55)}
+.scene .sBob{animation:sbob 3.6s ease-in-out infinite alternate}
+@keyframes sbob{from{transform:translateY(1.500px)}to{transform:translateY(-2.500px)}}
+.scene .sGlow{animation:sglow 2.2s ease-in-out infinite alternate}
+@keyframes sglow{from{opacity:.45}to{opacity:1}}
+.scene .sVa{animation:sva 2.8s ease-in-out infinite alternate}
+@keyframes sva{to{transform:translateX(18px)}}
+.scene .sRoll{animation:sroll 3.4s ease-in-out infinite alternate;transform-origin:150px 126px}
+@keyframes sroll{to{transform:translate(9px,-13px) scale(.9)}}
+@media (prefers-reduced-motion:reduce){.scene *{animation:none!important}}
+/* fin escenas */
 </style>
 </head>
 <body>
@@ -321,7 +335,42 @@ html,body{overflow-x:clip}
 <!-- ======================= MENÚ ======================= -->
 <div class="screen on" id="menu"><div class="menu">
   <div class="logo">
-    <div class="cards" id="logoCards"></div>
+    <div class="pescena"><svg class="scene" viewBox="0 0 400 160" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>
+<radialGradient id="ptcBg" cx=".5" cy=".45" r=".75"><stop offset="0" stop-color="#9a6634"/><stop offset=".6" stop-color="#6b411d"/><stop offset="1" stop-color="#2e1809"/></radialGradient>
+<linearGradient id="ptcr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0564a"/><stop offset="1" stop-color="#b3231a"/></linearGradient><linearGradient id="ptcy" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd34d"/><stop offset="1" stop-color="#d99a00"/></linearGradient><linearGradient id="ptcg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#49c463"/><stop offset="1" stop-color="#1c7a31"/></linearGradient><linearGradient id="ptcb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f8dff"/><stop offset="1" stop-color="#123f9e"/></linearGradient><linearGradient id="ptck" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a3f4a"/><stop offset="1" stop-color="#0f1115"/></linearGradient>
+<linearGradient id="ptcGu" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a2212"/><stop offset=".35" stop-color="#8a5a30"/><stop offset=".6" stop-color="#5e3b1e"/><stop offset="1" stop-color="#24140a"/></linearGradient>
+<linearGradient id="ptcPl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8f9aa6"/><stop offset=".4" stop-color="#f4f7fa"/><stop offset="1" stop-color="#6d7783"/></linearGradient>
+<radialGradient id="ptcLuz" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe9b8" stop-opacity=".5"/><stop offset="1" stop-color="#ffe9b8" stop-opacity="0"/></radialGradient>
+<filter id="ptcB" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+</defs>
+<rect width="400" height="160" fill="url(#ptcBg)"/><g fill="none" stroke="#2a1507" stroke-width="1" opacity=".3"><path d="M-10,8 q100,-7 210,2 t210,6" /><path d="M-10,26 q100,8 210,2 t210,-5" /><path d="M-10,44 q100,-7 210,2 t210,6" /><path d="M-10,62 q100,8 210,2 t210,-5" /><path d="M-10,80 q100,-7 210,2 t210,6" /><path d="M-10,98 q100,8 210,2 t210,-5" /><path d="M-10,116 q100,-7 210,2 t210,6" /><path d="M-10,134 q100,8 210,2 t210,-5" /><path d="M-10,152 q100,-7 210,2 t210,6" /></g>
+<ellipse cx="200" cy="80" rx="170" ry="70" fill="url(#ptcLuz)"/>
+<g transform="rotate(-14 70 85)"><rect x="48" y="53" width="48" height="70" rx="6" fill="#000" opacity=".3"/><rect x="46" y="50" width="48" height="70" rx="6" fill="#fff"/><rect x="49" y="53" width="42" height="64" rx="4" fill="#12265e"/><g fill="none" stroke="#f2c14e" stroke-width=".8" opacity=".9"><circle cx="70" cy="85" r="15"/><circle cx="70" cy="85" r="9" stroke-dasharray="2 2"/><path d="M70,70 v30 M55,85 h30 M59.4,74.4 l21.200,21.200 M80.6,74.4 l-21.200,21.200"/></g><rect x="49" y="53" width="42" height="5" fill="#d52b1e"/><rect x="49" y="112" width="42" height="5" fill="#0038a8"/></g><g transform="rotate(-6 76 81)"><rect x="54" y="49" width="48" height="70" rx="6" fill="#000" opacity=".3"/><rect x="52" y="46" width="48" height="70" rx="6" fill="#fff"/><rect x="55" y="49" width="42" height="64" rx="4" fill="#12265e"/><g fill="none" stroke="#f2c14e" stroke-width=".8" opacity=".9"><circle cx="76" cy="81" r="15"/><circle cx="76" cy="81" r="9" stroke-dasharray="2 2"/><path d="M76,66 v30 M61,81 h30 M65.4,70.4 l21.200,21.200 M86.6,70.4 l-21.200,21.200"/></g><rect x="55" y="49" width="42" height="5" fill="#d52b1e"/><rect x="55" y="108" width="42" height="5" fill="#0038a8"/></g><g transform="rotate(3 81 78)"><rect x="59" y="46" width="48" height="70" rx="6" fill="#000" opacity=".3"/><rect x="57" y="43" width="48" height="70" rx="6" fill="#fff"/><rect x="60" y="46" width="42" height="64" rx="4" fill="#12265e"/><g fill="none" stroke="#f2c14e" stroke-width=".8" opacity=".9"><circle cx="81" cy="78" r="15"/><circle cx="81" cy="78" r="9" stroke-dasharray="2 2"/><path d="M81,63 v30 M66,78 h30 M70.4,67.4 l21.200,21.200 M91.6,67.4 l-21.200,21.200"/></g><rect x="60" y="46" width="42" height="5" fill="#d52b1e"/><rect x="60" y="105" width="42" height="5" fill="#0038a8"/></g>
+<g class="sBob"><g transform="rotate(-30 200 214)"><rect x="178.5" y="67.5" width="48" height="70" rx="6" fill="#000" opacity=".32"/><rect x="176" y="64" width="48" height="70" rx="6" fill="#fff"/><rect x="179" y="67" width="42" height="64" rx="4" fill="url(#ptcr)"/>
+<circle cx="200" cy="99" r="15.500" fill="#fff"/><text x="200" y="107.5" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="23" fill="#b3231a">7</text>
+<text x="184" y="78" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff">7</text><text x="216" y="127" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff" transform="rotate(180 216 124)">7</text>
+<path d="M181,73 q10,-6 22,-5" stroke="#fff" stroke-width="1" fill="none" opacity=".35"/></g><g transform="rotate(-15 200 214)"><rect x="178.5" y="63.5" width="48" height="70" rx="6" fill="#000" opacity=".32"/><rect x="176" y="60" width="48" height="70" rx="6" fill="#fff"/><rect x="179" y="63" width="42" height="64" rx="4" fill="url(#ptcy)"/>
+<circle cx="200" cy="95" r="15.500" fill="#fff"/><text x="200" y="103.5" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="23" fill="#d99a00">2</text>
+<text x="184" y="74" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff">2</text><text x="216" y="123" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff" transform="rotate(180 216 120)">2</text>
+<path d="M181,69 q10,-6 22,-5" stroke="#fff" stroke-width="1" fill="none" opacity=".35"/></g><g transform="rotate(0 200 214)"><rect x="178.5" y="61.5" width="48" height="70" rx="6" fill="#000" opacity=".32"/><rect x="176" y="58" width="48" height="70" rx="6" fill="#fff"/><rect x="179" y="61" width="42" height="64" rx="4" fill="url(#ptck)"/>
+<circle cx="200" cy="93" r="15.500" fill="#fff"/><g transform="translate(200,93)"><path d="M0,0 L0,-15.500 A15.500,15.500 0 0 1 15.500,0Z" fill="#f0564a"/><path d="M0,0 L15.500,0 A15.500,15.500 0 0 1 0,15.500Z" fill="#4f8dff"/><path d="M0,0 L0,15.500 A15.500,15.500 0 0 1 -15.500,0Z" fill="#49c463"/><path d="M0,0 L-15.500,0 A15.500,15.500 0 0 1 0,-15.500Z" fill="#ffd34d"/><circle r="8.500" fill="#14161b"/><text y="4.200" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="10.500" fill="#fff">+4</text></g>
+<text x="184" y="72" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff">+4</text><text x="216" y="121" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff" transform="rotate(180 216 118)">+4</text>
+<path d="M181,67 q10,-6 22,-5" stroke="#fff" stroke-width="1" fill="none" opacity=".35"/></g><g transform="rotate(15 200 214)"><rect x="178.5" y="63.5" width="48" height="70" rx="6" fill="#000" opacity=".32"/><rect x="176" y="60" width="48" height="70" rx="6" fill="#fff"/><rect x="179" y="63" width="42" height="64" rx="4" fill="url(#ptcg)"/>
+<circle cx="200" cy="95" r="15.500" fill="#fff"/><text x="200" y="103.5" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="23" fill="#1c7a31">5</text>
+<text x="184" y="74" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff">5</text><text x="216" y="123" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff" transform="rotate(180 216 120)">5</text>
+<path d="M181,69 q10,-6 22,-5" stroke="#fff" stroke-width="1" fill="none" opacity=".35"/></g><g transform="rotate(30 200 214)"><rect x="178.5" y="67.5" width="48" height="70" rx="6" fill="#000" opacity=".32"/><rect x="176" y="64" width="48" height="70" rx="6" fill="#fff"/><rect x="179" y="67" width="42" height="64" rx="4" fill="url(#ptcb)"/>
+<circle cx="200" cy="99" r="15.500" fill="#fff"/><text x="200" y="107.5" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="23" fill="#123f9e">9</text>
+<text x="184" y="78" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff">9</text><text x="216" y="127" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="9" fill="#fff" transform="rotate(180 216 124)">9</text>
+<path d="M181,73 q10,-6 22,-5" stroke="#fff" stroke-width="1" fill="none" opacity=".35"/></g></g>
+<g><ellipse cx="338" cy="140" rx="34" ry="8" fill="#000" opacity=".45" filter="url(#ptcB)"/>
+<path d="M352,20 L340,74" stroke="url(#ptcPl)" stroke-width="3.400" stroke-linecap="round"/><ellipse cx="353" cy="19" rx="3.600" ry="1.800" fill="#dfe5ea" transform="rotate(-12 353 19)"/>
+<path d="M310,66 Q312,118 322,138 Q336,146 350,138 Q362,116 364,66Z" fill="url(#ptcGu)"/>
+<path d="M318,84 q20,8 40,0 M316,104 q22,8 44,-1" stroke="#1d0f06" stroke-width="1" fill="none" opacity=".5"/>
+<ellipse cx="337" cy="66" rx="27" ry="7.500" fill="url(#ptcPl)"/><ellipse cx="337" cy="66" rx="23" ry="5.500" fill="#3f6a2a"/><ellipse cx="331" cy="65" rx="9" ry="2.400" fill="#6f9a3e" opacity=".8"/>
+<path d="M310,66 q0,7 27,7.500 q27,-.5 27,-7.500 v5 q0,7 -27,7.500 q-27,-.5 -27,-7.500z" fill="url(#ptcPl)"/>
+<path d="M316,74 q2,40 9,58" stroke="#fff" stroke-width="2" fill="none" opacity=".18"/></g>
+<g class="sGlow" fill="#fff6d0"><path d="M118,30 l1.800,5 5,1.800 -5,1.800 -1.800,5 -1.800,-5 -5,-1.800 5,-1.800z"/><path d="M286,24 l1.300,3.600 3.600,1.300 -3.600,1.300 -1.300,3.600 -1.300,-3.600 -3.600,-1.300 3.600,-1.300z"/></g></svg></div>
+    <div class="cards" id="logoCards" style="display:none"></div>
     <h1>PETEĨ<span>CARTAS PARAGUAYAS</span></h1>
     <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
   </div>
