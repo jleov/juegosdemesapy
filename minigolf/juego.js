@@ -1056,7 +1056,7 @@ function buildHole(ci){
   const nTree=R3.mobile?16:30;
   for(let k=0;k<nTree;k++){
     const a=R()*Math.PI*2, rr=Math.max(W,L)*.5+70+R()*300, x=bcx+Math.cos(a)*rr*(W/Math.max(W,L)+.4), y=bcy+Math.sin(a)*rr;
-    if(inCourse(x,y,62)) continue;
+    if(inCourse(x,y,100)) continue;
     const s=.8+R()*.8, tr=new T.Group(), q=R(), kind=q<.24?'rosa':q<.36?'amar':q<.52?'palm':'verde';
     if(kind==='palm'){
       const hgt=62*s; mk(tr, gTrunk, trunkM, 0, hgt/2, 0, 2.4*s, hgt, 2.4*s).rotation.z=.05;
@@ -1073,7 +1073,7 @@ function buildHole(ci){
   }
   for(let k=0;k<(R3.mobile?12:26);k++){
     const a=R()*Math.PI*2, rr=Math.max(W,L)*.5+48+R()*150, x=bcx+Math.cos(a)*rr*(W/Math.max(W,L)+.4), y=bcy+Math.sin(a)*rr;
-    if(inCourse(x,y,40)) continue;
+    if(inCourse(x,y,58)) continue;
     if(k%4===3){ const s=3+R()*5; mk(G, gRock, rockM, x, -10+s*.5, -y, s, s*.7, s*1.2).rotation.y=R()*6; }
     else { const s=5+R()*5, bm=LEAF.verde[k%3]; mk(G, gSph, bm, x, -10+s*.7, -y, s, s*.8, s); mk(G, gSph, LEAF.verde[(k+1)%3], x+s*.8, -10+s*.5, -y+s*.4, s*.7);
       if(k%3===0) for(let j=0;j<5;j++) mk(G, gSph, LEAF[j%2?'rosa':'amar'][1], x+(R()-.5)*s*1.6, -10+s*(1+R()*.4), -y+(R()-.5)*s*1.6, .9).castShadow=false; }
@@ -1088,28 +1088,63 @@ function buildHole(ci){
       const cap=new T.Mesh(new T.BoxGeometry(l+5, 1.2, 6.2), capM); cap.position.set(cx, top+.6, -cy); cap.rotation.y=w.rotation.y; G.add(cap); }
   });
   // obstáculos
+  const stoneM=new T.MeshStandardMaterial({color:0x8d9096, roughness:.95, flatShading:true}), woodM=new T.MeshStandardMaterial({color:0x6b4423, roughness:.85}), glassM=new T.MeshStandardMaterial({color:0x6fb6e6, roughness:.15, metalness:.4}),
+    creamM=new T.MeshStandardMaterial({color:0xf3e3c3, roughness:.75}), tileM=new T.MeshStandardMaterial({color:0xb03a2e, roughness:.6, flatShading:true}), chromeM=new T.MeshStandardMaterial({color:0xe9edf1, metalness:.85, roughness:.2}),
+    whiteM=new T.MeshStandardMaterial({color:0xf7f5ee, roughness:.4}), redM=new T.MeshStandardMaterial({color:0xd52b1e, roughness:.4}), blueM=new T.MeshStandardMaterial({color:0x0038a8, roughness:.4}), darkM=new T.MeshStandardMaterial({color:0x20242a, roughness:.7});
+  const dbox=(par, w, h, d, x, y, z, mat)=>{ const m=new T.Mesh(new T.BoxGeometry(w,h,d), mat); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; par.add(m); return m; };
+  const dcyl=(par, rt, rb, h, x, y, z, mat, seg)=>{ const m=new T.Mesh(new T.CylinderGeometry(rt,rb,h,seg||24), mat); m.position.set(x,y,z); m.castShadow=true; par.add(m); return m; };
   for(const o of H.obs){
     if(o.t==='block'){
       const sh=new T.Shape(o.pts.map(p=>new T.Vector2(p[0],p[1]))), hgt=o.house?60:12;
       const geo=new T.ExtrudeGeometry(sh, {depth:hgt+10, bevelEnabled:false}); geo.rotateX(-Math.PI/2);
-      const m=new T.Mesh(geo, new T.MeshStandardMaterial({color:o.house?0xf3e3c3:WALLCOL[ci%2], roughness:.7})); m.position.y=-10; m.castShadow=true; m.receiveShadow=true; G.add(m);
+      const m=new T.Mesh(geo, o.house?creamM:new T.MeshStandardMaterial({color:WALLCOL[ci%2], roughness:.5})); m.position.y=-10; m.castShadow=true; m.receiveShadow=true; G.add(m);
+      const xs=o.pts.map(p=>p[0]), ys=o.pts.map(p=>p[1]), ax0=Math.min(...xs), ax1=Math.max(...xs), ay0=Math.min(...ys), ay1=Math.max(...ys), bw=ax1-ax0, bd=ay1-ay0, mx=(ax0+ax1)/2, my=(ay0+ay1)/2;
+      if(o.house){
+        // casita del molino: zócalo de piedra, viga de madera y ventanas con postigos a los dos lados
+        dbox(G, bw+1.6, 10, bd+1.6, mx, 5, -my, stoneM); dbox(G, bw+1.6, 3, bd+1.6, mx, 58.5, -my, woodM);
+        if(bw>=30) for(const fy of [ay0-.6, ay1+.6]){ const n=bw>70?2:1; for(let k=0;k<n;k++){ const wx=n===1?mx:ax0+bw*(k?.72:.28);
+          dbox(G, 13, 16, 1, wx, 34, -fy, woodM); dbox(G, 9.5, 12.5, 1.4, wx, 34, -fy, glassM); dbox(G, 1, 12.5, 1.6, wx, 34, -fy, woodM); dbox(G, 9.5, 1, 1.6, wx, 34, -fy, woodM);
+          dbox(G, 15, 2, 2.4, wx, 25, -fy, stoneM); for(const sx of [-1,1]) dbox(G, 3.4, 15, 1, wx+sx*8.6, 34, -fy, redM); } }
+      } else { dbox(G, bw+2.4, 2.2, bd+2.4, mx, 12.6, -my, whiteM); dbox(G, bw+1, 2, bd+1, mx, 1, -my, darkM); }
     } else if(o.t==='post'){
-      const h0=hAt(pr,o.x,o.y), m=new T.Mesh(new T.CylinderGeometry(o.r, o.r, o.boing?10:16, 24), new T.MeshStandardMaterial({color:o.boing?0xe53935:0xf2f2f2, roughness:.4, emissive:o.boing?0x330000:0}));
-      m.position.set(o.x, h0+(o.boing?5:8), -o.y); m.castShadow=true; G.add(m);
-      const band=new T.Mesh(new T.CylinderGeometry(o.r+.15, o.r+.15, 3, 24), new T.MeshStandardMaterial({color:o.boing?0xffffff:0x0038a8})); band.position.set(o.x, h0+(o.boing?5:12), -o.y); G.add(band);
+      const h0=hAt(pr,o.x,o.y), pg=new T.Group(); pg.position.set(o.x, h0, -o.y); G.add(pg);
+      if(o.boing){   // rebotador: base, cuerpo rojo con franja blanca y tapa cromada
+        dcyl(pg, o.r+1.2, o.r+1.8, 1.6, 0, .8, 0, darkM); dcyl(pg, o.r, o.r, 9, 0, 5.5, 0, new T.MeshStandardMaterial({color:0xe53935, roughness:.35, emissive:0x3a0000}));
+        dcyl(pg, o.r+.2, o.r+.2, 2.4, 0, 5.5, 0, whiteM); dcyl(pg, o.r+.9, o.r+.9, 1.4, 0, 10.4, 0, chromeM);
+        const dm=new T.Mesh(new T.SphereGeometry(o.r*.8, 20, 10, 0, Math.PI*2, 0, Math.PI/2), chromeM); dm.position.y=11; dm.scale.y=.55; dm.castShadow=true; pg.add(dm);
+        const lt=new T.Mesh(new T.SphereGeometry(1.6, 12, 8), new T.MeshStandardMaterial({color:0xffd54a, emissive:0xb07a00})); lt.position.y=11+o.r*.44; pg.add(lt);
+      } else {       // poste: blanco con los colores de la bandera y punta redonda
+        dcyl(pg, o.r+.8, o.r+1.2, 1.4, 0, .7, 0, darkM); dcyl(pg, o.r*.92, o.r, 15, 0, 7.5, 0, whiteM);
+        dcyl(pg, o.r*.95+.15, o.r*.96+.15, 2.2, 0, 11.8, 0, redM); dcyl(pg, o.r*.97+.15, o.r*.98+.15, 2.2, 0, 8.4, 0, blueM);
+        const dm=new T.Mesh(new T.SphereGeometry(o.r*.92, 20, 10, 0, Math.PI*2, 0, Math.PI/2), whiteM); dm.position.y=15; dm.scale.y=.6; dm.castShadow=true; pg.add(dm);
+      }
     } else if(o.t==='spin'){
       const g=new T.Group(), y=hAt(pr,o.x,o.y), mat=new T.MeshStandardMaterial({color:0xf2c14e, roughness:.4}), mat2=new T.MeshStandardMaterial({color:0x222222});
-      for(let k=0;k<o.arms;k++){ const pv=new T.Group(); pv.rotation.y=k*2*Math.PI/o.arms; const arm=new T.Mesh(new T.BoxGeometry(o.len, 4, 3.5), k%2?mat2:mat); arm.position.x=o.len/2; arm.castShadow=true; pv.add(arm); g.add(pv); }
-      const hub=new T.Mesh(new T.CylinderGeometry(4.5,4.5,9,20), new T.MeshStandardMaterial({color:0xd52b1e})); g.add(hub);
+      for(let k=0;k<o.arms;k++){ const pv=new T.Group(); pv.rotation.y=k*2*Math.PI/o.arms; const arm=new T.Mesh(new T.BoxGeometry(o.len, 4, 3.5), k%2?mat2:mat); arm.position.x=o.len/2; arm.castShadow=true; pv.add(arm);
+        for(let s=1;s<4;s++) dbox(pv, 2.2, 4.2, 3.7, o.len*s/4, 0, 0, k%2?mat:mat2).castShadow=false;
+        const tip=new T.Mesh(new T.SphereGeometry(2.3, 12, 8), redM); tip.position.x=o.len-2; tip.castShadow=true; pv.add(tip); g.add(pv); }
+      dcyl(g, 4.5, 4.5, 9, 0, 0, 0, redM, 20); dcyl(g, 5.6, 5.6, 1.4, 0, 4.6, 0, chromeM, 20); dcyl(g, 7.5, 8.5, 1.6, 0, -1.9, 0, darkM, 20);
+      const dm=new T.Mesh(new T.SphereGeometry(3.6, 16, 8, 0, Math.PI*2, 0, Math.PI/2), chromeM); dm.position.y=5.2; dm.scale.y=.6; g.add(dm);
       g.position.set(o.x, y+2.5, -o.y); G.add(g); R3.spins.push({o, g});
     } else if(o.t==='mill'){
-      const top=60, roofM=new T.MeshStandardMaterial({color:0xb03a2e, roughness:.6});
-      const lint=new T.Mesh(new T.BoxGeometry(o.gw, top-16, o.d), new T.MeshStandardMaterial({color:0xf3e3c3, roughness:.7})); lint.position.set(o.x, 16+(top-16)/2, -(o.y+o.d/2)); lint.castShadow=true; G.add(lint);
-      const roof=new T.Mesh(new T.ConeGeometry(Math.max(o.hw, o.d)*1.05, 42, 4), roofM); roof.rotation.y=Math.PI/4; roof.scale.set(o.hw/Math.max(o.hw,o.d), 1, o.d/Math.max(o.hw,o.d)); roof.position.set(o.x, top+21, -(o.y+o.d/2)); roof.castShadow=true; G.add(roof);
-      const g=new T.Group(), bladeM=new T.MeshStandardMaterial({color:0xffffff, roughness:.5, side:T.DoubleSide}), barM=new T.MeshStandardMaterial({color:0x6b4423});
+      const top=60, zc=-(o.y+o.d/2), rw=o.hw*2+12;
+      dbox(G, o.gw, top-16, o.d, o.x, 16+(top-16)/2, zc, creamM);
+      // techo a dos aguas de tejas, torre con su techito y marco de madera en la entrada
+      const rs=new T.Shape(); rs.moveTo(-o.d/2-8, 0); rs.lineTo(0, 26); rs.lineTo(o.d/2+8, 0); rs.lineTo(-o.d/2-8, 0);
+      const rg=new T.ExtrudeGeometry(rs, {depth:rw, bevelEnabled:false}); rg.translate(0, 0, -rw/2); rg.rotateY(Math.PI/2);
+      const roof=new T.Mesh(rg, tileM); roof.position.set(o.x, top, zc); roof.castShadow=true; roof.receiveShadow=true; G.add(roof);
+      dbox(G, rw+2, 2, 3, o.x, top+26.5, zc, woodM);
+      dcyl(G, 12, 16, 44, o.x, top+30, zc, creamM, 8); dcyl(G, 12.6, 12.6, 2.4, o.x, top+50, zc, woodM, 8);
+      const tr=new T.Mesh(new T.ConeGeometry(17, 22, 8), tileM); tr.position.set(o.x, top+63, zc); tr.castShadow=true; G.add(tr);
+      const kb=new T.Mesh(new T.SphereGeometry(2, 10, 8), new T.MeshStandardMaterial({color:0xf2c14e, metalness:.7, roughness:.3})); kb.position.set(o.x, top+75, zc); G.add(kb);
+      for(const sg2 of [1,-1]){ dbox(G, 8, 10, 1.2, o.x, top+40, zc+sg2*13.4, woodM); dbox(G, 5.5, 7.5, 1.6, o.x, top+40, zc+sg2*13.5, glassM); }
+      for(const fy of [o.y-.8, o.y+o.d+.8]){ for(const sx of [-1,1]) dbox(G, 2.4, 17, 2, o.x+sx*(o.gw/2+.2), 8.5, -fy, woodM); dbox(G, o.gw+6, 3, 2.4, o.x, 17.5, -fy, woodM); }
+      const g=new T.Group(), bladeM=new T.MeshStandardMaterial({color:0xfbf7ec, roughness:.5, side:T.DoubleSide}), barM=woodM;
       for(let k=0;k<4;k++){ const pv=new T.Group(); pv.rotation.z=k*Math.PI/2-Math.PI/2; const bar=new T.Mesh(new T.BoxGeometry(1.6, 30, 1.2), barM); bar.position.y=15; pv.add(bar);
-        const sail=new T.Mesh(new T.BoxGeometry(7, 22, .5), k%2?bladeM:new T.MeshStandardMaterial({color:0xd52b1e, roughness:.5})); sail.position.set(4.2, 18, 0); sail.castShadow=true; pv.add(sail); g.add(pv); }
-      const hub=new T.Mesh(new T.CylinderGeometry(3,3,4,16), barM); hub.rotation.x=Math.PI/2; g.add(hub);
+        const sail=new T.Mesh(new T.BoxGeometry(7, 22, .5), k%2?bladeM:redM); sail.position.set(4.2, 18, 0); sail.castShadow=true; pv.add(sail);
+        for(let s=0;s<5;s++){ const rb=new T.Mesh(new T.BoxGeometry(7.4, .7, .9), barM); rb.position.set(4.2, 8+s*5, 0); pv.add(rb); } g.add(pv); }
+      const hub=new T.Mesh(new T.CylinderGeometry(3,3,6,16), barM); hub.rotation.x=Math.PI/2; g.add(hub);
+      const cap=new T.Mesh(new T.SphereGeometry(2.4, 12, 8), chromeM); cap.position.z=3; g.add(cap);
       g.position.set(o.x, 34, -o.y+3); G.add(g); R3.mills.push({o, g});
     } else if(o.t==='water'){
       const sh=new T.Shape(o.pts.map(p=>new T.Vector2(p[0],p[1]))), geo=new T.ShapeGeometry(sh); geo.rotateX(-Math.PI/2);
@@ -1118,8 +1153,11 @@ function buildHole(ci){
     } else if(o.t==='tube'){
       const a=o.a, bb=o.b, mid=[(a[0]+bb[0])/2, (a[1]+bb[1])/2];
       const curve=new T.CatmullRomCurve3([W3(a[0],a[1],-4), W3(a[0],a[1]+(bb[1]>a[1]?14:-14),20), W3(mid[0],mid[1],34), W3(bb[0],bb[1]-(bb[1]>a[1]?14:-14),20), W3(bb[0],bb[1],-4)]);
-      const pipe=new T.Mesh(new T.TubeGeometry(curve, 48, 5.5, 14, false), new T.MeshStandardMaterial({color:0x0038a8, roughness:.3, metalness:.2})); pipe.castShadow=true; G.add(pipe);
-      for(const p of [a, bb]){ const rim=new T.Mesh(new T.TorusGeometry(TR, 1.4, 8, 24), new T.MeshStandardMaterial({color:0xd52b1e})); rim.rotation.x=Math.PI/2; rim.position.set(p[0], hAt(pr,p[0],p[1])+.6, -p[1]); G.add(rim); }
+      const pipe=new T.Mesh(new T.TubeGeometry(curve, 64, 5.5, 16, false), new T.MeshStandardMaterial({color:0x0038a8, roughness:.25, metalness:.3})); pipe.castShadow=true; G.add(pipe);
+      // aros blancos y rojos a lo largo del caño
+      for(let k=1;k<8;k++){ const tt=k/8, p=curve.getPointAt(tt), tg=curve.getTangentAt(tt); if(p.y<6) continue;
+        const rg2=new T.Mesh(new T.TorusGeometry(5.9, .9, 8, 24), k%2?whiteM:redM); rg2.position.copy(p); rg2.quaternion.setFromUnitVectors(new T.Vector3(0,0,1), tg); rg2.castShadow=true; G.add(rg2); }
+      for(const p of [a, bb]){ const rim=new T.Mesh(new T.TorusGeometry(TR, 1.4, 8, 24), redM); rim.rotation.x=Math.PI/2; rim.position.set(p[0], hAt(pr,p[0],p[1])+.6, -p[1]); G.add(rim); }
     }
   }
   // banderita del hoyo (con los colores de Paraguay) y cartel del hoyo
