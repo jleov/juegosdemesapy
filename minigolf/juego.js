@@ -970,10 +970,7 @@ function init3D(){
   const hillG=new T.SphereGeometry(1, 14, 8), hillM=[0x4f8f45,0x3f7d3a,0x5a9a4c].map(c=>new T.MeshLambertMaterial({color:c}));
   R3.hills=new T.Group(); for(let i=0;i<18;i++){ const a=i/18*Math.PI*2+Math.random()*.2, rr=2700+Math.random()*700, r=420+Math.random()*380, hm=new T.Mesh(hillG, hillM[i%3]); hm.scale.set(r, r*(.22+Math.random()*.16), r); hm.position.set(Math.cos(a)*rr, -30, Math.sin(a)*rr); R3.hills.add(hm); } scene.add(R3.hills);
   // agua que se mueve y hoyuelos de la pelota
-  R3.waterTex=canvasTex(128, 128, (g,w,h)=>{ g.fillStyle='#3a97dc'; g.fillRect(0,0,w,h); g.lineCap='round';
-    for(let i=0;i<26;i++){ const x=Math.random()*w, y=Math.random()*h, l=10+Math.random()*22; g.strokeStyle=`rgba(255,255,255,${.18+Math.random()*.3})`; g.lineWidth=1+Math.random()*1.6; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+l/2,y-4,x+l,y); g.stroke(); }
-    for(let i=0;i<12;i++){ g.fillStyle='rgba(10,60,120,.18)'; g.beginPath(); g.ellipse(Math.random()*w, Math.random()*h, 14, 5, 0, 0, 7); g.fill(); } });
-  R3.waterTex.wrapS=R3.waterTex.wrapT=T.RepeatWrapping; R3.waterTex.repeat.set(1/55, 1/55);
+  R3.waterU={uT:{value:0}, uSun:{value:sunV.clone()}};
   R3.ballBump=canvasTex(128, 64, (g,w,h)=>{ g.fillStyle='#b0b0b0'; g.fillRect(0,0,w,h); for(let j=0;j<8;j++) for(let i=0;i<16;i++){ const x=(i+(j%2?.5:0))*8+4, y=j*8+4, gr=g.createRadialGradient(x,y,0,x,y,3.2); gr.addColorStop(0,'#3a3a3a'); gr.addColorStop(1,'#b0b0b0'); g.fillStyle=gr; g.fillRect(x-4,y-4,8,8); } });
   R3.ballBump.wrapS=T.RepeatWrapping;
   { const cap=320, geo=new T.BufferGeometry(), pos=new Float32Array(cap*3), col=new Float32Array(cap*4), siz=new Float32Array(cap);
@@ -995,13 +992,45 @@ function init3D(){
   resizeStage();
   return true;
 }
+// agua de verdad: olitas, reflejo del cielo y brillo del sol
+const WATER_VS='varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }';
+const WATER_FS=`uniform float uT; uniform vec3 uSun; varying vec3 vW;
+float wv(vec2 p){ return sin(p.x*.21+uT*1.3)+sin(p.y*.17-uT*1.1)+sin((p.x+p.y)*.12+uT*.8)+sin((p.x-p.y)*.33+uT*1.9)*.5+sin(p.x*.61-p.y*.47+uT*2.6)*.25; }
+void main(){ vec2 p=vW.xz; float h=wv(p), hx=wv(p+vec2(.6,0.)), hz=wv(p+vec2(0.,.6));
+  vec3 n=normalize(vec3((h-hx)*.4, 1., (h-hz)*.4)), v=normalize(cameraPosition-vW);
+  float fr=pow(1.-max(dot(n,v),0.),3.);
+  vec3 col=mix(vec3(.04,.30,.52), vec3(.16,.60,.76), clamp(.5+n.x*2.5+n.z*1.5,0.,1.));
+  col=mix(col, vec3(.78,.91,1.), fr*.75+.06);
+  float sp=pow(max(dot(reflect(-uSun,n),v),0.),70.); col+=vec3(1.,.97,.85)*sp*1.3;
+  col+=vec3(.9,.97,1.)*smoothstep(1.9,2.6,h)*.22;
+  gl_FragColor=vec4(col, .74+fr*.22+sp*.3); }`;
+// la arena y el agua están hundidas: cuánto baja el piso en cada punto (solo para dibujar)
+function edgeDist(pts, x, y){ let m=1e9; for(let i=0, j=pts.length-1; i<pts.length; j=i++){ const ax=pts[j][0], ay=pts[j][1], ex=pts[i][0]-ax, ey=pts[i][1]-ay, t=Math.max(0, Math.min(1, ((x-ax)*ex+(y-ay)*ey)/(ex*ex+ey*ey))), dx=x-ax-ex*t, dy=y-ay-ey*t, d=dx*dx+dy*dy; if(d<m) m=d; } return Math.sqrt(m); }
+function dipAt(x, y){ let h=0; for(const d of R3.dips||[]){ if(x<d.x0 || x>d.x1 || y<d.y0 || y>d.y1 || !inPoly(d.pts,x,y)) continue; const s=Math.min(1, edgeDist(d.pts,x,y)/d.bank); h+=d.dep*s*s*(3-2*s); } return h; }
+const gAt=(pr, x, y)=>hAt(pr,x,y)-dipAt(x,y);
+// obstáculos que se vuelven transparentes cuando tapan la pelota o se está cerca
+function fadeReg(objs, x0, y0, x1, y1, near, min){ R3.fades.push({objs, x0, y0, x1, y1, near, min, a:1}); }
+function segRect(ax, ay, bx, by, f, m){ let t0=0, t1=1; const dx=bx-ax, dy=by-ay;
+  for(const [p,q] of [[-dx, ax-(f.x0-m)], [dx, (f.x1+m)-ax], [-dy, ay-(f.y0-m)], [dy, (f.y1+m)-ay]]){ if(p===0){ if(q<0) return false; } else { const r=q/p; if(p<0){ if(r>t1) return false; if(r>t0) t0=r; } else { if(r<t0) return false; if(r<t1) t1=r; } } }
+  return true; }
+function fadeApply(f, tgt){
+  if(tgt===1 && f.a===1) return;
+  let a=f.a+(tgt-f.a)*.16; if(Math.abs(tgt-a)<.01) a=tgt; f.a=a;
+  if(!f.mats){ f.mats=[]; f.meshes=[]; const map=new Map();
+    for(const o of f.objs) o.traverse(m=>{ if(!m.isMesh) return; let c=map.get(m.material); if(!c){ c=m.material.clone(); c.userData={op:m.material.opacity, tr:m.material.transparent}; map.set(m.material, c); f.mats.push(c); } m.material=c; f.meshes.push([m, m.castShadow]); }); }
+  const on=a<.995;
+  for(const c of f.mats){ c.transparent=on||c.userData.tr; c.opacity=c.userData.op*a; c.depthWrite=!on && !c.userData.tr; }
+  for(const [m,cs] of f.meshes) m.castShadow=cs && a>.6;
+}
 function disposeTree(o){ o.traverse(m=>{ if(m.geometry) m.geometry.dispose(); if(m.material){ (Array.isArray(m.material)?m.material:[m.material]).forEach(x=>{ if(x.map) x.map.dispose(); x.dispose(); }); } }); }
 const WALLCOL=[0xc62828, 0x1d4fa8];
 // arma la cancha de un hoyo
 function buildHole(ci){
   const T=THREE, pr=prep(ci), H=pr.H, G=R3.holeG, b=pr.box;
   while(G.children.length){ const c=G.children[0]; G.remove(c); disposeTree(c); }
-  R3.spins=[]; R3.mills=[]; R3.built=ci;
+  R3.spins=[]; R3.mills=[]; R3.fades=[]; R3.built=ci;
+  R3.dips=[...pr.sand.map(p=>({pts:p, dep:5.5, bank:10, sand:true})), ...pr.water.map(p=>({pts:p, dep:7, bank:5}))];
+  R3.dips.forEach(d=>{ const xs=d.pts.map(p=>p[0]), ys=d.pts.map(p=>p[1]); d.x0=Math.min(...xs); d.x1=Math.max(...xs); d.y0=Math.min(...ys); d.y1=Math.max(...ys); });
   const M=6, x0=b.x0-M, y0=b.y0-M, W=b.x1-b.x0+2*M, L=b.y1-b.y0+2*M;
   // piso: alfombra con franjas, arena, agua y el hoyo, pintado en un canvas
   const sc=Math.min(4, 2048/Math.max(W,L)), cw=Math.ceil(W*sc), ch=Math.ceil(L*sc);
@@ -1020,20 +1049,30 @@ function buildHole(ci){
     const [tx,ty]=P(H.tee[0]-16, H.tee[1]+12); g.fillStyle='#1f6f30'; g.fillRect(tx, ty, 32*sc, 24*sc); g.strokeStyle='rgba(255,255,255,.55)'; g.lineWidth=.8*sc; g.strokeRect(tx+1.5*sc, ty+1.5*sc, 29*sc, 21*sc);
     for(const dx of [-11,0,11]){ const [mx,my]=P(H.tee[0]+dx, H.tee[1]); g.fillStyle=dx?'#f2c14e':'rgba(255,255,255,.9)'; g.beginPath(); g.arc(mx, my, (dx?1.3:1.6)*sc, 0, 7); g.fill(); }
     // arena con granitos
-    for(const s of pr.sand){ g.save(); path(g, s); g.clip(); g.fillStyle='#ecd9a2'; g.fillRect(0,0,cw,ch);
-      for(let i=0;i<cw*ch/260;i++){ g.fillStyle=`rgba(${Math.random()<.5?'150,115,50':'255,246,215'},.28)`; g.fillRect(Math.random()*cw, Math.random()*ch, 1.6, 1.6); }
-      path(g, s); g.strokeStyle='rgba(120,90,30,.35)'; g.lineWidth=7*sc; g.stroke(); g.restore();
-      path(g, s); g.strokeStyle='#c9ac68'; g.lineWidth=2*sc; g.stroke(); }
-    // el fondo del agua, con borde de piedra
-    for(const w of pr.water){ path(g, w); g.fillStyle='#134f80'; g.fill(); g.strokeStyle='#8d949b'; g.lineWidth=4.5*sc; g.stroke(); g.strokeStyle='#5d646b'; g.lineWidth=1.2*sc; g.stroke(); }
+    // camino claro y flechas que marcan el paso por debajo del molino
+    for(const m of pr.mills){ const [ax,ay]=P(m.x-m.gw/2, m.y+m.d+16), pw=m.gw*sc, ph=(m.d+32)*sc, pg=g.createLinearGradient(0,ay,0,ay+ph);
+      pg.addColorStop(0,'rgba(240,255,200,0)'); pg.addColorStop(.25,'rgba(240,255,200,.3)'); pg.addColorStop(.75,'rgba(240,255,200,.3)'); pg.addColorStop(1,'rgba(240,255,200,0)'); g.fillStyle=pg; g.fillRect(ax, ay, pw, ph);
+      g.strokeStyle='rgba(255,232,120,.8)'; g.lineWidth=2.2*sc; g.lineCap='round'; g.lineJoin='round';
+      for(const yy of [m.y-44, m.y-30, m.y-16]){ const a=P(m.x-8,yy-7), c=P(m.x,yy), e=P(m.x+8,yy-7); g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(c[0],c[1]); g.lineTo(e[0],e[1]); g.stroke(); } }
+    // arena: rastrillada en franjas que siguen el borde, con granitos y el borde en sombra
+    for(const s of pr.sand){ g.save(); path(g, s); g.clip(); g.fillStyle='#e3cf98'; g.fillRect(0,0,cw,ch); g.lineJoin='round';
+      for(let d=60, k=0; d>=2; d-=2, k++){ path(g, s); g.strokeStyle=k%2?'#dcc588':'#e9d6a2'; g.lineWidth=2*d*sc; g.stroke(); }
+      for(let i=0;i<cw*ch/200;i++){ g.fillStyle=`rgba(${Math.random()<.5?'140,105,45':'255,248,220'},.3)`; g.fillRect(Math.random()*cw, Math.random()*ch, 1.6, 1.6); }
+      for(const [lw,a] of [[24,.12],[13,.18],[6,.34]]){ path(g, s); g.strokeStyle=`rgba(95,65,20,${a})`; g.lineWidth=lw*sc; g.stroke(); } g.restore();
+      path(g, s); g.strokeStyle='#1f7a34'; g.lineWidth=3.2*sc; g.stroke(); path(g, s); g.strokeStyle='#8a6a35'; g.lineWidth=1.5*sc; g.stroke(); }
+    // el fondo del agua: orilla clara, centro hondo y piedritas, con borde de piedra
+    for(const w of pr.water){ g.save(); path(g, w); g.clip(); g.fillStyle='#0b3c66'; g.fillRect(0,0,cw,ch); g.lineJoin='round';
+      for(const [lw,c] of [[44,'rgba(30,110,150,.35)'],[26,'rgba(70,150,165,.4)'],[12,'rgba(170,190,150,.55)']]){ path(g, w); g.strokeStyle=c; g.lineWidth=lw*sc; g.stroke(); }
+      for(let i=0;i<cw*ch/420;i++){ g.fillStyle=`rgba(${Math.random()<.5?'205,215,205':'20,50,70'},.22)`; g.beginPath(); g.arc(Math.random()*cw, Math.random()*ch, (.6+Math.random()*1.3)*sc, 0, 7); g.fill(); }
+      g.restore(); path(g, w); g.strokeStyle='#8d949b'; g.lineWidth=4.5*sc; g.stroke(); g.strokeStyle='#5d646b'; g.lineWidth=1.2*sc; g.stroke(); }
     for(const m of pr.tubes){ const [ax,ay]=P(m.a[0],m.a[1]); g.fillStyle='#111'; g.beginPath(); g.arc(ax,ay,TR*sc,0,7); g.fill(); const [bx,by]=P(m.b[0],m.b[1]); g.fillStyle='#1a1a1a'; g.beginPath(); g.arc(bx,by,(TR-1)*sc,0,7); g.fill(); }
     // el hoyo: pasto gastado alrededor, aro blanco y el agujero
     const [cx,cy]=P(H.cup[0], H.cup[1]); const wg=g.createRadialGradient(cx,cy,CR*sc,cx,cy,CR*4.5*sc); wg.addColorStop(0,'rgba(215,255,190,.28)'); wg.addColorStop(1,'rgba(215,255,190,0)'); g.fillStyle=wg; g.beginPath(); g.arc(cx,cy,CR*4.5*sc,0,7); g.fill();
     g.fillStyle='#f6f6f6'; g.beginPath(); g.arc(cx,cy,(CR+1.2)*sc,0,7); g.fill(); g.fillStyle='#070707'; g.beginPath(); g.arc(cx,cy,CR*sc,0,7); g.fill();
     g.restore();
   });
-  const step=Math.max(3, Math.max(W,L)/240), sx=Math.ceil(W/step), sy=Math.ceil(L/step), pos=[], uv=[], idx=[];
-  for(let j=0;j<=sy;j++) for(let i=0;i<=sx;i++){ const x=x0+W*i/sx, y=y0+L*j/sy; pos.push(x, hAt(pr,x,y), -y); uv.push(i/sx, j/sy); }
+  const step=Math.max(2.5, Math.max(W,L)/(R3.mobile?260:340)), sx=Math.ceil(W/step), sy=Math.ceil(L/step), pos=[], uv=[], idx=[];
+  for(let j=0;j<=sy;j++) for(let i=0;i<=sx;i++){ const x=x0+W*i/sx, y=y0+L*j/sy; pos.push(x, gAt(pr,x,y), -y); uv.push(i/sx, j/sy); }
   for(let j=0;j<sy;j++) for(let i=0;i<sx;i++){ const a=j*(sx+1)+i, c=a+sx+1; idx.push(a,a+1,c, a+1,c+1,c); }
   const gg=new T.BufferGeometry(); gg.setAttribute('position', new T.Float32BufferAttribute(pos,3)); gg.setAttribute('uv', new T.Float32BufferAttribute(uv,2)); gg.setIndex(idx); gg.computeVertexNormals();
   const ground=new T.Mesh(gg, new T.MeshStandardMaterial({map:tex, roughness:.95, alphaTest:.5})); ground.receiveShadow=true; G.add(ground); R3.ground=ground;
@@ -1069,7 +1108,7 @@ function buildHole(ci){
       for(let j=0;j<4;j++){ const an=j*Math.PI/2+R()*1.2, d=cr*.62; mk(tr, gSph, L3[1+j%2], Math.cos(an)*d, hgt+cr*(.25+R()*.5), Math.sin(an)*d, cr*(.55+R()*.2)); }
       if(kind!=='verde'){ const pt=new T.Mesh(gPet, new T.MeshBasicMaterial({color:kind==='rosa'?0xf58ab8:0xffd966, transparent:true, opacity:.4, depthWrite:false})); pt.rotation.x=-Math.PI/2; pt.position.y=.5; pt.scale.set(cr*1.25, cr*1.25, 1); tr.add(pt); }
     }
-    tr.position.set(x,-10,-y); tr.rotation.y=R()*6; G.add(tr);
+    tr.position.set(x,-10,-y); tr.rotation.y=R()*6; G.add(tr); fadeReg([tr], x-24*s, y-24*s, x+24*s, y+24*s, 0, .25);
   }
   for(let k=0;k<(R3.mobile?12:26);k++){
     const a=R()*Math.PI*2, rr=Math.max(W,L)*.5+48+R()*150, x=bcx+Math.cos(a)*rr*(W/Math.max(W,L)+.4), y=bcy+Math.sin(a)*rr;
@@ -1093,7 +1132,9 @@ function buildHole(ci){
     whiteM=new T.MeshStandardMaterial({color:0xf7f5ee, roughness:.4}), redM=new T.MeshStandardMaterial({color:0xd52b1e, roughness:.4}), blueM=new T.MeshStandardMaterial({color:0x0038a8, roughness:.4}), darkM=new T.MeshStandardMaterial({color:0x20242a, roughness:.7});
   const dbox=(par, w, h, d, x, y, z, mat)=>{ const m=new T.Mesh(new T.BoxGeometry(w,h,d), mat); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; par.add(m); return m; };
   const dcyl=(par, rt, rb, h, x, y, z, mat, seg)=>{ const m=new T.Mesh(new T.CylinderGeometry(rt,rb,h,seg||24), mat); m.position.set(x,y,z); m.castShadow=true; par.add(m); return m; };
+  const parts=[];   // lo que arma cada obstáculo, para poder volverlo transparente
   for(const o of H.obs){
+    const n0=G.children.length; parts.push({o, n0});
     if(o.t==='block'){
       const sh=new T.Shape(o.pts.map(p=>new T.Vector2(p[0],p[1]))), hgt=o.house?60:12;
       const geo=new T.ExtrudeGeometry(sh, {depth:hgt+10, bevelEnabled:false}); geo.rotateX(-Math.PI/2);
@@ -1127,8 +1168,12 @@ function buildHole(ci){
       const dm=new T.Mesh(new T.SphereGeometry(3.6, 16, 8, 0, Math.PI*2, 0, Math.PI/2), chromeM); dm.position.y=5.2; dm.scale.y=.6; g.add(dm);
       g.position.set(o.x, y+2.5, -o.y); G.add(g); R3.spins.push({o, g});
     } else if(o.t==='mill'){
-      const top=60, zc=-(o.y+o.d/2), rw=o.hw*2+12;
-      dbox(G, o.gw, top-16, o.d, o.x, 16+(top-16)/2, zc, creamM);
+      const top=60, zc=-(o.y+o.d/2), rw=o.hw*2+12, ah=26;
+      // el paso: un túnel con arco, bien alto, con faroles y luz adentro para que se vea que se pasa
+      const ms=new T.Shape(); ms.moveTo(-o.gw/2, top); ms.lineTo(o.gw/2, top); ms.lineTo(o.gw/2, ah); ms.absarc(0, ah, o.gw/2, 0, Math.PI, false); ms.lineTo(-o.gw/2, top);
+      const mw=new T.Mesh(new T.ExtrudeGeometry(ms, {depth:o.d, bevelEnabled:false}), creamM); mw.position.set(o.x, 0, -(o.y+o.d)); mw.castShadow=true; mw.receiveShadow=true; G.add(mw);
+      const lampM=new T.MeshBasicMaterial({color:0xffe9a8}), tl=new T.PointLight(0xffe2ad, 1.1, 120, 1.4); tl.position.set(o.x, 15, zc); G.add(tl);
+      for(const lz of [-o.d*.3, 0, o.d*.3]) dbox(G, 5, .8, 5, o.x, ah+o.gw/2-.6, zc+lz, lampM).castShadow=false;
       // techo a dos aguas de tejas, torre con su techito y marco de madera en la entrada
       const rs=new T.Shape(); rs.moveTo(-o.d/2-8, 0); rs.lineTo(0, 26); rs.lineTo(o.d/2+8, 0); rs.lineTo(-o.d/2-8, 0);
       const rg=new T.ExtrudeGeometry(rs, {depth:rw, bevelEnabled:false}); rg.translate(0, 0, -rw/2); rg.rotateY(Math.PI/2);
@@ -1138,18 +1183,43 @@ function buildHole(ci){
       const tr=new T.Mesh(new T.ConeGeometry(17, 22, 8), tileM); tr.position.set(o.x, top+63, zc); tr.castShadow=true; G.add(tr);
       const kb=new T.Mesh(new T.SphereGeometry(2, 10, 8), new T.MeshStandardMaterial({color:0xf2c14e, metalness:.7, roughness:.3})); kb.position.set(o.x, top+75, zc); G.add(kb);
       for(const sg2 of [1,-1]){ dbox(G, 8, 10, 1.2, o.x, top+40, zc+sg2*13.4, woodM); dbox(G, 5.5, 7.5, 1.6, o.x, top+40, zc+sg2*13.5, glassM); }
-      for(const fy of [o.y-.8, o.y+o.d+.8]){ for(const sx of [-1,1]) dbox(G, 2.4, 17, 2, o.x+sx*(o.gw/2+.2), 8.5, -fy, woodM); dbox(G, o.gw+6, 3, 2.4, o.x, 17.5, -fy, woodM); }
+      for(const fy of [o.y-.8, o.y+o.d+.8]){ for(const sx of [-1,1]){ dbox(G, 3.6, ah, 2.6, o.x+sx*(o.gw/2+.6), ah/2, -fy, whiteM); dbox(G, 4.6, 2.4, 3.4, o.x+sx*(o.gw/2+.6), 1.2, -fy, stoneM);
+          dbox(G, 1, 1, 3.4, o.x+sx*(o.gw/2+7), 24, -fy+(fy<o.y?1.2:-1.2), woodM); dbox(G, 2.6, 4, 2.6, o.x+sx*(o.gw/2+7), 21.5, -fy+(fy<o.y?2.6:-2.6), lampM).castShadow=false; }
+        const ar=new T.Mesh(new T.TorusGeometry(o.gw/2+.8, 2, 8, 24, Math.PI), whiteM); ar.position.set(o.x, ah, -fy); ar.castShadow=true; G.add(ar);
+        dbox(G, 4.6, 5, 3.6, o.x, ah+o.gw/2+.9, -fy, redM); }
       const g=new T.Group(), bladeM=new T.MeshStandardMaterial({color:0xfbf7ec, roughness:.5, side:T.DoubleSide}), barM=woodM;
       for(let k=0;k<4;k++){ const pv=new T.Group(); pv.rotation.z=k*Math.PI/2-Math.PI/2; const bar=new T.Mesh(new T.BoxGeometry(1.6, 30, 1.2), barM); bar.position.y=15; pv.add(bar);
         const sail=new T.Mesh(new T.BoxGeometry(7, 22, .5), k%2?bladeM:redM); sail.position.set(4.2, 18, 0); sail.castShadow=true; pv.add(sail);
         for(let s=0;s<5;s++){ const rb=new T.Mesh(new T.BoxGeometry(7.4, .7, .9), barM); rb.position.set(4.2, 8+s*5, 0); pv.add(rb); } g.add(pv); }
       const hub=new T.Mesh(new T.CylinderGeometry(3,3,6,16), barM); hub.rotation.x=Math.PI/2; g.add(hub);
       const cap=new T.Mesh(new T.SphereGeometry(2.4, 12, 8), chromeM); cap.position.z=3; g.add(cap);
-      g.position.set(o.x, 34, -o.y+3); G.add(g); R3.mills.push({o, g});
+      const axle=new T.Mesh(new T.CylinderGeometry(1.5,1.5,9,12), barM); axle.rotation.x=Math.PI/2; axle.position.z=-5; g.add(axle);
+      g.scale.set(1.5, 1.5, 1); g.position.set(o.x, 57, -o.y+10); G.add(g); R3.mills.push({o, g}); fadeReg([g], o.x-46, o.y-13, o.x+46, o.y+2, 0, .22);   // las aspas solo se aclaran si tapan la pelota
     } else if(o.t==='water'){
       const sh=new T.Shape(o.pts.map(p=>new T.Vector2(p[0],p[1]))), geo=new T.ShapeGeometry(sh); geo.rotateX(-Math.PI/2);
-      const m=new T.Mesh(geo, new T.MeshStandardMaterial({color:0xffffff, map:R3.waterTex, roughness:.1, metalness:.3, transparent:true, opacity:.86}));
-      const c=o.pts.reduce((a,p)=>[a[0]+p[0]/o.pts.length, a[1]+p[1]/o.pts.length],[0,0]); m.position.y=hAt(pr,c[0],c[1])+.25; G.add(m);
+      const m=new T.Mesh(geo, new T.ShaderMaterial({uniforms:R3.waterU, vertexShader:WATER_VS, fragmentShader:WATER_FS, transparent:true, depthWrite:false}));
+      const c=o.pts.reduce((a,p)=>[a[0]+p[0]/o.pts.length, a[1]+p[1]/o.pts.length],[0,0]), wy=hAt(pr,c[0],c[1])-2.2; m.position.y=wy; G.add(m);
+      // piedras en la orilla, camalotes con flor y totoras
+      const n=o.pts.length, gap=R3.mobile?11:7.5;
+      for(let i=0;i<n;i++){ const p=o.pts[i], q=o.pts[(i+1)%n], len=Math.hypot(q[0]-p[0], q[1]-p[1]), k=Math.max(1, Math.round(len/gap));
+        for(let j=0;j<k;j++){ const x=p[0]+(q[0]-p[0])*(j+R()*.5)/k, y=p[1]+(q[1]-p[1])*(j+R()*.5)/k; if(edgeDist(H.out,x,y)<4) continue;
+          const s=1.9+R()*1.5, st=mk(G, gRock, rockM, x, hAt(pr,x,y)-.2, -y, s, s*.5, s*(.8+R()*.5)); st.rotation.y=R()*6; st.receiveShadow=true; } }
+      const xs=o.pts.map(p=>p[0]), ys=o.pts.map(p=>p[1]), wx0=Math.min(...xs), wx1=Math.max(...xs), wy0=Math.min(...ys), wy1=Math.max(...ys);
+      const inW=(lo,hi)=>{ for(let t=0;t<300;t++){ const x=wx0+R()*(wx1-wx0), y=wy0+R()*(wy1-wy0); if(!inPoly(o.pts,x,y)) continue; const d=edgeDist(o.pts,x,y); if(d>=lo && d<=hi) return [x,y]; } return null; };
+      const padM=new T.MeshStandardMaterial({color:0x3f9a48, roughness:.7, side:T.DoubleSide}), reedM=new T.MeshStandardMaterial({color:0x4c8f3a, roughness:.8}), catM=new T.MeshStandardMaterial({color:0x5a3b1e, roughness:.9});
+      for(let k=0, nk=Math.round(Math.min(9, 3+(wx1-wx0)*(wy1-wy0)/4500));k<nk;k++){ const p=inW(11, 1e9); if(!p) break; const s=3+R()*2.6;
+        const pad=new T.Mesh(new T.CircleGeometry(1, 14, .5, 5.6), padM); pad.rotation.x=-Math.PI/2; pad.rotation.z=R()*6; pad.scale.set(s,s,1); pad.position.set(p[0], wy+.15, -p[1]); G.add(pad);
+        if(k%2===0){ mk(G, gSph, LEAF.rosa[1], p[0]+s*.2, wy+.9, -p[1], 1.1, .8, 1.1).castShadow=false; mk(G, gSph, LEAF.amar[0], p[0]+s*.2, wy+1.5, -p[1], .45).castShadow=false; } }
+      for(let k=0;k<(R3.mobile?2:4);k++){ const p=inW(2.5, 6); if(!p) break;
+        for(let j=0;j<6;j++){ const hh=9+R()*9, rx=p[0]+(R()-.5)*5, ry=p[1]+(R()-.5)*5, rd=mk(G, gTrunk, reedM, rx, wy+hh/2-1, -ry, .35, hh, .35); rd.rotation.z=(R()-.5)*.25;
+          if(j%2===0) mk(G, gTrunk, catM, rx, wy+hh-1.5, -ry, .75, 3.4, .75).rotation.z=rd.rotation.z; } }
+    } else if(o.t==='sand'){
+      // matitas de pasto y piedritas en el borde de la trampa
+      const n=o.pts.length, tuftM=LEAF.verde;
+      for(let i=0;i<n;i++){ const p=o.pts[i], q=o.pts[(i+1)%n], len=Math.hypot(q[0]-p[0], q[1]-p[1]), k=Math.max(1, Math.round(len/(R3.mobile?14:9)));
+        for(let j=0;j<k;j++){ const x=p[0]+(q[0]-p[0])*(j+R())/k, y=p[1]+(q[1]-p[1])*(j+R())/k; if(edgeDist(H.out,x,y)<4) continue; const h0=hAt(pr,x,y);
+          if(j%3===2){ const s=1.2+R()*1.2; mk(G, gRock, rockM, x, h0+.1, -y, s, s*.55, s).rotation.y=R()*6; }
+          else for(let b=0;b<3;b++){ const tf=mk(G, gFrond, tuftM[(j+b)%3], x+(R()-.5)*2.4, h0+1.5, -y+(R()-.5)*2.4, .55, 3+R()*1.6, .55); tf.rotation.z=(R()-.5)*.5; tf.castShadow=false; } } }
     } else if(o.t==='tube'){
       const a=o.a, bb=o.b, mid=[(a[0]+bb[0])/2, (a[1]+bb[1])/2];
       const curve=new T.CatmullRomCurve3([W3(a[0],a[1],-4), W3(a[0],a[1]+(bb[1]>a[1]?14:-14),20), W3(mid[0],mid[1],34), W3(bb[0],bb[1]-(bb[1]>a[1]?14:-14),20), W3(bb[0],bb[1],-4)]);
@@ -1160,6 +1230,16 @@ function buildHole(ci){
       for(const p of [a, bb]){ const rim=new T.Mesh(new T.TorusGeometry(TR, 1.4, 8, 24), redM); rim.rotation.x=Math.PI/2; rim.position.set(p[0], hAt(pr,p[0],p[1])+.6, -p[1]); G.add(rim); }
     }
   }
+  // qué se vuelve transparente: el molino con sus casitas (todo junto), las casitas sueltas y el caño del túnel
+  parts.forEach((p,i)=>{ p.objs=G.children.slice(p.n0, i+1<parts.length ? parts[i+1].n0 : G.children.length); });
+  const used=new Set();
+  for(const p of parts){ if(p.o.t!=='mill') continue; const o=p.o; let objs=p.objs.filter(x=>!R3.mills.some(m=>m.g===x)), x0=o.x-o.gw/2, x1=o.x+o.gw/2;
+    for(const q of parts){ if(q.o.t!=='block' || !q.o.house) continue; const ys=q.o.pts.map(v=>v[1]), xs=q.o.pts.map(v=>v[0]); if(Math.max(...ys)<o.y-1 || Math.min(...ys)>o.y+o.d+1) continue;
+      used.add(q); objs=objs.concat(q.objs); x0=Math.min(x0, ...xs); x1=Math.max(x1, ...xs); }
+    fadeReg(objs, x0, o.y, x1, o.y+o.d, 95, .2); }
+  for(const p of parts){ const o=p.o;
+    if(o.t==='block' && o.house && !used.has(p)){ const xs=o.pts.map(v=>v[0]), ys=o.pts.map(v=>v[1]); fadeReg(p.objs, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), 80, .18); }
+    else if(o.t==='tube') fadeReg(p.objs, Math.min(o.a[0],o.b[0])-8, Math.min(o.a[1],o.b[1])-8, Math.max(o.a[0],o.b[0])+8, Math.max(o.a[1],o.b[1])+8, 45, .3); }
   // banderita del hoyo (con los colores de Paraguay) y cartel del hoyo
   const ch0=hAt(pr,H.cup[0],H.cup[1]);
   const pole=new T.Mesh(new T.CylinderGeometry(.55,.55,70,8), new T.MeshStandardMaterial({color:0xf5f5f5})); pole.position.set(H.cup[0], ch0+35, -H.cup[1]); pole.castShadow=true; G.add(pole);
@@ -1248,7 +1328,7 @@ function draw3D(){
   const T=THREE, ci=curHole(); if(R3.built!==ci) buildHole(ci);
   const pr=prep(ci), H=pr.H, t = ANIM.on ? ANIM.shot.t0+(performance.now()-ANIM.t0)/1000 : hostNow();
   const nowP=performance.now(), dtP=Math.min(.1, (nowP-(R3.lt||nowP))/1000); R3.lt=nowP;
-  stepParts(dtP); R3.waterTex.offset.set(nowP*.00002, nowP*.000035);
+  stepParts(dtP); R3.waterU.uT.value=nowP/1000%3600;
   R3.spins.forEach(s=>s.g.rotation.y=spinAng(s.o,t));
   R3.mills.forEach(s=>s.g.rotation.z=millAng(s.o,t));
   if(R3.flag){ const a=R3.flag.geometry.attributes.position, base=R3.flagBase, tt=performance.now()/1000;
@@ -1259,7 +1339,11 @@ function draw3D(){
     const o=ballMesh(b.id, b.col); seen[b.id]=1;
     const ghost=!V.opts.collide && !b.cur && !b.moving;
     o.m.material.transparent=ghost; o.m.material.opacity=ghost?.55:1;
-    o.m.position.set(b.x, hAt(pr,b.x,b.y)+BR - (b.sink||0)*BR*2.6 - (b.wet||0)*7, -b.y);
+    const gy=gAt(pr,b.x,b.y);
+    o.m.position.set(b.x, gy+BR - (b.sink||0)*BR*2.6 - (b.wet||0)*3, -b.y);
+    // arenita que salta cuando la pelota pasa por la trampa
+    if(b.moving && o.last && Math.hypot(b.x-o.last[0], b.y-o.last[1])>.35 && R3.dips.some(q=>q.sand && b.x>q.x0 && b.x<q.x1 && b.y>q.y0 && b.y<q.y1 && inPoly(q.pts,b.x,b.y)))
+      for(let k=0;k<2;k++) emitP({x:b.x, y:gy+1, z:-b.y, vx:(Math.random()-.5)*14, vy:8+Math.random()*14, vz:(Math.random()-.5)*14, g:70, floor:gy+.2, life:.45+Math.random()*.3, s:.9+Math.random()*.7, c:[.93,.84,.6], a:.85});
     o.m.visible = (b.wet||0)<1;
     // chapuzón al caer al agua y papelitos al embocar
     const wetNow=(b.wet||0)>0, sinkNow=(b.sink||0)>0;
@@ -1273,15 +1357,15 @@ function draw3D(){
   // la que juega: anillito, palo y ayuda
   const cur=d.balls.find(b=>b.cur), am = V.phase==='play' && !ANIM.on && cur ? aimNow() : null;
   R3.ring.visible=!!cur && !ANIM.on;
-  if(cur){ R3.ring.position.set(cur.x, hAt(pr,cur.x,cur.y)+.3, -cur.y); R3.ring.material.opacity=.5+.4*Math.sin(performance.now()/250); }
+  if(cur){ R3.ring.position.set(cur.x, gAt(pr,cur.x,cur.y)+.3, -cur.y); R3.ring.material.opacity=.5+.4*Math.sin(performance.now()/250); }
   R3.putter.visible=!!am; R3.guide.visible=false;
   if(am){
     const back=BR+1.6+am.pow*26, px=cur.x-Math.cos(am.ang)*back, py=cur.y-Math.sin(am.ang)*back;
-    R3.putter.position.set(px, hAt(pr,px,py), -py); R3.putter.rotation.y=am.ang;
+    R3.putter.position.set(px, gAt(pr,px,py), -py); R3.putter.rotation.y=am.ang;
     const pts=guidePts(am, cur);
     if(pts && pts.length>1){
       const arr=R3.guide.geometry.attributes.position, n=Math.min(240, pts.length); let last=pts[0];
-      for(let i=0;i<240;i++){ const p=pts[Math.min(i, n-1)]; if(p[0]!=null) last=p; arr.setXYZ(i, last[0], hAt(pr,last[0],last[1])+.7, -last[1]); }
+      for(let i=0;i<240;i++){ const p=pts[Math.min(i, n-1)]; if(p[0]!=null) last=p; arr.setXYZ(i, last[0], gAt(pr,last[0],last[1])+.7, -last[1]); }
       arr.needsUpdate=true; R3.guide.geometry.setDrawRange(0, n); R3.guide.geometry.computeBoundingSphere(); R3.guide.computeLineDistances(); R3.guide.visible=true;
     }
   }
@@ -1302,6 +1386,12 @@ function draw3D(){
     const dist=(ANIM.on?150:110)*z, hh=(ANIM.on?70:48)*z+CAM3.h*50;
     want=W3(focus.x-Math.cos(yaw)*dist, focus.y-Math.sin(yaw)*dist, fh+hh); look=W3(focus.x+Math.cos(yaw)*70, focus.y+Math.sin(yaw)*70, fh);
   }
+  // lo que tapa la pelota (o está pegado a ella) se vuelve transparente para ver dónde tirar
+  { const cx=cam.position.x, cy=-cam.position.z, fa=ANIM.on ? ANIM.shot.ang : am ? am.ang : null;
+    const ex=focus.x+(fa==null?0:Math.cos(fa)*90), ey=focus.y+(fa==null?0:Math.sin(fa)*90), top=CAM3.mode==='arriba';
+    for(const f of R3.fades){ const dx=Math.max(f.x0-focus.x, 0, focus.x-f.x1), dy=Math.max(f.y0-focus.y, 0, focus.y-f.y1);
+      const hide=(f.near && Math.hypot(dx,dy)<f.near) || (!top && isFinite(cx+cy) && (segRect(cx,cy,focus.x,focus.y,f,5) || (f.near && segRect(focus.x,focus.y,ex,ey,f,2))));
+      fadeApply(f, hide?f.min:1); } }
   const k = ANIM.on ? .07 : .18;
   // si la cámara quedó en un lugar imposible (pasaba al abrir con la vista de arriba guardada), se la pone directo donde va
   if(!isFinite(cam.position.x+cam.position.y+cam.position.z)) cam.position.copy(want);
