@@ -722,7 +722,7 @@ const CARDS = {
     {k:'money',v:-5,e:'🦺',x:'El cuidacoches te cobró por “cuidarte” el auto en el centro. Pagás ₲ 5.000.'},
     {k:'money',v:-20,e:'😭',x:'Apostaste a que tu equipo ganaba el superclásico y perdió. Pagás ₲ 20.000.'},
     {k:'money',v:-45,e:'🕳️',x:'Fuiste a San Lorenzo y caíste en un bache. La reparación del auto costó ₲ 45.000 y la pagás.'},
-    {k:'banco',v:100,e:'🏦',x:'Pusiste tu plata en un banco que parecía buenísimo… y te la congelaron. Te retienen ₲ 100.000: te los devuelven, pero dentro de 2 jugadas.'}
+    {k:'banco',v:100,e:'🏦',x:'Pusiste tu plata en un banco que parecía uenisimo… y te la congelaron. Te retienen ₲ 100.000: te los devuelven, pero dentro de 2 jugadas.'}
   ],
   ca:[
     {k:'goto',to:0,x:'Avance hasta la SALIDA y cobre ₲ 200.000.'},
@@ -1105,8 +1105,8 @@ function drawCard(p, deck, flip){
       p.pos=(p.pos+40-c.n)%40; land(p,diceSum(),null); return;
     case 'jail': goJail(p); return;
     case 'free': p.jcards.push(deck); break;
-    case 'banco':   // el banco "buenísimo": se lleva la plata ahora y la devuelve 2 jugadas después
-      pay(p, c.v*K, null, 'banco que parecía buenísimo');
+    case 'banco':   // el banco "uenisimo": se lleva la plata ahora y la devuelve 2 jugadas después
+      pay(p, c.v*K, null, 'banco que parecía uenisimo');
       (p.ret=p.ret||[]).push({v:c.v*K, n:2});
       log(`🏦 A ${p.name} le devuelven ${fmt(c.v*K)} dentro de 2 jugadas.`);
       break;
@@ -1196,7 +1196,7 @@ function nextTurn(){
   log(`Turno de ${cur().name}.`);
   devolverBanco(cur());
 }
-// plata retenida por el banco "buenísimo": cada turno del jugador falta una jugada menos; al llegar a 0 se la devuelven
+// plata retenida por el banco "uenisimo": cada turno del jugador falta una jugada menos; al llegar a 0 se la devuelven
 function devolverBanco(p){
   if(!p.ret || !p.ret.length) return;
   for(const r of p.ret) r.n--;
