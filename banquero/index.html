@@ -111,12 +111,13 @@ input[type=text],input[type=password],input[type=number],select{width:100%;paddi
 /* ---------- lupa del tablero 2D (para leer bien en el celular) ---------- */
 .boardwrap.zm .stage{width:var(--B);height:var(--B);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border-radius:6px;touch-action:pan-x pan-y}
 .boardwrap.zm .board{border-radius:0}
-.zoomctl{position:absolute;left:6px;top:6px;z-index:21;display:flex;gap:5px;align-items:center}
-.zoomctl button{height:34px;min-width:34px;padding:0 8px;border-radius:17px;border:0;background:rgba(246,241,225,.94);font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.45);touch-action:manipulation}
+.zoomctl{position:absolute;left:48px;top:-45px;white-space:nowrap;z-index:21;display:flex;gap:5px;align-items:center}
+.zoomctl button{height:34px;min-width:34px;padding:0 9px;border-radius:17px;border:0;background:rgba(246,241,225,.94);font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.45);touch-action:manipulation}
 .zoomctl .zfull{background:var(--gold)}
 .zoomctl b{background:rgba(0,0,0,.55);color:#fff;border-radius:10px;padding:2px 7px;font-size:12px}
 .boardwrap:not(.zm) .zoomctl .zout,.boardwrap:not(.zm) .zoomctl .zfull,.boardwrap:not(.zm) .zoomctl b{display:none}
 .v3d .zoomctl{display:none}
+@media (max-width:900px){ .zoomctl b{display:none!important} }
 .clogo{font-weight:900;letter-spacing:.12em;font-size:2.1em;color:var(--red);line-height:1;text-shadow:2px 2px 0 #fff}
 .clogo small{display:block;font-size:.42em;letter-spacing:.5em;color:var(--blue)}
 .dice{display:flex;gap:.7em}
@@ -549,8 +550,8 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <div class="stage" id="stage"><div class="board" id="board"></div></div>
       <div class="zoomctl" id="zoomctl">
         <button class="zin" onclick="lupa(1)" title="Agrandar el tablero para leer mejor (también se puede pellizcar con 2 dedos)">🔍＋</button>
-        <button class="zout" onclick="lupa(-1)" title="Achicar">🔍－</button>
-        <button class="zfull" onclick="lupa(0)" title="Volver a ver el tablero completo">⤢ Ver completo</button>
+        <button class="zout" onclick="lupa(-1)" title="Achicar">－</button>
+        <button class="zfull" onclick="lupa(0)" title="Volver a ver el tablero completo">⤢ Ver todo</button>
         <b id="zoomPct"></b>
       </div>
       <div id="hud"></div>
