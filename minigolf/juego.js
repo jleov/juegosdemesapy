@@ -1086,7 +1086,7 @@ function buildHole(ci){
       for(const [lw,c] of [[44,'rgba(30,110,150,.35)'],[26,'rgba(70,150,165,.4)'],[12,'rgba(170,190,150,.55)']]){ path(g, w); g.strokeStyle=c; g.lineWidth=lw*sc; g.stroke(); }
       for(let i=0;i<cw*ch/420;i++){ g.fillStyle=`rgba(${Math.random()<.5?'205,215,205':'20,50,70'},.22)`; g.beginPath(); g.arc(Math.random()*cw, Math.random()*ch, (.6+Math.random()*1.3)*sc, 0, 7); g.fill(); }
       g.restore(); path(g, w); g.strokeStyle='#8d949b'; g.lineWidth=4.5*sc; g.stroke(); g.strokeStyle='#5d646b'; g.lineWidth=1.2*sc; g.stroke(); }
-    for(const m of pr.tubes){ const [ax,ay]=P(m.a[0],m.a[1]); g.fillStyle='#111'; g.beginPath(); g.arc(ax,ay,TR*sc,0,7); g.fill(); const [bx,by]=P(m.b[0],m.b[1]); g.fillStyle='#1a1a1a'; g.beginPath(); g.arc(bx,by,(TR-1)*sc,0,7); g.fill(); }
+    for(const m of pr.tubes) for(const [q,r] of [[m.a,TR+3],[m.b,TR+2]]){ const [ax,ay]=P(q[0],q[1]), sg=g.createRadialGradient(ax,ay,0,ax,ay,r*1.6*sc); sg.addColorStop(0,'rgba(0,20,5,.55)'); sg.addColorStop(1,'rgba(0,20,5,0)'); g.fillStyle=sg; g.beginPath(); g.arc(ax,ay,r*1.6*sc,0,7); g.fill(); }
     // el hoyo: pasto gastado alrededor, aro blanco y el agujero
     const [cx,cy]=P(H.cup[0], H.cup[1]); const wg=g.createRadialGradient(cx,cy,CR*sc,cx,cy,CR*4.5*sc); wg.addColorStop(0,'rgba(215,255,190,.28)'); wg.addColorStop(1,'rgba(215,255,190,0)'); g.fillStyle=wg; g.beginPath(); g.arc(cx,cy,CR*4.5*sc,0,7); g.fill();
     g.fillStyle='#f6f6f6'; g.beginPath(); g.arc(cx,cy,(CR+1.2)*sc,0,7); g.fill(); g.fillStyle='#070707'; g.beginPath(); g.arc(cx,cy,CR*sc,0,7); g.fill();
@@ -1262,12 +1262,19 @@ function buildHole(ci){
           else for(let b=0;b<3;b++){ const tf=mk(G, gFrond, tuftM[(j+b)%3], x+(R()-.5)*2.4, h0+1.5, -y+(R()-.5)*2.4, .55, 3+R()*1.6, .55); tf.rotation.z=(R()-.5)*.5; tf.castShadow=false; } } }
     } else if(o.t==='tube'){
       const a=o.a, bb=o.b, mid=[(a[0]+bb[0])/2, (a[1]+bb[1])/2];
-      const curve=new T.CatmullRomCurve3([W3(a[0],a[1],-4), W3(a[0],a[1]+(bb[1]>a[1]?14:-14),20), W3(mid[0],mid[1],34), W3(bb[0],bb[1]-(bb[1]>a[1]?14:-14),20), W3(bb[0],bb[1],-4)]);
-      const pipe=new T.Mesh(new T.TubeGeometry(curve, 64, 5.5, 16, false), new T.MeshStandardMaterial({color:0x0038a8, roughness:.25, metalness:.3})); pipe.castShadow=true; G.add(pipe);
+      // el caño va acostado en el piso: la boca abierta mira al jugador, se mete en el cerro y sale del otro lado
+      const fw=bb[1]>a[1]?1:-1, ex=Math.cos(o.dir), ey=Math.sin(o.dir), PR=7.2;
+      const curve=new T.CatmullRomCurve3([W3(a[0],a[1]-7*fw,PR), W3(a[0],a[1]+24*fw,PR), W3(mid[0],mid[1],PR+9), W3(bb[0]-ex*24,bb[1]-ey*24,PR), W3(bb[0]+ex*6,bb[1]+ey*6,PR)]);
+      const pipe=new T.Mesh(new T.TubeGeometry(curve, 72, PR, 20, false), new T.MeshStandardMaterial({color:0x0038a8, roughness:.25, metalness:.3})); pipe.castShadow=true; G.add(pipe);
+      G.add(new T.Mesh(new T.TubeGeometry(curve, 72, PR-.9, 20, false), new T.MeshBasicMaterial({color:0x06080c, side:T.BackSide})));
       // aros blancos y rojos a lo largo del caño
-      for(let k=1;k<8;k++){ const tt=k/8, p=curve.getPointAt(tt), tg=curve.getTangentAt(tt); if(p.y<6) continue;
-        const rg2=new T.Mesh(new T.TorusGeometry(5.9, .9, 8, 24), k%2?whiteM:redM); rg2.position.copy(p); rg2.quaternion.setFromUnitVectors(new T.Vector3(0,0,1), tg); rg2.castShadow=true; G.add(rg2); }
-      for(const p of [a, bb]){ const rim=new T.Mesh(new T.TorusGeometry(TR, 1.4, 8, 24), redM); rim.rotation.x=Math.PI/2; rim.position.set(p[0], hAt(pr,p[0],p[1])+.6, -p[1]); G.add(rim); }
+      for(let k=1;k<8;k++){ const tt=k/8, p=curve.getPointAt(tt), tg=curve.getTangentAt(tt);
+        const rg2=new T.Mesh(new T.TorusGeometry(PR+.4, .9, 8, 24), k%2?whiteM:redM); rg2.position.copy(p); rg2.quaternion.setFromUnitVectors(new T.Vector3(0,0,1), tg); rg2.castShadow=true; G.add(rg2); }
+      // las dos bocas: embudo rojo con borde blanco y el fondo oscuro, para que se vea que la pelota entra
+      for(const tt of [0, 1]){ const p=curve.getPointAt(tt), tg=curve.getTangentAt(tt), q=new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,1), tg), out=tt?1:-1;
+        const fl=new T.Mesh(new T.CylinderGeometry(PR+3.2, PR, 5, 24, 1, true), new T.MeshStandardMaterial({color:0xd52b1e, roughness:.4, side:T.DoubleSide})); fl.quaternion.copy(q).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1,0,0), out*Math.PI/2)); fl.position.copy(p).addScaledVector(tg, out*2.5); fl.castShadow=true; G.add(fl);
+        const rim=new T.Mesh(new T.TorusGeometry(PR+3.2, 1, 8, 28), whiteM); rim.quaternion.copy(q); rim.position.copy(p).addScaledVector(tg, out*5); G.add(rim);
+        const dk=new T.Mesh(new T.CircleGeometry(PR-.6, 24), new T.MeshBasicMaterial({color:0x020304, side:T.DoubleSide})); dk.quaternion.copy(q); dk.position.copy(p).addScaledVector(tg, -out*9); G.add(dk); }
     }
   }
   // qué se vuelve transparente: el molino con sus casitas (todo junto), las casitas sueltas y el caño del túnel
@@ -1279,9 +1286,10 @@ function buildHole(ci){
     fadeReg(objs, x0, o.y, x1, o.y+o.d, 95, .2); }
   for(const p of parts){ const o=p.o;
     if(o.t==='block' && o.house && !used.has(p)){ const xs=o.pts.map(v=>v[0]), ys=o.pts.map(v=>v[1]); fadeReg(p.objs, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), 80, .18); }
-    else if(o.t==='tube'){ let objs=p.objs, x0=Math.min(o.a[0],o.b[0])-8, x1=Math.max(o.a[0],o.b[0])+8;
-      for(const q of parts) if(q.o.t==='block' && !q.o.house){ objs=objs.concat(q.objs); const xs=q.o.pts.map(v=>v[0]); x0=Math.min(x0, ...xs); x1=Math.max(x1, ...xs); }
-      fadeReg(objs, x0, Math.min(o.a[1],o.b[1])-8, x1, Math.max(o.a[1],o.b[1])+8, 50, .22); } }
+    else if(o.t==='tube'){ const ty0=Math.min(o.a[1],o.b[1]), ty1=Math.max(o.a[1],o.b[1]);
+      // el caño solo se aclara si tapa la pelota, y las bocas (las últimas 6 piezas) nunca: hay que ver por dónde entra
+      fadeReg(p.objs.slice(0, -6), Math.min(o.a[0],o.b[0])-8, ty0+10, Math.max(o.a[0],o.b[0])+8, ty1-10, 0, .25);
+      for(const q of parts) if(q.o.t==='block' && !q.o.house){ const xs=q.o.pts.map(v=>v[0]), ys=q.o.pts.map(v=>v[1]); fadeReg(q.objs, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), 45, .22); } } }
   // banderita del hoyo (con los colores de Paraguay) y cartel del hoyo
   const ch0=hAt(pr,H.cup[0],H.cup[1]);
   const pole=new T.Mesh(new T.CylinderGeometry(.55,.55,70,8), new T.MeshStandardMaterial({color:0xf5f5f5})); pole.position.set(H.cup[0], ch0+35, -H.cup[1]); pole.castShadow=true; G.add(pole);
