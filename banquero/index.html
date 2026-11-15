@@ -113,9 +113,14 @@ input[type=text],input[type=password],input[type=number],select{width:100%;paddi
 .boardwrap.zm .board{border-radius:0}
 .zoomctl{position:absolute;left:48px;top:-45px;white-space:nowrap;z-index:21;display:flex;gap:5px;align-items:center}
 .zoomctl button{height:34px;min-width:34px;padding:0 9px;border-radius:17px;border:0;background:rgba(246,241,225,.94);font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.45);touch-action:manipulation}
-.zoomctl .zfull{background:var(--gold)}
+.zoomctl .zfol{background:var(--gold)}
 .zoomctl b{background:rgba(0,0,0,.55);color:#fff;border-radius:10px;padding:2px 7px;font-size:12px}
-.boardwrap:not(.zm) .zoomctl .zout,.boardwrap:not(.zm) .zoomctl .zfull,.boardwrap:not(.zm) .zoomctl b{display:none}
+.boardwrap:not(.zm) .zoomctl .zout,.boardwrap:not(.zm) .zoomctl b{display:none}
+.zmenu{position:absolute;left:0;top:40px;background:#fffaf0;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.5);padding:8px;display:flex;flex-direction:column;gap:4px;min-width:220px;z-index:40;white-space:normal}
+.zmenu h4{margin:2px 6px 4px;font-size:13px;color:#555}
+.zoomctl .zmenu button{height:auto;min-height:38px;border-radius:10px;text-align:left;box-shadow:none;background:#f1ead6;font-size:15px;display:flex;align-items:center;gap:8px;padding:6px 10px}
+.zoomctl .zmenu button.on{background:var(--gold)}
+.zoomctl .zmenu button i{font-style:normal;margin-left:auto}
 .v3d .zoomctl{display:none}
 @media (max-width:900px){ .zoomctl b{display:none!important} }
 .clogo{font-weight:900;letter-spacing:.12em;font-size:2.1em;color:var(--red);line-height:1;text-shadow:2px 2px 0 #fff}
@@ -551,8 +556,9 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
       <div class="zoomctl" id="zoomctl">
         <button class="zin" onclick="lupa(1)" title="Agrandar el tablero para leer mejor (también se puede pellizcar con 2 dedos)">🔍＋</button>
         <button class="zout" onclick="lupa(-1)" title="Achicar">－</button>
-        <button class="zfull" onclick="lupa(0)" title="Volver a ver el tablero completo">⤢ Ver todo</button>
+        <button class="zfol" id="zoomFol" onclick="menuSeguir()" title="Elegí a quién sigue la lupa, o volvé a ver el tablero completo">🎯 Seguir ▾</button>
         <b id="zoomPct"></b>
+        <div class="zmenu" id="zoomMenu" hidden></div>
       </div>
       <div id="hud"></div>
       <div class="camctl" id="camctl">
@@ -2747,7 +2753,7 @@ applyView();
 
 // --- lupa del tablero 2D: agrandar para leer y deslizar con el dedo; "Ver completo" vuelve a lo normal ---
 const ZOOM_PASOS=[1, 1.5, 2, 2.6];
-let ZF=1, zoomPos=null;
+let ZF=1, zoomPos=null, ZSIGUE='turno';
 function setZoom(z, cx, cy){   // cx,cy = punto de la pantalla que queda quieto (centro del pellizco)
   z=Math.max(1, Math.min(3, +z.toFixed(2)));
   if(VIEW.mode==='3d') z=1;
@@ -2757,6 +2763,7 @@ function setZoom(z, cx, cy){   // cx,cy = punto de la pantalla que queda quieto 
   const px=(st.scrollLeft+fx)/old, py=(st.scrollTop+fy)/old;   // punto del tablero (sin zoom) bajo el dedo
   ZF=z; wrap.classList.toggle('zm', z>1); wrap.style.setProperty('--zf', z);
   $('#zoomPct').textContent = Math.round(z*100)+'%';
+  etiquetaSeguir();
   if(z>1){ st.scrollLeft=px*z-fx; st.scrollTop=py*z-fy; } else { st.scrollLeft=0; st.scrollTop=0; }
 }
 function lupa(d){
@@ -2766,15 +2773,49 @@ function lupa(d){
   if(d>0 && ZF>1) seguirFicha(true);
 }
 // con lupa puesta, cuando la ficha del turno se mueve, el tablero se desliza solo para mostrarla
+function seguidoP(){
+  if(!S || !S.players) return null;
+  if(ZSIGUE==='libre') return null;
+  const p = ZSIGUE==='turno' ? null : S.players.find(x=>x.id===ZSIGUE && !x.bk);
+  return p || (S.phase==='play' ? cur() : null);
+}
 function seguirFicha(force){
   if(ZF<=1 || VIEW.mode==='3d' || !S || S.phase!=='play') return;
-  const p=cur(), pos = disp[p.id]!=null ? disp[p.id] : p.pos;
+  const p=seguidoP(); if(!p) return;
+  const pos = disp[p.id]!=null ? disp[p.id] : p.pos;
   if(!force && zoomPos===p.id+':'+pos) return;
   zoomPos=p.id+':'+pos;
   const c=$('#c'+pos), st=$('#stage'); if(!c) return;
   const cr=c.getBoundingClientRect(), sr=st.getBoundingClientRect();
   st.scrollTo({left: st.scrollLeft + cr.left-sr.left - (sr.width-cr.width)/2, top: st.scrollTop + cr.top-sr.top - (sr.height-cr.height)/2, behavior:'smooth'});
 }
+// botón 🎯: muestra a quién sigue ahora la lupa
+function etiquetaSeguir(){
+  const b=$('#zoomFol'); if(!b) return;
+  if(ZF<=1){ b.textContent='🎯 Seguir ▾'; return; }
+  const p = ZSIGUE==='turno' || ZSIGUE==='libre' ? null : S && S.players && S.players.find(x=>x.id===ZSIGUE);
+  b.textContent = (ZSIGUE==='turno' ? '🎯 🎲' : ZSIGUE==='libre' ? '🎯 ✋' : '🎯 '+(p ? p.emoji : '🎲'))+' ▾';
+}
+function menuSeguir(){
+  const m=$('#zoomMenu');
+  if(!m.hidden){ m.hidden=true; return; }
+  const me = typeof meId==='function' ? meId() : null;
+  const op=(v, ic, txt)=>`<button class="${ZF>1 && ZSIGUE===v?'on':''}" onclick="elegirSeguir('${v}')">${ic} ${txt}${ZF>1 && ZSIGUE===v?'<i>✓</i>':''}</button>`;
+  m.innerHTML='<h4>🔍 ¿A quién sigue la lupa?</h4>'
+    + op('turno','🎲','Al que le toca jugar')
+    + (S && S.players ? S.players.filter(p=>!p.bk).map(p=>op(p.id, p.emoji, esc(p.name)+(p.id===me?' (vos)':''))).join('') : '')
+    + op('libre','✋','A nadie (lo muevo yo con el dedo)')
+    + `<button onclick="elegirSeguir('todo')">⤢ Ver el tablero completo</button>`;
+  m.hidden=false;
+}
+function elegirSeguir(v){
+  $('#zoomMenu').hidden=true;
+  if(v==='todo') return setZoom(1);
+  ZSIGUE=v;
+  if(ZF<=1) setZoom(2); else etiquetaSeguir();
+  seguirFicha(true);
+}
+document.addEventListener('pointerdown', e=>{ const m=$('#zoomMenu'); if(m && !m.hidden && !e.target.closest('#zoomctl')) m.hidden=true; });
 // pellizcar con 2 dedos sobre el tablero (2D)
 (function(){
   const st=$('#stage'); let pin=null;
