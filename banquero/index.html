@@ -64,13 +64,14 @@ input[type=text],input[type=password],input[type=number],select{width:100%;paddi
 .dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
 /* ---------- juego ---------- */
 .layout{display:flex;gap:12px;padding:52px 8px 8px;justify-content:center;align-items:flex-start}
-.board{--S:min(calc(100vh - 16px),calc(100vw - 410px));width:var(--S);height:var(--S);flex:0 0 auto;display:grid;
+.boardwrap{--B:min(calc(100vh - 16px),calc(100vw - 410px))}
+.board{--S:calc(var(--B) * var(--zf,1));width:var(--S);height:var(--S);flex:0 0 auto;display:grid;
   grid-template-columns:1.6fr repeat(9,1fr) 1.6fr;grid-template-rows:1.6fr repeat(9,1fr) 1.6fr;gap:1px;background:var(--line);
   border:3px solid var(--line);border-radius:6px;font-size:max(6.3px,calc(var(--S) / 92));box-shadow:0 10px 30px rgba(0,0,0,.5);position:relative}
 .side{width:380px;height:calc(100vh - 16px);display:flex;flex-direction:column;gap:8px}
 @media (max-width:900px){
   .layout{flex-direction:column;align-items:center;padding:52px 6px 6px}
-  .board{--S:min(calc(100vw - 12px),640px)}
+  .boardwrap{--B:min(calc(100vw - 12px),640px)}
   .side{width:100%;max-width:640px;height:auto}
   .side .comm{height:420px}
 }
@@ -106,7 +107,16 @@ input[type=text],input[type=password],input[type=number],select{width:100%;paddi
 .tk.now{animation:pulse 1s infinite}
 @keyframes pulse{50%{scale:1.18}}
 #center{position:relative;grid-area:2/2/11/11;background:linear-gradient(135deg,#e8f3e9,#d7ead9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6em;padding:4%;
-  font-size:clamp(11px,calc(var(--S) / 50),16px);overflow:auto;text-align:center}
+  font-size:clamp(11px,calc(var(--S) / 50),calc(16px * var(--zf,1)));overflow:auto;text-align:center}
+/* ---------- lupa del tablero 2D (para leer bien en el celular) ---------- */
+.boardwrap.zm .stage{width:var(--B);height:var(--B);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border-radius:6px;touch-action:pan-x pan-y}
+.boardwrap.zm .board{border-radius:0}
+.zoomctl{position:absolute;left:6px;top:6px;z-index:21;display:flex;gap:5px;align-items:center}
+.zoomctl button{height:34px;min-width:34px;padding:0 8px;border-radius:17px;border:0;background:rgba(246,241,225,.94);font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.45);touch-action:manipulation}
+.zoomctl .zfull{background:var(--gold)}
+.zoomctl b{background:rgba(0,0,0,.55);color:#fff;border-radius:10px;padding:2px 7px;font-size:12px}
+.boardwrap:not(.zm) .zoomctl .zout,.boardwrap:not(.zm) .zoomctl .zfull,.boardwrap:not(.zm) .zoomctl b{display:none}
+.v3d .zoomctl{display:none}
 .clogo{font-weight:900;letter-spacing:.12em;font-size:2.1em;color:var(--red);line-height:1;text-shadow:2px 2px 0 #fff}
 .clogo small{display:block;font-size:.42em;letter-spacing:.5em;color:var(--blue)}
 .dice{display:flex;gap:.7em}
@@ -537,6 +547,12 @@ body.spy #voiceBar, body.spy .tabs [data-tab=chat], body.spy #feedChat, body.spy
   <div class="layout">
     <div class="boardwrap" id="boardwrap">
       <div class="stage" id="stage"><div class="board" id="board"></div></div>
+      <div class="zoomctl" id="zoomctl">
+        <button class="zin" onclick="lupa(1)" title="Agrandar el tablero para leer mejor (también se puede pellizcar con 2 dedos)">🔍＋</button>
+        <button class="zout" onclick="lupa(-1)" title="Achicar">🔍－</button>
+        <button class="zfull" onclick="lupa(0)" title="Volver a ver el tablero completo">⤢ Ver completo</button>
+        <b id="zoomPct"></b>
+      </div>
       <div id="hud"></div>
       <div class="camctl" id="camctl">
         <button onclick="camSpin(-90)" title="Girar a la izquierda">⟲</button>
@@ -2428,7 +2444,7 @@ function renderTokens(){
     } else el.innerHTML=`<span>${p.emoji}</span>`;
     $('#c'+pos+' .toks').appendChild(el);
   }
-  camFollow();
+  camFollow(); seguirFicha();
 }
 // sello del centro del tablero (marca de agua, muy tenue)
 const BCP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><g opacity=".13" fill="none" stroke="#0b3d2e">
@@ -2695,7 +2711,7 @@ function placeHud(){
 }
 window.addEventListener('resize', placeHud);
 function toggleView(){
-  VIEW.mode = VIEW.mode==='3d' ? '2d' : '3d'; saveView(); applyView();
+  VIEW.mode = VIEW.mode==='3d' ? '2d' : '3d'; saveView(); applyView(); setZoom(1);
   if(S && S.phase!=='lobby'){ renderTokens(); renderCenter(); camFollow(true); }
   toast(VIEW.mode==='3d' ? '🧊 Vista 3D: arrastrá el tablero para girarlo. Botones de cámara arriba a la derecha.' : '🗺️ Vista 2D (plana).');
 }
@@ -2727,6 +2743,48 @@ function camFollow(force){
   stage.addEventListener('click', e=>{ if(window.__noClick && Date.now()-window.__noClick<300){ e.stopPropagation(); e.preventDefault(); } }, true);
 })();
 applyView();
+
+// --- lupa del tablero 2D: agrandar para leer y deslizar con el dedo; "Ver completo" vuelve a lo normal ---
+const ZOOM_PASOS=[1, 1.5, 2, 2.6];
+let ZF=1, zoomPos=null;
+function setZoom(z, cx, cy){   // cx,cy = punto de la pantalla que queda quieto (centro del pellizco)
+  z=Math.max(1, Math.min(3, +z.toFixed(2)));
+  if(VIEW.mode==='3d') z=1;
+  const wrap=$('#boardwrap'), st=$('#stage');
+  const old=ZF, r=st.getBoundingClientRect();
+  const fx = cx==null ? r.width/2 : cx-r.left, fy = cy==null ? r.height/2 : cy-r.top;
+  const px=(st.scrollLeft+fx)/old, py=(st.scrollTop+fy)/old;   // punto del tablero (sin zoom) bajo el dedo
+  ZF=z; wrap.classList.toggle('zm', z>1); wrap.style.setProperty('--zf', z);
+  $('#zoomPct').textContent = Math.round(z*100)+'%';
+  if(z>1){ st.scrollLeft=px*z-fx; st.scrollTop=py*z-fy; } else { st.scrollLeft=0; st.scrollTop=0; }
+}
+function lupa(d){
+  if(d===0) return setZoom(1);
+  const i = d>0 ? ZOOM_PASOS.findIndex(x=>x>ZF+.01) : ZOOM_PASOS.length-1-[...ZOOM_PASOS].reverse().findIndex(x=>x<ZF-.01);
+  setZoom(ZOOM_PASOS[i<0 || i>=ZOOM_PASOS.length ? (d>0?ZOOM_PASOS.length-1:0) : i]);
+  if(d>0 && ZF>1) seguirFicha(true);
+}
+// con lupa puesta, cuando la ficha del turno se mueve, el tablero se desliza solo para mostrarla
+function seguirFicha(force){
+  if(ZF<=1 || VIEW.mode==='3d' || !S || S.phase!=='play') return;
+  const p=cur(), pos = disp[p.id]!=null ? disp[p.id] : p.pos;
+  if(!force && zoomPos===p.id+':'+pos) return;
+  zoomPos=p.id+':'+pos;
+  const c=$('#c'+pos), st=$('#stage'); if(!c) return;
+  const cr=c.getBoundingClientRect(), sr=st.getBoundingClientRect();
+  st.scrollTo({left: st.scrollLeft + cr.left-sr.left - (sr.width-cr.width)/2, top: st.scrollTop + cr.top-sr.top - (sr.height-cr.height)/2, behavior:'smooth'});
+}
+// pellizcar con 2 dedos sobre el tablero (2D)
+(function(){
+  const st=$('#stage'); let pin=null;
+  const dist=t=>Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+  st.addEventListener('touchstart', e=>{ if(VIEW.mode==='3d' || e.touches.length!==2) return; pin={d:dist(e.touches), z:ZF}; e.preventDefault(); }, {passive:false});
+  st.addEventListener('touchmove', e=>{
+    if(!pin || e.touches.length!==2) return; e.preventDefault();
+    const t=e.touches; setZoom(pin.z*dist(t)/pin.d, (t[0].clientX+t[1].clientX)/2, (t[0].clientY+t[1].clientY)/2);
+  }, {passive:false});
+  st.addEventListener('touchend', e=>{ if(e.touches.length<2 && pin){ pin=null; if(ZF<1.08) setZoom(1); window.__noClick=Date.now(); } });
+})();
 
 // --- jugador que no responde: el anfitrión decide esperar, saltar o quitar ---
 const mins = ms => { const m=Math.floor(ms/60000); return m<1?'menos de 1 minuto':m===1?'1 minuto':m+' minutos'; };
