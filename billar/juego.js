@@ -1063,7 +1063,8 @@ function init3D(){
   const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, mobile?1.5:2));
   renderer.shadowMap.enabled=true; renderer.shadowMap.type=T.PCFSoftShadowMap;
-  const scene=new T.Scene(); scene.background=new T.Color(0x140d08); scene.fog=new T.Fog(0x140d08, 500, 1100);
+  const scene=new T.Scene(); scene.background=new T.Color(0x140d08); scene.fog=new T.Fog(0x140d08, 900, 2600);
+  R3.env=salaEnvTex();
   const cam=new T.PerspectiveCamera(50, 1, 1, 3000);
   R3.renderer=renderer; R3.scene=scene; R3.cam=cam; R3.T=T;
   // luces: lámpara arriba de la mesa
@@ -1097,7 +1098,7 @@ function init3D(){
     m.position.set(mx+ox, 1.95, mz+oz); scene.add(m);
   }
   // baranda de madera
-  const wood=new T.MeshStandardMaterial({color:0x6b3519, roughness:.45, metalness:.05});
+  const wood=new T.MeshStandardMaterial({map:woodTex('#7a3d1c','40,16,5',[5,1]), roughness:.38, metalness:.05});
   const wW=RW-4.6, H=17, top=4.6;
   const rails=[[TL+2*RW, wW, 0, -(TW/2+4.6+wW/2)], [TL+2*RW, wW, 0, TW/2+4.6+wW/2], [wW, TW+9.2, -(TL/2+4.6+wW/2), 0], [wW, TW+9.2, TL/2+4.6+wW/2, 0]];
   for(const [w,d,x,z] of rails){ const m=new T.Mesh(new T.BoxGeometry(w, H, d), wood); m.position.set(x, top-H/2, z); m.castShadow=true; m.receiveShadow=true; scene.add(m); }
@@ -1108,10 +1109,12 @@ function init3D(){
   for(let k=1;k<8;k++){ if(k===4) continue; addD(TL*k/8, -(4.6+wW/2)); addD(TL*k/8, TW+4.6+wW/2); }
   for(let k=1;k<4;k++){ addD(-4.6-wW/2, TW*k/4); addD(TL+4.6+wW/2, TW*k/4); }
   // cuerpo de la mesa y patas
-  const body=new T.Mesh(new T.BoxGeometry(TL+2*RW-6, 34, TW+2*RW-6), new T.MeshStandardMaterial({color:0x3e1c0b, roughness:.6}));
+  const body=new T.Mesh(new T.BoxGeometry(TL+2*RW-6, 34, TW+2*RW-6), new T.MeshStandardMaterial({map:woodTex('#4a2210','20,8,2',[4,1]), roughness:.55}));
+  body.castShadow=true;
   body.position.y=top-H-17; scene.add(body);
-  for(const sx of [-1,1]) for(const sz of [-1,1]){ const l=new T.Mesh(new T.BoxGeometry(14,40,14), body.material); l.position.set(sx*(TL/2-10), top-H-34-20, sz*(TW/2-6)); scene.add(l); }
-  const floor=new T.Mesh(new T.PlaneGeometry(2400,2400), new T.MeshStandardMaterial({color:0x2a1d14, roughness:1})); floor.rotation.x=-Math.PI/2; floor.position.y=top-H-34-40; floor.receiveShadow=true; scene.add(floor);
+  for(const sx of [-1,1]) for(const sz of [-1,1]){ const l=new T.Mesh(new T.BoxGeometry(14,40,14), body.material); l.position.set(sx*(TL/2-10), top-H-34-20, sz*(TW/2-6)); l.castShadow=true; scene.add(l); }
+  // la sala: piso, alfombra, paredes, cartel, lámpara de bronce y adornos (sala3d.js)
+  sala3D(T, scene, mobile, {top, H, wW, floorY:top-H-34-40});
   // lámpara
   const shadeM=new T.MeshStandardMaterial({color:0x1d5b33, roughness:.5, emissive:0x081a10});
   for(const x of [-70,0,70]){ const lamp=new T.Mesh(new T.CylinderGeometry(9, 22, 14, 24, 1, true), shadeM); lamp.position.set(x,150,0); scene.add(lamp);
@@ -1119,7 +1122,7 @@ function init3D(){
   // bolas
   R3.balls={}; R3.sphere=new T.SphereGeometry(BR, 36, 24);
   for(let n=0;n<=15;n++){
-    const m=new T.Mesh(R3.sphere, new T.MeshPhongMaterial({map:ballTexture(n), shininess:110, specular:0x777777}));
+    const m=new T.Mesh(R3.sphere, new T.MeshPhongMaterial({map:ballTexture(n), shininess:140, specular:0x999999, envMap:R3.env, combine:T.AddOperation, reflectivity:.3}));
     m.castShadow=true; m.visible=false; scene.add(m);
     m.quaternion.setFromEuler(new T.Euler(Math.random()*6, Math.random()*6, Math.random()*6));
     R3.balls[n]={mesh:m, last:null};
@@ -1148,6 +1151,9 @@ function paintFelt3D(){
   const g=c.createRadialGradient(W/2,H/2,20,W/2,H/2,W*.6); g.addColorStop(0,f1); g.addColorStop(1,f2); c.fillStyle=g; c.fillRect(0,0,W,H);
   const img=c.getImageData(0,0,W,H), d=img.data; for(let i=0;i<d.length;i+=4){ const k=(Math.random()-.5)*10; d[i]+=k; d[i+1]+=k; d[i+2]+=k; } c.putImageData(img,0,0);
   const X=x=>(x+4.6)*sx, Y=y=>(y+4.6)*sy;
+  // sombra suave contra las bandas y luz de la lámpara en el medio
+  for(const [lw,a] of [[30,.05],[18,.07],[9,.1]]){ c.strokeStyle=`rgba(0,0,0,${a})`; c.lineWidth=lw; c.strokeRect(X(0),Y(0),X(TL)-X(0),Y(TW)-Y(0)); }
+  for(const fx of [.24,.5,.76]){ const lg=c.createRadialGradient(W*fx,H/2,0,W*fx,H/2,H*.55); lg.addColorStop(0,'rgba(255,250,220,.07)'); lg.addColorStop(1,'rgba(255,250,220,0)'); c.fillStyle=lg; c.fillRect(0,0,W,H); }
   c.strokeStyle='rgba(255,255,255,.14)'; c.lineWidth=1.5; c.setLineDash([6,6]); c.beginPath(); c.moveTo(X(HEAD_X),Y(0)); c.lineTo(X(HEAD_X),Y(TW)); c.stroke(); c.setLineDash([]);
   c.fillStyle='rgba(255,255,255,.35)'; for(const x of [HEAD_X, FOOT_X]){ c.beginPath(); c.arc(X(x),Y(MID_Y),2.5,0,7); c.fill(); }
   c.globalAlpha=.07; c.strokeStyle='#fff'; c.lineWidth=1.4;

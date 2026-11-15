@@ -1083,6 +1083,10 @@ function init3D(){
   R3.pins=PIN_SPOTS.map(()=>{ const p=makePin(T, R3.mats); p.visible=false; scene.add(p); return p; });
   // bola
   R3.ball=new T.Mesh(new T.SphereGeometry(BR, 40, 26), new T.MeshPhongMaterial({shininess:120, specular:0x888888})); R3.ball.castShadow=true; scene.add(R3.ball); R3.ballCol=null;
+  // reflejos en la pista: copias de los pinos y de la bola, dadas vuelta, debajo de la madera
+  R3.mirror=new T.Group(); R3.mirror.scale.y=-1; scene.add(R3.mirror);
+  R3.pinsRef=PIN_SPOTS.map(()=>{ const p=makePin(T, R3.mats); p.traverse(o=>{ o.castShadow=false; o.receiveShadow=false; }); p.visible=false; R3.mirror.add(p); return p; });
+  R3.ballRef=new T.Mesh(R3.ball.geometry, R3.ball.material); R3.ballRef.visible=false; R3.mirror.add(R3.ballRef);
   // ayuda para apuntar
   R3.guide=new T.Line(new T.BufferGeometry().setFromPoints([...Array(90)].map(()=>new T.Vector3())), new T.LineDashedMaterial({color:0xffffff, dashSize:12, gapSize:10, transparent:true, opacity:.85}));
   scene.add(R3.guide);
@@ -1096,13 +1100,18 @@ function buildLane3D(){
   const T=R3.T, th=TH(), W=R3.world;
   while(W.children.length) W.remove(W.children[0]);
   R3.scene.background=new T.Color(th.bg); R3.scene.fog=new T.Fog(th.bg, 1600, 4200);
-  const laneMat=new T.MeshStandardMaterial({map:laneTexture(), roughness:.18, metalness:.05});
+  // la pista está lustrada: deja ver, debajo, el reflejo de los pinos y de la bola
+  const laneMat=new T.MeshStandardMaterial({map:laneTexture(), roughness:.14, metalness:.08, transparent:true, opacity:.84});
   const gutMat=new T.MeshStandardMaterial({color:th.gut, roughness:.5, metalness:.4});
   const capMat=new T.MeshStandardMaterial({color: th.glow?0x1a1840:0x3a2a20, roughness:.6});
   const appMat=new T.MeshStandardMaterial({color:th.app, roughness:.4});
   const addLane=(ox, pins)=>{
     const g=new T.Group(); g.position.x=ox; W.add(g);
-    const lane=new T.Mesh(new T.BoxGeometry(LW, 6, PITY), [0,1,2,3,4,5].map(i=>i===2?laneMat:capMat)); lane.position.set(0,-3,-PITY/2); lane.receiveShadow=true; g.add(lane);
+    const lane=new T.Mesh(new T.BoxGeometry(LW, 6, PITY), [0,1,2,3,4,5].map(i=>i===2?laneMat:capMat)); lane.position.set(0,-3,-PITY/2); lane.receiveShadow=true; lane.renderOrder=-1; g.add(lane);
+    const under=new T.Mesh(new T.PlaneGeometry(LW, PITY), new T.MeshBasicMaterial({color: th.glow?0x05041a:0x1a0f08})); under.rotation.x=-Math.PI/2; under.position.set(0,-46,-PITY/2); g.add(under);
+    // luz sobre los pinos
+    const pl=new T.Mesh(new T.BoxGeometry(LW+2*GW, 5, 26), new T.MeshBasicMaterial({color: th.glow?th.glow:0xfff3d6})); pl.position.set(0, 74, -HEAD+14); g.add(pl);
+    const hood=new T.Mesh(new T.BoxGeometry(LW+2*GW+12, 62, 150), capMat); hood.position.set(0, 108, -HEAD-62); g.add(hood);
     const app=new T.Mesh(new T.BoxGeometry(LW+2*GW, 6, 460), appMat); app.position.set(0,-3,230); app.receiveShadow=true; g.add(app);
     for(const sx of [-1,1]){
       const gut=new T.Mesh(new T.BoxGeometry(GW, 1, PITY), gutMat); gut.position.set(sx*(LW/2+GW/2), -7.5, -PITY/2); gut.receiveShadow=true; g.add(gut);
@@ -1111,7 +1120,9 @@ function buildLane3D(){
     }
     const pit=new T.Mesh(new T.BoxGeometry(LW+2*GW, 2, 120), new T.MeshBasicMaterial({color:0x050505})); pit.position.set(0,-12,-PITY-60); g.add(pit);
     const back=new T.Mesh(new T.PlaneGeometry(LW+2*GW+12, 160), new T.MeshBasicMaterial({color:0x080808})); back.position.set(0,60,-PITY-110); g.add(back);
-    if(pins) PIN_SPOTS.forEach(([x,y])=>{ const p=makePin(T, R3.mats); p.position.set(x-C, 19, -y); g.add(p); });
+    if(pins){ const mg=new T.Group(); mg.scale.y=-1; g.add(mg);
+      PIN_SPOTS.forEach(([x,y])=>{ const p=makePin(T, R3.mats); p.position.set(x-C, 19, -y); g.add(p);
+        const r=makePin(T, R3.mats); r.traverse(o=>{ o.castShadow=false; o.receiveShadow=false; }); r.position.set(x-C, 19, -y); mg.add(r); }); }
     return g;
   };
   addLane(0, false);
@@ -1122,10 +1133,45 @@ function buildLane3D(){
   const gr=g.createLinearGradient(0,0,1024,0); gr.addColorStop(0,'#d52b1e'); gr.addColorStop(.5,'#ffffff'); gr.addColorStop(1,'#0038a8');
   g.fillStyle= th.glow ? '#10082e' : gr; g.fillRect(0,0,1024,256);
   g.fillStyle= th.glow ? th.glow : '#1b2a5a'; g.font='900 120px system-ui'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('🎳 BOLOS PY', 512, 135);
-  const mask=new T.Mesh(new T.PlaneGeometry(step*5, 110), new T.MeshBasicMaterial({map:new T.CanvasTexture(c)})); mask.position.set(0, 125, -HEAD-60); W.add(mask);
-  const floor=new T.Mesh(new T.PlaneGeometry(9000, 9000), new T.MeshStandardMaterial({color: th.glow?0x0a0820:0x2a1d14, roughness:1})); floor.rotation.x=-Math.PI/2; floor.position.y=-30; W.add(floor);
+  const mask=new T.Mesh(new T.PlaneGeometry(step*5, 110), new T.MeshBasicMaterial({map:new T.CanvasTexture(c)})); mask.position.set(0, 134, -HEAD+15); W.add(mask);
+  const floor=new T.Mesh(new T.PlaneGeometry(9000, 9000), new T.MeshStandardMaterial({color: th.glow?0x0a0820:0x2a1d14, roughness:1})); floor.rotation.x=-Math.PI/2; floor.position.y=-50; W.add(floor);
+  decorBolos(T, W, th, step);
   if(th.glow){ R3.mats.pin.emissive=new T.Color(0x2a2a55); R3.mats.ring.color.set(th.ring); R3.mats.ring.emissive=new T.Color(th.ring).multiplyScalar(.6); R3.hemi.intensity=.45; }
   else { R3.mats.pin.emissive=new T.Color(0); R3.mats.ring.color.set(th.ring); R3.mats.ring.emissive=new T.Color(0); R3.hemi.intensity=.65; }
+}
+// el salón: techo con tiras de luz, paredes con neón, retorno de bolas, pantallas y piso de la zona de tiro
+function decorBolos(T, W, th, step){
+  const neon=th.glow||'#fff1d6', n2=th.glow?'#ff2bd6':'#d52b1e', n3=th.glow?'#39ff14':'#0038a8';
+  const basic=c=>new T.MeshBasicMaterial({color:c}), std=p=>new T.MeshStandardMaterial(p);
+  const box=(w,h,d,x,y,z,m,sh)=>{ const k=new T.Mesh(new T.BoxGeometry(w,h,d), m); k.position.set(x,y,z); if(sh){ k.castShadow=true; k.receiveShadow=true; } W.add(k); return k; };
+  const tex=(w,h,draw)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); const t=new T.CanvasTexture(c); t.anisotropy=4; return t; };
+  const halfW=step*2.5+70, CH=360;
+  // techo y tiras de luz a lo largo, entre pista y pista
+  const ceil=new T.Mesh(new T.PlaneGeometry(halfW*2, HEAD+900), new T.MeshLambertMaterial({color: th.glow?0x06051a:0x120c08})); ceil.rotation.x=Math.PI/2; ceil.position.set(0, CH, -HEAD/2+200); W.add(ceil);
+  for(let k=-2;k<=3;k++){ const x=(k-.5)*step; box(5, 3, HEAD+500, x, CH-4, -HEAD/2+150, basic(k%2?neon:(th.glow?n2:'#ffe2ae'))); }
+  for(let j=0;j<7;j++) box(halfW*2, 6, 10, 0, CH-3, 380-j*330, new T.MeshLambertMaterial({color: th.glow?0x14123a:0x2a1c12}));
+  // paredes de los costados con líneas de neón
+  const wallT=tex(512, 256, (g,w,h)=>{ g.fillStyle=th.glow?'#0b0a24':'#241710'; g.fillRect(0,0,w,h); for(let x=0;x<w;x+=64){ g.fillStyle='rgba(255,255,255,.03)'; g.fillRect(x,0,32,h); }
+    for(const [y,c,lw] of [[70,neon,5],[96,n2,3],[122,n3,3]]){ g.shadowColor=c; g.shadowBlur=14; g.strokeStyle=c; g.lineWidth=lw; g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke(); }
+    g.shadowBlur=0; g.fillStyle=th.glow?'#14123a':'#3a2414'; g.fillRect(0,h-56,w,56); });
+  wallT.wrapS=T.RepeatWrapping; wallT.repeat.set(6,1);
+  for(const sx of [-1,1]){ const wl=new T.Mesh(new T.PlaneGeometry(HEAD+900, CH+50), new T.MeshBasicMaterial({map:wallT})); wl.rotation.y=-sx*Math.PI/2; wl.position.set(sx*halfW, CH/2-25, -HEAD/2+200); W.add(wl); }
+  // pared del fondo, detrás de las máquinas
+  box(halfW*2, CH+50, 4, 0, CH/2-25, -PITY-200, new T.MeshLambertMaterial({color: th.glow?0x08071c:0x160d08}));
+  // pantallas con el número de pista, colgadas sobre la zona de tiro
+  for(let k=-2;k<=2;k++){ const scr=tex(256, 128, (g,w,h)=>{ g.fillStyle='#05070d'; g.fillRect(0,0,w,h); g.strokeStyle=neon; g.lineWidth=5; g.strokeRect(5,5,w-10,h-10);
+      g.fillStyle=k===0?'#ffd54a':'#cfe6ff'; g.font='900 34px system-ui,sans-serif'; g.textAlign='center'; g.fillText('PISTA '+(k+3), w/2, 46);
+      for(let i=0;i<10;i++){ g.strokeStyle='rgba(255,255,255,.5)'; g.lineWidth=1.5; g.strokeRect(14+i*23, 64, 21, 26); } g.fillStyle='#d52b1e'; g.fillRect(14,100,76,8); g.fillStyle='#fff'; g.fillRect(90,100,76,8); g.fillStyle='#0038a8'; g.fillRect(166,100,76,8); });
+    const m=new T.Mesh(new T.PlaneGeometry(86, 43), new T.MeshBasicMaterial({map:scr})); m.position.set(k*step, 232, 40); W.add(m); box(90, 47, 5, k*step, 232, 36.5, std({color:0x0a0a0a, roughness:.6})); box(3, CH-256, 3, k*step, (CH+256)/2, 36, std({color:0x333333, metalness:.7, roughness:.4})); }
+  // retorno de bolas entre la pista del medio y las de al lado, con bolas esperando
+  const cols=[0xd52b1e, 0x0038a8, 0x2a9d3f, 0xf2c14e, 0x7a2fbf, 0x111111];
+  for(const sx of [-1,1]){ const x=sx*step/2, dk=std({color: th.glow?0x15133c:0x231710, roughness:.5, metalness:.2}), chr=std({color:0xdfe5ea, metalness:.9, roughness:.2});
+    box(26, 30, 112, x, 9, 92, dk, true); box(30, 4, 118, x, 25, 92, chr, true);
+    const hd=new T.Mesh(new T.CylinderGeometry(15, 15, 30, 20, 1, false, 0, Math.PI), dk); hd.rotation.z=Math.PI/2; hd.rotation.y=Math.PI/2; hd.position.set(x, 26, 46); hd.castShadow=true; W.add(hd);
+    for(const rz of [-1,1]) box(2, 2, 84, x+rz*7, 30, 104, chr);
+    for(let i=0;i<3;i++){ const b=new T.Mesh(new T.SphereGeometry(BR, 24, 16), new T.MeshPhongMaterial({color:cols[(i+(sx>0?2:0))%6], shininess:120, specular:0x999999})); b.position.set(x, 30+BR, 76+i*(BR*2+1.5)); b.castShadow=true; W.add(b); } }
+  // puntos de la zona de tiro y línea de falta iluminada
+  for(let k=-2;k<=2;k++){ box(LW, .6, 3, k*step, .3, 1.5, basic(th.glow?th.glow:0xd52b1e)); }
 }
 function wire3DInput(canvas){
   let drag=null;
@@ -1169,7 +1215,9 @@ function draw3D(){
     if(R3.anBall && !b.held){ const dx=pos.x-R3.anBall.x, dz=pos.z-R3.anBall.z, dist=Math.hypot(dx,dz);
       if(dist>1e-3 && dist<200){ const ax=new T.Vector3(-dz,0,dx).normalize(); R3.ball.quaternion.premultiply(new T.Quaternion().setFromAxisAngle(ax, -dist/BR)); } }
     R3.anBall=b.held?null:pos.clone(); R3.ball.position.copy(pos);
-  } else R3.ball.visible=false;
+    R3.ballRef.visible=!inG && sinkP===0 && b.y<PITY; if(R3.ballRef.visible){ R3.ballRef.position.copy(pos); R3.ballRef.quaternion.copy(R3.ball.quaternion); }
+  } else { R3.ball.visible=false; R3.ballRef.visible=false; }
+  R3.pinsRef.forEach((r,i)=>{ const m=R3.pins[i]; r.visible=m.visible && m.position.y>=5.5; if(r.visible){ r.position.copy(m.position); r.quaternion.copy(m.quaternion); r.children[0].material=m.children[0].material; } });
   // ayuda
   const am = V.phase==='play' && !ANIM.on ? aimNow() : null;
   R3.guide.visible=false; R3.ghost.visible=false;
