@@ -691,7 +691,8 @@ function ciudadSelect(sel, editable, fn){
 }
 function setMyCity(id){ store('bnq_ciudad', id); }
 function setRoomCity(id){ setMyCity(id); doAct({type:'city', city:id}); }
-// k: money | goto | back | jail | free | repairs | each | nearest   (valores en unidades de ₲1.000)
+// k: money | goto | back | jail | free | repairs | each | nearest | banco   (valores en unidades de ₲1.000)
+// banco: se paga ahora y se devuelve al empezar el segundo turno siguiente de ese jugador (p.ret)
 const CARDS = {
   cc:[
     {k:'goto',to:0,x:'Avance hasta la SALIDA y cobre ₲ 200.000.'},
@@ -720,7 +721,8 @@ const CARDS = {
     {k:'money',v:-20,e:'💡',x:'Se cortó la luz de la ANDE toda la tarde y se te pudrió lo de la heladera. Perdés ₲ 20.000.'},
     {k:'money',v:-5,e:'🦺',x:'El cuidacoches te cobró por “cuidarte” el auto en el centro. Pagás ₲ 5.000.'},
     {k:'money',v:-20,e:'😭',x:'Apostaste a que tu equipo ganaba el superclásico y perdió. Pagás ₲ 20.000.'},
-    {k:'money',v:-45,e:'🕳️',x:'Fuiste a San Lorenzo y caíste en un bache. La reparación del auto costó ₲ 45.000 y la pagás.'}
+    {k:'money',v:-45,e:'🕳️',x:'Fuiste a San Lorenzo y caíste en un bache. La reparación del auto costó ₲ 45.000 y la pagás.'},
+    {k:'banco',v:100,e:'🏦',x:'Pusiste tu plata en un banco que parecía buenísimo… y te la congelaron. Te retienen ₲ 100.000: te los devuelven, pero dentro de 2 jugadas.'}
   ],
   ca:[
     {k:'goto',to:0,x:'Avance hasta la SALIDA y cobre ₲ 200.000.'},
@@ -858,7 +860,8 @@ function walletHTML(p){
   const bl=p.bills || billsOf(p.money);
   const items=BILLS.filter(b=>bl[b.v]>0).map(b=>`<div class="bill ${bl[b.v]>1?'stack':''} ${b.coin?'coin':''}" style="--bc:${b.c}" data-v="${b.v}" title="${bl[b.v]} ${b.coin?'moneda(s)':'billete(s)'} de ${fmt(b.v)}">
     ${BANKER_PIC}<span class="bv">${billLabel(b.v)}</span><span class="bn">×${bl[b.v]}</span></div>`).join('');
-  const cards=(p.jcards||[]).map(d=>`<div class="jcard ${d}" title="Usala cuando estés preso o vendela con 🤝 Negociar">🎫 Salga libre<small>de Tacumbú</small></div>`).join('');
+  const cards=(p.jcards||[]).map(d=>`<div class="jcard ${d}" title="Usala cuando estés preso o vendela con 🤝 Negociar">🎫 Salga libre<small>de Tacumbú</small></div>`).join('')
+    + (p.ret||[]).map(r=>`<div class="jcard cc" title="El banco te la devuelve sola">🏦 ${fmt(r.v)}<small>vuelve en ${r.n} jugada${r.n===1?'':'s'}</small></div>`).join('');
   return `<div class="bills">${items||'<span class="muted">Sin billetes</span>'}${cards}</div>`;
 }
 // en modo local "yo" es el jugador del turno; si le toca a un bot, el primer humano
@@ -960,7 +963,7 @@ function addBot(){
   return addPlayer(name, null, 'bot'+(S.seq+1), null, true);
 }
 function startGame(){
-  const players = shuffle(S.players).map(p=>Object.assign(p,{money:START_MONEY,bills:billsOf(START_MONEY),pos:0,jail:false,jailT:0,jcards:[],bk:false,cred:null}));
+  const players = shuffle(S.players).map(p=>Object.assign(p,{money:START_MONEY,bills:billsOf(START_MONEY),pos:0,jail:false,jailT:0,jcards:[],bk:false,cred:null,ret:[]}));
   S = {phase:'play', players, seq:S.seq, hostPid:S.hostPid, props:{}, turn:0, tp:'roll', dbl:0, rolledDbl:false,
        roll:[1,1], rollId:0, card:null, cardId:0, pendingBuy:null, decks:{cc:shuffle(range(CARDS.cc.length)), ca:shuffle(range(CARDS.ca.length))},
        trades:[], tradeSeq:0, log:[], logSeq:0, winner:null, rent:null, rentSeq:0, rolled:{}, observers:S.observers||[], ownerTok:S.ownerTok, ver:2, turnAt:Date.now(), startedAt:Date.now(),
@@ -1102,6 +1105,11 @@ function drawCard(p, deck, flip){
       p.pos=(p.pos+40-c.n)%40; land(p,diceSum(),null); return;
     case 'jail': goJail(p); return;
     case 'free': p.jcards.push(deck); break;
+    case 'banco':   // el banco "buenísimo": se lleva la plata ahora y la devuelve 2 jugadas después
+      pay(p, c.v*K, null, 'banco que parecía buenísimo');
+      (p.ret=p.ret||[]).push({v:c.v*K, n:2});
+      log(`🏦 A ${p.name} le devuelven ${fmt(c.v*K)} dentro de 2 jugadas.`);
+      break;
     case 'repairs': {
       let h=0, ho=0;
       for(const i in S.props){ const o=S.props[i]; if(o.o===p.id){ if(o.h===5) ho++; else h+=o.h; } }
@@ -1186,6 +1194,14 @@ function nextTurn(){
   do{ S.turn=(S.turn+1)%S.players.length; }while(cur().bk);
   S.tp='roll';
   log(`Turno de ${cur().name}.`);
+  devolverBanco(cur());
+}
+// plata retenida por el banco "buenísimo": cada turno del jugador falta una jugada menos; al llegar a 0 se la devuelven
+function devolverBanco(p){
+  if(!p.ret || !p.ret.length) return;
+  for(const r of p.ret) r.n--;
+  for(const r of p.ret.filter(r=>r.n<=0)){ p.money+=r.v; log(`🏦 ¡El banco por fin le devolvió a ${p.name} sus ${fmt(r.v)}!`); }
+  p.ret=p.ret.filter(r=>r.n>0);
 }
 function goBankrupt(p, retire){
   if(retire){ p.cred=null; p.retired=true; if(p.money<0) p.money=0; }   // se retira: no le debe a nadie, todo vuelve al Banco
@@ -1203,7 +1219,7 @@ function goBankrupt(p, retire){
     for(const d of p.jcards) S.decks[d].push(CARDS[d].findIndex(c=>c.k==='free'));
     log(retire ? `🏳️ ${p.name} se retira de la partida (bancarrota voluntaria). Sus propiedades vuelven al Banco.` : `💀 ${p.name} quiebra. Sus propiedades vuelven al Banco.`);
   }
-  p.jcards=[]; p.money=0; p.bk=true; p.jail=false;
+  p.jcards=[]; p.money=0; p.bk=true; p.jail=false; p.ret=[];
   S.trades=S.trades.filter(t=>t.from!==p.id && t.to!==p.id);
   if(cur().id===p.id) nextTurn();
 }
@@ -1981,7 +1997,7 @@ function nameEmojiTaken(name, emoji){
 const takenInfo = () => ({names:S.players.map(x=>x.name), emojis:S.players.map(x=>x.emoji)});
 function firstRoundDone(){ return S.phase==='play' && alive().every(p=>S.rolled && S.rolled[p.id]); }
 function joinMidGame(p){   // entra a una partida que ya empezó (antes de que todos hayan tirado)
-  Object.assign(p,{money:START_MONEY, bills:billsOf(START_MONEY), pos:0, jail:false, jailT:0, jcards:[], bk:false, cred:null});
+  Object.assign(p,{money:START_MONEY, bills:billsOf(START_MONEY), pos:0, jail:false, jailT:0, jcards:[], bk:false, cred:null, ret:[]});
   log(`➕ ${p.name} se suma a la partida con ${fmt(START_MONEY)}. Juega al final de la ronda.`);
 }
 function hostOnClose(conn){
