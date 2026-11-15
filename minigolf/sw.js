@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar el Mini Golf PY como app.
-const CACHE = 'golf-v7';
+const CACHE = 'golf-v8';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './reglas.js', './juego.js'];
 
 self.addEventListener('install', e => {

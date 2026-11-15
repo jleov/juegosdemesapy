@@ -1141,6 +1141,19 @@ function buildHole(ci){
     }
     tr.position.set(x,-10,-y); tr.rotation.y=R()*6; G.add(tr); fadeReg([tr], x-24*s, y-24*s, x+24*s, y+24*s, 0, .25);
   }
+  // jardín en los huecos que deja la cancha por dentro (herradura, zeta): pasto, arbustos, flores y algún árbol
+  { const gs=8, pos=[], spots=[];
+    for(let y=b.y0+gs/2;y<b.y1;y+=gs) for(let x=b.x0+gs/2;x<b.x1;x+=gs){ if(inPoly(H.out,x,y) || edgeDist(H.out,x,y)<9) continue;
+      const h=gs/2; pos.push(x-h,-9.3,-(y-h), x+h,-9.3,-(y-h), x+h,-9.3,-(y+h), x-h,-9.3,-(y-h), x+h,-9.3,-(y+h), x-h,-9.3,-(y+h)); if(edgeDist(H.out,x,y)>=16) spots.push([x,y]); }
+    if(pos.length){ const gg2=new T.BufferGeometry(); gg2.setAttribute('position', new T.Float32BufferAttribute(pos,3)); gg2.setAttribute('uv', new T.Float32BufferAttribute(pos.filter((v,i)=>i%3!==1).map(v=>v/40),2)); gg2.computeVertexNormals();
+      const gm=new T.Mesh(gg2, new T.MeshStandardMaterial({color:0x8fcf6a, map:R3.grassTex, roughness:1})); gm.receiveShadow=true; G.add(gm);
+      let n=0; for(const [x,y] of spots){ if((Math.round(x/gs)+Math.round(y/gs)*3)%5) continue; const q=R(); n++;
+        if(q<.08 && edgeDist(H.out,x,y)>40){ const s=.7+R()*.3, tr=new T.Group(), L3=LEAF[R()<.5?'rosa':'amar']; mk(tr, gTrunk, trunkM, 0, 15*s, 0, 2.6*s, 30*s, 2.6*s);
+          mk(tr, gSph, L3[0], 0, 30*s+9*s, 0, 14*s, 11*s, 14*s); for(let j=0;j<3;j++) mk(tr, gSph, L3[1+j%2], Math.cos(j*2.1)*9*s, 34*s, Math.sin(j*2.1)*9*s, 9*s);
+          tr.position.set(x,-10,-y); G.add(tr); fadeReg([tr], x-20, y-20, x+20, y+20, 0, .25); }
+        else if(q<.55){ const s=3.5+R()*3; mk(G, gSph, LEAF.verde[n%3], x, -10+s*.7, -y, s, s*.8, s); if(n%2) for(let j=0;j<4;j++) mk(G, gSph, LEAF[j%2?'rosa':'amar'][1], x+(R()-.5)*s*1.6, -10+s*(1.1+R()*.3), -y+(R()-.5)*s*1.6, .8).castShadow=false; }
+        else if(q<.8) for(let j=0;j<6;j++){ const fx=x+(R()-.5)*10, fy=y+(R()-.5)*10; mk(G, gTrunk, LEAF.verde[1], fx, -9, -fy, .25, 2.4, .25).castShadow=false; mk(G, gSph, LEAF[['rosa','amar','rosa'][j%3]][j%3], fx, -7.6, -fy, .9).castShadow=false; }
+        else { const s=1.6+R()*2; mk(G, gRock, rockM, x, -9.5+s*.3, -y, s, s*.6, s*1.2).rotation.y=R()*6; } } } }
   for(let k=0;k<(R3.mobile?12:26);k++){
     const a=R()*Math.PI*2, rr=Math.max(W,L)*.5+48+R()*150, x=bcx+Math.cos(a)*rr*(W/Math.max(W,L)+.4), y=bcy+Math.sin(a)*rr;
     if(inCourse(x,y,58)) continue;

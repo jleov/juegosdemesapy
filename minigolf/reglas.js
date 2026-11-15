@@ -53,6 +53,29 @@ const HOLES=[
     obs:[{t:'water', pts:rect(0,280,75,600)}, {t:'spin', x:150, y:440, len:42, arms:3, w:-2}, {t:'ramp', ax:'y', a:630, b:740, h:18},
       {t:'post', x:60, y:790, r:7}, {t:'post', x:160, y:790, r:7},
       {t:'block', pts:rect(0,860,96,910), house:true}, {t:'block', pts:rect(124,860,220,910), house:true}, {t:'mill', x:110, y:860, gw:28, hw:110, d:50, per:3.2}]},
+  {n:'El Arroyo', par:3, d:'Un arroyo cruza la cancha: pasá por el vado sin mojarte.',
+    out:rect(0,0,220,760), tee:[110,45], cup:[110,690],
+    obs:[{t:'water', pts:[[0,330],[138,330],[142,365],[136,400],[0,400]]}, {t:'water', pts:[[184,330],[220,330],[220,400],[180,400],[186,365]]},
+      {t:'post', x:60, y:250, r:7}, {t:'hill', x:60, y:540, r:32, h:5}, {t:'post', x:170, y:560, r:9, boing:true}, {t:'sand', pts:rect(70,722,150,752)}]},
+  {n:'El Laberinto', par:4, d:'Paredes de un lado y del otro: buscá el hueco y usá las bandas.',
+    out:rect(0,0,160,900), tee:[80,45], cup:[80,840],
+    obs:[{t:'block', pts:rect(0,250,108,282)}, {t:'block', pts:rect(52,480,160,512)}, {t:'block', pts:rect(0,710,108,742)},
+      {t:'post', x:130, y:380, r:6}, {t:'post', x:30, y:610, r:6}, {t:'hill', x:80, y:840, r:30, h:-3}]},
+  {n:'La Terraza', par:3, d:'Subí la rampa, cruzá el pasillo entre el agua y bajá con cuidado.',
+    out:rect(0,0,200,860), tee:[100,45], cup:[150,800],
+    obs:[{t:'ramp', ax:'y', a:190, b:300, h:14}, {t:'water', pts:rect(0,340,52,500)}, {t:'water', pts:rect(148,340,200,500)},
+      {t:'ramp', ax:'y', a:540, b:660, h:-14}, {t:'post', x:40, y:600, r:6}, {t:'post', x:160, y:600, r:6}, {t:'post', x:122, y:735, r:9, boing:true}, {t:'sand', pts:rect(0,760,70,860)}, {t:'hill', x:150, y:800, r:30, h:-3}]},
+  {n:'La Herradura', par:4, d:'Subí, doblá dos veces y volvé por el otro lado.',
+    out:[[0,0],[120,0],[120,520],[300,520],[300,0],[420,0],[420,640],[0,640]], tee:[60,45], cup:[360,70],
+    obs:[{t:'post', x:40, y:600, r:9, boing:true}, {t:'spin', x:210, y:580, len:44, arms:2, w:1.5}, {t:'post', x:380, y:600, r:9, boing:true},
+      {t:'hill', x:360, y:360, r:38, h:4}, {t:'sand', pts:rect(300,170,350,215)}, {t:'sand', pts:rect(372,230,420,275)}]},
+  {n:'El Gran Desafío', par:5, d:'Postes, túnel, molinete y molino: el hoyo más largo de todos.',
+    out:rect(0,0,200,1120), tee:[100,45], cup:[100,1055],
+    obs:[{t:'post', x:50, y:220, r:6}, {t:'post', x:100, y:240, r:9, boing:true}, {t:'post', x:150, y:220, r:6},
+      {t:'block', pts:rect(0,400,200,450)}, {t:'tube', a:[100,345], b:[140,500], dir:1.35},
+      {t:'spin', x:100, y:650, len:50, arms:2, w:1.8},
+      {t:'block', pts:rect(0,860,86,910), house:true}, {t:'block', pts:rect(114,860,200,910), house:true}, {t:'mill', x:100, y:860, gw:28, hw:100, d:50, per:3.6},
+      {t:'hill', x:100, y:1055, r:34, h:-3}]},
 ];
 
 // datos de cada hoyo listos para la física (se arman una sola vez)
@@ -501,6 +524,41 @@ const BOT_TALK={
 };
 const pick = a => a[rnd(a.length)];
 const autoPlays = p => p && (p.bot || (!p.conn && p.offAt && Date.now()-p.offAt>20000));
+/* distancia hasta el hoyo yendo por la cancha (rodeando paredes y agua, y contando el túnel como atajo):
+   así el bot no se queda pegado contra una pared que está cerca del hoyo en línea recta */
+const FIELD={};
+function holeField(ci){
+  if(FIELD[ci]) return FIELD[ci];
+  const pr=prep(ci), H=pr.H, b=pr.box, st=5, nx=Math.ceil((b.x1-b.x0)/st)+1, ny=Math.ceil((b.y1-b.y0)/st)+1, N=nx*ny;
+  const free=new Uint8Array(N), d=new Float64Array(N).fill(1e9), at=(x,y)=>[b.x0+x*st, b.y0+y*st];
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){ const [x,y]=at(i,j);
+    if(!inPoly(H.out,x,y) || pr.water.some(p=>inPoly(p,x,y))) continue;
+    if(H.obs.some(o=>o.t==='block' && inPoly(o.pts,x,y))) continue;
+    if(pr.segs.some(s=>{ const q=closest(x,y,s[0],s[1],s[2],s[3]); return Math.hypot(x-q[0],y-q[1])<BR+1; })) continue;
+    free[j*nx+i]=1; }
+  const idx=(x,y)=>{ const i=Math.round((x-b.x0)/st), j=Math.round((y-b.y0)/st); return i<0||j<0||i>=nx||j>=ny ? -1 : j*nx+i; };
+  // Dijkstra con un montículo binario (cola de prioridad)
+  const run=seeds=>{ const hk=[], hv=[];
+    const push=(k,v)=>{ let i=hk.length; hk.push(k); hv.push(v); while(i>0){ const p=(i-1)>>1; if(hv[p]<=v) break; hk[i]=hk[p]; hv[i]=hv[p]; i=p; } hk[i]=k; hv[i]=v; };
+    const pop=()=>{ const k=hk[0], v=hv[0], lk=hk.pop(), lv=hv.pop(); if(hk.length){ let i=0; const n=hk.length;
+        for(;;){ let c=2*i+1; if(c>=n) break; if(c+1<n && hv[c+1]<hv[c]) c++; if(hv[c]>=lv) break; hk[i]=hk[c]; hv[i]=hv[c]; i=c; } hk[i]=lk; hv[i]=lv; } return [k,v]; };
+    seeds.forEach(([k,v])=>{ if(v<d[k]){ d[k]=v; push(k,v); } });
+    while(hk.length){ const [k,v]=pop(); if(v>d[k]) continue;
+      const i=k%nx, j=(k-i)/nx;
+      for(let dj=-1;dj<=1;dj++) for(let di=-1;di<=1;di++){ if(!di&&!dj) continue; const a=i+di, c=j+dj; if(a<0||c<0||a>=nx||c>=ny) continue; const kk=c*nx+a; if(!free[kk]) continue;
+        const nv=v+st*(di&&dj?1.414:1); if(nv<d[kk]){ d[kk]=nv; push(kk,nv); } } } };
+  const near=(x,y,r)=>{ const out=[]; for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){ const [cx,cy]=at(i,j); if(free[j*nx+i] && Math.hypot(cx-x,cy-y)<=r) out.push(j*nx+i); } return out; };
+  run(near(H.cup[0],H.cup[1],st).map(k=>[k,0]));
+  for(const m of pr.tubes){ const ex=near(m.b[0],m.b[1],TR+st).reduce((v,k)=>Math.min(v,d[k]),1e9); if(ex<1e9) run(near(m.a[0],m.a[1],TR).map(k=>[k,ex])); }
+  return FIELD[ci]={d, free, idx, nx};
+}
+function pathDist(ci, x, y){
+  const F=holeField(ci), k=F.idx(x,y), cup=HOLES[ci].cup, eu=Math.hypot(x-cup[0], y-cup[1]);
+  if(k>=0 && F.d[k]<1e9) return F.d[k];
+  // la celda justo cae pegada a una pared: se usa la vecina más cercana que sirva
+  let best=1e9; const i=k%F.nx, j=(k-i)/F.nx; if(k>=0) for(let dj=-2;dj<=2;dj++) for(let di=-2;di<=2;di++){ const kk=(j+dj)*F.nx+(i+di); if(kk>=0 && kk<F.d.length && F.d[kk]<best) best=F.d[kk]+5; }
+  return best<1e9 ? best : eu+600;
+}
 function botPlan(lvOverride){
   const u=S.units[S.cur], ci=S.course[S.hi], H=HOLES[ci], pr=prep(ci), lv=lvOverride||S.opts.bot;
   const from=u.pos || {x:H.tee[0], y:H.tee[1]}, balls=onCourse(u, from), t0=Date.now()/1000, cup=H.cup;
@@ -512,7 +570,7 @@ function botPlan(lvOverride){
   const nA = lv==='facil' ? 12 : lv==='crack' ? 36 : 24, pows = lv==='facil' ? [.3,.6,.9] : [.2,.35,.5,.7,.9];
   for(let k=0;k<nA;k++) for(const pw of pows) cands.push([k*2*Math.PI/nA + (k%2?.07:0), pw]);
   const cost=(ang,pw)=>{ const r=simulate(ci, balls, {id:u.id, ang, pow:pw}, t0, {collide:S.opts.collide}, 'light'), f=r.fin[u.id];
-    if(f.inn) return -1000+pw; return (f.wet?400:0) + Math.hypot(f.x-cup[0], f.y-cup[1]) + (lv==='crack'?0:Math.abs(pw-.5)*10); };
+    if(f.inn) return -1000+pw; return (f.wet?400:0) + pathDist(ci, f.x, f.y) + (lv==='crack'?0:Math.abs(pw-.5)*10); };
   let best=null;
   for(const [ang,pw] of cands){ const c=cost(ang,pw); if(!best || c<best.c) best={ang, pow:pw, c}; }
   // afina alrededor del mejor
