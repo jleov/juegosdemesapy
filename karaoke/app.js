@@ -37,7 +37,8 @@ const cfg = Object.assign({
 const saveCfg = () => { try { localStorage.setItem('karaoke_cfg', JSON.stringify(cfg)); } catch (e) {} };
 
 /* ---------------- estado ---------------- */
-const EMPTY = () => ({ v: 0, sid: '', vid: '', title: '', by: '', playing: false, pos: 0, at: 0, queue: [] });
+// mark: sube con cada orden de alguien (canción, play, pausa, salto); wait: esperando que todos carguen el video (rdy de tot listos)
+const EMPTY = () => ({ v: 0, sid: '', vid: '', title: '', by: '', playing: false, pos: 0, at: 0, queue: [], mark: 0, wait: 0, rdy: 0, tot: 0 });
 const S = {
   room: '', name: '', me: null, reg: null, regConn: null, regTimer: 0, left: false,
   roster: [], peers: new Map(), pending: new Map(),
@@ -215,6 +216,7 @@ async function audioStart() {
   A.mix.connect(A.vvol); A.vvol.connect(A.dest); A.vvol.connect(A.mon); A.mon.connect(ctx.destination);
   // sin micrófono (no hay o no dio permiso) igual se puede mirar y escuchar
   try { await micOpen(); } catch (e) { console.warn('sin micrófono', e); A.noMic = e && e.name === 'NotAllowedError' ? 'permiso' : 'falta'; }
+  if (!A.noMic) rnLoad();   // se prepara de fondo para cuando toque «Hablar»
   if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
   setInterval(gateTick, 20);
   setInterval(talkTick, 150);
@@ -222,7 +224,7 @@ async function audioStart() {
 }
 
 async function micOpen(id = cfg.mic) {
-  const want = { echoCancellation: !cfg.phones, noiseSuppression: S.mode !== 'sing' && !cfg.phones, autoGainControl: false, channelCount: 1 };
+  const want = { echoCancellation: !cfg.phones, noiseSuppression: S.mode === 'talk' && !A.rn && !cfg.phones, autoGainControl: false, channelCount: 1 };
   let raw;
   try { raw = await navigator.mediaDevices.getUserMedia({ audio: id ? { ...want, deviceId: { exact: id } } : want }); }
   catch (e) {
@@ -234,7 +236,33 @@ async function micOpen(id = cfg.mic) {
   try { A.src && A.src.disconnect(); } catch (e) {}
   A.raw = raw;
   A.src = A.ctx.createMediaStreamSource(raw);
-  A.src.connect(A.hp);
+  micRoute();
+}
+
+// «Hablar»: la voz pasa por RNNoise (inteligencia que saca ruidos de alrededor, tipo Krisp, la misma de las Salas de Voz).
+// Al cantar no se usa porque corta las notas largas y la música.
+async function rnLoad() {
+  if (A.rnTry) return A.rnTry;
+  return A.rnTry = (async () => {
+    try {
+      const { RnnoiseWorkletNode, loadRnnoise } = await import('../salas/vendor/ns.js');
+      const bin = await loadRnnoise({ url: '../salas/vendor/rnnoise.wasm', simdUrl: '../salas/vendor/rnnoise_simd.wasm' });
+      await A.ctx.audioWorklet.addModule('../salas/vendor/rnnoise-worklet.js');
+      A.rn = new RnnoiseWorkletNode(A.ctx, { wasmBinary: bin, maxChannels: 1 });
+      A.rn.connect(A.hp);
+      micRoute(); micConstraints();
+    } catch (e) { console.warn('RNNoise no cargó', e); A.rn = null; micConstraints(); }
+  })();
+}
+function micRoute() {
+  if (!A.src) return;
+  try { A.src.disconnect(); } catch (e) {}
+  A.src.connect(S.mode === 'talk' && A.rn ? A.rn : A.hp);
+}
+// el quitado de ruido del navegador solo hace falta si no anda RNNoise
+function micConstraints() {
+  const tr = A.raw && A.raw.getAudioTracks()[0];
+  if (tr && tr.applyConstraints) tr.applyConstraints({ echoCancellation: !cfg.phones, noiseSuppression: S.mode === 'talk' && !A.rn && !cfg.phones, autoGainControl: false }).catch(() => {});
 }
 
 function makeIR(sec) {
@@ -310,9 +338,8 @@ function setMode(m) {
   const was = S.mode;
   S.mode = m;
   A.dest.stream.getAudioTracks().forEach(t => t.enabled = m !== 'mute');
-  // al cantar se apaga el quitado de ruido del navegador (corta las notas largas)
-  const tr = A.raw && A.raw.getAudioTracks()[0];
-  if (tr && tr.applyConstraints) tr.applyConstraints({ echoCancellation: !cfg.phones, noiseSuppression: m !== 'sing' && !cfg.phones, autoGainControl: false }).catch(() => {});
+  // al hablar se sacan los ruidos de alrededor; al cantar no (cortaría las notas largas)
+  micRoute(); micConstraints();
   applyFx();
   broadcast({ t: 'mode', mode: m });
   if (m === 'sing' && was !== 'sing' && !cfg.phones && !S.tipShown) { S.tipShown = true; toast('🎧 Consejo: con auriculares suena mucho mejor (sin que la música se escuche dos veces).', 6000); }
@@ -410,6 +437,7 @@ function becomeRegistry() {
     Object.assign(R, {
       sid: String(st.sid || rand(6)).slice(0, 8), vid: okVid(st.vid) ? st.vid : '', title: String(st.title || '').slice(0, 150), by: String(st.by || '').slice(0, 24),
       playing: !!st.playing && okVid(st.vid), pos: clamp(+st.pos || 0, 0, 36000), at: now(), queue: (st.queue || []).map(cleanItem).filter(Boolean).slice(0, 100),
+      mark: (st.mark | 0) + 1, wait: 0,
     });
     R.v++;
   };
@@ -418,13 +446,39 @@ function becomeRegistry() {
   const sendList = () => { const m = listMsg(); members.forEach(x => safeSend(x.conn, m)); watchers.forEach(c => safeSend(c, m)); };
   const sendSt = () => { const m = { t: 'st', st: R }; members.forEach(x => safeSend(x.conn, m)); };
   const cur = () => R.playing ? R.pos + Math.max(0, now() - R.at) / 1000 : R.pos;
+  // antes de arrancar una canción (o después de un salto) se espera a que todos tengan cargados
+  // unos segundos del video, así después nadie se traba; si alguien tarda mucho se arranca igual
+  const prep = { got: new Set(), until: 0 };
+  const prepare = ms => { R.playing = true; R.wait = 1; R.at = now() + 60000; R.rdy = 0; R.tot = members.size; prep.got = new Set(); prep.until = now() + ms; };
+  const go = () => { R.wait = 0; R.at = now() + 800; R.v++; sendSt(); };
+  const checkPrep = () => {
+    if (!R.wait) return;
+    const ids = [...members.keys()];
+    const rdy = ids.filter(id => prep.got.has(id)).length;
+    if (rdy >= ids.length || now() > prep.until) return go();
+    if (rdy !== R.rdy || ids.length !== R.tot) { R.rdy = rdy; R.tot = ids.length; R.v++; sendSt(); }
+  };
   const startNext = () => {
     const it = R.queue.shift();
-    if (it) Object.assign(R, { sid: rand(6), vid: it.vid, title: it.title, by: it.by, pos: 0, playing: true, at: now() + 1500 });
-    else Object.assign(R, { sid: '', vid: '', title: '', by: '', pos: 0, playing: false, at: now() });
+    if (it) { Object.assign(R, { sid: rand(6), vid: it.vid, title: it.title, by: it.by, pos: 0 }); prepare(10000); }
+    else Object.assign(R, { sid: '', vid: '', title: '', by: '', pos: 0, playing: false, wait: 0, at: now() });
+    R.mark++;
     sendList();
   };
-  const doCmd = (d, who) => {
+  const doCmd = (d, who, from) => {
+    if (d.op === 'ready') {
+      if (R.wait && d.sid === R.sid && d.mark === R.mark) { prep.got.add(from); checkPrep(); }
+      return;
+    }
+    if (d.op === 'lead') {
+      // quien canta avisa por dónde va su video: la sala lo sigue a él (a él nunca se lo corrige)
+      const ts = +d.ts, pos = +d.pos;
+      if (!R.vid || !R.playing || R.wait || d.sid !== R.sid || d.mark !== R.mark || !(pos >= 0) || !(Math.abs(now() - ts) < 5000)) return;
+      if (d.stall) { R.pos = pos; R.at = now() + 1000; }   // se le está cargando: los demás esperan en el mismo lugar
+      else { R.pos = pos + (now() - ts) / 1000; R.at = now(); }
+      R.v++; sendSt();
+      return;
+    }
     switch (d.op) {
       case 'add': {
         const it = cleanItem({ vid: d.vid, title: d.title, by: who }); if (!it || R.queue.length >= 100) return;
@@ -432,14 +486,19 @@ function becomeRegistry() {
       }
       case 'now': {
         const it = cleanItem({ vid: d.vid, title: d.title, by: who }); if (!it) return;
-        Object.assign(R, { sid: rand(6), vid: it.vid, title: it.title, by: it.by, pos: 0, playing: true, at: now() + 1500 });
+        Object.assign(R, { sid: rand(6), vid: it.vid, title: it.title, by: it.by, pos: 0 });
+        prepare(10000); R.mark++;
         sendList(); break;
       }
       case 'next': startNext(); break;
       case 'ended': if (!R.vid || d.sid !== R.sid) return; startNext(); break;
-      case 'play': if (!R.vid || R.playing) return; R.pos = cur(); R.playing = true; R.at = now() + 700; break;
-      case 'pause': if (!R.playing) return; R.pos = cur(); R.playing = false; R.at = now(); break;
-      case 'seek': if (!R.vid) return; R.pos = clamp(+d.pos || 0, 0, 36000); R.at = now() + (R.playing ? 700 : 0); break;
+      case 'play': if (!R.vid || R.playing) return; R.pos = cur(); R.playing = true; R.at = now() + 700; R.mark++; break;
+      case 'pause': if (!R.playing) return; R.pos = cur(); R.playing = false; R.wait = 0; R.at = now(); R.mark++; break;
+      case 'seek':
+        if (!R.vid) return;
+        R.pos = clamp(+d.pos || 0, 0, 36000);
+        if (R.playing) prepare(5000); else R.at = now();
+        R.mark++; break;
       case 'rm': R.queue = R.queue.filter(x => x.k !== d.k); break;
       case 'up': { const i = R.queue.findIndex(x => x.k === d.k); if (i > 0) R.queue.unshift(R.queue.splice(i, 1)[0]); break; }
       default: return;
@@ -449,7 +508,7 @@ function becomeRegistry() {
   r.on('open', () => joinRegistry());
   r.on('error', e => {
     if (e.type === 'unavailable-id') {   // otro ya la tomó
-      clearInterval(r._iv); r.destroy(); if (S.reg === r) S.reg = null;
+      clearInterval(r._iv); clearInterval(r._iv2); r.destroy(); if (S.reg === r) S.reg = null;
       setTimeout(joinRegistry, 300 + Math.random() * 700);
     } else console.warn('lista', e.type);
   });
@@ -465,10 +524,11 @@ function becomeRegistry() {
         sendList(); safeSend(c, { t: 'st', st: R });
       } else if (d.t === 'peek') { watchers.add(c); safeSend(c, listMsg()); }
       else if (d.t === 'ping') safeSend(c, { t: 'pong', c: d.c, s: now() });
-      else if (d.t === 'cmd' && m) doCmd(d, m.name);
+      else if (d.t === 'cmd' && m) doCmd(d, m.name, c.peer);
     });
-    c.on('close', () => { watchers.delete(c); const m = members.get(c.peer); if (m && m.conn === c) { members.delete(c.peer); sendList(); } });
+    c.on('close', () => { watchers.delete(c); const m = members.get(c.peer); if (m && m.conn === c) { members.delete(c.peer); sendList(); checkPrep(); } });
   });
+  r._iv2 = setInterval(checkPrep, 500);
   r._iv = setInterval(() => {
     let ch = false;
     members.forEach((m, id) => { if (Date.now() - m.seen > 15000) { members.delete(id); try { m.conn.close(); } catch (e) {} ch = true; } });
@@ -649,7 +709,7 @@ async function statsTick() {
    YOUTUBE SINCRONIZADO
    ===================================================================== */
 let yt = null;
-const P = { ready: false, sid: '', lastSeek: 0, lag: 0.15, drifts: [], lagCheck: false, want: 0, startFor: -1, startT: 0, fine: true, rateFails: 0, rate: 1, align: 0, dragging: false };
+const P = { ready: false, sid: '', lastSeek: 0, lag: 0.15, drifts: [], lagCheck: false, want: 0, startFor: -1, startT: 0, fine: true, rateFails: 0, rate: 1, align: 0, dragging: false, mark: -1, hard: true, leadAt: 0, readyFor: '', warm: false };
 window.__karaoke = { S, P, CK, A, yt: () => yt };   // para revisar desde la consola
 
 function loadYT() {
@@ -667,7 +727,12 @@ async function ytStart() {
     events: {
       onReady: () => { P.ready = true; yt.setVolume(cfg.music); syncTick(); },
       onStateChange: e => {
-        if (e.data === 0 && S.st.vid && P.sid === S.st.sid) cmd('ended', { sid: S.st.sid });
+        if (e.data === 0 && S.st.vid && P.sid === S.st.sid) {
+          // si alguien canta, el que termina la canción es él (así no se le corta el final);
+          // los demás avisan solo si él no lo hizo en unos segundos
+          const sid = S.st.sid, other = leaderId() && !iLead();
+          setTimeout(() => { if (S.st.sid === sid) cmd('ended', { sid }); }, other ? 4000 : 0);
+        }
         if (e.data === 1) $('#tapPlay').classList.add('hidden');
       },
       onError: e => {
@@ -677,6 +742,20 @@ async function ytStart() {
       },
     },
   });
+}
+
+// quien marca el ritmo: el que canta (si cantan varios, el de id más chico, igual para todos)
+function leaderId() {
+  const ids = [...S.peers.values()].filter(p => p.mode === 'sing').map(p => p.id);
+  if (S.mode === 'sing' && S.me && S.me.id) ids.push(S.me.id);
+  return ids.sort()[0] || '';
+}
+const iLead = () => S.mode === 'sing' && S.me && leaderId() === S.me.id;
+// el que canta avisa a la sala por dónde va su video (una vez por segundo, o enseguida si se le traba)
+function sendLead(cur, stall) {
+  if (!stall && now() - P.leadAt < 1000) return;
+  P.leadAt = now();
+  safeSend(S.regConn, { t: 'cmd', op: 'lead', sid: S.st.sid, mark: S.st.mark, pos: cur, ts: regNow(), stall: !!stall });
 }
 
 // cuánto atraso mi video para que la voz de quien canta caiga justo con la música
@@ -713,6 +792,7 @@ function syncTick() {
   const want = alignTarget();
   P.align += clamp(want - P.align, -0.02, 0.02);
   const target = expectedPos() - P.align;
+  if (P.mark !== st.mark) { P.mark = st.mark; P.hard = true; }   // alguien dio una orden: se acomoda aunque cante
   if (P.sid !== st.sid) {
     P.sid = st.sid; P.drifts = []; P.lagCheck = false; P.lastSeek = now(); P.want = now(); setRate(1);
     yt.loadVideoById({ videoId: st.vid, startSeconds: Math.max(0, target) });
@@ -722,19 +802,40 @@ function syncTick() {
   let ps, cur, dur;
   try { ps = yt.getPlayerState(); cur = yt.getCurrentTime() || 0; dur = yt.getDuration() || 0; } catch (e) { return; }
   paintCtrl(cur, dur);
-  const waiting = st.playing && target < st.pos - 0.03;   // todavía no llegó el momento de arrancar
+  // si canto yo y nadie dio una orden, mi video no se detiene (la espera de los demás es por mí)
+  const free = iLead() && !P.hard && st.playing && !st.wait;
+  const behind = st.pos - expectedPos();   // > 0: todavía no llegó el momento de arrancar
+  const waiting = !free && st.playing && behind > 0.03;
   if (!st.playing || waiting) {
-    if (ps === 1) yt.pauseVideo();
-    const hold = st.playing ? st.pos : Math.max(0, target);
-    if (Math.abs(cur - hold) > 0.25 && ps !== 3 && now() - P.lastSeek > 700) { yt.seekTo(hold, true); P.lastSeek = now(); }
-    if (waiting && P.startFor !== st.v) {
+    const hold = Math.max(0, st.playing ? st.pos - P.align : target);
+    // esperando que todos carguen: YouTube no carga en pausa, así que se reproduce un momento en silencio
+    // hasta tener unos segundos guardados, y después vuelve al lugar justo y avisa a la sala
+    if (st.wait && dur > 0 && P.readyFor !== st.sid + '|' + st.mark) {
+      let frac = 0; try { frac = yt.getVideoLoadedFraction() || 0; } catch (e) {}
+      if (frac >= 0.99 || frac * dur - st.pos >= 6) {
+        P.readyFor = st.sid + '|' + st.mark;
+        unwarm(hold);
+        safeSend(S.regConn, { t: 'cmd', op: 'ready', sid: st.sid, mark: st.mark });
+      } else if (!P.warm && ps !== 3) {
+        P.warm = true;
+        try { yt.mute(); yt.seekTo(hold, true); yt.playVideo(); } catch (e) {}
+        P.lastSeek = now();
+      }
+    } else if (P.warm) unwarm(hold);
+    if (!P.warm) {
+      if (ps === 1) yt.pauseVideo();
+      if (Math.abs(cur - hold) > 0.25 && ps !== 3 && now() - P.lastSeek > 700) { yt.seekTo(hold, true); P.lastSeek = now(); }
+    }
+    if (waiting && !st.wait && P.startFor !== st.v) {
       P.startFor = st.v; clearTimeout(P.startT);
-      P.startT = setTimeout(() => { try { yt.playVideo(); } catch (e) {} }, (st.pos - target) * 1000);
+      P.startT = setTimeout(() => { try { yt.playVideo(); } catch (e) {} }, behind * 1000);
     }
     P.want = now(); P.drifts = []; setRate(1); paintSync(null); return;
   }
+  if (P.warm) { unwarm(Math.max(0, target)); return; }   // se arrancó antes de terminar de cargar
   if (ps === 0) return;
   if (ps !== 1) {
+    if (ps === 3 && iLead() && !P.hard) sendLead(cur, true);   // se me trabó a mí: los demás me esperan
     if (ps !== 3) { try { yt.playVideo(); } catch (e) {} }
     if (ps !== 3 && now() - P.want > 3000) $('#tapPlay').classList.remove('hidden');
     P.drifts = []; paintSync(null); return;
@@ -742,11 +843,14 @@ function syncTick() {
   P.want = now();
   $('#unmute').classList.toggle('hidden', !(yt.isMuted && yt.isMuted()));
   if (CK.s.length < 3) return;   // todavía no se midió bien el reloj
+  // si canto yo, mi video sigue de corrido: ni saltos ni cambios de velocidad; la sala me sigue a mí
+  if (iLead() && !P.hard) { setRate(1); P.drifts = []; sendLead(cur, false); paintSync('lead'); return; }
   const d = cur - target;
   P.drifts.push(d); if (P.drifts.length > 5) P.drifts.shift();
   if (P.drifts.length < 3) return;
   const med = [...P.drifts].sort((a, b) => a - b)[P.drifts.length >> 1];
   paintSync(med);
+  if (P.hard && Math.abs(med) < 0.15) P.hard = false;
   // después de un salto se aprende cuánto se quedó corto o pasado
   if (P.lagCheck) { P.lagCheck = false; P.lag = clamp(P.lag - med * 0.8, 0, 1.5); }
   // lejos: salto; cerca: un poquito más lento o más rápido hasta alcanzar (no se nota)
@@ -764,6 +868,13 @@ function syncTick() {
   }
 }
 
+// deja de cargar en silencio: vuelve al lugar justo, en pausa y con sonido
+function unwarm(pos) {
+  P.warm = false;
+  try { yt.pauseVideo(); yt.seekTo(pos, true); yt.unMute(); yt.setVolume(cfg.music); } catch (e) {}
+  P.lastSeek = now();
+}
+
 function paintCtrl(cur, dur) {
   $('#bPlay').textContent = S.st.playing ? '⏸' : '▶';
   if (!P.dragging) {
@@ -774,11 +885,16 @@ function paintCtrl(cur, dur) {
 function paintSync(d) {
   const b = $('#syncBadge');
   b.classList.remove('ok', 'warn');
-  if (d === null || !S.st.vid) { b.textContent = S.st.vid ? (S.st.playing ? '● Cargando…' : '⏸ En pausa') : '● —'; return; }
+  if (d === 'lead') { b.classList.add('ok'); b.textContent = '🎤 Vos marcás el ritmo'; return; }
+  if (d === null || !S.st.vid) {
+    b.textContent = !S.st.vid ? '● —' : S.st.wait ? `⏳ Cargando el video para todos (${S.st.rdy}/${S.st.tot})` : S.st.playing ? '● Cargando…' : '⏸ En pausa';
+    return;
+  }
   const ms = Math.round(Math.abs(d) * 1000);
   if (ms < 80) { b.classList.add('ok'); b.textContent = `● Sincronizado ±${ms} ms`; }
   else { b.classList.add('warn'); b.textContent = `● Ajustando ${d > 0 ? '+' : '−'}${(Math.abs(d)).toFixed(2)} s`; }
-  if (P.align > 0.02) b.textContent += ' · 🎤';
+  const l = leaderId(), lp = l && S.peers.get(l);
+  if (lp) b.textContent += ' · siguiendo a ' + lp.name;
 }
 
 /* =====================================================================
