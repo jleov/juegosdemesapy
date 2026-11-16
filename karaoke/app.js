@@ -208,7 +208,7 @@ async function audioStart() {
   // micrófono → filtro → (tono) → compresor → brillo → corte de silencio → seco + reverberación + eco
   const head = A.pitch ? (A.hp.connect(A.pitch), A.pitch) : A.hp;
   head.connect(A.comp); A.comp.connect(A.pres); A.pres.connect(A.lp);
-  A.lp.connect(A.an); A.lp.connect(A.gate);
+  A.hp.connect(A.an); A.lp.connect(A.gate);   // el nivel se mide antes del compresor (que sube el volumen y también el ruido)
   A.gate.connect(A.dry); A.dry.connect(A.mix);
   A.gate.connect(A.conv); A.conv.connect(A.rev); A.rev.connect(A.mix);
   A.gate.connect(A.dly); A.dly.connect(A.fbLp); A.fbLp.connect(A.fb); A.fb.connect(A.dly); A.fbLp.connect(A.echo); A.echo.connect(A.mix);
@@ -251,7 +251,7 @@ async function rnLoad() {
       A.rn = new RnnoiseWorkletNode(A.ctx, { wasmBinary: bin, maxChannels: 1 });
       A.rn.connect(A.hp);
       micRoute(); micConstraints();
-    } catch (e) { console.warn('RNNoise no cargó', e); A.rn = null; micConstraints(); }
+    } catch (e) { console.warn('RNNoise no cargó', e); A.rn = null; A.rnFail = true; micConstraints(); }
   })();
 }
 function micRoute() {
@@ -262,7 +262,18 @@ function micRoute() {
 // el quitado de ruido del navegador solo hace falta si no anda RNNoise
 function micConstraints() {
   const tr = A.raw && A.raw.getAudioTracks()[0];
-  if (tr && tr.applyConstraints) tr.applyConstraints({ echoCancellation: !cfg.phones, noiseSuppression: S.mode === 'talk' && !A.rn && !cfg.phones, autoGainControl: false }).catch(() => {});
+  const ns = S.mode === 'talk' && !A.rn && !cfg.phones;
+  if (tr && tr.applyConstraints) tr.applyConstraints({ echoCancellation: !cfg.phones, noiseSuppression: ns, autoGainControl: false }).then(() => {
+    // Chrome no deja prender el quitado de ruido del navegador en un micrófono ya abierto: se vuelve a abrir
+    const now_ = tr.getSettings ? tr.getSettings().noiseSuppression : ns;
+    if (ns && now_ === false && !A.reopening) { A.reopening = true; micOpen().catch(() => {}).finally(() => { A.reopening = false; }); }
+  }).catch(() => {});
+  paintNs();
+}
+function paintNs() {
+  const el = $('#nsState'); if (!el) return;
+  el.textContent = A.noMic ? '' : A.rn ? '✅ Quitado de ruido con IA (tipo Krisp) listo: se usa al tocar «💬 Hablar».'
+    : A.rnFail ? '⚠️ La IA de ruido no anda en este aparato: se usa la del navegador (más simple).' : '⏳ Preparando el quitado de ruido con IA…';
 }
 
 function makeIR(sec) {
@@ -289,7 +300,8 @@ function applyFx() {
   A.hp.frequency.setTargetAtTime(radio ? 450 : 90, t, 0.05);
   A.lp.frequency.setTargetAtTime(radio ? 3400 : 16000, t, 0.05);
   A.pres.gain.setTargetAtTime(radio ? 6 : sing ? 2.5 : 0, t, 0.05);
-  A.comp.ratio.value = sing ? 4 : 3;
+  // el compresor sube solo el volumen (y con él el ruido de fondo): al hablar queda apagado
+  A.comp.threshold.value = sing ? -26 : 0; A.comp.ratio.value = sing ? 4 : 1;
   if (A.pitch) {
     const tu = TUNES[cfg.tune] || TUNES.off;
     A.pitch.parameters.get('ratio').setValueAtTime(sing ? Math.pow(2, cfg.pitch / 12) : 1, t);
@@ -309,8 +321,13 @@ const gBuf = new Float32Array(1024);
 function gateTick() {
   const n = now(), sing = fxOn();
   A.db = levelDb(A.an, gBuf);
-  if (A.db > (sing ? -62 : -55)) { A.lastLoud = n; A.open = true; }
-  else if (A.open && n - A.lastLoud > (sing ? 1000 : 650)) A.open = false;
+  // corte de silencio que se adapta a cada aparato: aprende el nivel del ruido de fondo
+  // (baja enseguida, sube despacio) y solo deja pasar lo que está claramente por encima: tu voz
+  if (A.floor === undefined || A.db < A.floor) A.floor = A.floor === undefined ? A.db : A.floor * 0.7 + A.db * 0.3;
+  else A.floor = Math.min(A.floor + 0.015, -20);
+  const thr = Math.max(A.floor + (sing ? 7 : 12), sing ? -68 : -62);
+  if (A.db > thr) { A.lastLoud = n; A.open = true; }
+  else if (A.open && n - A.lastLoud > (sing ? 1000 : 450)) A.open = false;
   const on = A.open && (S.mode !== 'mute' || cfg.monitor);
   A.gate.gain.setTargetAtTime(on ? 1 : 0, A.ctx.currentTime, on ? 0.004 : 0.15);
   if (S.tab === 'voice') {
@@ -909,7 +926,7 @@ function roomUI() {
     document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('hidden', t.id !== 'tab-' + S.tab));
     if (S.tab === 'chat') { S.unread = 0; $('#unread').classList.add('hidden'); const mb = $('#msgBox'); mb.scrollTop = mb.scrollHeight; }
-    if (S.tab === 'voice') fillMics();
+    if (S.tab === 'voice') { fillMics(); paintNs(); }
   });
   // modos del micrófono
   document.querySelectorAll('#modes button').forEach(b => b.onclick = () => { if (A.ctx.state === 'suspended') A.ctx.resume(); setMode(b.dataset.m); });
