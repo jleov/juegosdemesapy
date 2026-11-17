@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<!-- SEO (buscadores y vista previa al compartir) -->
+<title>Carrera Guasu: carreras de karts en 3D por el Paraguay, online y gratis | Juegos PY</title>
+<meta name="description" content="Carrera Guasu: juego de karts en 3D con animales del Paraguay. 12 pistas en Asunción, Encarnación, Ciudad del Este, Caacupé y más, con chipa turbo, tereré helado y derrapes. Gratis, en línea con amigos o contra bots.">
+<link rel="canonical" href="https://juegospy.com/karts/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Juegos Paraguay Digitales">
+<meta property="og:title" content="Carrera Guasu: carreras de karts en 3D por el Paraguay, online y gratis | Juegos PY">
+<meta property="og:description" content="Juego de karts en 3D con animales del Paraguay: 12 pistas en ciudades paraguayas, objetos con chipa y tereré, derrapes, copas, contrarreloj y carreras en línea con amigos.">
+<meta property="og:url" content="https://juegospy.com/karts/">
+<meta property="og:image" content="https://juegospy.com/karts/icon-512.png">
+<meta property="og:locale" content="es_PY">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Carrera Guasu", "url": "https://juegospy.com/karts/", "description": "Carreras de karts en 3D con animales del Paraguay: 12 pistas en ciudades paraguayas, objetos con chipa y tereré, derrapes con mini turbo, copas, contrarreloj y carreras en línea de hasta 8 karts con chat, voz y bots.", "image": "https://juegospy.com/karts/icon-512.png", "inLanguage": "es", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "jleovgames", "url": "https://juegospy.com/"}, "isPartOf": {"@type": "WebSite", "name": "Juegos Paraguay Digitales", "url": "https://juegospy.com/"}, "genre": ["Carreras", "Karts", "Arcade"], "gamePlatform": ["Navegador web", "Android", "PC"], "playMode": "MultiPlayer", "applicationCategory": "Game", "operatingSystem": "Cualquiera (navegador)", "alternateName": ["Carrera Guasu", "Karts PY", "Karts paraguayos", "Juego de karts online"], "keywords": "juego de karts online, carreras de karts gratis, karts paraguayos, juego de carreras 3D en el navegador, juegos paraguayos online, carreras con amigos"}</script>
+<!-- /SEO -->
+<meta name="theme-color" content="#12306b">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!-- librería de conexión entre jugadores (PeerJS 1.5.4) y la de 3D (three.js r128), guardadas junto al juego -->
+<script src="peerjs.min.js"></script>
+<script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="three.min.js"></script>
+<script src="../ice.js"></script>
+<style>
+:root{--cream:#fbf4e4;--ink:#1d1d1d;--muted:#6b6b6b;--red:#d52b1e;--blue:#0038a8;--gold:#f2c14e;--green:#1f9a46}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(circle at 30% 10%,#2f6fd0,#12306b 55%,#081534) fixed;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+html,body{overflow-x:clip}
+body.corriendo{overflow:hidden;position:fixed;inset:0}
+.screen{display:none}.screen.on{display:block}
+input,button,select,textarea{font:inherit}
+input[type=text],select,textarea{width:100%;padding:10px 12px;border:1px solid #cbbf9f;border-radius:10px;background:#fff;color:var(--ink)}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff;touch-action:manipulation}
+.btn.red{background:var(--red)}.btn.gray{background:#7a7a7a}.btn.gold{background:var(--gold);color:#222}.btn.green{background:var(--green)}.btn.dark{background:#22264a}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.wide{width:100%}
+.btn.big{font-size:18px;padding:13px 16px}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.muted{color:var(--muted);font-size:13px}
+.box{background:var(--cream);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:14px}
+.box h3{margin:0 0 10px;font-size:17px}
+.box label,#mbox label{display:block;font-size:13px;font-weight:800;margin:10px 0 4px}
+/* ---------- menú ---------- */
+.menu{max-width:480px;margin:0 auto;padding:14px 16px 40px}
+.logo{text-align:center;color:#fff;margin:0 0 12px;position:relative}
+.vitrina{height:210px;position:relative;margin:0 auto -8px;max-width:420px}
+.vitrina canvas{width:100%;height:100%;display:block}
+.vitrina.sin3d{display:none}
+.logo h1{margin:0;font:900 44px/1 "Arial Black",system-ui,sans-serif;letter-spacing:1px;color:var(--gold);-webkit-text-stroke:2px #5a1500;text-shadow:0 4px 0 #5a1500,0 8px 18px rgba(0,0,0,.5);transform:skewX(-7deg)}
+.logo h1 b{color:#fff}
+.logo p{margin:8px 0 0;font-weight:800;letter-spacing:2px;font-size:12px;color:#cfe0ff}
+.bandera{display:inline-block;margin-top:8px;border-radius:5px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.45);line-height:1}
+.bandera i{display:block;height:6px}.bandera i.rojo{background:#d52b1e}.bandera i.azul{background:#0038a8}
+.bandera b{display:block;background:#fff;color:#1b2a5a;font-weight:900;letter-spacing:5px;font-size:13px;padding:4px 11px 4px 16px}
+.tokens{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tok{font-size:26px;border-radius:12px;border:3px solid transparent;background:#fff;cursor:pointer;padding:5px 0 3px;line-height:1.1}
+.tok small{display:block;font-size:10.5px;font-weight:800;color:#444;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tok.sel{border-color:var(--red);background:#fff4d6;transform:scale(1.04)}
+.pinfo{background:#fff;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px}
+.stats{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:3px 8px;align-items:center;font-size:12px;margin-top:6px;color:#444}
+.bar{display:flex;gap:2px}.bar i{flex:1;height:8px;border-radius:3px;background:#ddd}.bar i.on{background:linear-gradient(#ffb52e,#e2571e)}
+.modos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.modos .btn{padding:12px 4px;font-size:14px;line-height:1.25}
+.modos .btn span{display:block;font-size:26px}
+.code{font-size:38px;font-weight:900;letter-spacing:6px;text-align:center;color:var(--blue);margin:4px 0}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
+@media (max-width:460px){.pgrid{grid-template-columns:1fr}}
+.pcard{display:flex;gap:8px;align-items:center;text-align:left;background:#fff;border:2px solid #e3d8bd;border-radius:12px;padding:8px 10px;cursor:pointer;width:100%}
+.pcard:hover{border-color:var(--gold);background:#fff9e6}
+.pcard.copa{margin:8px 0}
+.pcard .pe{font-size:28px}.pcard .pn{min-width:0}.pcard b{display:block;font-size:14px}.pcard small{color:#666;font-size:12px}
+.box label.opt,.opt,#mbox label.opt{display:flex;gap:10px;align-items:flex-start;background:#fff;border-radius:10px;padding:9px 10px;margin:8px 0 0;font-weight:400}
+.opt input{margin-top:3px;width:20px;height:20px;flex:none}
+.opt b{display:block;font-size:14px}.opt small{color:#555;font-size:12.5px;line-height:1.35}
+/* ---------- sala de espera ---------- */
+.lobbywrap{max-width:1100px;margin:0 auto;padding:56px 12px 30px;display:flex;gap:14px;align-items:flex-start}
+.lobbywrap>.lmain{flex:1;min-width:0}
+#lobbySide{width:360px;flex:none;position:sticky;top:10px}
+@media (max-width:860px){.lobbywrap{flex-direction:column}#lobbySide{width:100%;position:static}}
+.plist{list-style:none;padding:0;margin:8px 0}
+.plist li{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#fff;margin-bottom:6px}
+.plist li .nm{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plist .head{position:relative;left:auto;bottom:auto;transform:none;--hw2:30px;flex:none}
+.dot{width:14px;height:14px;border-radius:50%;flex:0 0 14px;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
+.colores{display:flex;gap:6px;flex-wrap:wrap}
+.colores button{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer}
+.colores button.sel{box-shadow:0 0 0 3px var(--ink)}
+body>.side{display:none}
+#lobbySide .only-mobile{display:none}
+
+/* ======================= CARRERA ======================= */
+#game{position:fixed;inset:0;background:#0a1028;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none}
+#stage{position:absolute;inset:0}
+#c3d{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.topbar{position:absolute;left:0;right:0;top:0;z-index:20;display:flex;gap:6px;align-items:center;padding:8px 8px 8px 56px;color:#fff;pointer-events:none}
+.topbar>*{pointer-events:auto}
+.topbar .sp{flex:1}
+.topbar .btn{white-space:nowrap;background:rgba(15,12,30,.72);border:2px solid rgba(255,255,255,.4);border-radius:20px}
+.badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:3px}
+#pistaNombre{color:#fff;font-size:13px;text-shadow:0 1px 3px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+#hud{position:absolute;inset:0;pointer-events:none;z-index:10;color:#fff;font-weight:900}
+#hud>*{position:absolute}
+#hud.turbo::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 90px 20px rgba(255,170,40,.35);pointer-events:none}
+#hud.lluvia::before{content:"";position:absolute;inset:0;background:rgba(20,30,60,.28);pointer-events:none}
+#hPos{left:12px;bottom:calc(150px + env(safe-area-inset-bottom));font:900 64px/1 "Arial Black",system-ui,sans-serif;color:var(--gold);-webkit-text-stroke:2px #5a1500;text-shadow:0 4px 0 #5a1500}
+#hPos small{font-size:.5em}#hPos i{font:900 18px system-ui;color:#fff;-webkit-text-stroke:0;text-shadow:0 2px 3px #000;margin-left:2px}
+.hbox{background:rgba(10,14,40,.62);border-radius:12px;padding:5px 10px;text-shadow:0 1px 2px #000}
+#hInfo{left:50%;top:50px;transform:translateX(-50%);text-align:center;font-size:14px;white-space:nowrap}
+#hTiempo{font-size:20px;font-variant-numeric:tabular-nums;display:block}
+#hVel{right:12px;bottom:calc(150px + env(safe-area-inset-bottom));font:900 30px/1 system-ui;text-shadow:0 2px 4px #000;text-align:right}
+#hVel small{font-size:.4em;display:block;opacity:.85}
+#mini{right:8px;top:56px;width:124px;height:124px;background:rgba(10,14,40,.35);border-radius:14px}
+#hObj{left:8px;top:56px;width:72px;height:72px;border-radius:16px;background:rgba(10,14,40,.62);border:3px solid rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-size:40px;pointer-events:auto;cursor:pointer}
+#hObj.lleno{border-color:var(--gold);box-shadow:0 0 16px var(--gold);animation:late 1s infinite}
+#hObj i{position:absolute;right:4px;bottom:2px;font:900 15px system-ui;color:var(--gold);text-shadow:0 1px 2px #000}
+@keyframes late{50%{transform:scale(1.07)}}
+#hRank{left:8px;top:136px;font-size:12px;font-weight:700;line-height:1.5;text-shadow:0 1px 2px #000}
+#hRank div{display:flex;align-items:center;gap:4px;white-space:nowrap;max-width:150px;overflow:hidden;padding:0 5px 0 3px;border-radius:8px}
+#hRank div.yo{background:rgba(242,193,78,.9);color:#2a1a00;text-shadow:none}
+#hRank b{width:12px;text-align:center}#hRank i{width:8px;height:8px;border-radius:50%;flex:none}
+#hRank span{overflow:hidden;text-overflow:ellipsis}
+.hmsg{left:50%;top:26%;transform:translateX(-50%) scale(.6);opacity:0;font:900 clamp(20px,5vw,34px)/1.1 "Arial Black",system-ui,sans-serif;text-shadow:0 3px 0 #000,0 0 14px rgba(0,0,0,.6);transition:all .18s;white-space:nowrap}
+.hmsg.on{opacity:1;transform:translateX(-50%) scale(1)}
+.hmsg.oro{color:var(--gold)}.hmsg.rojo{color:#ff6a5a}
+.cuenta{left:50%;top:36%;transform:translate(-50%,-50%);font:900 clamp(90px,26vw,200px)/1 "Arial Black",system-ui,sans-serif;color:#fff;-webkit-text-stroke:4px #5a1500;text-shadow:0 8px 0 #5a1500}
+.cuenta.ya{color:#3ee06a}
+.cuenta.go{animation:cta .9s ease-out forwards}
+@keyframes cta{0%{transform:translate(-50%,-50%) scale(2);opacity:0}20%{transform:translate(-50%,-50%) scale(1);opacity:1}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(.8)}}
+#hAviso{left:50%;top:44%;transform:translateX(-50%);background:rgba(160,20,10,.9);border-radius:12px;padding:8px 14px;font-size:15px;pointer-events:auto;cursor:pointer;display:none;white-space:nowrap}
+#hChat{left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:70%;background:rgba(10,14,40,.75);border-radius:12px;padding:5px 12px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hChat.on{opacity:1}
+#cartelPista{left:50%;top:22%;transform:translate(-50%,-40px);opacity:0;transition:all .5s;text-align:center;background:rgba(10,14,40,.78);border-radius:18px;padding:12px 22px;max-width:90%;border-bottom:5px solid var(--gold)}
+#cartelPista.on{opacity:1;transform:translate(-50%,0)}
+#cartelPista span{font-size:40px;display:block}#cartelPista b{font-size:22px;display:block}#cartelPista small{font-weight:600;font-size:13px;color:#dfe6ff}
+#ayudaTeclas{left:50%;bottom:10px;transform:translateX(-50%);font-size:12px;font-weight:600;opacity:.75;text-shadow:0 1px 2px #000;white-space:nowrap}
+.obsbar{background:#2b1d3f;color:#fff;text-align:center;font-size:13px;padding:5px}
+#obsbar{position:absolute;left:0;right:0;bottom:0;z-index:25;display:none}
+/* controles táctiles */
+#toques{position:absolute;inset:0;z-index:15;pointer-events:none}
+#toques button{position:absolute;pointer-events:auto;border:3px solid rgba(255,255,255,.6);background:rgba(10,14,40,.42);color:#fff;border-radius:50%;font-size:30px;font-weight:900;touch-action:none;-webkit-user-select:none;user-select:none;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+#toques button.ap{background:rgba(242,193,78,.75);transform:scale(.94)}
+#toques button small{position:absolute;bottom:-17px;left:0;right:0;font-size:10px;font-weight:800;text-shadow:0 1px 2px #000;letter-spacing:.5px}
+#tIzq,#tDer{width:88px;height:88px;bottom:calc(34px + env(safe-area-inset-bottom))}
+#tIzq{left:calc(12px + env(safe-area-inset-left))}#tDer{left:calc(110px + env(safe-area-inset-left))}
+#tDerr{width:92px;height:92px;right:calc(12px + env(safe-area-inset-right));bottom:calc(34px + env(safe-area-inset-bottom));font-size:36px}
+#tObj{width:70px;height:70px;right:calc(112px + env(safe-area-inset-right));bottom:calc(86px + env(safe-area-inset-bottom))}
+#tObj.lleno{border-color:var(--gold);box-shadow:0 0 14px var(--gold)}
+#tFreno{width:60px;height:60px;right:calc(116px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom));font-size:15px}
+#tGas{width:76px;height:76px;right:calc(28px + env(safe-area-inset-right));bottom:calc(140px + env(safe-area-inset-bottom));font-size:15px;background:rgba(31,154,70,.5)}
+#btnReco{position:absolute;right:8px;top:188px;z-index:16;width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:rgba(10,14,40,.55);color:#fff;font-size:20px;cursor:pointer;pointer-events:auto}
+#pausa{position:absolute;inset:0;z-index:40;background:rgba(5,8,25,.72);display:none;flex-direction:column;gap:10px;align-items:center;justify-content:center;color:#fff}
+#pausa h2{font-size:34px;margin:0 0 10px}
+#pausa .btn{min-width:230px}
+@media (max-height:430px){
+  #hRank{display:none}#pistaNombre{display:none}#mini{width:100px;height:100px}#hPos{font-size:48px;bottom:140px}#hVel{display:none}
+  #hInfo{top:50px}#tIzq,#tDer{width:78px;height:78px}#tDer{left:calc(100px + env(safe-area-inset-left))}
+}
+@media (max-width:520px){ #pistaNombre{display:none} #hInfo{top:52px;font-size:12.5px} #hRank{font-size:11px} #mini{width:104px;height:104px} #btnReco{top:168px} .topbar .hidem{display:none} }
+/* ---------- panel lateral ---------- */
+.side{width:350px;flex:none;display:flex;flex-direction:column;background:var(--cream);min-height:0;box-shadow:-4px 0 18px rgba(0,0,0,.35)}
+#lobbySide .side{width:100%;height:min(600px,80vh);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);overflow:hidden}
+#game .side{position:fixed;right:0;top:0;bottom:0;width:min(380px,94vw);transform:translateX(105%);transition:transform .25s;z-index:60;user-select:text;-webkit-user-select:text;touch-action:auto}
+#game .side.open{transform:none}
+.voice{display:flex;gap:6px;padding:8px;border-bottom:1px solid #e3d8bd;flex-wrap:wrap}
+.voice .btn{flex:1}.voice .btn.on{background:#d52b1e;animation:pulso2 1.4s infinite}
+@keyframes pulso2{50%{opacity:.75}}
+.tabs{display:flex;border-bottom:1px solid #e3d8bd}
+.tabs button{flex:1;border:0;background:none;padding:9px 2px;font-weight:800;font-size:13px;cursor:pointer;color:#7b6a4c;border-bottom:3px solid transparent}
+.tabs button.on{color:#1d1d1d;border-bottom-color:var(--red)}
+.tabp{display:none;flex:1;min-height:0;flex-direction:column}
+.tabp.on{display:flex}
+.scroll{flex:1;overflow-y:auto;padding:8px 10px;min-height:0}
+.msg{margin:0 0 6px;font-size:14px;line-height:1.35;word-wrap:break-word}
+.msg .who{font-weight:800}
+.msg.sys{color:#7b6a4c;font-size:12.5px;font-style:italic}
+.msg.priv{background:#2b1d3f;color:#fff;border-radius:10px;padding:6px 9px}
+.msg.priv .who{color:#ffd77a}
+.msg.priv small{color:#cdbbe9;display:block;font-size:11.5px}
+.msg .at{background:#ffe9a8;border-radius:4px;padding:0 3px;font-weight:700}
+.secret{padding:6px 8px;border-top:1px solid #e3d8bd;display:flex;gap:4px;align-items:center;font-size:12.5px}
+.secret select{padding:4px 6px;font-size:12.5px;flex:1}
+.chatin{display:flex;gap:6px;padding:8px;border-top:1px solid #e3d8bd;position:relative;flex-wrap:wrap}
+.chatin select{width:auto;flex:0 0 auto;max-width:42%;padding:8px 6px;font-size:13px}
+.chatin input{flex:1;min-width:120px}
+.chatin.priv input{background:#f1eaff;border-color:#8e6bd0}
+.atpop{position:absolute;left:8px;right:8px;bottom:100%;background:#fff;border-radius:10px;box-shadow:0 -4px 16px rgba(0,0,0,.25);overflow:hidden;display:none;z-index:5}
+.atpop.on{display:block}
+.atpop div{padding:8px 10px;cursor:pointer;font-weight:700}
+.atpop div:hover,.atpop div.sel{background:#f1eaff}
+.prow{display:flex;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:7px 8px;margin-bottom:6px;font-size:14px}
+.prow.yo{background:#fff1c4}
+.prow .nm{flex:1;min-width:0}
+.prow .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .nm small{color:#777}
+.prow .pts{font-weight:900;font-size:16px;white-space:nowrap}
+/* ---------- avisos ---------- */
+#toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:100;text-align:center;max-width:92%;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+#netbar{position:fixed;left:0;right:0;top:0;background:#b8860b;color:#fff;text-align:center;padding:6px;font-weight:700;z-index:99;display:none}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:14px;z-index:80}
+#modal.on{display:flex}
+#modal .mbox{background:var(--cream);border-radius:16px;padding:18px;max-width:560px;width:100%;max-height:90vh;max-height:90dvh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#modal h2{margin:0 0 10px;font-size:21px}
+#modal h3{margin:14px 0 6px;font-size:16px}
+.podio .prow{font-size:15px}
+.podio .md{font-size:20px;width:34px;text-align:center;font-weight:900}
+.rules h3{margin:14px 0 6px}
+.rules p,.rules li{font-size:14.5px;line-height:1.45}
+.big-msg{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%) scale(.3);font:900 clamp(40px,10vw,100px)/1 "Arial Black",system-ui,sans-serif;color:var(--gold);
+  -webkit-text-stroke:3px #5a0b00;text-shadow:0 6px 0 #5a0b00,0 0 40px #ff9800;pointer-events:none;z-index:90;opacity:0;animation:escpop 1.6s ease-out forwards;white-space:nowrap}
+.big-msg small{display:block;font-size:.3em;text-align:center;color:#fff;-webkit-text-stroke:1px #000;text-shadow:0 2px 0 #000}
+@keyframes escpop{15%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}30%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%) scale(1)}}
+/* ---------- caras ---------- */
+.head{--hw2:46px;position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);width:var(--hw2);height:calc(var(--hw2) * 1.2);
+  border-radius:48% 48% 44% 44% / 58% 58% 42% 42%;overflow:hidden;background:var(--pc,#888);box-shadow:0 0 0 3px var(--pc,#888),0 4px 10px rgba(0,0,0,.55);
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--hw2) * .5);pointer-events:none;z-index:2}
+.head img,.head video{width:100%;height:100%;object-fit:cover;display:block}
+.head.live img,.head.live span{display:none}
+.head .rec{position:absolute;top:3px;right:4px;width:7px;height:7px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 5px #ff2d2d;animation:pulso2 1.4s infinite}
+.facepv video{transform:scaleX(-1)}
+.head[data-hp] video{transform:scaleX(-1)}
+.facepv{display:flex;justify-content:center;margin:6px 0 14px}
+.facepv .head{position:relative;left:auto;bottom:auto;transform:none;--hw2:120px}
+.fthumb{width:26px;height:31px;object-fit:cover;border-radius:48% 48% 44% 44% / 58% 58% 42% 42%;flex:none}
+.seo-info{max-width:460px;margin:18px auto 0;padding:0 4px;color:rgba(255,255,255,.78);font-size:13px;line-height:1.5}.seo-info summary{cursor:pointer;font-weight:700;opacity:.85}.seo-info p{margin:6px 0 0}.seo-info b{color:inherit}
+</style>
+</head>
+<body>
+<div id="netbar"></div>
+
+<!-- ======================= MENÚ ======================= -->
+<div class="screen on" id="menu"><div class="menu">
+  <div class="logo">
+    <div class="vitrina" id="vitrina"><canvas id="c3d"></canvas></div>
+    <h1>CARRERA <b>GUASU</b></h1>
+    <p>KARTS POR LAS CIUDADES DEL PARAGUAY</p>
+    <div class="bandera"><i class="rojo"></i><b>PARAGUAY</b><i class="azul"></i></div>
+  </div>
+  <div class="box">
+    <label for="myName" style="margin-top:0">Tu nombre</label>
+    <input type="text" id="myName" maxlength="16" placeholder="Ej.: Juan" autocomplete="nickname">
+    <label>Tu piloto</label>
+    <div class="tokens" id="pilotos"></div>
+    <div class="pinfo" id="pilotoInfo"></div>
+  </div>
+  <div class="box">
+    <h3>🏁 Un jugador (contra bots)</h3>
+    <div class="modos">
+      <button class="btn green" onclick="gpModal()"><span>🏆</span>Gran Premio</button>
+      <button class="btn" onclick="libreModal()"><span>🏁</span>Carrera libre</button>
+      <button class="btn dark" onclick="cronoModal()"><span>⏱️</span>Contrarreloj</button>
+    </div>
+  </div>
+  <div class="box">
+    <h3>🌐 Correr en línea con amigos</h3>
+    <button class="btn green wide" onclick="hostStart(false)">➕ Crear sala</button>
+    <label for="joinCode">o entrá con el código de la sala</label>
+    <div class="row"><input type="text" id="joinCode" maxlength="6" placeholder="Código" style="text-transform:uppercase;letter-spacing:3px;font-weight:800"><button class="btn" style="flex:0 0 auto" onclick="joinClick()">Entrar</button></div>
+    <button class="btn gold wide" id="btnResume" style="margin-top:10px;display:none" onclick="resumeClick()">↩️ Volver a la sala</button>
+    <p class="muted" style="margin-bottom:0">Hasta 8 karts (los lugares libres los completan bots). Los que lleguen con la carrera empezada entran a mirar 👀, con chat y voz, y se suman a la próxima.</p>
+  </div>
+  <div class="row"><button class="btn dark" onclick="showRules()">📜 Cómo se juega</button><button class="btn dark" onclick="ajustesModal()">⚙️ Ajustes</button></div>
+  <p class="muted" id="musicCredit" style="color:#c9d3f5;text-align:center;font-size:11px;margin-top:14px"></p>
+</div>
+<details class="seo-info"><summary>ℹ️ Sobre el juego</summary><p><b>Carrera Guasu</b> (“carrera grande” en guaraní) es un <b>juego de karts en 3D, gratis y en el navegador</b>, hecho en Paraguay: el yacaré, el carpincho, el tucán, el jaguareté y más animales corren por 12 pistas inspiradas en Asunción, San Bernardino, Areguá, Caacupé, Encarnación, Trinidad, Villarrica, Luque, Ciudad del Este, Salto Cristal, el Chaco y Cerro Corá. Hay chipa turbo, tereré helado, cáscaras de mango y escudo de ñandutí; copas con puntos, contrarreloj y carreras en línea con amigos con chat y voz.</p></details>
+</div>
+
+<!-- ======================= SALA DE ESPERA ======================= -->
+<div class="screen" id="lobby"><div class="lobbywrap">
+  <div class="lmain">
+    <div class="box">
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0;flex:1">🏁 Sala de espera</h3><button class="btn sm gray btnMusic" style="flex:0 0 auto;margin-right:6px" onclick="toggleMusic()" title="Música">🎶</button><button class="btn sm gray" style="flex:0 0 auto" onclick="leaveClick()">🚪 Salir</button></div>
+      <div id="lobbyCodeBox"><p class="muted" style="text-align:center;margin:8px 0 0">Código de la sala</p><div class="code" id="lobbyCode">—</div>
+        <div class="row"><button class="btn sm" onclick="shareRoom()">📤 Compartir enlace</button><button class="btn sm gray" onclick="copyCode()">📋 Copiar código</button></div></div>
+      <div id="lobbyObs"></div>
+      <h3 style="margin-top:14px">Parrilla <span class="muted" id="pcount"></span></h3>
+      <ul class="plist" id="plist"></ul>
+      <div id="lobbyHostBtns"></div>
+    </div>
+    <div class="box">
+      <h3>🏎️ Tu kart</h3>
+      <div id="lobbyPiloto"></div>
+      <button class="btn sm dark" style="margin-top:10px" onclick="faceModal()">📷 Mi cara: foto o cámara (opcional)</button>
+    </div>
+    <div class="box">
+      <h3>⚙️ La carrera</h3>
+      <div id="optsBox"></div>
+    </div>
+  </div>
+  <div id="lobbySide"></div>
+</div></div>
+
+<!-- ======================= CARRERA ======================= -->
+<div class="screen" id="game">
+  <div id="stage"></div>
+  <div id="hud">
+    <div id="hObj" onclick="TOQUE.usar=1;setTimeout(()=>TOQUE.usar=0,120)" title="Usar el objeto (X)"></div>
+    <div id="hRank"></div>
+    <div id="hInfo" class="hbox"><span id="hVuelta"></span><span id="hTiempo">0:00.00</span></div>
+    <canvas id="mini" width="150" height="150"></canvas>
+    <div id="hPos"></div>
+    <div id="hVel"></div>
+    <div id="hMsg" class="hmsg"></div>
+    <div id="cuenta" class="cuenta"></div>
+    <div id="cartelPista"></div>
+    <div id="hAviso" onclick="volverPista()"></div>
+    <div id="hChat"></div>
+    <div id="ayudaTeclas">⬅️➡️ doblar · ⬆️ acelerar · ⬇️ frenar · Espacio derrapar · X objeto · R volver a la pista</div>
+  </div>
+  <div id="toques">
+    <button id="tIzq" data-t="izq">◀</button>
+    <button id="tDer" data-t="der">▶</button>
+    <button id="tGas" data-t="gas">GAS</button>
+    <button id="tObj" data-t="usar">🎁<small>OBJETO</small></button>
+    <button id="tFreno" data-t="freno">FRENO</button>
+    <button id="tDerr" data-t="derrape">↯<small>DERRAPE</small></button>
+  </div>
+  <button id="btnReco" onclick="volverPista()" title="Volver a la pista (R)">↺</button>
+  <div class="topbar">
+    <span class="btn sm" id="roomTag" style="cursor:default" title="Código de la sala"></span>
+    <span id="pistaNombre"></span>
+    <span class="sp"></span>
+    <button class="btn sm" id="hMic" onclick="toggleMic()" title="Micrófono">🎤</button>
+    <button class="btn sm hidem" onclick="pausar()" id="btnPausa" title="Pausa (solo contra bots)">⏸️</button>
+    <button class="btn sm" id="btnSnd" onclick="toggleSound()">🔊</button>
+    <button class="btn sm btnMusic" onclick="toggleMusic()" title="Música">🎶</button>
+    <button class="btn sm" id="btnSide" onclick="toggleSide()">💬<span class="badge" id="unread" style="display:none">0</span></button>
+    <button class="btn sm red" onclick="leaveClick()" title="Salir de la carrera">🚪</button>
+  </div>
+  <div id="obsbar" class="obsbar"></div>
+  <div id="pausa"><h2>⏸️ Pausa</h2><button class="btn green big" onclick="pausar()">▶️ Seguir</button><button class="btn dark" onclick="ajustesModal()">⚙️ Ajustes</button><button class="btn dark" onclick="showRules()">📜 Cómo se juega</button><button class="btn red" onclick="leaveClick()">🚪 Salir de la carrera</button></div>
+  <div id="gameSide"></div>
+</div>
+
+<!-- ======================= PANEL (se mueve entre la sala y la carrera) ======================= -->
+<div class="side" id="side">
+  <div class="voice" id="voiceBar">
+    <button class="btn sm gray" id="btnMic" onclick="toggleMic()">🎤 Activar micrófono</button>
+    <button class="btn sm gray" id="btnSpk" style="flex:0 0 46px" onclick="toggleSpk()" title="Escuchar a los demás">🔊</button>
+    <button class="btn sm gray only-mobile" id="btnCloseSide" style="flex:0 0 46px" onclick="toggleSide(false)">✕</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="chat" class="on">💬 Chat</button>
+    <button data-tab="mesa">🏎️ Parrilla</button>
+  </div>
+  <div class="tabp on" id="tab-chat">
+    <div class="scroll" id="chatList"></div>
+    <div class="secret">
+      <select onchange="fraseRapida(this.value);this.value=''">
+        <option value="">⚡ Frase rápida…</option>
+        <option>¡Buena carrera! 👏</option><option>¡Nde tavy! 😂</option><option>¿Quién tiró esa cáscara de mango? 🥭</option><option>¡Hendy! 🔥</option>
+        <option>Esperá que me acomodo 😅</option><option>¡Revancha! 🏁</option><option>Voy a buscar el tereré 🧉</option></select>
+    </div>
+    <div class="chatin" id="chatIn">
+      <div class="atpop" id="atpop"></div>
+      <select id="chatTo" title="Para quién es el mensaje" onchange="chatToChanged()"></select>
+      <input type="text" id="chatText" maxlength="300" placeholder="Escribí… (@nombre = privado)" autocomplete="off">
+      <button class="btn sm" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+  <div class="tabp" id="tab-mesa"><div class="scroll" id="mesaList"></div></div>
+</div>
+
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast"></div>
+
+<script src="pistas.js?v=2"></script>
+<script src="mundo.js?v=2"></script>
+<script src="karts3d.js?v=2"></script>
+<script src="carrera.js?v=2"></script>
+<script src="sala.js?v=2"></script>
+<script src="juego.js?v=2"></script>
+<script src="caras.js?v=2"></script>
+<script src="../dueno-link.js"></script>
+<script src="../inicio.js?v=2"></script>
+<script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', suave:true, sonidos:[], ocultar:[], barra:'.topbar'};</script>
+<script>
+// le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)
+if(window.DuenoLink) DuenoLink.start({game:"karts",
+  info(){
+    if(!S || (NET.mode!=="host" && NET.mode!=="local")) return null;
+    const local=NET.mode==="local"; if(local && !S.localCode) S.localCode="L"+genCode();
+    const pista=S.carrera ? PISTAS[S.carrera.pista].n : null;
+    return {code: local ? S.localCode : NET.code, local, phase:S.phase, started:S.startedAt||null,
+      host:(P(S.hostPid)||{}).name||"", pista, modo:S.crono?"crono":S.opts.modo, nCarrera:S.nCarrera||0,
+      players:S.players.map(p=>{ const k=R && R.porPid[p.id]; return {n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot, pos:k?k.puesto:0, lap:k?Math.max(0,k.lapN)+1:0, pts:p.pts||0}; }),
+      obs:(S.observers||[]).filter(o=>o.conn).map(o=>({n:o.name, owner:!!o.owner}))};
+  },
+  onIam(tok){ if(NET.mode!=="host") return; S.ownerTok=[...new Set([...(S.ownerTok||[]), tok])].slice(-4); commit(); }
+});
+</script>
+</body>
+</html>
