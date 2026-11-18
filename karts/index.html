@@ -145,7 +145,24 @@ body>.side{display:none}
 .obsbar{background:#2b1d3f;color:#fff;text-align:center;font-size:13px;padding:5px}
 #obsbar{position:absolute;left:0;right:0;bottom:0;z-index:25;display:none}
 /* controles táctiles */
-#toques{position:absolute;inset:0;z-index:15;pointer-events:none}
+#toques{position:fixed;inset:0;z-index:15;pointer-events:none;display:none}
+body.corriendo #toques.tactil{display:block}
+body.panel #toques,body.pausado #toques{display:none!important}
+body.editando #toques{display:block!important;z-index:97}
+body.editando #toques button{animation:menea 1.4s ease-in-out infinite;cursor:grab}
+body.editando #toques button.sel{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold),0 0 18px var(--gold)}
+@keyframes menea{50%{transform:rotate(-4deg)}}
+body.editando #pausa,body.editando #rotate{display:none!important}
+#editCtrl{position:fixed;inset:0;z-index:96;display:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 1px,transparent 1px 40px),repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 40px),rgba(5,10,35,.82)}
+body.editando #editCtrl{display:block}
+#editCtrl .ebar{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:min(430px,62vw);background:var(--cream);border-radius:14px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.5);font-size:13px}
+#editCtrl .muted2{display:block;color:#555;font-size:12px;margin:2px 0 6px}
+#editCtrl .erow{display:flex;align-items:center;gap:8px;margin:3px 0}
+#editCtrl .erow label{flex:0 0 46%;font-weight:700;font-size:12.5px}
+#editCtrl .erow label.chk{flex:1}
+#editCtrl input[type=range]{flex:1}
+#editCtrl .ebtns{display:flex;gap:8px;margin-top:6px}#editCtrl .ebtns .btn{flex:1}
+@media (orientation:portrait){#editCtrl .ebar{width:calc(100% - 20px)}}
 #toques button{position:absolute;pointer-events:auto;border:3px solid rgba(255,255,255,.6);background:rgba(10,14,40,.42);color:#fff;border-radius:50%;font-size:30px;font-weight:900;touch-action:none;-webkit-user-select:none;user-select:none;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
 #toques button.ap{background:rgba(242,193,78,.75);transform:scale(.94)}
 #toques button small{position:absolute;bottom:-17px;left:0;right:0;font-size:10px;font-weight:800;text-shadow:0 1px 2px #000;letter-spacing:.5px}
@@ -155,7 +172,7 @@ body>.side{display:none}
 #tObj{width:70px;height:70px;right:calc(112px + env(safe-area-inset-right));bottom:calc(86px + env(safe-area-inset-bottom))}
 #tObj.lleno{border-color:var(--gold);box-shadow:0 0 14px var(--gold)}
 #tFreno{width:60px;height:60px;right:calc(116px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom));font-size:15px}
-#tGas{width:76px;height:76px;right:calc(28px + env(safe-area-inset-right));bottom:calc(140px + env(safe-area-inset-bottom));font-size:15px;background:rgba(31,154,70,.5)}
+#tGas{width:76px;height:76px;right:calc(28px + env(safe-area-inset-right));bottom:calc(140px + env(safe-area-inset-bottom));font-size:22px;background:rgba(31,154,70,.55)}
 #btnReco{position:absolute;right:8px;top:188px;z-index:16;width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:rgba(10,14,40,.55);color:#fff;font-size:20px;cursor:pointer;pointer-events:auto}
 #rotate{position:fixed;inset:0;z-index:95;background:#0a1a44;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:20px;font-weight:800}
 #rotate .ph{font-size:70px;animation:rot 1.6s ease-in-out infinite}
@@ -320,14 +337,6 @@ body>.side{display:none}
     <div id="hChat"></div>
     <div id="ayudaTeclas">⬅️➡️ doblar · ⬆️ acelerar · ⬇️ frenar · Espacio derrapar · X objeto · R volver a la pista</div>
   </div>
-  <div id="toques">
-    <button id="tIzq" data-t="izq">◀</button>
-    <button id="tDer" data-t="der">▶</button>
-    <button id="tGas" data-t="gas">GAS</button>
-    <button id="tObj" data-t="usar">🎁<small>OBJETO</small></button>
-    <button id="tFreno" data-t="freno">FRENO</button>
-    <button id="tDerr" data-t="derrape">↯<small>DERRAPE</small></button>
-  </div>
   <button id="btnReco" onclick="volverPista()" title="Volver a la pista (R)">↺</button>
   <div class="topbar">
     <span class="btn sm" id="roomTag" style="cursor:default" title="Código de la sala"></span>
@@ -341,7 +350,7 @@ body>.side{display:none}
     <button class="btn sm red" onclick="leaveClick()" title="Salir de la carrera">🚪</button>
   </div>
   <div id="obsbar" class="obsbar"></div>
-  <div id="pausa"><h2>⏸️ Pausa</h2><button class="btn green big" onclick="pausar()">▶️ Seguir</button><button class="btn dark" onclick="ajustesModal()">⚙️ Ajustes</button><button class="btn dark" onclick="showRules()">📜 Cómo se juega</button><button class="btn red" onclick="leaveClick()">🚪 Salir de la carrera</button></div>
+  <div id="pausa"><h2>⏸️ Pausa</h2><button class="btn green big" onclick="pausar()">▶️ Seguir</button><button class="btn dark" onclick="editarControles()">🎮 Acomodar controles</button><button class="btn dark" onclick="ajustesModal()">⚙️ Ajustes</button><button class="btn dark" onclick="showRules()">📜 Cómo se juega</button><button class="btn red" onclick="leaveClick()">🚪 Salir de la carrera</button></div>
   <div id="gameSide"></div>
 </div>
 
@@ -374,19 +383,37 @@ body>.side{display:none}
   <div class="tabp" id="tab-mesa"><div class="scroll" id="mesaList"></div></div>
 </div>
 
+<div id="toques">
+  <button id="tIzq" data-t="izq">◀</button>
+  <button id="tDer" data-t="der">▶</button>
+  <button id="tGas" data-t="gas">GO</button>
+  <button id="tObj" data-t="usar">🎁<small>OBJETO</small></button>
+  <button id="tFreno" data-t="freno">FRENO</button>
+  <button id="tDerr" data-t="derrape">↯<small>DERRAPE</small></button>
+</div>
+<div id="editCtrl">
+  <div class="ebar">
+    <b>🎮 Acomodar controles</b>
+    <span class="muted2">Arrastrá cada botón adonde te quede cómodo. Tocá uno para cambiarle el tamaño.</span>
+    <div class="erow"><label>Tamaño de <span id="eSel">—</span></label><input type="range" id="eTam" min="44" max="150" step="2" oninput="ctrlTam(this.value)"></div>
+    <div class="erow"><label>Transparencia</label><input type="range" id="eOp" min="25" max="100" step="5" oninput="ctrlOp(this.value)"></div>
+    <div class="erow"><label class="chk"><input type="checkbox" id="eAuto" onchange="CFG.auto=this.checked;guardarCfg();renderTouch()"> Acelerar solo (sin botón GO)</label></div>
+    <div class="ebtns"><button class="btn sm gray" onclick="ctrlReset()">↩️ Como venía</button><button class="btn sm green" onclick="ctrlListo()">✔️ Listo</button></div>
+  </div>
+</div>
 <div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br>para correr<small id="rotateSub"></small></p></div>
 <div id="modal"><div class="mbox" id="mbox"></div></div>
 <div id="toast"></div>
 
-<script src="pistas.js?v=5"></script>
-<script src="mundo.js?v=5"></script>
-<script src="karts3d.js?v=5"></script>
-<script src="carrera.js?v=5"></script>
-<script src="sala.js?v=5"></script>
-<script src="juego.js?v=5"></script>
-<script src="caras.js?v=5"></script>
+<script src="pistas.js?v=7"></script>
+<script src="mundo.js?v=7"></script>
+<script src="karts3d.js?v=7"></script>
+<script src="carrera.js?v=7"></script>
+<script src="sala.js?v=7"></script>
+<script src="juego.js?v=7"></script>
+<script src="caras.js?v=7"></script>
 <script src="../dueno-link.js"></script>
-<script src="../inicio.js?v=5"></script>
+<script src="../inicio.js?v=7"></script>
 <script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', suave:true, sonidos:[], ocultar:[], barra:'.topbar'};</script>
 <script>
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)

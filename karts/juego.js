@@ -58,11 +58,11 @@ function vitrina(){
 function setCalidad(q){ CFG.calidad=q; guardarCfg(); M3.setCalidad(q); if(!R) vitrina(); toast(q==='baja'?'🐢 Calidad baja: más liviano para celulares modestos.':q==='alta'?'✨ Calidad alta.':'Calidad media.'); }
 function ajustesHTML(){
   return `<label>Calidad del 3D</label><select onchange="setCalidad(this.value)">${[['baja','Baja (celulares modestos)'],['media','Media'],['alta','Alta']].map(([v,t])=>`<option value="${v}" ${CFG.calidad===v?'selected':''}>${t}</option>`).join('')}</select>
-    <label class="opt"><input type="checkbox" ${CFG.auto?'checked':''} onchange="CFG.auto=this.checked;guardarCfg();renderTouch()"><span><b>Acelerar solo</b><small>El kart acelera siempre; vos doblás, derrapás y frenás. Cómodo en el celular.</small></span></label>
+    <label class="opt"><input type="checkbox" ${CFG.auto?'checked':''} onchange="CFG.auto=this.checked;guardarCfg();renderTouch()"><span><b>Acelerar solo</b><small>Sin botón GO: el kart acelera siempre; vos doblás, derrapás y frenás. Cómodo en el celular.</small></span></label>
     <label class="opt"><input type="checkbox" ${CFG.tilt?'checked':''} onchange="setTilt(this.checked)"><span><b>Doblar inclinando el celular</b><small>Como un volante. Si no, se dobla con las flechas ◀ ▶.</small></span></label>
     <label class="opt"><input type="checkbox" ${CFG.vib?'checked':''} onchange="CFG.vib=this.checked;guardarCfg()"><span><b>Vibración</b><small>En los golpes y turbos (si el celular lo permite).</small></span></label>`;
 }
-function ajustesModal(){ modal(`<h2>⚙️ Ajustes</h2>${ajustesHTML()}<p class="muted">Teclado: flechas o WASD para manejar, <b>Espacio</b> salta y derrapa, <b>X</b> o <b>Enter</b> usa el objeto, <b>R</b> te vuelve a la pista. También funciona con mando.</p><button class="btn wide" onclick="closeModal()">Listo</button>`); }
+function ajustesModal(){ modal(`<h2>⚙️ Ajustes</h2><button class="btn green wide" onclick="editarControles()">🎮 Acomodar controles del celular</button>${ajustesHTML()}<p class="muted">Teclado: flechas o WASD para manejar, <b>Espacio</b> salta y derrapa, <b>X</b> o <b>Enter</b> usa el objeto, <b>R</b> te vuelve a la pista. También funciona con mando.</p><button class="btn wide" onclick="closeModal()">Listo</button>`); }
 /* elegir pista / copa (partidas de un jugador) */
 const TIEMPOS = () => load('kg_tiempos') || {};
 function pistaCard(id, fn){ const p=PISTAS[id], t=TIEMPOS()[id]; return `<button class="pcard" onclick="${fn}('${id}')"><span class="pe">${p.e}</span><span class="pn"><b>${esc(p.n)}</b><small>${esc(p.ciudad)}${t?` · ⏱️ ${fmtT(t.t)}`:''}</small></span></button>`; }
@@ -455,14 +455,56 @@ addEventListener('keyup', e=>{ TECLAS[e.code]=0; });
 addEventListener('blur', ()=>{ for(const k in TECLAS) TECLAS[k]=0; for(const k in TOQUE) TOQUE[k]=0; });
 function ligarToques(){
   $$('[data-t]').forEach(b=>{
-    const k=b.dataset.t, on=e=>{ e.preventDefault(); TOQUE[k]=1; b.classList.add('ap'); try{ b.setPointerCapture(e.pointerId); }catch(x){} actx(); }, off=e=>{ TOQUE[k]=0; b.classList.remove('ap'); };
+    const k=b.dataset.t, on=e=>{ if(ED.on) return; e.preventDefault(); TOQUE[k]=1; b.classList.add('ap'); try{ b.setPointerCapture(e.pointerId); }catch(x){} actx(); }, off=e=>{ TOQUE[k]=0; b.classList.remove('ap'); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
     b.addEventListener('contextmenu', e=>e.preventDefault());
   });
 }
+/* posiciones de los botones táctiles: cada uno se puede mover y agrandar (se guarda en el aparato) */
+const CTRL = Object.assign({}, load('kg_ctrl')||{});
+// lado (l/r), distancia a ese borde, distancia al borde de abajo, tamaño
+function ctrlDef(id){
+  const D = {tIzq:['l',12,30,88], tDer:['l',110,30,88], tGas:['r',12,18,96], tDerr:['r',18,128,84], tObj:['r',122,110,70], tFreno:['r',122,18,64]};
+  if(CFG.auto) Object.assign(D, {tDerr:['r',12,18,96], tObj:['r',122,98,72], tFreno:['r',122,14,64]});   // sin GO, el derrape va a la esquina
+  return D[id];
+}
+const CTRL_IDS = ['tIzq','tDer','tGas','tDerr','tObj','tFreno'];
+function aplicarCtrl(){
+  for(const id of CTRL_IDS){
+    const b=$('#'+id), [lado,dx,dy,s]=CTRL[id]||ctrlDef(id);
+    b.style.left = lado==='l' ? `calc(${dx}px + env(safe-area-inset-left))` : 'auto';
+    b.style.right = lado==='r' ? `calc(${dx}px + env(safe-area-inset-right))` : 'auto';
+    b.style.bottom = `calc(${dy}px + env(safe-area-inset-bottom))`;
+    b.style.width = b.style.height = s+'px';
+    b.style.fontSize = Math.round(s*(id==='tGas'?.27:id==='tFreno'?.22:id==='tObj'?.44:.38))+'px';
+  }
+  $('#toques').style.opacity = (CTRL._op||100)/100;
+}
+const ED={on:false, sel:null, drag:null};
+function editarControles(){
+  closeModal(); ED.on=true; document.body.classList.add('editando'); renderTouch();
+  $('#eOp').value=CTRL._op||100; $('#eAuto').checked=!!CFG.auto; ctrlElegir(CFG.auto?'tDerr':'tGas');
+}
+function ctrlElegir(id){ ED.sel=id; $$('#toques button').forEach(b=>b.classList.toggle('sel', b.id===id)); $('#eSel').textContent=$('#'+id).firstChild.textContent.trim(); $('#eTam').value=(CTRL[id]||ctrlDef(id))[3]; }
+function ctrlTam(v){ if(!ED.sel) return; const c=(CTRL[ED.sel]||ctrlDef(ED.sel)).slice(); c[3]=+v; CTRL[ED.sel]=c; aplicarCtrl(); }
+function ctrlOp(v){ CTRL._op=+v; aplicarCtrl(); }
+function ctrlReset(){ Object.keys(CTRL).forEach(k=>{ CTRL[k]=undefined; }); for(const k of Object.keys(CTRL)) if(CTRL[k]===undefined) Reflect.deleteProperty(CTRL, k); aplicarCtrl(); $('#eOp').value=100; if(ED.sel) ctrlElegir(ED.sel); toast('Los controles volvieron a como venían.'); }
+function ctrlListo(){ ED.on=false; document.body.classList.remove('editando'); $$('#toques button').forEach(b=>b.classList.remove('sel')); store('kg_ctrl', CTRL); renderTouch(); toast('🎮 Controles guardados en este aparato.'); }
+function ctrlArrastre(){
+  $$('#toques button').forEach(b=>{
+    b.addEventListener('pointerdown', e=>{ if(!ED.on) return; e.preventDefault(); e.stopPropagation(); ctrlElegir(b.id); const r=b.getBoundingClientRect(); ED.drag={b, ox:e.clientX-(r.left+r.width/2), oy:e.clientY-(r.top+r.height/2)}; try{ b.setPointerCapture(e.pointerId); }catch(x){} }, true);
+    b.addEventListener('pointermove', e=>{ if(!ED.on || !ED.drag || ED.drag.b!==b) return;
+      const W=innerWidth, Hh=innerHeight, s=(CTRL[b.id]||ctrlDef(b.id))[3];
+      const cx=Math.max(s/2, Math.min(W-s/2, e.clientX-ED.drag.ox)), cy=Math.max(s/2, Math.min(Hh-s/2, e.clientY-ED.drag.oy));
+      CTRL[b.id] = cx<W/2 ? ['l', Math.round(cx-s/2), Math.round(Hh-cy-s/2), s] : ['r', Math.round(W-cx-s/2), Math.round(Hh-cy-s/2), s];
+      aplicarCtrl(); });
+    const fin=()=>{ ED.drag=null; }; b.addEventListener('pointerup', fin); b.addEventListener('pointercancel', fin);
+  });
+}
 function renderTouch(){
-  const t=tactil(); $('#toques').style.display = t ? '' : 'none';
+  const t=tactil()||ED.on; $('#toques').classList.toggle('tactil', t);
   $('#tGas').style.display = CFG.auto ? 'none' : '';
+  aplicarCtrl();
   $('#tIzq').style.display = $('#tDer').style.display = CFG.tilt && TILT.ok ? 'none' : '';
   $('#ayudaTeclas').style.display = t ? 'none' : '';
 }
@@ -490,7 +532,7 @@ function leerEntrada(){
   return {gas, freno, dir:Math.max(-1, Math.min(1, dir)), derrape, usar};
 }
 function volverPista(){ const k=R && R.porPid[NET.myPid]; if(k && k.local && !k.bot && R.t>0 && k.spin<=0 && k.hielo<=0 && k.parpadeo<=0){ recolocar(R, k); sfx.sel(); } }
-function pausar(){ if(!R || NET.mode!=='local' || S.phase!=='race') return; HUD.pausa=!HUD.pausa; $('#pausa').style.display=HUD.pausa?'flex':'none'; if(HUD.pausa) motorSet(0,0,0,0,true); }
+function pausar(){ if(!R || NET.mode!=='local' || S.phase!=='race') return; HUD.pausa=!HUD.pausa; $('#pausa').style.display=HUD.pausa?'flex':'none'; document.body.classList.toggle('pausado', HUD.pausa); if(HUD.pausa) motorSet(0,0,0,0,true); }
 function camSiguiente(){ HUD.obsI++; }
 
 /* ---------- lo que se ve y se oye cuando pasa algo ---------- */
@@ -623,7 +665,7 @@ function renderChat(m){
 let UNREAD=0;
 function refreshUnread(){ const b=$('#unread'); b.style.display=UNREAD?'inline-block':'none'; b.textContent=UNREAD; }
 function sideVisible(tab){ const on=$('#tab-'+tab).classList.contains('on'); if($('#lobby').classList.contains('on')) return on; return on && $('#side').classList.contains('open'); }
-function toggleSide(force){ const s=$('#side'), open = force==null ? !s.classList.contains('open') : force; s.classList.toggle('open', open); if(open && force==null) setTab('chat'); }
+function toggleSide(force){ const s=$('#side'), open = force==null ? !s.classList.contains('open') : force; s.classList.toggle('open', open); document.body.classList.toggle('panel', open); if(open && force==null) setTab('chat'); }
 function setTab(t){
   $$('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
   $$('.tabp').forEach(p=>p.classList.toggle('on', p.id==='tab-'+t));
@@ -966,6 +1008,6 @@ function showRules(){
   <button class="btn wide" onclick="closeModal()">Entendido</button></div>`);
 }
 
-renderPilotos(); ligarToques(); renderTouch(); renderVoice();
+renderPilotos(); ligarToques(); ctrlArrastre(); renderTouch(); renderVoice();
 setTimeout(vitrina, 50);
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
