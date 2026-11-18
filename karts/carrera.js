@@ -128,9 +128,11 @@ function pasoKart(R, k, dt, corre){
   }
   k.lat=lat;
   const d=circ(fidx-k.f0, N); if(Math.abs(d)<N*.3) k.prog+=d; k.f0=fidx; k.idx=i;
+  /* rampas: el piso sube hasta el borde de la rampa, y ahí sale el salto */
+  if(!k.enAtajo) for(const si of T.saltos){ const rel=circ(fidx-si, N)*T.paso; if(rel>-RAMPA && rel<=0 && Math.abs(lat)<w){ yS+=(rel+RAMPA)/RAMPA*ALTO_RAMPA; break; } }
   /* saltos y flechas turbo */
   if(suelo && d>0){
-    for(const si of T.saltos){ const falta=((si-(fidx-d))%N+N)%N; if(falta<=d && k.v>11){ k.vy=6.4+k.v*.2; k.aire=.001; k.trucoV=.45; k.truco=false; if(k.pid===R.miPid) R.alFx({k:'salto'}); } }
+    for(const si of T.saltos){ const falta=((si-(fidx-d))%N+N)%N; if(falta<=d && k.v>8 && Math.abs(lat)<w && !k.enAtajo){ k.vy=6.4+k.v*.2; k.aire=.001; k.trucoV=.45; k.truco=false; if(k.pid===R.miPid) R.alFx({k:'salto'}); } }
     for(const t of T.turbos){ if(Math.abs(circ(fidx-t.i, N))<1.3 && Math.abs(lat-t.lat)<3.3){ if(k.boost<.7 && k.pid===R.miPid) R.alFx({k:'flecha'}); k.boost=Math.max(k.boost, 1.05); } }
   }
   /* altura */
@@ -138,6 +140,7 @@ function pasoKart(R, k, dt, corre){
   if(k.aire>0){ k.vy-=30*dt; k.y+=k.vy*dt; k.aire+=dt;
     if(k.y<=yS && k.vy<=0){ k.y=yS; k.vy=0; k.aire=0; if(k.truco){ k.boost=Math.max(k.boost, .85); k.truco=false; if(k.pid===R.miPid) R.alFx({k:'miniturbo', n:1}); } } }
   else if(yS<k.y-.45){ k.aire=.001; k.vy=0; }
+  else if(yS>k.y) k.y=yS;   // subiendo (rampa o cuesta): pegado al piso
   else k.y+=(yS-k.y)*Math.min(1, dt*18);
   k.cabeceo+=((k.aire>0 ? Math.max(-.4, Math.min(.4, k.vy*.035)) : Math.atan(pend)*Math.cos(k.h-th))-k.cabeceo)*Math.min(1, dt*8);
   /* choques con otros karts y rebufo */

@@ -7,7 +7,8 @@
    Todas las pistas giran en el mismo sentido: el lado izquierdo es el de afuera.
    ===================================================================== */
 const PASO = 4;          // metros entre muestra y muestra de la pista
-const MARGEN = 10;       // pasto que se puede pisar a cada lado antes de la baranda
+const MARGEN = 10;
+const RAMPA = 7, ALTO_RAMPA = 1.6;   // largo y alto de las rampas de salto (el borde de arriba está justo en la muestra del salto)       // pasto que se puede pisar a cada lado antes de la baranda
 
 /* ---------- ayudas para escribir los decorados ----------
    F: fila a lo largo de la pista  (tipo, de cp, a cp, cada cuántos metros, lado 1=afuera -1=adentro 0=los dos, distancia al borde, tamaño)
@@ -174,7 +175,7 @@ const PISTAS = {
     tema:{cielo:['#3f86d6','#d5e9f7'], niebla:'#cfe2ee', lejos:540, suelo:'#4f9f47', suelo2:'#448f40', camino:'#5a5e66', agua:'#7a6a4a', cerros:'#5f956a', nCerros:5},
     agua:[{r4:[52,-900,128,900]}], nivelAgua:-3,
     puentes:[[2.75,5.2,'arco'],[8.0,10.25,'represa']],
-    cajas:[2.3, 5.6, 7.5, 11.2, 13.5], turbos:[[3.6,0],[9.0,0],[13.0,0]], saltos:[11.6],
+    cajas:[2.3, 5.6, 7.5, 11.2, 13.5], turbos:[[3.6,0],[9.0,0],[13.0,0]], saltos:[14.3],
     atajos:[{de:11.25, a:12.8, l0:1, l1:1}],
     deco:[
       F('torre',0.3,2.4,24,1,10), F('torre',12.2,14.6,26,1,12), F('edificio',0.6,2.2,22,-1,10), F('letrero',1.0,2.4,26,1,4), F('farol',0.2,2.4,18,-1,2),

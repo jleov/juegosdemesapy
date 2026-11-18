@@ -283,8 +283,18 @@ function armarMundo(T, calidad){
   { const s=S[0], w=s.w+2; b.en(s.x, s.y, s.z, s.h, 1, o=>{ for(const x of [-w,w]){ o.cil(x,0,0,.45,.55,8,'#d52b1e',8); o.cil(x,3,0,.47,.47,2.4,'#ffffff',8); o.cil(x,5.4,0,.46,.46,2.6,'#0038a8',8); }
       for(let i=0;i<Math.round(w*2/1.2);i++) for(let j=0;j<2;j++) o.caja(-w+.6+i*1.2, 7.4+j*1.1, 0, 1.2, 1.1, .5, (i+j)%2?'#111111':'#ffffff'); o.caja(0,9.6,0,w*2+1.4,.5,.9,'#f2c14e'); }); }
   /* rampas de salto */
-  for(const i of T.saltos){ const s=S[((i-1)%N+N)%N]; b.en(s.x, s.y+.1, s.z, s.h, 1, o=>{ const w=s.w*2-1.5; o.caja(0,-.75,-1.5,w,1.5,6,'#f2c14e',0,-.24);
-      for(let x=-w/2+1;x<w/2;x+=2.4) o.caja(x,-.72,-1.5,1.1,1.5,5.4,'#d52b1e',0,-.24); }); }
+  // la misma forma que usa la carrera: sube RAMPA metros hasta ALTO_RAMPA justo en la muestra del salto
+  for(const i of T.saltos){ const s=S[i], k=RAMPA/T.paso, a=S[((i-Math.ceil(k))%N+N)%N], c=S[((i-Math.floor(k))%N+N)%N], fr=k-Math.floor(k), y0=c.y+(a.y-c.y)*fr;
+    const sube=s.y+ALTO_RAMPA-y0, ang=Math.atan2(sube, RAMPA), L=Math.hypot(sube, RAMPA), w=s.w*2-.4, gr=.35;
+    b.en(s.x, s.y, s.z, s.h, 1, o=>{
+      // la tabla inclinada (su cara de arriba va del piso al borde)
+      const cy=(y0-s.y+ALTO_RAMPA)/2-gr/2*Math.cos(ang);
+      o.caja(0,cy-gr/2,-RAMPA/2+gr/2*Math.sin(ang),w,gr,L,'#f2c14e',0,-ang);
+      for(let x=-w/2+1.2;x<w/2-.6;x+=2.4) o.caja(x,cy-gr/2+.02,-RAMPA/2+gr/2*Math.sin(ang),1.1,gr,L*.92,'#d52b1e',0,-ang);
+      // frente del borde y costados
+      o.caja(0,-.3,-.12,w,ALTO_RAMPA+.3,.24,'#c8902a');
+      for(const x of [-w/2,w/2]) for(let q=0;q<4;q++){ const z=-RAMPA*(q+.5)/4, h=ALTO_RAMPA*(1-(q+.5)/4)+(y0-s.y)*((q+.5)/4); if(h>.05) o.caja(x,-.3,z,.2,h+.3,RAMPA/4,'#b07a22'); }
+    }); }
   /* puentes */
   for(const p of T.puentes){
     for(let k=0;k<=p.len;k++){ const s=S[(p.i0+k)%N], o=S[(p.i0+k+1)%N];
