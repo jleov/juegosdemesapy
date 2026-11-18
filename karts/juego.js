@@ -460,43 +460,66 @@ function ligarToques(){
     b.addEventListener('contextmenu', e=>e.preventDefault());
   });
 }
-/* posiciones de los botones táctiles: cada uno se puede mover y agrandar (se guarda en el aparato) */
+/* posiciones de los botones táctiles y de lo de arriba (mapa, caja del objeto, ↺):
+   cada uno se puede mover y agrandar; se guarda en el aparato */
 const CTRL = Object.assign({}, load('kg_ctrl')||{});
-// lado (l/r), distancia a ese borde, distancia al borde de abajo, tamaño
+// [lado l/r, distancia a ese borde, distancia al borde de abajo (o de arriba si dice 't'), tamaño, 't']
 function ctrlDef(id){
-  const D = {tIzq:['l',12,30,88], tDer:['l',110,30,88], tGas:['r',12,18,96], tDerr:['r',18,128,84], tObj:['r',122,110,70], tFreno:['r',122,18,64]};
+  const bajo=innerHeight<430, ang=innerWidth<=520;
+  const D = {tIzq:['l',12,30,88], tDer:['l',110,30,88], tGas:['r',12,18,96], tDerr:['r',18,128,84], tObj:['r',122,110,70], tFreno:['r',122,18,64],
+    mini:['r',8,56,bajo?100:ang?104:124,'t'], hObj:['l',8,56,72,'t'], btnReco:['r',8,bajo?166:ang?168:188,44,'t']};
   if(CFG.auto) Object.assign(D, {tDerr:['r',12,18,96], tObj:['r',122,98,72], tFreno:['r',122,14,64]});   // sin GO, el derrape va a la esquina
   return D[id];
 }
-const CTRL_IDS = ['tIzq','tDer','tGas','tDerr','tObj','tFreno'];
+const CTRL_IDS = ['tIzq','tDer','tGas','tDerr','tObj','tFreno','mini','hObj','btnReco'];
+const CTRL_NOM = {tIzq:'◀', tDer:'▶', tGas:'GO', tDerr:'derrape', tObj:'objeto', tFreno:'freno', mini:'el mapa', hObj:'la caja del objeto', btnReco:'↺'};
+const CTRL_FS = {tGas:.27, tFreno:.22, tObj:.44, hObj:.55, btnReco:.45, mini:.12};
 function aplicarCtrl(){
   for(const id of CTRL_IDS){
-    const b=$('#'+id), [lado,dx,dy,s]=CTRL[id]||ctrlDef(id);
-    b.style.left = lado==='l' ? `calc(${dx}px + env(safe-area-inset-left))` : 'auto';
-    b.style.right = lado==='r' ? `calc(${dx}px + env(safe-area-inset-right))` : 'auto';
-    b.style.bottom = `calc(${dy}px + env(safe-area-inset-bottom))`;
-    b.style.width = b.style.height = s+'px';
-    b.style.fontSize = Math.round(s*(id==='tGas'?.27:id==='tFreno'?.22:id==='tObj'?.44:.38))+'px';
+    const [lado,dx,dy,sz,v]=CTRL[id]||ctrlDef(id);
+    for(const b of [$('#'+id), $('#p_'+id)]){
+      if(!b) continue;
+      b.style.left = lado==='l' ? `calc(${dx}px + env(safe-area-inset-left))` : 'auto';
+      b.style.right = lado==='r' ? `calc(${dx}px + env(safe-area-inset-right))` : 'auto';
+      if(v==='t'){ b.style.top=`calc(${dy}px + env(safe-area-inset-top))`; b.style.bottom='auto'; }
+      else { b.style.bottom=`calc(${dy}px + env(safe-area-inset-bottom))`; b.style.top='auto'; }
+      b.style.width = b.style.height = sz+'px';
+      b.style.fontSize = Math.round(sz*(CTRL_FS[id]||.38))+'px';
+    }
+    const px=$('#p_'+id); if(px) px.style.fontSize=Math.round(sz*(id==='btnReco'?.45:.28))+'px';
   }
   $('#toques').style.opacity = (CTRL._op||100)/100;
 }
 const ED={on:false, sel:null, drag:null};
+const ctrlArrastrables = () => [...document.querySelectorAll('#toques button, #editCtrl .prox')];
+const ctrlId = el => el.dataset.c || el.id;
 function editarControles(){
   closeModal(); ED.on=true; document.body.classList.add('editando'); renderTouch();
+  // se acomoda con el celular de costado, como se juega
+  $('#rotateTxt').textContent='para acomodar los controles'; $('#rotateSub').textContent='Los controles se acomodan con el celular de costado, como se corre.';
+  horizontal();
   $('#eOp').value=CTRL._op||100; $('#eAuto').checked=!!CFG.auto; ctrlElegir(CFG.auto?'tDerr':'tGas');
 }
-function ctrlElegir(id){ ED.sel=id; $$('#toques button').forEach(b=>b.classList.toggle('sel', b.id===id)); $('#eSel').textContent=$('#'+id).firstChild.textContent.trim(); $('#eTam').value=(CTRL[id]||ctrlDef(id))[3]; }
+function ctrlElegir(id){ ED.sel=id; ctrlArrastrables().forEach(b=>b.classList.toggle('sel', ctrlId(b)===id)); $('#eSel').textContent=CTRL_NOM[id]||id; $('#eTam').value=(CTRL[id]||ctrlDef(id))[3]; }
 function ctrlTam(v){ if(!ED.sel) return; const c=(CTRL[ED.sel]||ctrlDef(ED.sel)).slice(); c[3]=+v; CTRL[ED.sel]=c; aplicarCtrl(); }
 function ctrlOp(v){ CTRL._op=+v; aplicarCtrl(); }
-function ctrlReset(){ Object.keys(CTRL).forEach(k=>{ CTRL[k]=undefined; }); for(const k of Object.keys(CTRL)) if(CTRL[k]===undefined) Reflect.deleteProperty(CTRL, k); aplicarCtrl(); $('#eOp').value=100; if(ED.sel) ctrlElegir(ED.sel); toast('Los controles volvieron a como venían.'); }
-function ctrlListo(){ ED.on=false; document.body.classList.remove('editando'); $$('#toques button').forEach(b=>b.classList.remove('sel')); store('kg_ctrl', CTRL); renderTouch(); toast('🎮 Controles guardados en este aparato.'); }
+function ctrlReset(){ for(const k of Object.keys(CTRL)) Reflect.deleteProperty(CTRL, k); aplicarCtrl(); $('#eOp').value=100; if(ED.sel) ctrlElegir(ED.sel); toast('Los controles volvieron a como venían.'); }
+function ctrlPanel(){ $('#editCtrl .ebar').classList.toggle('abajo'); }
+function ctrlListo(){
+  ED.on=false; document.body.classList.remove('editando'); ctrlArrastrables().forEach(b=>b.classList.remove('sel')); store('kg_ctrl', CTRL);
+  $('#rotateTxt').textContent='para correr'; $('#rotateSub').textContent = NET.mode==='local' ? 'La carrera queda en pausa hasta que lo gires.' : 'La carrera sigue: ¡apurate!';
+  if(!document.body.classList.contains('corriendo')) salirHorizontal();
+  renderTouch(); toast('🎮 Controles guardados en este aparato.');
+}
 function ctrlArrastre(){
-  $$('#toques button').forEach(b=>{
-    b.addEventListener('pointerdown', e=>{ if(!ED.on) return; e.preventDefault(); e.stopPropagation(); ctrlElegir(b.id); const r=b.getBoundingClientRect(); ED.drag={b, ox:e.clientX-(r.left+r.width/2), oy:e.clientY-(r.top+r.height/2)}; try{ b.setPointerCapture(e.pointerId); }catch(x){} }, true);
+  ctrlArrastrables().forEach(b=>{
+    const id=ctrlId(b);
+    b.addEventListener('pointerdown', e=>{ if(!ED.on) return; e.preventDefault(); e.stopPropagation(); ctrlElegir(id); const r=b.getBoundingClientRect(); ED.drag={b, ox:e.clientX-(r.left+r.width/2), oy:e.clientY-(r.top+r.height/2)}; try{ b.setPointerCapture(e.pointerId); }catch(x){} }, true);
     b.addEventListener('pointermove', e=>{ if(!ED.on || !ED.drag || ED.drag.b!==b) return;
-      const W=innerWidth, Hh=innerHeight, s=(CTRL[b.id]||ctrlDef(b.id))[3];
-      const cx=Math.max(s/2, Math.min(W-s/2, e.clientX-ED.drag.ox)), cy=Math.max(s/2, Math.min(Hh-s/2, e.clientY-ED.drag.oy));
-      CTRL[b.id] = cx<W/2 ? ['l', Math.round(cx-s/2), Math.round(Hh-cy-s/2), s] : ['r', Math.round(W-cx-s/2), Math.round(Hh-cy-s/2), s];
+      const W=innerWidth, Hh=innerHeight, sz=(CTRL[id]||ctrlDef(id))[3];
+      const cx=Math.max(sz/2, Math.min(W-sz/2, e.clientX-ED.drag.ox)), cy=Math.max(sz/2, Math.min(Hh-sz/2, e.clientY-ED.drag.oy));
+      const lado = cx<W/2 ? ['l', Math.round(cx-sz/2)] : ['r', Math.round(W-cx-sz/2)];
+      CTRL[id] = cy<Hh/2 ? [...lado, Math.round(cy-sz/2), sz, 't'] : [...lado, Math.round(Hh-cy-sz/2), sz];
       aplicarCtrl(); });
     const fin=()=>{ ED.drag=null; }; b.addEventListener('pointerup', fin); b.addEventListener('pointercancel', fin);
   });

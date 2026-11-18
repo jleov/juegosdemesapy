@@ -152,7 +152,15 @@ body.editando #toques{display:block!important;z-index:97}
 body.editando #toques button{animation:menea 1.4s ease-in-out infinite;cursor:grab}
 body.editando #toques button.sel{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold),0 0 18px var(--gold)}
 @keyframes menea{50%{transform:rotate(-4deg)}}
-body.editando #pausa,body.editando #rotate{display:none!important}
+body.editando #pausa{display:none!important}
+@media (orientation:portrait) and (pointer:coarse){body.editando #rotate{display:flex!important;z-index:99}}
+#editCtrl .prox{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border:3px dashed var(--gold);border-radius:14px;background:rgba(10,14,40,.75);color:#fff;font-weight:800;line-height:1.1;text-align:center;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+#editCtrl .prox span{font-size:.75em}
+#editCtrl .prox.redondo{border-radius:50%}
+#editCtrl .prox.sel{border-style:solid;box-shadow:0 0 0 3px var(--gold),0 0 18px var(--gold)}
+#editCtrl .ebar{z-index:3}
+#editCtrl .ebar.abajo{top:auto;bottom:8px}
+@media (max-height:430px){#editCtrl .muted2{display:none}#editCtrl .ebar{padding:6px 10px;font-size:12px}#editCtrl .erow{margin:1px 0}#editCtrl .ebtns{margin-top:3px}}
 #editCtrl{position:fixed;inset:0;z-index:96;display:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 1px,transparent 1px 40px),repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 40px),rgba(5,10,35,.82)}
 body.editando #editCtrl{display:block}
 #editCtrl .ebar{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:min(430px,62vw);background:var(--cream);border-radius:14px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.5);font-size:13px}
@@ -392,28 +400,31 @@ body.editando #editCtrl{display:block}
   <button id="tDerr" data-t="derrape">↯<small>DERRAPE</small></button>
 </div>
 <div id="editCtrl">
+  <div class="prox" id="p_mini" data-c="mini">🗺️<span>Mapa</span></div>
+  <div class="prox" id="p_hObj" data-c="hObj">🎁<span>Objeto</span></div>
+  <div class="prox redondo" id="p_btnReco" data-c="btnReco">↺</div>
   <div class="ebar">
     <b>🎮 Acomodar controles</b>
-    <span class="muted2">Arrastrá cada botón adonde te quede cómodo. Tocá uno para cambiarle el tamaño.</span>
+    <span class="muted2">Arrastrá los botones, el mapa 🗺️, la caja del objeto 🎁 y el ↺ adonde te queden cómodos. Tocá uno para cambiarle el tamaño.</span>
     <div class="erow"><label>Tamaño de <span id="eSel">—</span></label><input type="range" id="eTam" min="44" max="150" step="2" oninput="ctrlTam(this.value)"></div>
     <div class="erow"><label>Transparencia</label><input type="range" id="eOp" min="25" max="100" step="5" oninput="ctrlOp(this.value)"></div>
     <div class="erow"><label class="chk"><input type="checkbox" id="eAuto" onchange="CFG.auto=this.checked;guardarCfg();renderTouch()"> Acelerar solo (sin botón GO)</label></div>
-    <div class="ebtns"><button class="btn sm gray" onclick="ctrlReset()">↩️ Como venía</button><button class="btn sm green" onclick="ctrlListo()">✔️ Listo</button></div>
+    <div class="ebtns"><button class="btn sm gray" onclick="ctrlPanel()" title="Si este cartel tapa algo, mandalo arriba o abajo">↕️ Panel</button><button class="btn sm gray" onclick="ctrlReset()">↩️ Como venía</button><button class="btn sm green" onclick="ctrlListo()">✔️ Listo</button></div>
   </div>
 </div>
-<div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br>para correr<small id="rotateSub"></small></p></div>
+<div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br><span id="rotateTxt">para correr</span><small id="rotateSub"></small></p></div>
 <div id="modal"><div class="mbox" id="mbox"></div></div>
 <div id="toast"></div>
 
-<script src="pistas.js?v=7"></script>
-<script src="mundo.js?v=7"></script>
-<script src="karts3d.js?v=7"></script>
-<script src="carrera.js?v=7"></script>
-<script src="sala.js?v=7"></script>
-<script src="juego.js?v=7"></script>
-<script src="caras.js?v=7"></script>
+<script src="pistas.js?v=9"></script>
+<script src="mundo.js?v=9"></script>
+<script src="karts3d.js?v=9"></script>
+<script src="carrera.js?v=9"></script>
+<script src="sala.js?v=9"></script>
+<script src="juego.js?v=9"></script>
+<script src="caras.js?v=9"></script>
 <script src="../dueno-link.js"></script>
-<script src="../inicio.js?v=7"></script>
+<script src="../inicio.js?v=9"></script>
 <script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', suave:true, sonidos:[], ocultar:[], barra:'.topbar'};</script>
 <script>
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)
