@@ -157,6 +157,11 @@ body>.side{display:none}
 #tFreno{width:60px;height:60px;right:calc(116px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom));font-size:15px}
 #tGas{width:76px;height:76px;right:calc(28px + env(safe-area-inset-right));bottom:calc(140px + env(safe-area-inset-bottom));font-size:15px;background:rgba(31,154,70,.5)}
 #btnReco{position:absolute;right:8px;top:188px;z-index:16;width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:rgba(10,14,40,.55);color:#fff;font-size:20px;cursor:pointer;pointer-events:auto}
+#rotate{position:fixed;inset:0;z-index:95;background:#0a1a44;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:20px;font-weight:800}
+#rotate .ph{font-size:70px;animation:rot 1.6s ease-in-out infinite}
+#rotate small{display:block;font-size:14px;font-weight:600;opacity:.8;margin-top:8px}
+@keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait) and (pointer:coarse){body.corriendo #rotate{display:flex}}
 #pausa{position:absolute;inset:0;z-index:40;background:rgba(5,8,25,.72);display:none;flex-direction:column;gap:10px;align-items:center;justify-content:center;color:#fff}
 #pausa h2{font-size:34px;margin:0 0 10px}
 #pausa .btn{min-width:230px}
@@ -369,18 +374,19 @@ body>.side{display:none}
   <div class="tabp" id="tab-mesa"><div class="scroll" id="mesaList"></div></div>
 </div>
 
+<div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br>para correr<small id="rotateSub"></small></p></div>
 <div id="modal"><div class="mbox" id="mbox"></div></div>
 <div id="toast"></div>
 
-<script src="pistas.js?v=4"></script>
-<script src="mundo.js?v=4"></script>
-<script src="karts3d.js?v=4"></script>
-<script src="carrera.js?v=4"></script>
-<script src="sala.js?v=4"></script>
-<script src="juego.js?v=4"></script>
-<script src="caras.js?v=4"></script>
+<script src="pistas.js?v=5"></script>
+<script src="mundo.js?v=5"></script>
+<script src="karts3d.js?v=5"></script>
+<script src="carrera.js?v=5"></script>
+<script src="sala.js?v=5"></script>
+<script src="juego.js?v=5"></script>
+<script src="caras.js?v=5"></script>
 <script src="../dueno-link.js"></script>
-<script src="../inicio.js?v=4"></script>
+<script src="../inicio.js?v=5"></script>
 <script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', suave:true, sonidos:[], ocultar:[], barra:'.topbar'};</script>
 <script>
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)

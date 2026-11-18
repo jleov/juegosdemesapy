@@ -82,12 +82,26 @@ function cronoModal(){ if(needName()) return; modal(`<h2>⏱️ Contrarreloj</h2
 function cronoGo(id){ localStart('crono', id); }
 
 /* ====================== PANTALLAS ====================== */
+/* en el celular se corre en horizontal: pantalla completa y pantalla trabada de costado (como la pelea) */
+const deCostado = () => !(tactil() && innerHeight>innerWidth);
+function horizontal(){
+  if(!tactil()) return;
+  const d=document.documentElement;
+  const trabar=()=>{ try{ screen.orientation.lock('landscape').catch(()=>{}); }catch(e){} };
+  if(!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen({navigationUI:'hide'}).then(trabar).catch(trabar); else trabar();
+}
+function salirHorizontal(){ try{ screen.orientation.unlock(); }catch(e){} if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }
+// si la carrera arrancó sin tocar nada (en línea), se pide al primer toque
+document.addEventListener('pointerdown', ()=>{ if(enJuego() && !document.fullscreenElement) horizontal(); });
 function show(id){
   $$('.screen').forEach(s=>s.classList.toggle('on', s.id===id));
   const side=$('#side'), dest = id==='lobby' ? $('#lobbySide') : id==='game' ? $('#gameSide') : null;
   if(dest && side.parentElement!==dest) dest.appendChild(side);
   if(id==='menu'){ refreshResume(); vitrina(); }
+  const antes=document.body.classList.contains('corriendo');
   document.body.classList.toggle('corriendo', id==='game');
+  if(id==='game' && !antes) horizontal(); else if(id!=='game' && antes) salirHorizontal();
+  $('#rotateSub').textContent = NET.mode==='local' ? 'La carrera queda en pausa hasta que lo gires.' : 'La carrera sigue: ¡apurate!';
 }
 function localStart(kind, x){
   leerComunes(); closeModal();
@@ -506,7 +520,7 @@ function fxCarrera(e){
 /* ---------- el bucle ---------- */
 let tPrev=performance.now(), tRaf=0;
 function cuadro(dt, dibujar){
-  if(R && !HUD.pausa){
+  if(R && !HUD.pausa && !(NET.mode==='local' && !deCostado())){
     const yo=R.porPid[NET.myPid], inp=yo && !yo.bot ? leerEntrada() : null;
     if(R.listo || R.host){ let q=dt; while(q>1e-4){ const h=Math.min(q, .034); pasoCarrera(R, h, inp); q-=h; } }
     else R.reloj+=dt;
@@ -518,7 +532,8 @@ function cuadro(dt, dibujar){
       M3.sync(R, cam, dt); hud(dt, cam);
       if(yo) motorSet(yo.v, yo.drift, yo.boost>0||yo.viento>0, yo.fuera, false); else if(cam) motorSet(cam.v, cam.drift, cam.boost>0, false, false);
     }
-  } else if(dibujar && !R && $('#menu').classList.contains('on') && M3.listo && M3.enVitrina()) M3.cuadroVitrina(performance.now()/1000);
+  } else if(R && dibujar && NET.mode==='local' && !deCostado()) motorSet(0,0,0,0,true);
+  else if(dibujar && !R && $('#menu').classList.contains('on') && M3.listo && M3.enVitrina()) M3.cuadroVitrina(performance.now()/1000);
 }
 function bucle(t){ const dt=Math.min(.1, (t-tPrev)/1000); tPrev=t; tRaf=t; cuadro(dt, true); requestAnimationFrame(bucle); }
 requestAnimationFrame(bucle);
