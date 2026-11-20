@@ -81,6 +81,7 @@ input[type=password]{width:100%;padding:11px 12px;border:1px solid #c9c2a8;borde
 <div class="wrap">
   <h1>👑 Panel del <span>dueño</span></h1>
   <div class="sub">Todas las salas abiertas de Juegos Paraguay Digitales: Banquero, Lotería, Face Punch, Peteĩ y los demás.</div>
+  <div id="sistemas" class="box" style="display:none"></div>
   <div id="stats" class="box" style="display:none"></div>
   <div id="body"></div>
 </div>
@@ -313,9 +314,19 @@ function renderStats(){
   el.innerHTML=h;
 }
 
+// ---------- 🗂️ mis sistemas privados (no figuran en la portada ni en buscadores; cada uno tiene su propio ingreso) ----------
+const MIS_SISTEMAS = [
+  {n:'📹 Presupuestos CCTV', url:'https://juegospy.com/cctv/', d:'INFORTEC: presupuestos, clientes, precios de proveedores y reportes'},
+];
+function renderSistemas(){
+  const el=$('#sistemas'); el.style.display = A.key ? '' : 'none'; if(!A.key) return;
+  el.innerHTML='<h2 style="margin:0 0 10px;font-size:20px">🗂️ Mis sistemas</h2>'
+    + MIS_SISTEMAS.map(s=>`<p style="margin:6px 0"><a class="btn sm" href="${s.url}" target="_blank" rel="noopener">${esc(s.n)}</a> <span class="muted">${esc(s.d)}</span></p>`).join('');
+}
+
 function render(){
   // el recuadro de estadísticas se arma solo al entrar o salir (si no, se borraría lo que se escribe en el buscador)
-  if(!!A.key !== ST.mostrado){ ST.mostrado=!!A.key; renderStats(); }
+  if(!!A.key !== ST.mostrado){ ST.mostrado=!!A.key; renderStats(); renderSistemas(); }
   if(A.key && !ST.datos && !ST.cargando && !ST.err) cargarStats();
   const el=$('#body');
   if(!A.key){
