@@ -22,6 +22,7 @@
     { "name": "Carrera Guasu", "short_name": "Karts", "url": "karts/", "icons": [{ "src": "karts/icon-192.png", "sizes": "192x192" }] },
     { "name": "Ludo PY", "short_name": "Ludo", "url": "ludo/", "icons": [{ "src": "ludo/icon-192.png", "sizes": "192x192" }] },
     { "name": "Yva Rape", "short_name": "Yva Rape", "url": "frutas/", "icons": [{ "src": "frutas/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Dibujá y Adiviná PY", "short_name": "Dibujá", "url": "dibuja/", "icons": [{ "src": "dibuja/icon-192.png", "sizes": "192x192" }] },
     { "name": "El Impostor", "short_name": "Impostor", "url": "impostor/", "icons": [{ "src": "impostor/icon-192.png", "sizes": "192x192" }] },
     { "name": "Tarot Jasy", "short_name": "Tarot", "url": "tarot/", "icons": [{ "src": "tarot/icon-192.png", "sizes": "192x192" }] },
     { "name": "Versículo del Día", "short_name": "Versículo", "url": "versiculo/", "icons": [{ "src": "versiculo/icon-192.png", "sizes": "192x192" }] },
