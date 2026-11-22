@@ -62,7 +62,7 @@ function ajustesHTML(){
     <label class="opt"><input type="checkbox" ${CFG.tilt?'checked':''} onchange="setTilt(this.checked)"><span><b>Doblar inclinando el celular</b><small>Como un volante. Si no, se dobla con las flechas ◀ ▶.</small></span></label>
     <label class="opt"><input type="checkbox" ${CFG.vib?'checked':''} onchange="CFG.vib=this.checked;guardarCfg()"><span><b>Vibración</b><small>En los golpes y turbos (si el celular lo permite).</small></span></label>`;
 }
-function ajustesModal(){ modal(`<h2>⚙️ Ajustes</h2><button class="btn green wide" onclick="editarControles()">🎮 Acomodar controles del celular</button>${ajustesHTML()}<p class="muted">Teclado: flechas o WASD para manejar, <b>Espacio</b> salta y derrapa, <b>X</b> o <b>Enter</b> usa el objeto, <b>R</b> te vuelve a la pista. También funciona con mando.</p><button class="btn wide" onclick="closeModal()">Listo</button>`); }
+function ajustesModal(){ modal(`<h2>⚙️ Ajustes</h2><label style="margin-top:0">🏎️ Volante o mando</label><div id="padBox">${padHTML()}</div><button class="btn green wide" onclick="editarControles()">🎮 Acomodar controles del celular</button>${ajustesHTML()}<p class="muted">Teclado: flechas o WASD para manejar, <b>Espacio</b> salta y derrapa, <b>X</b> o <b>Enter</b> usa el objeto, <b>R</b> te vuelve a la pista. También funciona con mando.</p><button class="btn wide" onclick="closeModal()">Listo</button>`); }
 /* elegir pista / copa (partidas de un jugador) */
 const TIEMPOS = () => load('kg_tiempos') || {};
 function pistaCard(id, fn){ const p=PISTAS[id], t=TIEMPOS()[id]; return `<button class="pcard" onclick="${fn}('${id}')"><span class="pe">${p.e}</span><span class="pn"><b>${esc(p.n)}</b><small>${esc(p.ciudad)}${t?` · ⏱️ ${fmtT(t.t)}`:''}</small></span></button>`; }
@@ -548,11 +548,9 @@ function leerEntrada(){
   let gas=K.ArrowUp||K.KeyW||TOQUE.gas?1:0, freno=K.ArrowDown||K.KeyS||TOQUE.freno?1:0, derrape=K.Space||K.ShiftLeft||K.ShiftRight||TOQUE.derrape?1:0, usar=K.KeyX||K.KeyE||K.Enter||K.ControlLeft||TOQUE.usar?1:0;
   if(CFG.tilt && TILT.ok && tactil() && Math.abs(TILT.v)>.06) dir+=TILT.v;
   if(CFG.auto && tactil() && !freno) gas=1;
-  const pads=navigator.getGamepads ? navigator.getGamepads() : [];
-  for(const g of pads){ if(!g || !g.connected) continue; const b=i=>g.buttons[i] && g.buttons[i].pressed, ax=g.axes[0]||0;
-    if(Math.abs(ax)>.15) dir+=ax; if(b(14)) dir-=1; if(b(15)) dir+=1;
-    if(b(0)||b(7)) gas=1; if(b(1)||b(6)) freno=1; if(b(5)||b(2)) derrape=1; if(b(4)||b(3)) usar=1; if(b(9) && !leerEntrada.st) pausar(); leerEntrada.st=b(9); break; }
-  return {gas, freno, dir:Math.max(-1, Math.min(1, dir)), derrape, usar};
+  const inp={gas, freno, dir, derrape, usar};
+  if(typeof leerMando==='function') leerMando(inp);   // volante o mando (mando.js)
+  inp.dir=Math.max(-1, Math.min(1, inp.dir)); return inp;
 }
 function volverPista(){ const k=R && R.porPid[NET.myPid]; if(k && k.local && !k.bot && R.t>0 && k.spin<=0 && k.hielo<=0 && k.parpadeo<=0){ recolocar(R, k); sfx.sel(); } }
 function pausar(){ if(!R || NET.mode!=='local' || S.phase!=='race') return; HUD.pausa=!HUD.pausa; $('#pausa').style.display=HUD.pausa?'flex':'none'; document.body.classList.toggle('pausado', HUD.pausa); if(HUD.pausa) motorSet(0,0,0,0,true); }
