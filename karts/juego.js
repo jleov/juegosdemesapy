@@ -395,7 +395,7 @@ function clientOnData(d){
 
 /* ====================== LA CARRERA EN ESTE APARATO ====================== */
 const HUD={t:0, fant:[], fantT:0, msgT:0, obsI:0, pausa:false, netT:0};
-function quitarCarrera(){ if(R){ R=null; M3.limpiar(); motorOff(); } $('#cuenta').textContent=''; HUD.pausa=false; $('#pausa').style.display='none'; }
+function quitarCarrera(){ cerrarPodio(); if(R){ R=null; M3.limpiar(); motorOff(); } $('#cuenta').textContent=''; HUD.pausa=false; $('#pausa').style.display='none'; }
 function prepararCarrera(){
   const c=S.carrera, T=armarPista(c.pista), soyHost=simulo(), yo=NET.myPid;
   const parrilla=c.parrilla.map(pid=>{ const p=VP(pid); if(!p) return null;
@@ -403,7 +403,7 @@ function prepararCarrera(){
     return {pid, ch:p.ch, color:p.color, nombre:p.name, bot:p.bot||ausente, lvl:c.nivel, local: p.id===yo || (soyHost && (p.bot||ausente)), ausente}; }).filter(Boolean);
   const lienzo=$('#c3d'); if(lienzo.parentElement!==$('#stage')) $('#stage').insertBefore(lienzo, $('#stage').firstChild);
   M3.calidad=CFG.calidad; if(!M3.init($('#c3d'))){ toast('Este aparato no pudo abrir el 3D 😕'); return; }
-  M3.tam(); M3.cargar(T);
+  cerrarPodio(); M3.tam(); M3.cargar(T);
   const fant = S.crono ? load('kg_fant_'+c.pista) : null;
   if(fant) parrilla.push({pid:'fantasma', ch:miCh, color:'#ffffff', nombre:'Tu fantasma', fantasma:true, local:true});
   R=crearCarrera({pista:c.pista, vueltas:c.vueltas, ritmo:c.ritmo, nivel:c.nivel, objetos:c.objetos, parrilla, host:soyHost, miPid:yo, vidas:c.vidas, tiempo:c.tiempo});
@@ -584,6 +584,11 @@ function fxCarrera(e){
     case 'golpe': if(e.pid===yo && R.arena){ const k=R.porPid[yo]; aviso((e.c==='hielo'?'🧊 ':'💥 ')+(k.vidas>0?'¡Te quedan '+'❤️'.repeat(k.vidas)+'!':'¡Sin corazones!'),'rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.pid===yo){ aviso(e.c==='hielo'?'🧊 ¡Te congelaron!':'💫 ¡Patinaste!','rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.por===yo){ aviso('🎯 ¡Le diste a '+nom(e.pid)+'!','oro'); sfx.acierto(); } break;
     case 'escudo': if(e.pid===yo){ aviso('🕸️ ¡El ñandutí te salvó!','oro'); sfx.escudo(); } break;
     case 'tormenta': sfx.trueno(); if(e.de===yo) aviso('⛈️ ¡Tormenta para todos!','oro'); break;
+    case 'gasta': if(e.pid===yo){ const k=R.porPid[yo], n=k&&k.item==='guampa'?k.itemN:0; aviso('🧊 ¡Congelaste a '+nom(e.a)+'!'+(n?' Te quedan '+n:' Se terminó el tereré'),'oro'); sfx.acierto(); vib(40); } break;
+    case 'quita': if(e.pid===yo){ aviso('🥥 ¡Te volaron el mango! Sin daño','rojo'); sfx.escudo(); vib(60); } else if(e.por===yo){ aviso('🎯 Le sacaste el mango a '+nom(e.pid),'oro'); sfx.acierto(); } break;
+    case 'tira': aviso('🧉 Tiraste la guampa: ya podés agarrar otra cosa'); sfx.sel(); break;
+    case 'cocoAtras': aviso('🥥 ¡Coco para atrás!','oro'); break;
+    case 'sost': if((HUD.sostN=(HUD.sostN||0)+1)<=3) aviso('🥭 Soltá para tirarlo adelante · frenando cae atrás'); break;
   }
 }
 
@@ -598,6 +603,7 @@ function cuadro(dt, dibujar){
     if(S && S.crono && yo && R.t>=0 && yo.fin==null){ HUD.fantT+=dt; while(HUD.fantT>=.1){ HUD.fantT-=.1; HUD.fant.push([Math.round(yo.x*10), Math.round(yo.y*10), Math.round(yo.z*10), Math.round(yo.h*100)]); } }
     if(dibujar){
       const vivos=R.orden.filter(q=>!q.muerto), cam = yo && !yo.muerto ? yo : (vivos.length ? vivos[HUD.obsI%vivos.length] : yo || R.orden[0]);
+      if(M3.enPodio()){ M3.cuadroPodio(dt); motorSet(0,0,0,0,true); return; }
       if(!R.listo && !R.host) M3.paseo(R, R.reloj);
       M3.sync(R, cam, dt); hud(dt, cam);
       if(yo) motorSet(yo.v, yo.drift, yo.boost>0||yo.viento>0, yo.fuera, false); else if(cam) motorSet(cam.v, cam.drift, cam.boost>0, false, false);
@@ -960,8 +966,21 @@ function resultados(force){
   // contrarreloj: guardar el mejor tiempo y el fantasma
   if(S.crono && V.res && V.res[0] && !V.res[0].est){ const r=V.res[0], T0=TIEMPOS(), id=V.carrera.pista, ant=T0[id]; LAST.record=!ant || r.t<ant.t; LAST.antes=ant?ant.t:null;
     if(LAST.record){ T0[id]={t:r.t, v:r.mejor}; store('kg_tiempos', T0); store('kg_fant_'+id, HUD.fant.slice(0, 3000)); } else if(r.mejor && (!ant.v || r.mejor<ant.v)){ ant.v=r.mejor; store('kg_tiempos', T0); } }
-  setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key) modal(resHTML()); }, force?0:1200);
+  const podio = !force && !S.crono && V.res && V.res.length && R && M3.listo;
+  if(podio){ const lista=V.res.slice(0,3).map(r=>{ const p=VP(r.pid)||{}; return {pid:r.pid, ch:p.ch|0, color:p.color||'#888', nombre:p.name||'?', cara:CFG.calidad==='baja'?null:FACES[r.pid]}; });
+    setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key && R) abrirPodio(lista); }, 1400); }
+  setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key) modal(resHTML()); }, force?0:podio?8200:1200);
 }
+// el podio de los tres primeros, con su cartel y un botón para ver la tabla
+function abrirPodio(lista){
+  M3.mostrarPodio(lista, R && R.T.tema); document.body.classList.add('enpodio');
+  const w=lista[0], yo=me(), d=$('#podioCartel')||document.createElement('div'); d.id='podioCartel';
+  const arena=V.carrera.modo==='arena', copa=V.opts.modo==='copa' && V.final;
+  d.innerHTML=`<b>${arena?'💥':'🏆'} ${esc(w.nombre)}${w.pid===yo?' (vos)':''}</b><small>${arena?'ganó la batalla':'ganó la carrera'}${lista.findIndex(q=>q.pid===yo)>0?' · vos saliste '+(lista.findIndex(q=>q.pid===yo)+1)+'º':''}</small><button class="btn gold sm" onclick="resultados(true)">📋 Ver resultados</button>`;
+  if(!d.parentElement) $('#stage').appendChild(d);
+  const pos=lista.findIndex(q=>q.pid===yo); if(pos===0){ sfx.meta(); vib([60,40,60,40,160]); }
+}
+function cerrarPodio(){ M3.cerrarPodio(); document.body.classList.remove('enpodio'); const d=$('#podioCartel'); if(d) d.remove(); }
 function resHTML(){
   const host=amHost(), copa=V.opts.modo==='copa', c=COPAS.find(x=>x.id===V.opts.copa)||COPAS[0], yo=me();
   const fila=(r,i)=>{ const p=VP(r.pid)||{name:'?', ch:0, color:'#888', emoji:'❔'}; return `<div class="prow ${r.pid===yo?'yo':''}" style="border-left:6px solid ${p.color}"><span class="md">${MEDAL[i]}</span>${carita(p,22)}<span class="nm"><b>${esc(p.name)}${r.pid===yo?' (vos)':''}${p.bot?' 🤖':''}</b><small>${esc(piloto(p.ch).n)} · ${r.vidas!=null ? (r.afuera?'💀 aguantó '+fmtT(r.t).replace(/\.\d+$/,''):'❤️'.repeat(r.vidas)+' quedó en pie')+' · 💥 pegó '+r.golpes : r.est?'no llegó':'⏱️ '+fmtT(r.t)}${r.mejor?' · mejor vuelta '+fmtT(r.mejor):''}</small></span>${S.crono?'':`<span class="pts">+${r.pts}</span>`}</div>`; };
@@ -979,7 +998,7 @@ function resHTML(){
     else h+=`<div class="row"><button class="btn green" onclick="closeModal();doAct({type:'next'})">🔁 Otra vez acá</button><button class="btn" onclick="closeModal();doAct({type:'next',sig:1})">▶️ Pista siguiente</button></div>`;
     h+=`<button class="btn gray wide" style="margin-top:6px" onclick="closeModal();${NET.mode==='local'?'leaveToMenu()':`doAct({type:'lobby'})`}">${NET.mode==='local'?'🏠 Volver al menú':'↩️ Volver a la sala'}</button>`;
   } else h+=`<p class="muted" style="text-align:center">⏳ Esperando que el anfitrión 👑 largue la próxima…</p>${NET.obs?`<button class="btn gold wide" onclick="doAct({type:'joinNext',ch:${miCh}})">🪑 Sumarme a la próxima carrera</button>`:''}`;
-  return h+`<button class="btn dark wide" style="margin-top:6px" onclick="closeModal()">Ver la pista</button></div>`;
+  return h+`<button class="btn dark wide" style="margin-top:6px" onclick="closeModal()">${M3.enPodio()?'🏆 Ver el podio':'Ver la pista'}</button></div>`;
 }
 // ---------- ventanas ----------
 function modal(h){ $('#mbox').innerHTML=h; $('#modal').classList.add('on'); }

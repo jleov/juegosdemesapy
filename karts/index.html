@@ -148,6 +148,11 @@ body>.side{display:none}
 #toques{position:fixed;inset:0;z-index:15;pointer-events:none;display:none}
 body.corriendo #toques.tactil{display:block}
 body.panel #toques,body.pausado #toques{display:none!important}
+body.enpodio #toques,body.enpodio #hud{display:none!important}
+#podioCartel{position:absolute;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:20;background:rgba(10,12,30,.78);color:#fff;border-radius:16px;padding:10px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;max-width:92%;box-shadow:0 6px 24px rgba(0,0,0,.5);animation:escpop2 .5s ease-out}
+#podioCartel b{font:900 clamp(18px,4.5vw,28px)/1.1 "Arial Black",system-ui,sans-serif;color:var(--gold)}
+#podioCartel small{font-weight:700;opacity:.9}
+@keyframes escpop2{from{opacity:0;transform:translate(-50%,30px)}}
 body.editando #toques{display:block!important;z-index:97}
 body.editando #toques button{animation:menea 1.4s ease-in-out infinite;cursor:grab}
 body.editando #toques button.sel{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold),0 0 18px var(--gold)}
@@ -419,10 +424,10 @@ body.editando #editCtrl{display:block}
 
 <script src="pistas.js?v=12"></script>
 <script src="mundo.js?v=12"></script>
-<script src="karts3d.js?v=12"></script>
-<script src="carrera.js?v=13"></script>
+<script src="karts3d.js?v=13"></script>
+<script src="carrera.js?v=14"></script>
 <script src="sala.js?v=12"></script>
-<script src="juego.js?v=13"></script>
+<script src="juego.js?v=14"></script>
 <script src="mando.js?v=3"></script>
 <script src="caras.js?v=12"></script>
 <script src="../dueno-link.js"></script>
