@@ -13,6 +13,9 @@
 (function(){
   if(!window.Peer) return;
   const HUB = 'jpychat26-central', PREF = 'jpychat26-';
+  // versión del chat: si entra alguien con una más nueva, la central vieja le deja el lugar
+  // (así una pestaña abierta hace horas no frena las novedades, como un juego nuevo para invitar)
+  const CHAT_V = 2;
   const MAXT = 200, MAXN = 20, HIST = 30, VIDA = 3600e3, BAN_MS = 24*3600e3;
   const vigentes = l => l.filter(m => Date.now() - (+m.ts || 0) < VIDA).slice(-HIST);   // los últimos 30 de la última hora
   const $ = s => document.querySelector(s);
@@ -78,7 +81,7 @@
     const c = R.me.connect(HUB, { reliable:true });
     R.conn = c;
     const espera = setTimeout(() => { if(R.conn === c && !c.open){ R.conn = null; try{ c.close(); }catch(e){} reintentar(); } }, 9000);
-    c.on('open', () => { clearTimeout(espera); R.intento = 0; R.visto = Date.now(); enviar({ t:'hola', n:nombre, dv:DEV }); estado(''); });
+    c.on('open', () => { clearTimeout(espera); R.intento = 0; R.visto = Date.now(); enviar({ t:'hola', n:nombre, dv:DEV, v:CHAT_V }); estado(''); });
     c.on('data', d => { R.visto = Date.now(); recibir(d); });
     c.on('close', () => { if(R.conn === c){ R.conn = null; reintentar(); } });
     c.on('error', () => {});
@@ -125,6 +128,11 @@
   async function hubRecibe(id, d){
     const cl = R.clientes.get(id); if(!cl || !d || typeof d !== 'object') return;
     cl.visto = Date.now();
+    if(d.t === 'hola' && (+d.v || 0) > CHAT_V){   // llegó alguien con el chat más nuevo: que sea la central
+      dejarCentral(); estado('Reconectando…');
+      clearTimeout(R.reintento); R.reintento = setTimeout(() => { R.intento = 0; arrancar(); }, 4000);
+      return;
+    }
     if(d.t === 'hola' || d.t === 'nom'){
       if(d.t === 'hola' && typeof d.dv === 'string') cl.dv = d.dv.slice(0, 40);
       if(d.t === 'hola' && d.oculto) cl.oculto = true;   // un juego que solo viene a dejar una invitación: no se muestra en la lista
@@ -141,7 +149,7 @@
       hubMensaje(id, cl.n, d.x, cl);
     } else if(d.t === 'inv'){
       if(!cl.n) return;
-      hubInvitar(id, cl.n, { g:String(d.g || ''), c:String(d.c || '') }, cl);
+      hubInvitar(id, cl.n, { g:String(d.g || ''), c:String(d.c || ''), nom:limpiaNom(d.nom) }, cl);
     } else if(d.t === 'dueno' && cl.no && typeof d.sig === 'string'){
       const no = cl.no; cl.no = null;
       if(await verificar(no, d.sig)){ cl.dueno = true; try{ cl.c.send({ t:'eresDueno' }); }catch(e){} avisarGente(); }
@@ -185,7 +193,8 @@
     if(ahora - (cl.inv || 0) < 60000) return no('Esperá un minuto antes de invitar otra vez.');
     if(hist.some(m => m.inv && m.inv.g === v.g && m.inv.c === v.c && ahora - m.ts < 120000)) return no('Esa sala ya está en el chat.');
     cl.inv = ahora;
-    const m = { id, n, x:'📣 ¡Vengan a jugar ' + INV[v.g][0] + '! Sala ' + v.c, ts:ahora, k:rid(), inv:{ g:v.g, c:v.c } };
+    const inv = { g:v.g, c:v.c }; if(!INV[v.g] && v.nom) inv.nom = v.nom;
+    const m = { id, n, x:'📣 ¡Vengan a jugar ' + nomInv(inv) + '! Sala ' + v.c, ts:ahora, k:rid(), inv };
     if(cl.dueno) m.d = 1;
     agregar(m);
     difundir({ t:'msg', m });
@@ -248,8 +257,12 @@
     basta:['Basta PY','#'], tejo:['Tejo PY','#'], botones:['Botones PY','#'], naval:['Batalla Naval PY','#'], mavapa:['¿Mávapa?','#'],
     mavaiko:['¿Mávaiko Ojuka?','#'], ajedrez:['Ajedrez y Damas PY','#'], salon:['Salón de Belleza PY','#'] };
   const CODIGO = /^[A-Za-z0-9_-]{3,12}$/;
-  const okInv = v => v && typeof v === 'object' && INV[v.g] && CODIGO.test(String(v.c || ''));
-  const enlaceInv = v => v.g + '/' + INV[v.g][1] + encodeURIComponent(v.c);
+  // un juego que no está en la lista (uno nuevo) igual se puede invitar: carpeta en minúsculas y entra con #código
+  const okInv = v => v && typeof v === 'object' && (INV[v.g] || /^[a-z0-9]{2,16}$/.test(String(v.g || ''))) && CODIGO.test(String(v.c || ''));
+  const nomInv = v => INV[v.g] ? INV[v.g][0] : (typeof v.nom === 'string' && v.nom.trim() ? v.nom.trim().slice(0, 30) : v.g);
+  const enlaceInv = v => v.g + '/' + (INV[v.g] ? INV[v.g][1] : '#') + encodeURIComponent(v.c);
+  // invitación que llegó como texto (la mandó un juego a una central vieja): se le pone igual el botón
+  const INV_TXT = /^📣 ¡Vengan a jugar .{1,40}! Sala ([A-Za-z0-9_-]{3,12}) 👉 juegospy\.com\/([a-z0-9]{2,16})\/#\1$/u;
 
   function mandar(x){
     x = limpiaTxt(x); if(!x) return false;
@@ -446,10 +459,12 @@
     }
     const x = document.createElement('span'); x.className = 'x'; x.textContent = m.x;
     d.append(n, x);
-    if(okInv(m.inv)){   // invitación de un juego: botón para entrar a la sala
+    let inv = m.inv;
+    if(!okInv(inv)){ const t = INV_TXT.exec(m.x); if(t) inv = { g:t[2], c:t[1] }; }
+    if(okInv(inv)){   // invitación de un juego: botón para entrar a la sala
       d.classList.add('inv');
-      const a = document.createElement('a'); a.className = 'unir'; a.href = enlaceInv(m.inv); a.textContent = '🎮 Unirme';
-      a.title = 'Entrar a la sala ' + m.inv.c + ' de ' + INV[m.inv.g][0];
+      const a = document.createElement('a'); a.className = 'unir'; a.href = enlaceInv(inv); a.textContent = '🎮 Unirme';
+      a.title = 'Entrar a la sala ' + inv.c + ' de ' + nomInv(inv);
       d.appendChild(a);
     }
     return d;

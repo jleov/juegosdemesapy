@@ -30,7 +30,9 @@
     if(!abierta) return null;
     const humanos = (i.players || []).filter(p => p && p.n && !p.bot);
     const n = i.host || (humanos[0] && humanos[0].n) || load('jpy_chat_nombre', '') || '';
-    return { g: CARPETA[g] || g, c: String(i.code), n };
+    // nombre del juego: lo que está antes de los dos puntos en el título de la página
+    const nom = (document.title.split(/[:|]/)[0] || '').trim().slice(0, 30);
+    return { g: CARPETA[g] || g, c: String(i.code), n, nom };
   }
 
   function armar(){
@@ -69,7 +71,7 @@
     ocupado = true; btn.disabled = true; pintar('📣 Mandando al chat…', '');
     let DEV = load('jpy_chat_dev', ''); if(!DEV){ DEV = rid() + rid(); store('jpy_chat_dev', DEV); }
     const me = new Peer(PREF + rid(), { debug:0, config:{ iceServers: window.ICE_SERVERS || [{urls:'stun:stun.l.google.com:19302'}] } });
-    let listo = false;
+    let listo = false, texto = '';
     const cerrar = (txt, clase) => { if(listo) return; listo = true; clearTimeout(t); setTimeout(() => { try{ me.destroy(); }catch(e){} }, 500); fin(txt, clase); };
     const t = setTimeout(() => cerrar('😕 No se pudo llegar al chat, probá de nuevo', 'mal'), 12000);
     me.on('error', e => cerrar(e && e.type === 'peer-unavailable' ? '😴 Ahora no hay nadie en el chat' : '😕 No se pudo llegar al chat, probá de nuevo', 'mal'));
@@ -78,8 +80,14 @@
       c.on('open', () => c.send({ t:'hola', n:s.n, dv:DEV, oculto:1 }));
       c.on('data', d => {
         if(!d || typeof d !== 'object') return;
-        if(d.t === 'hist') c.send({ t:'inv', g:s.g, c:s.c });
+        if(d.t === 'hist') c.send({ t:'inv', g:s.g, c:s.c, nom:s.nom });
         else if(d.t === 'invOk'){ ultima[k] = Date.now(); const n = +d.n || 0; cerrar(n ? `✅ Invitación enviada (${n} en el chat)` : '✅ Invitación enviada al chat', 'ok'); }
+        else if(d.t === 'aviso' && /no se puede invitar/.test(String(d.x)) && !texto){
+          // la central tiene una versión vieja del chat que no conoce este juego: se manda como mensaje con el link
+          texto = '📣 ¡Vengan a jugar ' + (s.nom || s.g) + '! Sala ' + s.c + ' 👉 juegospy.com/' + s.g + '/#' + s.c;
+          c.send({ t:'msg', x:texto });
+        }
+        else if(d.t === 'msg' && texto && d.m && d.m.x === texto){ ultima[k] = Date.now(); cerrar('✅ Invitación enviada al chat', 'ok'); }
         else if(d.t === 'aviso') cerrar('⚠️ ' + String(d.x || '').slice(0, 90), 'mal');
         else if(d.t === 'echado'){ store('jpy_chat_ban', String(+d.h || 0)); cerrar('⛔ No podés usar el chat por ahora', 'mal'); }
       });
