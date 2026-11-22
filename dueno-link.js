@@ -81,5 +81,5 @@
   };
   // botón para invitar al chat global de la portada (chat/invitar.js, al lado de este archivo)
   try{ const yo=document.currentScript && document.currentScript.src;
-    if(yo){ const sc=document.createElement('script'); sc.src=new URL('chat/invitar.js', yo).href; sc.async=true; (document.head||document.documentElement).appendChild(sc); } }catch(e){}
+    if(yo){ const sc=document.createElement('script'); sc.src=new URL('chat/invitar.js?v=2', yo).href; sc.async=true; (document.head||document.documentElement).appendChild(sc); } }catch(e){}
 })();

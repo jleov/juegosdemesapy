@@ -18,3 +18,14 @@
   X-Robots-Tag: noindex, nofollow
 /grabar-g8p3mekgrf/*
   X-Robots-Tag: noindex, nofollow
+
+# archivos que comparten todos los juegos: el navegador pregunta siempre si hay versión nueva
+# (si no, quedaba hasta 4 horas con la vieja y, por ejemplo, no se podía invitar al chat desde un juego nuevo)
+/chat/*
+  Cache-Control: no-cache
+/dueno-link.js
+  Cache-Control: no-cache
+/inicio.js
+  Cache-Control: no-cache
+/ice.js
+  Cache-Control: no-cache

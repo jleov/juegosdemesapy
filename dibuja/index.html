@@ -1320,7 +1320,7 @@ function toast(t) { let el = $('.toast'); if (!el) { el = document.createElement
 function banner(t) { let el = $('.banner'); if (!el) { el = document.createElement('div'); el.className = 'banner'; document.body.appendChild(el); } el.textContent = t; el.classList.remove('hidden'); }
 function hideBanner() { const el = $('.banner'); if (el) el.classList.add('hidden'); }
 </script>
-<script src="../dueno-link.js"></script>
+<script src="../dueno-link.js?v=2"></script>
 <script src="../inicio.js?v=2"></script>
 <script>
 window.INICIO = { enJuego: () => !!mode, salida: 'leaveToMenu', sonidos: ['#sndBtn'], ocultar: ['#leaveBtn'], barra: '.topbar' };

@@ -1307,7 +1307,7 @@ cargarCasa().then(()=>{ if(UI.sonido) renderOv(); });
 window.addEventListener('focus', ()=>cargarGrabados().then(()=>{ if(UI.sonido) renderOv(); else if(S) render(); }));
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="../dueno-link.js"></script>
+<script src="../dueno-link.js?v=2"></script>
 <script src="../inicio.js?v=2"></script>
 <script>window.INICIO={enJuego:()=>!!NET.mode, salida:'leave', sonidos:['#top .ib[data-act="sonido"]'], ocultar:['#top .ib[data-act="salir"]'], barra:'#top', preguntar(){
   if(NET.mode==='host' && !confirm('Sos el anfitrión: si salís, la sala se cierra para todos. ¿Salir?')) return;
