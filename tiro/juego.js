@@ -304,6 +304,8 @@
           yo.ry = m.ry; yo.rx = 0; yo.alive = true; yo.hp = 100; yo.reloadT = 0; yo.w = yo.prim; yo.kick = 0; yo.bloom = 0;
           yo.ammo = { [yo.prim]: A[yo.prim].mag, pistola: A.pistola.mag };
           $('#muerte').classList.add('hidden'); SFX.aparece(); armaHUD();
+          // si no volvió a agarrar el mouse mientras estaba muerto, se le pide un clic
+          if (!tactil() && !C.obs() && document.pointerLockElement !== ren.domElement && !chatAbierto()) pausa(true);
         } else { const r = remotos.get(m.id); if (r) { r.buf = [{ t: performance.now(), x: m.p[0], y: m.p[1], z: m.p[2], ry: m.ry, rx: 0 }]; r.alive = true; r.caida = 0; } }
         break;
       }
@@ -362,6 +364,8 @@
     const w = m && A[m.w];
     $('#mTxt').innerHTML = m && m.a && m.a !== m.v ? `Te bajó <b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> con ${w ? w.ico + ' ' + w.n : 'un tiro'}${m.h ? ' <b>¡a la cabeza!</b> 🎯' : ''}` : 'Caíste 💀';
     $('#muerte').classList.remove('hidden');
+    // en la PC se suelta el mouse para poder tocar el arma de la próxima vida
+    if (document.pointerLockElement) document.exitPointerLock();
     pintarElegir();
   }
   function pintarElegir() {
@@ -377,11 +381,13 @@
   function controles() {
     const cv = ren.domElement;
     cv.addEventListener('click', () => { J.audio(); if (C.obs()) { mira++; return; } if (!tactil() && document.pointerLockElement !== cv) bloquear(); });
+    // muerto: al tocar un arma (o cualquier lugar) se vuelve a agarrar el mouse para seguir jugando
+    $('#muerte').addEventListener('click', () => setTimeout(bloquear, 0));
     $('#pausa').addEventListener('click', e => { if (e.target.closest('.no-lock')) return; J.audio(); bloquear(); });
     document.addEventListener('pointerlockchange', () => {
       const ok = document.pointerLockElement === cv;
       if (!ok) { inp.fire = false; inp.aim = false; inp.keys.clear(); }
-      if (activo && !C.obs() && !tactil()) pausa(!ok && !chatAbierto());
+      if (activo && !C.obs() && !tactil()) pausa(!ok && !chatAbierto() && yo.alive);
     });
     document.addEventListener('mousemove', e => {
       if (document.pointerLockElement !== cv) return;
@@ -403,6 +409,8 @@
       if (C.obs()) { if (e.key === 'ArrowRight' || e.key === ' ') mira++; if (e.key === 'ArrowLeft') mira--; if (e.key === 'Tab') { e.preventDefault(); inp.tabla = true; tabla(); } return; }
       const k = e.code;
       if (k === 'Tab') { e.preventDefault(); inp.tabla = true; tabla(); return; }
+      // muerto: 1, 2 o 3 elige el arma de la próxima vida
+      if (!yo.alive && ['Digit1', 'Digit2', 'Digit3'].includes(k)) { const w = ['fusil', 'escopeta', 'franco'][+k.slice(5) - 1]; const b = document.querySelector(`#mArmas [data-w="${w}"]`); if (b) b.click(); else J.elegirArma(w); return; }
       inp.keys.add(k);
       if (k === 'Space') { inp.jumpQ = true; e.preventDefault(); }
       if (k === 'KeyR') recargar();

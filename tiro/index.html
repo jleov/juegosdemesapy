@@ -144,6 +144,7 @@ input:focus,select:focus{border-color:var(--azul2)}
 #muerte{background:linear-gradient(rgba(90,0,0,.35),rgba(6,10,20,.55));pointer-events:auto}
 #muerte h2{margin:0;font-size:clamp(20px,4vw,30px)}#mCuenta{color:#ffc83d}
 #mArmas{max-width:420px;width:100%}
+body.tactil .pc-solo{display:none}
 #pausa{cursor:pointer}
 #pausa .card{padding:16px 18px;max-width:480px;width:100%;cursor:default;text-align:left}
 #pausa h2{margin:0 0 6px;text-align:center}
@@ -284,7 +285,7 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div id="muerte" class="capa hidden">
     <h2 id="mTxt"></h2>
     <div id="mCuenta"></div>
-    <div class="lbl" style="margin-top:10px">Para la próxima, ¿qué arma?</div>
+    <div class="lbl" style="margin-top:10px">Para la próxima, ¿qué arma? <span class="pc-solo">(tocala o apretá 1, 2 o 3)</span></div>
     <div class="armas" id="mArmas"></div>
   </div>
   <div id="pausa" class="capa hidden">
