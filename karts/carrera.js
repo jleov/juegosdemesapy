@@ -90,13 +90,13 @@ function pasoKart(R, k, dt, corre){
   const trabado=k.hielo>0||k.spin>0, turbo=k.boost>0||k.viento>0||k.sol>0, suelo=k.aire<=0;
   const gas=trabado?0:inp.gas, freno=trabado?0:inp.freno, dir=trabado?0:inp.dir;
   /* velocidad */
-  let vmax=(26.5+p.vel*1.15)*f;
+  let vmax=(28.4+p.vel*.42)*f;
   if(k.fuera && !turbo) vmax*=.5;
   if(k.lento>0 && k.viento<=0 && !(k.sol>0)) vmax*=.7;
   if(k.rebufo) vmax*=1.09;
   if(k.viento>0) vmax*=1.42; else if(k.sol>0) vmax*=1.3; else if(k.boost>0) vmax*=1.32;
   if(k.bot) vmax*=k.bot.f*(k.bot.goma||1);
-  const ace=(11+p.ace*1.7)*f*(turbo?2.6:1);
+  const ace=(10+p.ace*2.4)*f*(turbo?2.6:1);
   if(turbo && k.v<vmax) k.v=Math.min(vmax, k.v+ace*dt);
   else if(gas>0 && k.v<vmax) k.v=Math.min(vmax, k.v+ace*gas*dt*(1.2-Math.max(0,k.v)/vmax));
   else if(k.v>vmax) k.v-=(k.v-vmax)*Math.min(1, dt*(k.fuera?3.4:1.5));
@@ -105,7 +105,7 @@ function pasoKart(R, k, dt, corre){
   if(trabado) k.v*=Math.max(0, 1-(k.hielo>0?4.5:2.2)*dt);
   /* volante y derrape */
   k.steer+=(dir-k.steer)*Math.min(1, dt*9); k.steerVis=k.steer;
-  const giro=1.75+p.man*.11, vf=Math.max(-1, Math.min(1, k.v/9));
+  const giro=1.64+p.man*.17, vf=Math.max(-1, Math.min(1, k.v/9));
   const der=!!inp.derrape && !trabado;
   if(der && !k.derPrev){
     if(suelo){ k.vy=5.2; k.aire=.001; if(Math.abs(dir)>.25 && k.v>13){ k.drift=Math.sign(dir); k.dCarga=0; k.dNivel=0; } }
@@ -265,7 +265,7 @@ function botInput(R, k, dt){
   const tx=s.x+s.nx*la, tz=s.z+s.nz*la, dh=angC(Math.atan2(tx-k.x, tz-k.z)-k.h);
   inp.dir=Math.max(-1, Math.min(1, -dh*2.6));
   // cuánto frenar en las curvas
-  const giro=1.75+p.man*.11, curva=T.vmax[(k.idx+2)%N], vCurva=curva>.004 ? giro/curva*(b.niv==='dificil'?1.05:b.niv==='medio'?.95:.85) : 99;
+  const giro=1.64+p.man*.17, curva=T.vmax[(k.idx+2)%N], vCurva=curva>.004 ? giro/curva*(b.niv==='dificil'?1.05:b.niv==='medio'?.95:.85) : 99;
   if(k.v>vCurva+3) { inp.gas=0; inp.freno=1; } else if(k.v>vCurva) inp.gas=0;
   // la goma: si se escapa mucho afloja, si queda muy atrás aprieta
   const yo=R.porPid[R.miPid], lider=R.karts.reduce((m,o)=>o.humano && !o.fantasma && (!m||o.prog>m.prog)?o:m, null) || yo;

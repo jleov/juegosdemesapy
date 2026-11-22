@@ -1,5 +1,5 @@
 // Service worker: permite instalar Carrera Guasu como app y jugar sin conexión contra bots.
-const CACHE = 'karts-v13';
+const CACHE = 'karts-v14';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './pistas.js', './mundo.js', './karts3d.js', './carrera.js', './sala.js', './juego.js', './caras.js', './mando.js'];
 
 self.addEventListener('install', e => {

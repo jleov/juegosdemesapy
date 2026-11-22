@@ -15,7 +15,7 @@ const genCode = () => { const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; fo
 let myToken=load('kg_token'); if(!myToken){ myToken=Math.random().toString(36).slice(2)+Date.now().toString(36); store('kg_token', myToken); }
 const NET={mode:null, peer:null, code:null, conns:{}, hostConn:null, myPid:null, obs:null, welcomed:false};
 let CHAT=[], V=null, R=null;
-const VERSION = 17;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
+const VERSION = 18;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
 const me = () => NET.myPid || NET.obs;
 const VP = id => V && (V.players.find(p=>p.id===id) || (V.observers||[]).find(o=>o.id===id));
 const amHost = () => NET.mode==='local' || (V && V.hostPid===NET.myPid && NET.mode==='host');
