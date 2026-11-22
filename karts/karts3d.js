@@ -10,11 +10,11 @@ const PILOTOS = [
   {id:'jakare',  n:'Jakare',   esp:'el yacaré',        e:'🐊', veh:'Motocarro',          color:'#3f9a45', vel:4, ace:2, man:2, peso:5},
   {id:'kapi',    n:'Kapi',     esp:'el carpincho',     e:'🦫', veh:'Carrito chipero',    color:'#b07a3a', vel:3, ace:3, man:4, peso:3},
   {id:'tuka',    n:'Tukã',     esp:'el tucán',         e:'🦜', veh:'Kart pico largo',    color:'#ff9a1e', vel:2, ace:5, man:4, peso:1},
-  {id:'jagua',   n:'Jaguarete',esp:'el jaguareté',     e:'🐆', veh:'Kart de carrera',    color:'#f2b01e', vel:5, ace:2, man:2, peso:4},
+  {id:'jagua',   n:'Jaguarete',esp:'el jaguareté',     e:'🐆', veh:'Kart de carrera',    color:'#f2b01e', vel:5, ace:2, man:1, peso:4},
   {id:'kure',    n:'Kure',     esp:'el chanchito',     e:'🐷', veh:'Tractorcito',        color:'#f28aa8', vel:3, ace:2, man:3, peso:5},
   {id:'aguara',  n:'Aguara',   esp:'el aguará guazú',  e:'🦊', veh:'Arenero patas largas',color:'#d8582a', vel:4, ace:3, man:4, peso:2},
-  {id:'kai',     n:'Ka’i',     esp:'el monito',        e:'🐒', veh:'Karrito de madera',  color:'#8a5a34', vel:2, ace:4, man:5, peso:1},
-  {id:'lobope',  n:'Lobope',   esp:'la nutria gigante',e:'🦦', veh:'Lancha con ruedas',  color:'#3b8fd0', vel:3, ace:4, man:3, peso:3},
+  {id:'kai',     n:'Ka’i',     esp:'el monito',        e:'🐒', veh:'Karrito de madera',  color:'#8a5a34', vel:4, ace:4, man:5, peso:1},
+  {id:'lobope',  n:'Lobope',   esp:'la nutria gigante',e:'🦦', veh:'Lancha con ruedas',  color:'#3b8fd0', vel:4, ace:4, man:3, peso:3},
 ];
 const COLORES = ['#d52b1e','#1d6fe0','#f2c14e','#2fae5a','#ff7a1e','#c452d8','#19c2c2','#f4f1e8'];
 const piloto = i => PILOTOS[((i|0)%PILOTOS.length+PILOTOS.length)%PILOTOS.length];
