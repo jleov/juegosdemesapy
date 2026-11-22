@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121826">
+<!-- SEO (buscadores y vista previa al compartir) -->
+<title>Tiro Guasu: juego de disparos en 3D online gratis con amigos | Juegos PY</title>
+<meta name="description" content="Tiro Guasu: juego de tiros en primera persona en 3D, online y gratis desde el navegador. Mapas paraguayos (Mercado 4, Puerto de Asunción, una estancia en el Chaco), fusil, escopeta, francotirador y pistola, todos contra todos o Albirroja contra Azules. Salas con amigos hasta 12, chat, voz y bots.">
+<link rel="canonical" href="https://juegospy.com/tiro/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Juegos Paraguay Digitales">
+<meta property="og:title" content="Tiro Guasu: juego de disparos en 3D online gratis con amigos | Juegos PY">
+<meta property="og:description" content="Juego de tiros en primera persona en 3D con mapas paraguayos: Mercado 4, el Puerto de Asunción y el Chaco. Salas con amigos, chat, voz y bots.">
+<meta property="og:url" content="https://juegospy.com/tiro/">
+<meta property="og:image" content="https://juegospy.com/tiro/icon-512.png">
+<meta property="og:locale" content="es_PY">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Tiro Guasu", "url": "https://juegospy.com/tiro/", "description": "Juego de disparos en primera persona en 3D, online y gratis, con mapas paraguayos (Mercado 4, Puerto de Asunción, Chaco). Todos contra todos o por equipos, salas con amigos hasta 12, chat, voz y bots.", "image": "https://juegospy.com/tiro/icon-512.png", "inLanguage": "es", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "jleovgames", "url": "https://juegospy.com/"}, "isPartOf": {"@type": "WebSite", "name": "Juegos Paraguay Digitales", "url": "https://juegospy.com/"}, "genre": ["Disparos en primera persona", "Acción", "Multijugador"], "gamePlatform": ["Navegador web", "Android", "PC"], "playMode": "MultiPlayer", "applicationCategory": "Game", "operatingSystem": "Cualquiera (navegador)", "alternateName": ["Juego de tiros online", "Shooter paraguayo", "FPS online gratis"], "keywords": "juego de disparos online, juego de tiros 3d, fps navegador, shooter con amigos, juegos paraguayos online, juego gratis"}</script>
+<!-- /SEO -->
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!-- librerías guardadas junto al juego: conexión entre jugadores (PeerJS 1.5.4) y 3D (Three.js r128) -->
+<script src="peerjs.min.js"></script>
+<script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="three.min.js"></script>
+<script src="../ice.js"></script>
+<style>
+:root{--rojo:#D52B1E;--azul:#0038A8;--azul2:#3a6df0;--bg:#0f1420;--card:#1a2233;--card2:#222c42;--tx:#eef2fb;--mut:#93a0bd;--ok:#22b35e;--line:#2e3a55;--r:14px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--tx);
+  background:linear-gradient(180deg,var(--rojo) 0 6px,#fff 6px 12px,var(--azul) 12px 18px) top/100% 18px no-repeat,radial-gradient(circle at 50% 0,#263452,var(--bg) 70%) fixed;}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;border-radius:10px;padding:.6em 1em;background:var(--card2);font-weight:700;transition:transform .08s,filter .15s}
+button:active{transform:scale(.96)}
+button:hover{filter:brightness(1.12)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.btn-p{background:var(--azul2);color:#fff}.btn-r{background:var(--rojo);color:#fff}.btn-ok{background:var(--ok);color:#fff}
+input,select{border:2px solid var(--line);border-radius:10px;padding:.6em .8em;background:#11182a;outline:none;width:100%}
+input:focus,select:focus{border-color:var(--azul2)}
+.hidden{display:none!important}
+.card{background:var(--card);border-radius:var(--r);box-shadow:0 6px 24px rgba(0,0,0,.35);border:1px solid var(--line)}
+.screen{min-height:100%;padding:12px;padding-top:26px}
+/* inicio */
+#home{display:flex;align-items:center;justify-content:center}
+.home-box{width:100%;max-width:460px;padding:22px}
+.logo{text-align:center;margin:0 0 2px;font-size:clamp(34px,9vw,50px);line-height:1;font-weight:900;letter-spacing:-1px;text-transform:uppercase}
+.logo .a{color:#ff5a4b}.logo .b{color:#6f9bff}
+.sub{text-align:center;color:var(--mut);margin:6px 0 16px}
+.lbl{font-size:.82em;font-weight:700;color:var(--mut);margin:12px 0 6px;display:block}
+.avatars{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.avatars button{padding:6px 0;font-size:21px;background:#11182a;border:2px solid transparent}
+.avatars button.sel{border-color:var(--azul2);background:#1c2a4d}
+.armas{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.armas button{padding:.55em .2em;font-size:.86em;background:#11182a;border:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:2px}
+.armas button b{font-size:1.5em}
+.armas button small{color:var(--mut);font-weight:600;font-size:.78em}
+.armas button.sel{border-color:#ffc83d;background:#2c2a1c}
+.row{display:flex;gap:8px}
+.home-actions{display:grid;gap:10px;margin-top:16px}
+.home-actions button{padding:.85em;font-size:1.05em}
+.note{font-size:.82em;color:var(--mut);text-align:center;margin-top:12px;line-height:1.4}
+/* sala de espera */
+.lobby-wrap{max-width:1100px;margin:0 auto;display:grid;gap:12px;grid-template-columns:1fr}
+.codebox{padding:16px;text-align:center}
+.code{font-size:44px;font-weight:900;letter-spacing:8px;color:#ffc83d;margin:4px 0}
+.panel{padding:14px}
+.panel h3{margin:0 0 10px;font-size:1em}
+.equipos{display:grid;gap:10px;grid-template-columns:1fr}
+.plist-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.pchip{display:flex;align-items:center;gap:8px;background:#11182a;border-radius:10px;padding:8px;border-left:4px solid transparent}
+.pchip .av{font-size:22px}
+.pchip .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:.92em}
+.pchip .x,.pchip .sw{padding:2px 8px;font-size:.85em}
+.pchip .x{background:#4a1d1d;color:#ff8a80}
+.tcol h4{margin:0 0 8px;font-size:.92em}
+.tcol.r h4{color:#ff8a80}.tcol.a h4{color:#8ab4ff}
+.sets{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sets label{font-size:.8em;font-weight:700;color:var(--mut);display:grid;gap:4px}
+.lobby-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.lobby-btns button{flex:1;min-width:130px}
+.lobby-chat{height:260px;display:flex;flex-direction:column;gap:6px}
+#msgs{flex:1;overflow-y:auto;background:#11182a;border-radius:10px;padding:8px;font-size:.9em}
+#msgs .m{padding:2px 0;word-wrap:break-word}#msgs .system{color:var(--mut);font-style:italic}
+#chatForm{display:flex;gap:6px}#chatForm button{flex:none}
+.ayuda{font-size:.84em;color:var(--mut);line-height:1.55}
+.ayuda kbd{background:#11182a;border:1px solid var(--line);border-radius:5px;padding:0 5px;color:var(--tx);font-family:inherit;font-size:.92em}
+@media (min-width:900px){.lobby-wrap{grid-template-columns:1.4fr 1fr}.codebox{grid-column:1/-1}.equipos.dos{grid-template-columns:1fr 1fr}}
+/* ---------- el juego (pantalla completa) ---------- */
+#juego{position:fixed;inset:0;background:#000;overflow:hidden;user-select:none;-webkit-user-select:none;z-index:10}
+#cv3{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+#hud{position:absolute;inset:0;pointer-events:none;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+#mira{position:absolute;left:50%;top:50%;--g:6px;transition:opacity .1s}
+#mira i{position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#mira i:nth-child(1){width:2px;height:9px;left:-1px;bottom:var(--g)}#mira i:nth-child(2){width:2px;height:9px;left:-1px;top:var(--g)}
+#mira i:nth-child(3){height:2px;width:9px;top:-1px;right:var(--g)}#mira i:nth-child(4){height:2px;width:9px;top:-1px;left:var(--g)}
+#mira b{position:absolute;width:2px;height:2px;left:-1px;top:-1px;background:#fff}
+#hitm{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;opacity:0;transition:opacity .12s}
+#hitm::before,#hitm::after{content:"";position:absolute;left:12px;top:-2px;width:2px;height:30px;background:#fff;transform:rotate(45deg);
+  -webkit-mask:linear-gradient(#000 0 35%,transparent 35% 65%,#000 65%);mask:linear-gradient(#000 0 35%,transparent 35% 65%,#000 65%)}
+#hitm::after{transform:rotate(-45deg)}
+#hitm.head::before,#hitm.head::after{background:#ffcf33}#hitm.kill::before,#hitm.kill::after{background:#ff3b30;width:3px}
+#arriba{position:absolute;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);text-align:center;background:rgba(10,14,25,.6);padding:4px 14px;border-radius:12px;white-space:nowrap}
+#tReloj{font-size:20px;font-variant-numeric:tabular-nums}#tScore{font-size:13px}
+.tr{color:#ff8a80}.ta{color:#8ab4ff}
+#feed{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 52px);right:10px;display:flex;flex-direction:column;gap:4px;align-items:flex-end;max-width:60vw}
+.fk{background:rgba(10,14,25,.65);padding:3px 9px;border-radius:8px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.fk.mio{border:1px solid #ffc83d}
+#abajo{position:absolute;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:flex-end}
+.vida{width:min(240px,38vw)}
+.vida .num{font-size:30px;line-height:1}.vida .num small{font-size:13px;color:#ccc}
+.vbar{height:10px;background:rgba(0,0,0,.5);border-radius:6px;overflow:hidden;margin-top:4px;border:1px solid rgba(255,255,255,.25)}
+#vBar{height:100%;width:100%;background:#2ecc71;transition:width .15s}
+.armahud{text-align:right}#aNom{font-size:14px;color:#ddd}#aBal{font-size:20px}#aBal b{font-size:32px}
+#aRec{display:none;width:120px;height:6px;background:rgba(0,0,0,.5);border-radius:4px;overflow:hidden;margin:4px 0 0 auto}#aRec div{height:100%;background:#ffc83d;width:0}
+#aviso{position:absolute;top:30%;left:0;right:0;text-align:center;font-size:clamp(16px,3.4vw,24px);opacity:0}
+#aviso .racha{font-size:1.4em;color:#ffc83d}
+#aviso.ver{animation:aviso 2.2s ease-out forwards}
+@keyframes aviso{0%{opacity:0;transform:scale(1.4)}10%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0}}
+#dano{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(200,0,0,.75));opacity:0;transition:opacity .3s}
+#flecha{position:absolute;left:50%;top:50%;width:0;height:0;opacity:0;transition:opacity .4s}
+#flecha::before{content:"";position:absolute;left:-40px;top:-150px;width:80px;height:24px;border-radius:50% 50% 0 0;border-top:6px solid rgba(255,40,30,.9)}
+#mirilla{position:absolute;inset:0;background:radial-gradient(circle at center,transparent 0 min(36vh,36vw),#000 calc(min(36vh,36vw) + 2px))}
+#mirilla::before,#mirilla::after{content:"";position:absolute;background:#000}
+#mirilla::before{left:50%;top:0;bottom:0;width:2px;margin-left:-1px}#mirilla::after{top:50%;left:0;right:0;height:2px;margin-top:-1px}
+#tabla{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(12,17,30,.9);border-radius:14px;padding:12px 16px;width:min(520px,92vw);max-height:80vh;overflow:auto;pointer-events:auto}
+#tabla h3{margin:6px 0}#tabla table{width:100%;border-collapse:collapse;font-size:14px}
+#tabla th{color:var(--mut);text-align:left;font-size:12px}#tabla td,#tabla th{padding:4px 6px}#tabla td+td,#tabla th+th{text-align:center;width:60px}
+#tabla tr.me{background:rgba(255,200,61,.15)}
+#clog{position:absolute;left:12px;bottom:calc(max(12px,env(safe-area-inset-bottom)) + 70px);width:min(420px,60vw);font-size:13px;display:flex;flex-direction:column;gap:2px}
+.cl{background:rgba(10,14,25,.5);padding:2px 8px;border-radius:6px;transition:opacity 1s}.cl.viejo{opacity:0}
+#chatF{position:absolute;left:12px;bottom:calc(max(12px,env(safe-area-inset-bottom)) + 40px);width:min(420px,80vw);display:none;gap:6px;pointer-events:auto}
+#chatF.abierto{display:flex}#chatF input{background:rgba(10,14,25,.85)}
+#obsTxt{position:absolute;bottom:max(14px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(10,14,25,.7);padding:6px 14px;border-radius:10px;white-space:nowrap;font-size:14px;display:none}
+#hud.obs #obsTxt{display:block}#hud.obs #abajo,#hud.obs #mira{display:none}
+#topBtns{position:absolute;top:max(8px,env(safe-area-inset-top));left:56px;display:flex;gap:6px;pointer-events:auto;z-index:3}
+#topBtns button{width:40px;height:40px;border-radius:50%;padding:0;font-size:17px;background:rgba(15,12,30,.72);border:2px solid rgba(255,255,255,.4)}
+#topBtns button.on{background:var(--ok)}#topBtns button.muted{background:var(--rojo)}
+/* pantallas encima del juego */
+.capa{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:rgba(6,10,20,.72);text-align:center;padding:20px;z-index:4}
+#muerte{background:linear-gradient(rgba(90,0,0,.35),rgba(6,10,20,.55));pointer-events:auto}
+#muerte h2{margin:0;font-size:clamp(20px,4vw,30px)}#mCuenta{color:#ffc83d}
+#mArmas{max-width:420px;width:100%}
+#pausa{cursor:pointer}
+#pausa .card{padding:16px 18px;max-width:480px;width:100%;cursor:default;text-align:left}
+#pausa h2{margin:0 0 6px;text-align:center}
+.ajuste{display:grid;grid-template-columns:1fr 2fr 34px;align-items:center;gap:8px;font-size:.88em;margin:6px 0}
+.ajuste input[type=range]{padding:0;accent-color:#ffc83d}
+.ajuste.chk{grid-template-columns:auto 1fr}.ajuste.chk input{width:auto}
+.jugar{font-size:1.25em;padding:.8em 1.4em;background:var(--ok);color:#fff;border-radius:14px;box-shadow:0 0 0 4px rgba(34,179,94,.3)}
+#fin .card{padding:18px;max-width:520px;width:100%}
+#fin h2{margin:0 0 8px}
+.rk{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:#11182a;margin:4px 0;text-align:left}
+.rk .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rk.me{outline:2px solid #ffc83d}
+/* controles del celular */
+#tctl{position:absolute;inset:0;z-index:2;touch-action:none}
+#palanca{position:absolute;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.35);left:40px;bottom:60px;opacity:.5}
+#palanca.on{opacity:1}
+#bolita{position:absolute;left:30px;top:30px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.55)}
+.tb{position:absolute;width:54px;height:54px;border-radius:50%;background:rgba(15,20,35,.55);border:2px solid rgba(255,255,255,.45);color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px}
+.tb.on{background:rgba(255,200,61,.7)}
+.tb[data-b=fire]{width:84px;height:84px;font-size:32px;right:28px;bottom:110px;background:rgba(213,43,30,.55)}
+.tb[data-b=fire].on{background:rgba(213,43,30,.9)}
+.tb[data-b=aim]{right:126px;bottom:150px}.tb[data-b=jump]{right:30px;bottom:24px}.tb[data-b=crouch]{right:96px;bottom:24px}
+.tb[data-b=reload]{right:126px;bottom:84px}.tb[data-b=swap]{right:162px;bottom:24px}
+.tb[data-b=tabla]{right:14px;top:calc(max(8px,env(safe-area-inset-top)) + 52px);width:40px;height:40px;font-size:16px}
+.tb[data-b=chat]{right:60px;top:calc(max(8px,env(safe-area-inset-top)) + 52px);width:40px;height:40px;font-size:16px}
+body.tactil #feed{top:calc(max(8px,env(safe-area-inset-top)) + 100px)}
+body.tactil #abajo{left:12px;right:auto;bottom:auto;top:calc(max(8px,env(safe-area-inset-top)) + 54px);flex-direction:column;align-items:flex-start;gap:6px}
+body.tactil .armahud{text-align:left}body.tactil #aRec{margin:4px 0 0}
+body.tactil .vida .num{font-size:22px}body.tactil #aBal b{font-size:22px}
+body.tactil #clog{bottom:auto;top:50%;width:44vw}
+body.tactil #chatF{bottom:auto;top:30%}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0b1020;color:#fff;padding:10px 16px;border-radius:12px;z-index:9999;max-width:90vw;text-align:center;border:1px solid var(--line)}
+.banner{position:fixed;left:0;right:0;top:0;padding:10px;text-align:center;background:#ffc83d;color:#111;font-weight:800;z-index:9998}
+</style>
+</head>
+<body>
+<!-- ================= inicio ================= -->
+<section id="home" class="screen">
+  <div class="home-box card">
+    <h1 class="logo"><span class="a">Tiro</span> <span class="b">Guasu</span></h1>
+    <p class="sub">🔫 Tiros en 3D por el Mercado 4, el Puerto y el Chaco</p>
+    <label class="lbl" for="nameIn">Tu nombre</label>
+    <input id="nameIn" maxlength="16" placeholder="Ej: Kalé" autocomplete="nickname">
+    <span class="lbl">Tu cara</span>
+    <div class="avatars" id="avatars"></div>
+    <span class="lbl">Tu arma (la pistola va siempre)</span>
+    <div class="armas" id="armasH"></div>
+    <div class="home-actions">
+      <button class="btn-r" id="createBtn">➕ Crear sala</button>
+      <div class="row"><input id="codeIn" maxlength="4" placeholder="CÓDIGO" style="text-transform:uppercase;letter-spacing:4px;text-align:center;font-weight:800"><button class="btn-p" id="joinBtn" style="flex:none">Unirme</button></div>
+      <button id="watchBtn">👀 Solo mirar una sala</button>
+      <button class="btn-ok" id="practiceBtn">🤖 Practicar contra bots</button>
+    </div>
+    <p class="note" id="homeNote"></p>
+  </div>
+</section>
+
+<!-- ================= sala de espera ================= -->
+<section id="lobby" class="screen hidden">
+  <div class="lobby-wrap">
+    <div class="codebox card">
+      <div class="lbl" id="codeLbl" style="margin:0">CÓDIGO DE LA SALA</div>
+      <div class="code" id="codeTxt">----</div>
+      <div class="row" style="justify-content:center;flex-wrap:wrap">
+        <button class="btn-p" id="shareBtn">📤 Invitar</button>
+        <button id="voiceBtnL">🎙️ Entrar a la voz</button>
+        <button id="leaveBtnL">🚪 Salir</button>
+      </div>
+    </div>
+    <div style="display:grid;gap:12px">
+      <div class="panel card">
+        <h3 id="pcount">Jugadores</h3>
+        <div id="lobbyPlayers"></div>
+      </div>
+      <div class="panel card">
+        <h3>Tu arma</h3>
+        <div class="armas" id="armasL"></div>
+      </div>
+      <div class="panel card">
+        <h3>Partida <small id="hostOnly" style="color:var(--mut);font-weight:600"></small></h3>
+        <div class="sets">
+          <label>Modo<select id="sMode"><option value="ffa">🎯 Todos contra todos</option><option value="equipos">🔴🔵 Albirroja contra Azules</option></select></label>
+          <label>Mapa<select id="sMap"></select></label>
+          <label>Gana con<select id="sGoal"></select></label>
+          <label>Tiempo<select id="sTime"></select></label>
+          <label>Bots<select id="sBots"><option value="facil">🙂 Fáciles</option><option value="normal">😐 Normales</option><option value="dificil">😈 Difíciles</option></select></label>
+          <label>&nbsp;<button id="addBotBtn">🤖 Agregar bot</button></label>
+        </div>
+        <div class="lobby-btns"><button class="btn-ok" id="startBtn" style="font-size:1.1em">🔫 ¡Empezar!</button></div>
+        <p class="note" id="waitNote"></p>
+      </div>
+    </div>
+    <div style="display:grid;gap:12px;align-content:start">
+      <div class="panel card lobby-chat" id="lobbyChatSlot"><div id="msgs"></div>
+        <form id="chatForm"><input id="chatIn" maxlength="120" placeholder="Escribí algo..." autocomplete="off"><button class="btn-p">➤</button></form></div>
+      <div class="panel card ayuda">
+        <b>Cómo se juega</b><br>
+        🖥️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · mouse apuntar · clic izquierdo tirar · clic derecho mira · <kbd>Espacio</kbd> saltar · <kbd>Shift</kbd> agacharse (corriendo, te deslizás) · <kbd>R</kbd> recargar · <kbd>Q</kbd>/<kbd>1</kbd>/<kbd>2</kbd> cambiar arma · <kbd>Tab</kbd> tabla · <kbd>Enter</kbd> chat · <kbd>Esc</kbd> ajustes<br>
+        📱 palanca a la izquierda para caminar, arrastrá a la derecha para mirar, y botones para tirar, apuntar, saltar y agacharte.<br>
+        🎯 A la cabeza hace el doble. La vida se recupera sola si no te pegan un rato.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= el juego ================= -->
+<div id="juego" class="hidden">
+  <canvas id="cv3"></canvas>
+  <div id="hud">
+    <div id="dano"></div><div id="flecha"></div>
+    <div id="mirilla" class="hidden"></div>
+    <div id="mira"><i></i><i></i><i></i><i></i><b></b></div>
+    <div id="hitm"></div>
+    <div id="arriba"><div id="tReloj">0:00</div><div id="tScore"></div></div>
+    <div id="feed"></div>
+    <div id="aviso"></div>
+    <div id="clog"></div>
+    <div id="abajo">
+      <div class="vida"><div class="num">❤️ <span id="vNum">100</span></div><div class="vbar"><div id="vBar"></div></div></div>
+      <div class="armahud"><div id="aNom"></div><div id="aBal"></div><div id="aRec"><div></div></div></div>
+    </div>
+    <div id="obsTxt"></div>
+    <div id="tabla" class="hidden"></div>
+  </div>
+  <form id="chatF"><input id="cin" maxlength="120" placeholder="Escribí y Enter..." autocomplete="off"><button class="btn-p">➤</button></form>
+  <div id="tctl" class="hidden">
+    <div id="palanca"><div id="bolita"></div></div>
+    <div class="tb" data-b="fire">🔫</div><div class="tb" data-b="aim">🎯</div><div class="tb" data-b="jump">⬆️</div>
+    <div class="tb" data-b="crouch">⬇️</div><div class="tb" data-b="reload">🔄</div><div class="tb" data-b="swap">🔁</div>
+    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div>
+  </div>
+  <div id="topBtns">
+    <button id="cfgBtn" title="Ajustes">⚙️</button>
+    <button id="voiceBtn" title="Voz">🎙️</button>
+    <button id="micBtn" class="hidden" title="Micrófono">🎤</button>
+    <button id="sndBtn" title="Sonido">🔊</button>
+    <button id="leaveBtn" title="Salir">🚪</button>
+  </div>
+  <div id="muerte" class="capa hidden">
+    <h2 id="mTxt"></h2>
+    <div id="mCuenta"></div>
+    <div class="lbl" style="margin-top:10px">Para la próxima, ¿qué arma?</div>
+    <div class="armas" id="mArmas"></div>
+  </div>
+  <div id="pausa" class="capa hidden">
+    <button class="jugar">▶️ Tocá para jugar</button>
+    <div class="card no-lock">
+      <h2>⚙️ Ajustes</h2>
+      <div class="ajuste"><span>Mouse</span><input type="range" id="sSens" min="0.2" max="3" step="0.1"><span id="vSens"></span></div>
+      <div class="ajuste"><span>Dedo</span><input type="range" id="sTsens" min="0.3" max="3" step="0.1"><span id="vTsens"></span></div>
+      <div class="ajuste"><span>Visión</span><input type="range" id="sFov" min="60" max="100" step="1"><span id="vFov"></span></div>
+      <label class="ajuste chk"><input type="checkbox" id="sAimTog"> <span>La mira queda puesta con un clic (no hay que mantener)</span></label>
+      <div class="row" style="margin-top:10px"><button class="btn-r" id="leaveBtnP" style="flex:1">🚪 Salir de la partida</button></div>
+    </div>
+  </div>
+  <div id="fin" class="capa hidden"><div class="card" id="finBox"></div></div>
+  <div id="audios"></div>
+</div>
+
+<script src="mundo.js"></script>
+<script src="sala.js"></script>
+<script src="juego.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const W = window.TiroMundo, R = window.TiroSala;
+const AVATARS = ['😎','🤠','😤','🥷','🧢','🐊','🦜','🐆','🐸','🦊','🧉','🥯','⚽','🎸','💀','👽'];
+const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} }, set(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} } };
+const sess = { get(k){ try{return JSON.parse(sessionStorage.getItem(k));}catch(e){return null;} }, set(k,v){ try{ v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+const tactil = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
+if (tactil) document.body.classList.add('tactil');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let S = null, myId = null, mode = null, token = null, roomCode = null, reconnectTries = 0;
+let localRoom = null, avatar = store.get('tg_avatar', AVATARS[0]), prim = store.get('tg_prim', 'fusil');
+if (!W.ARMAS[prim] || prim === 'pistola') prim = 'fusil';
+
+Juego.conectar({ send: m => send(m), S: () => S, me: () => myId, obs: () => amObs });
+Juego.setPrim(prim);
+
+// ================= inicio =================
+$('#nameIn').value = store.get('tg_name', '');
+AVATARS.forEach(a => {
+  const b = document.createElement('button'); b.textContent = a; b.type = 'button'; if (a === avatar) b.classList.add('sel');
+  b.onclick = () => { avatar = a; store.set('tg_avatar', a); $('#avatars').querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b)); };
+  $('#avatars').appendChild(b);
+});
+const ARM_TXT = { fusil: 'de todo un poco', escopeta: 'de cerquita', franco: 'de lejos' };
+function armarArmas(box) {
+  box.innerHTML = ['fusil', 'escopeta', 'franco'].map(w => `<button type="button" data-w="${w}"><b>${W.ARMAS[w].ico}</b>${W.ARMAS[w].n}<small>${ARM_TXT[w]}</small></button>`).join('');
+  box.querySelectorAll('[data-w]').forEach(b => b.onclick = () => elegirPrim(b.dataset.w));
+}
+['#armasH', '#armasL', '#mArmas'].forEach(q => armarArmas($(q)));
+function elegirPrim(w) {
+  prim = w; store.set('tg_prim', w); Juego.elegirArma(w);
+  document.querySelectorAll('.armas [data-w]').forEach(b => b.classList.toggle('sel', b.dataset.w === w));
+}
+document.querySelectorAll('.armas [data-w]').forEach(b => b.classList.toggle('sel', b.dataset.w === prim));
+function myName(){ const n = $('#nameIn').value.trim() || 'Jugador'; store.set('tg_name', n); return n; }
+
+// ================= salas en línea (PeerJS, como los demás juegos) =================
+// El anfitrión corre la sala en su aparato (R.Room) y los demás se conectan a él.
+const PREF = 'tiropy26-';
+let peer = null, hostConn = null, firstMsg = null, amObs = false, localCode = null, startedAt = null;
+const conns = {}, obsConns = new Map();
+const Q = new URLSearchParams(location.search);
+const hashCode = (location.hash.slice(1).match(/^[A-Za-z]{4}$/) || [])[0];
+const urlCode = (hashCode || Q.get('sala') || '').toUpperCase().slice(0, 4);
+const isOwner = Q.get('dueno') === '1';
+if (urlCode) $('#codeIn').value = urlCode;
+$('#homeNote').innerHTML = urlCode ? '¡Te invitaron! Poné tu nombre y tocá "Unirme".' : 'Creá una sala y pasales el código a tus amigos, o practicá contra bots.<br>Mejor con mouse en la PC; en el celu, de costado.';
+const cleanTxt = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
+function genCode() { const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let s = ''; for (let i = 0; i < 4; i++) s += L[Math.floor(Math.random() * L.length)]; return s; }
+function newPeer(id) { const o = { debug: 0, config: { iceServers: window.ICE_SERVERS || [{ urls: 'stun:stun.l.google.com:19302' }] } }; return id ? new Peer(id, o) : new Peer(o); }
+
+$('#createBtn').onclick = () => { Juego.audio(); createRoom(0); };
+$('#joinBtn').onclick = () => {
+  const code = $('#codeIn').value.trim().toUpperCase();
+  if (code.length !== 4) return toast('El código tiene 4 letras');
+  Juego.audio(); joinRoom(code, { t: 'join', name: myName(), avatar, token: savedToken(code) });
+};
+$('#watchBtn').onclick = () => {
+  const code = $('#codeIn').value.trim().toUpperCase();
+  if (code.length !== 4) return toast('Escribí el código de 4 letras de la sala');
+  Juego.audio(); joinRoom(code, { t: 'watch', name: myName(), owner: false });
+};
+$('#codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('#joinBtn').click(); });
+$('#practiceBtn').onclick = () => { Juego.audio(); startLocal(); };
+function savedToken(code) { const s = sess.get('tg_session'); return s && s.code === code ? s.token : null; }
+
+setTimeout(() => {
+  if (urlCode && isOwner) { joinRoom(urlCode, { t: 'watch', name: 'Dueño', owner: true }); return; }
+  const saved = sess.get('tg_session');
+  if (saved && saved.code && saved.token && (!urlCode || urlCode === saved.code)) joinRoom(saved.code, { t: 'join', name: myName(), avatar, token: saved.token });
+}, 300);
+
+// ---------- anfitrión ----------
+function createRoom(tries) {
+  closeNet(); mode = 'online';
+  const code = genCode(), p = newPeer(PREF + code); peer = p;
+  banner('Abriendo la sala...');
+  p.on('open', () => {
+    if (p !== peer) return;
+    hideBanner(); roomCode = code;
+    localRoom = new R.Room(code, { send: hostSend, onEmpty() {} });
+    hookObservers(localRoom);
+    const me = localRoom.addPlayer({ name: myName(), avatar });
+    myId = me.id; token = me.token; localRoom.setPrim(myId, prim);
+    history.replaceState(null, '', location.pathname + '#' + code);
+    localRoom.broadcastState();
+  });
+  p.on('connection', c => hostAccept(c));
+  p.on('error', e => {
+    if (p !== peer) return;
+    if (e && e.type === 'unavailable-id' && tries < 5) { try { p.destroy(); } catch (x) {} createRoom(tries + 1); return; }
+    if (!localRoom) { hideBanner(); toast('No se pudo abrir la sala. Revisá la conexión y probá de nuevo.'); goHome(true); }
+  });
+  p.on('disconnected', () => { if (!p.destroyed) setTimeout(() => { try { p.reconnect(); } catch (e) {} }, 1500); });
+}
+function hostSend(pid, msg) {
+  if (pid === myId) { setTimeout(() => onMsg(msg), 0); return; }
+  const c = conns[pid]; if (c && c.open) { try { c.send(msg); } catch (e) {} }
+}
+// los que solo miran reciben lo mismo que todos pero no juegan
+function hookObservers(room) {
+  const all0 = room.all.bind(room), bs0 = room.broadcastState.bind(room);
+  room.all = (msg, except) => { all0(msg, except); obsConns.forEach((o, c) => { if (c.open) try { c.send(msg); } catch (e) {} }); };
+  room.broadcastState = () => { bs0(); obsConns.forEach((o, c) => { if (c.open) try { c.send(room.stateFor('obs')); } catch (e) {} }); };
+}
+function hostAccept(c) {
+  c.on('data', m => {
+    const room = localRoom;
+    if (!room || room.dead || !m || typeof m !== 'object') return;
+    if (c._pid) {
+      if (m.t === 'leave') { const id = c._pid; c._pid = null; delete conns[id]; room.removePlayer(id); return; }
+      room.handle(c._pid, m); return;
+    }
+    if (c._obs) {
+      if (m.t === 'chat') { const text = cleanTxt(m.text, 120); if (text) room.all({ t: 'chat', kind: 'msg', id: 'obs', name: '👀 ' + c._obs.name, avatar: '', text }); }
+      return;
+    }
+    if (m.t === 'join') {
+      let p = m.token ? room.reconnect(String(m.token)) : null;
+      if (!p) p = room.addPlayer({ name: m.name, avatar: m.avatar });
+      if (!p) { try { c.send({ t: 'err', msg: 'La sala está llena 😕', expired: true }); } catch (e) {} return; }
+      c._pid = p.id; const old = conns[p.id]; conns[p.id] = c;
+      if (old && old !== c) { try { old.close(); } catch (e) {} }
+      c.send({ t: 'welcome', id: p.id, token: p.token, code: roomCode });
+      room.sendInitial(p.id);
+    } else if (m.t === 'watch') {
+      c._obs = { name: cleanTxt(m.name, 16) || 'Alguien', owner: !!m.owner }; obsConns.set(c, c._obs);
+      c.send({ t: 'welcome', id: 'obs', code: roomCode, obs: true });
+      c.send(room.stateFor('obs'));
+      room.sys(`👀 ${c._obs.owner ? '👑 ' : ''}${c._obs.name} está mirando`);
+    }
+  });
+  c.on('close', () => {
+    if (c._pid && conns[c._pid] === c) { delete conns[c._pid]; if (localRoom && !localRoom.dead) localRoom.disconnect(c._pid); }
+    if (c._obs) obsConns.delete(c);
+  });
+}
+
+// ---------- invitado ----------
+function joinRoom(code, first) {
+  closeNet(); mode = 'online'; roomCode = code; firstMsg = first; amObs = first.t === 'watch'; reconnectTries = 0;
+  banner('Conectando con la sala...');
+  connectHost();
+}
+function connectHost() {
+  if (!peer || peer.destroyed) {
+    const p = peer = newPeer();
+    p.on('error', e => {
+      if (p !== peer) return;
+      if (e && e.type === 'peer-unavailable' && !S) { hideBanner(); toast('No encontré la sala ' + roomCode + '. Revisá el código.'); sess.set('tg_session', null); goHome(true); }
+    });
+    p.on('disconnected', () => { if (!p.destroyed) setTimeout(() => { try { p.reconnect(); } catch (e) {} }, 1500); });
+  }
+  const go = () => {
+    if (mode !== 'online' || !roomCode) return;
+    const c = peer.connect(PREF + roomCode, { reliable: true }); hostConn = c; let opened = false;
+    c.on('open', () => { opened = true; reconnectTries = 0; hideBanner(); c.send(firstMsg); });
+    c.on('data', m => { if (c === hostConn) onMsg(m); });
+    c.on('close', () => { if (c !== hostConn) return; hostConn = null; lost(); });
+    setTimeout(() => { if (!opened && c === hostConn) { try { c.close(); } catch (e) {} hostConn = null; lost(); } }, 9000);
+  };
+  if (peer.open) go(); else peer.once('open', go);
+}
+function lost() {
+  if (mode !== 'online' || !roomCode || localRoom) return;
+  if (reconnectTries++ > 6) { banner('Se perdió la conexión con la sala'); setTimeout(() => goHome(true), 1800); return; }
+  banner('Reconectando...');
+  if (token) firstMsg = { t: 'join', name: myName(), avatar, token };
+  setTimeout(() => { if (mode === 'online' && roomCode && !hostConn) connectHost(); }, 1200 + reconnectTries * 500);
+}
+
+// ---------- práctica y salida ----------
+function startLocal() {
+  closeNet(); mode = 'local'; amObs = false;
+  localRoom = new R.Room('PRÁCTICA', { send: (pid, msg) => { if (pid === myId) setTimeout(() => onMsg(msg), 0); }, onEmpty() {} });
+  const p = localRoom.addPlayer({ name: myName(), avatar });
+  myId = p.id; roomCode = null; localRoom.setPrim(myId, prim);
+  for (let i = 0; i < 5; i++) localRoom.addBot(myId);
+}
+function closeNet() {
+  if (localRoom) {
+    for (const id in conns) { try { conns[id].send({ t: 'err', msg: 'El anfitrión cerró la sala 🚪', expired: true }); } catch (e) {} }
+    obsConns.forEach((o, c) => { try { c.send({ t: 'err', msg: 'El anfitrión cerró la sala 🚪', expired: true }); } catch (e) {} });
+    localRoom.destroy(); localRoom = null;
+  }
+  for (const id in conns) delete conns[id];
+  obsConns.clear();
+  const c = hostConn; hostConn = null;
+  if (c) { try { if (c.open && !amObs) c.send({ t: 'leave' }); } catch (e) {} setTimeout(() => { try { c.close(); } catch (e) {} }, 200); }
+  const p = peer; peer = null;
+  if (p) setTimeout(() => { try { p.destroy(); } catch (e) {} }, 400);
+}
+window.leaveToMenu = () => goHome();
+function goHome(silent) {
+  leaveVoice(); closeNet(); Juego.salir();
+  mode = null; S = null; myId = null; roomCode = null; token = null; amObs = false; localCode = null; startedAt = null;
+  sess.set('tg_session', null);
+  history.replaceState(null, '', location.pathname);
+  $('#msgs').innerHTML = '';
+  show('home'); hideBanner();
+}
+function send(m) {
+  if (localRoom) { localRoom.handle(myId, m); return; }
+  if (hostConn && hostConn.open) { try { hostConn.send(m); } catch (e) {} }
+}
+
+// ================= mensajes =================
+function onMsg(m) {
+  switch (m.t) {
+    case 'welcome':
+      myId = m.id; roomCode = m.code; amObs = !!m.obs;
+      if (!m.obs) { token = m.token; sess.set('tg_session', { code: m.code, token: m.token }); send({ t: 'prim', w: prim }); }
+      history.replaceState(null, '', location.pathname + '#' + m.code);
+      break;
+    case 'state': setState(m); break;
+    case 'chat': addMsg(m); if (Juego.activo()) Juego.chat(m); break;
+    case 'snap': case 'spawn': case 'fx': case 'kill': case 'hurt': case 'hitm': if (Juego.activo()) Juego.msg(m); break;
+    case 'sfx': Juego.sfx(m.name); break;
+    case 'rtc': onRtc(m.from, m.data); break;
+    case 'err': toast(m.msg); if (m.expired) { sess.set('tg_session', null); goHome(true); } break;
+  }
+}
+function show(id) { ['home', 'lobby'].forEach(s => $('#' + s).classList.toggle('hidden', s !== id)); }
+function setState(s) {
+  S = s; myId = s.me;
+  if (s.phase === 'lobby') { startedAt = null; if (Juego.activo()) Juego.salir(); show('lobby'); renderLobby(); }
+  else {
+    if (!startedAt) startedAt = Date.now();
+    show('lobby');
+    if (!Juego.activo()) Juego.entrar(s); else Juego.estado(s);
+    renderFin();
+  }
+  syncVoicePeers();
+  const vOn = !!localStream;
+  [$('#voiceBtn'), $('#voiceBtnL')].forEach(b => { b.classList.toggle('on', vOn); b.classList.toggle('hidden', mode !== 'online' || amObs); });
+  $('#voiceBtnL').textContent = vOn ? '🔇 Salir de la voz' : '🎙️ Entrar a la voz';
+  $('#micBtn').classList.toggle('hidden', !vOn);
+  $('#shareBtn').classList.toggle('hidden', mode !== 'online');
+}
+
+// ================= sala de espera =================
+function fillSelect(sel, items, val) {
+  const key = JSON.stringify(items);
+  if (sel.dataset.k !== key) { sel.innerHTML = items.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); sel.dataset.k = key; }
+  sel.value = String(val);
+}
+function chip(p, s, host) {
+  const col = s.settings.mode === 'equipos' ? (p.team === 'r' ? '#ff5a4b' : '#6f9bff') : '';
+  const puedeCambiar = s.settings.mode === 'equipos' && (p.id === myId || (host && p.bot));
+  return `<div class="pchip" style="${col ? 'border-left-color:' + col : ''}">
+    <span class="av">${esc(p.avatar)}</span><span class="nm">${esc(p.name)}${p.id === myId ? ' (vos)' : ''}</span>
+    ${p.id === s.hostId ? '👑' : ''}${p.voice ? '🔊' : ''}<span title="${W.ARMAS[p.prim] ? W.ARMAS[p.prim].n : ''}">${W.ARMAS[p.prim] ? W.ARMAS[p.prim].ico : ''}</span>
+    ${puedeCambiar ? `<button class="sw" data-sw="${p.id}" data-t="${p.team === 'r' ? 'a' : 'r'}" title="Cambiar de equipo">⇄</button>` : ''}
+    ${host && p.bot ? `<button class="x" data-rm="${p.id}">✕</button>` : ''}</div>`;
+}
+function renderLobby() {
+  const s = S, host = s.hostId === myId, st = s.settings;
+  $('#codeTxt').textContent = mode === 'local' ? '🤖' : s.code;
+  $('#codeLbl').textContent = mode === 'local' ? 'MODO PRÁCTICA' : 'CÓDIGO DE LA SALA';
+  $('#pcount').textContent = `Jugadores (${s.players.length}/${st.max})`;
+  const box = $('#lobbyPlayers');
+  if (st.mode === 'equipos') {
+    box.className = 'equipos dos';
+    box.innerHTML = ['r', 'a'].map(t => `<div class="tcol ${t}"><h4>${t === 'r' ? '🔴 Albirroja' : '🔵 Azules'}</h4><div class="plist-l">${s.players.filter(p => p.team === t).map(p => chip(p, s, host)).join('')}</div></div>`).join('');
+  } else { box.className = 'plist-l'; box.innerHTML = s.players.map(p => chip(p, s, host)).join(''); }
+  box.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => send({ t: 'removeBot', id: b.dataset.rm }));
+  box.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => send({ t: 'team', id: b.dataset.sw, team: b.dataset.t }));
+  $('#sMode').value = st.mode;
+  fillSelect($('#sMap'), s.maps, st.map);
+  fillSelect($('#sGoal'), [10, 15, 20, 30, 40, 50].map(n => [n, n + ' bajas']), st.goal);
+  fillSelect($('#sTime'), [3, 5, 8, 10, 15].map(n => [n, n + ' minutos']), st.time);
+  $('#sBots').value = st.bots;
+  ['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#addBotBtn', '#startBtn'].forEach(q => $(q).disabled = !host);
+  $('#hostOnly').textContent = host ? '' : '(la elige el anfitrión)';
+  $('#waitNote').textContent = amObs ? '👀 Estás mirando la sala: no jugás, pero ves todo.' : host ? (s.players.length < 2 ? 'Esperando jugadores... o agregá bots 🤖' : '') : 'Esperando que el anfitrión empiece...';
+  $('#armasL').parentNode.classList.toggle('hidden', amObs);
+}
+const sendSettings = () => send({ t: 'settings', s: { mode: $('#sMode').value, map: $('#sMap').value, goal: +$('#sGoal').value, time: +$('#sTime').value, bots: $('#sBots').value } });
+['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots'].forEach(q => $(q).onchange = sendSettings);
+$('#addBotBtn').onclick = () => send({ t: 'addBot' });
+$('#startBtn').onclick = () => { Juego.audio(); send({ t: 'start' }); };
+$('#leaveBtnL').onclick = () => goHome();
+let leaveArm = 0;
+function salirJuego() {
+  if (S && S.phase === 'over') return goHome();
+  if (Date.now() - leaveArm < 2500) return goHome();
+  leaveArm = Date.now(); toast('Tocá 🚪 de nuevo para salir');
+}
+$('#leaveBtn').onclick = salirJuego; $('#leaveBtnP').onclick = salirJuego;
+$('#cfgBtn').onclick = () => { $('#pausa').classList.toggle('hidden'); if (document.pointerLockElement) document.exitPointerLock(); };
+$('#pausa').addEventListener('click', e => { if (!e.target.closest('.no-lock') && tactil) $('#pausa').classList.add('hidden'); });
+$('#shareBtn').onclick = async () => {
+  const url = location.origin + location.pathname + '#' + S.code;
+  const text = `🔫 ¡Vení a jugar Tiro Guasu! Código: ${S.code}`;
+  try { if (navigator.share) { await navigator.share({ title: 'Tiro Guasu', text, url }); return; } } catch (e) { return; }
+  try { await navigator.clipboard.writeText(text + ' ' + url); toast('📋 Link copiado'); } catch (e) { toast(url); }
+};
+
+// ================= fin de la partida =================
+function renderFin() {
+  const s = S, f = $('#fin');
+  if (s.phase !== 'over' || !s.ranking) { f.classList.add('hidden'); return; }
+  if (document.pointerLockElement) document.exitPointerLock();
+  $('#pausa').classList.add('hidden'); $('#muerte').classList.add('hidden');
+  const med = ['🥇', '🥈', '🥉'], eq = s.settings.mode === 'equipos';
+  let tit = '🏆 ¡Fin de la partida!';
+  if (eq) tit = s.winner === 'empate' ? '🤝 ¡Empate!' : s.winner === 'r' ? '🔴 ¡Ganó la Albirroja!' : '🔵 ¡Ganaron los Azules!';
+  else { const w = s.ranking[0]; if (w) tit = w.id === myId ? '🏆 ¡Ganaste vos!' : `🏆 Ganó ${esc(w.avatar)} ${esc(w.name)}`; }
+  $('#finBox').innerHTML = `<h2>${tit}</h2>${eq ? `<div style="font-size:1.3em;margin-bottom:6px"><span class="tr">🔴 ${s.score.r}</span> — <span class="ta">${s.score.a} 🔵</span></div>` : ''}
+    ${s.ranking.map((p, i) => `<div class="rk ${p.id === myId ? 'me' : ''}"><span>${med[i] || (i + 1) + 'º'}</span><span>${esc(p.avatar)}</span><span class="n ${eq ? (p.team === 'r' ? 'tr' : 'ta') : ''}">${esc(p.name)}${p.bot ? ' 🤖' : ''}</span><span>🔫 ${p.k}</span><span style="color:var(--mut)">💀 ${p.d}</span></div>`).join('')}
+    ${s.hostId === myId ? '<div class="row" style="margin-top:12px"><button class="btn-ok" id="againBtn" style="flex:1">🔁 Otra partida</button><button id="toLobbyBtn" style="flex:1">⚙️ Sala de espera</button></div>' : '<p class="note">Esperando al anfitrión...</p>'}`;
+  f.classList.remove('hidden');
+  const ag = $('#againBtn'); if (ag) ag.onclick = () => send({ t: 'start' });
+  const tl = $('#toLobbyBtn'); if (tl) tl.onclick = () => send({ t: 'lobby' });
+}
+
+// ================= chat de la sala =================
+function addMsg(m) {
+  const d = document.createElement('div'); d.className = 'm ' + (m.kind || 'msg');
+  if (m.kind === 'msg') d.innerHTML = `<b>${esc(m.avatar || '')} ${esc(m.name)}:</b> ${esc(m.text)}`; else d.textContent = m.text;
+  const box = $('#msgs'); box.appendChild(d);
+  while (box.children.length > 200) box.firstChild.remove();
+  box.scrollTop = box.scrollHeight;
+}
+$('#chatForm').onsubmit = e => { e.preventDefault(); const v = $('#chatIn').value.trim(); if (!v) return; send({ t: 'chat', text: v }); $('#chatIn').value = ''; };
+
+// ================= sonido =================
+function paintSnd() { const on = Juego.sonido(); $('#sndBtn').textContent = on ? '🔊' : '🔈'; $('#sndBtn').classList.toggle('muted', !on); }
+$('#sndBtn').onclick = () => { Juego.sonido(!Juego.sonido()); Juego.audio(); paintSnd(); };
+paintSnd();
+
+// ================= voz (WebRTC entre jugadores) =================
+let localStream = null; const pcs = {};
+const ICE = window.ICE_SERVERS || [{ urls: 'stun:stun.l.google.com:19302' }];
+async function joinVoice() {
+  if (mode !== 'online') return;
+  try { localStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  catch (e) { toast('No se pudo usar el micrófono 🎙️'); return; }
+  send({ t: 'voice', on: true });
+  for (const p of S.players) if (p.voice && p.id !== myId && !p.bot) callPeer(p.id);
+  toast('🎙️ Estás en la voz'); setState(S);
+}
+function leaveVoice() {
+  Object.keys(pcs).forEach(closePeer);
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; if (mode === 'online') send({ t: 'voice', on: false }); }
+  $('#micBtn').textContent = '🎤'; $('#micBtn').classList.remove('muted');
+}
+function makePeer(id) {
+  const pc = new RTCPeerConnection({ iceServers: ICE }); pcs[id] = pc;
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.onicecandidate = e => { if (e.candidate) send({ t: 'rtc', to: id, data: { ice: e.candidate } }); };
+  pc.ontrack = e => {
+    let a = document.getElementById('au-' + id);
+    if (!a) { a = document.createElement('audio'); a.id = 'au-' + id; a.autoplay = true; a.playsInline = true; $('#audios').appendChild(a); }
+    a.srcObject = e.streams[0]; a.play().catch(() => {});
+  };
+  pc.onconnectionstatechange = () => { if (['failed', 'closed'].includes(pc.connectionState)) closePeer(id); };
+  return pc;
+}
+async function callPeer(id) {
+  const pc = makePeer(id);
+  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+  send({ t: 'rtc', to: id, data: { sdp: pc.localDescription } });
+}
+async function onRtc(from, data) {
+  if (!localStream || !data) return;
+  try {
+    let pc = pcs[from];
+    if (data.sdp) {
+      if (data.sdp.type === 'offer') { if (pc) closePeer(from); pc = makePeer(from); }
+      if (!pc) return;
+      await pc.setRemoteDescription(data.sdp);
+      if (data.sdp.type === 'offer') { const ans = await pc.createAnswer(); await pc.setLocalDescription(ans); send({ t: 'rtc', to: from, data: { sdp: pc.localDescription } }); }
+    } else if (data.ice && pc) await pc.addIceCandidate(data.ice);
+  } catch (e) { console.warn('rtc', e); }
+}
+function closePeer(id) { const pc = pcs[id]; if (pc) { try { pc.close(); } catch (e) {} delete pcs[id]; } const a = document.getElementById('au-' + id); if (a) a.remove(); }
+function syncVoicePeers() { if (!S) return; for (const id of Object.keys(pcs)) { const p = S.players.find(x => x.id === id); if (!p || !p.voice) closePeer(id); } }
+function toggleVoice() { Juego.audio(); if (localStream) { leaveVoice(); setState(S); } else joinVoice(); }
+$('#voiceBtn').onclick = toggleVoice; $('#voiceBtnL').onclick = toggleVoice;
+$('#micBtn').onclick = () => {
+  if (!localStream) return; const t = localStream.getAudioTracks()[0]; t.enabled = !t.enabled;
+  $('#micBtn').textContent = t.enabled ? '🎤' : '🔇'; $('#micBtn').classList.toggle('muted', !t.enabled);
+};
+
+// ================= avisos =================
+let toastT;
+function toast(t) { let el = $('.toast'); if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); } el.textContent = t; el.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.add('hidden'), 2600); }
+function banner(t) { let el = $('.banner'); if (!el) { el = document.createElement('div'); el.className = 'banner'; document.body.appendChild(el); } el.textContent = t; el.classList.remove('hidden'); }
+function hideBanner() { const el = $('.banner'); if (el) el.classList.add('hidden'); }
+</script>
+<script src="../dueno-link.js"></script>
+<script src="../inicio.js?v=2"></script>
+<script>
+window.INICIO = { enJuego: () => !!mode, salida: 'leaveToMenu', sonidos: ['#sndBtn'], ocultar: ['#leaveBtn'], suave: true };
+// le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la práctica contra bots)
+if (window.DuenoLink) DuenoLink.start({ game: 'tiro',
+  info() {
+    const r = localRoom; if (!r || r.dead || !S) return null;
+    const local = mode === 'local'; if (local && !localCode) localCode = 'L' + genCode();
+    return { code: local ? localCode : roomCode, local, phase: r.phase, started: startedAt,
+      host: (r.players.get(r.hostId) || {}).name || '', opts: { mode: r.settings.mode, map: W.mapa(r.settings.map).n, goal: r.settings.goal }, score: r.score,
+      players: r.order.map(id => r.players.get(id)).filter(Boolean).map(p => ({ n: p.name, e: p.avatar, bot: !!p.bot, conn: !!p.bot || !!p.connected, k: p.k, d: p.d, team: r.settings.mode === 'equipos' ? p.team : null })),
+      obs: [...obsConns.values()].map(o => ({ n: o.name, owner: !!o.owner })) };
+  },
+  onIam() {}
+});
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>

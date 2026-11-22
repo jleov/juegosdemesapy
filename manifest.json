@@ -19,6 +19,7 @@
     { "name": "Lotería", "short_name": "Lotería", "url": "loteria/", "icons": [{ "src": "loteria/icon-192.png", "sizes": "192x192" }] },
     { "name": "Peteĩ", "short_name": "Peteĩ", "url": "petei/", "icons": [{ "src": "petei/icon-192.png", "sizes": "192x192" }] },
     { "name": "Escoba de 15", "short_name": "Escoba", "url": "escoba/", "icons": [{ "src": "escoba/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Tiro Guasu", "short_name": "Tiro", "url": "tiro/", "icons": [{ "src": "tiro/icon-192.png", "sizes": "192x192" }] },
     { "name": "Carrera Guasu", "short_name": "Karts", "url": "karts/", "icons": [{ "src": "karts/icon-192.png", "sizes": "192x192" }] },
     { "name": "Ludo PY", "short_name": "Ludo", "url": "ludo/", "icons": [{ "src": "ludo/icon-192.png", "sizes": "192x192" }] },
     { "name": "Yva Rape", "short_name": "Yva Rape", "url": "frutas/", "icons": [{ "src": "frutas/icon-192.png", "sizes": "192x192" }] },
