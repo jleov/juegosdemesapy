@@ -15,7 +15,7 @@ const OBJETOS = {
   nanduti: {e:'🕸️', n:'Escudo de ñandutí', d:'Te cubre de un golpe por un rato.'},
   tormenta:{e:'⛈️', n:'Tormenta',          d:'Llueve sobre todos los demás y van más lento.'},
   viento:  {e:'🌬️', n:'Viento norte',      d:'Volás un rato: nadie te para y volteás al que tocás.'},
-  guampa:  {e:'🧊', n:'Guampa helada',      d:'Vas tomando tereré con 3 cargas de hielo: congela al que te choca o al que chocás. Si apretás usar, la lanzás para adelante y congela al primero que toca.', x:3},
+  guampa:  {e:'🧊', n:'Guampa helada',      d:'Vas tomando tereré con 3 cargas de hielo: congela al que te choca o al que chocás. Cada vez que apretás usar lanzás una carga para adelante (hasta 3) que congela al primero que toca.', x:3},
   mango5:  {e:'🥭', n:'Mazo de mangos',     d:'Cinco cáscaras para ir tirando de a una (cada una también se puede mantener colgando y lanzar adelante).', x:5},
   sol:     {e:'☀️', n:'Fuerza del Kuarahy', d:'Brillás como el sol: vas más rápido, nada te hace daño y volteás a todo el que chocás.'},
   mainumby:{e:'🐦', n:'Mainumby furioso',   d:'Un picaflor que vuela directo al que va primero y le pega sí o sí, aunque tenga escudo. Si alguien se le cruza en el camino, también lo voltea.'},
@@ -203,7 +203,8 @@ function usoObjeto(R, k, inp, trabado){
 }
 function usarObjeto(R, k, extra){
   const o=k.item;
-  if(o==='guampa'){ R.pedir({k:'usar', o, pid:k.pid, x:k.x, y:k.y, z:k.z, h:k.h, f:k.f0, lat:k.lat||0}); k.item=null; k.itemN=0; if(k.pid===R.miPid) R.alFx({k:'tira'}); return; }
+  // la guampa se lanza de a una carga: con 3 cargas sin usar, se puede tirar hasta 3 veces
+  if(o==='guampa'){ R.pedir({k:'usar', o, pid:k.pid, x:k.x, y:k.y, z:k.z, h:k.h, f:k.f0, lat:k.lat||0}); k.itemN--; if(k.itemN<=0){ k.item=null; k.itemN=0; } if(k.pid===R.miPid) R.alFx({k:'tira', n:k.itemN}); return; }
   if(o==='sol'){ k.sol=7.5; k.lento=0; k.hielo=0; k.spin=0; }
   if(o==='coco' && !R.arena && k.puesto===1 && R.orden.length>1 && k.pid===R.miPid) R.alFx({k:'cocoAtras'});
   if(o==='chipa' || o==='chipa3') k.boost=Math.max(k.boost, 1.5);

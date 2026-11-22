@@ -15,7 +15,7 @@ const genCode = () => { const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; fo
 let myToken=load('kg_token'); if(!myToken){ myToken=Math.random().toString(36).slice(2)+Date.now().toString(36); store('kg_token', myToken); }
 const NET={mode:null, peer:null, code:null, conns:{}, hostConn:null, myPid:null, obs:null, welcomed:false};
 let CHAT=[], V=null, R=null;
-const VERSION = 19;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
+const VERSION = 20;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
 const me = () => NET.myPid || NET.obs;
 const VP = id => V && (V.players.find(p=>p.id===id) || (V.observers||[]).find(o=>o.id===id));
 const amHost = () => NET.mode==='local' || (V && V.hostPid===NET.myPid && NET.mode==='host');
@@ -593,7 +593,7 @@ function fxCarrera(e){
     case 'tormenta': sfx.trueno(); if(e.de===yo) aviso('⛈️ ¡Tormenta para todos!','oro'); break;
     case 'gasta': if(e.pid===yo){ const k=R.porPid[yo], n=k&&k.item==='guampa'?k.itemN:0; aviso('🧊 ¡Congelaste a '+nom(e.a)+'!'+(n?' Te quedan '+n:' Se terminó el tereré'),'oro'); sfx.acierto(); vib(40); } break;
     case 'quita': if(e.pid===yo){ aviso('🥥 ¡Te volaron el mango! Sin daño','rojo'); sfx.escudo(); vib(60); } else if(e.por===yo){ aviso('🎯 Le sacaste el mango a '+nom(e.pid),'oro'); sfx.acierto(); } break;
-    case 'tira': aviso('🧊 ¡Guampa lanzada! Ya podés agarrar otra cosa'); sfx.sel(); break;
+    case 'tira': aviso(e.n>0 ? '🧊 ¡Guampa lanzada! Te quedan '+e.n : '🧊 ¡Última carga lanzada! Ya podés agarrar otra cosa'); sfx.sel(); break;
     case 'cocoAtras': aviso('🥥 ¡Coco para atrás!','oro'); break;
     case 'sost': if((HUD.sostN=(HUD.sostN||0)+1)<=3) aviso('🥭 Soltá para tirarlo adelante · frenando cae atrás'); break;
   }
