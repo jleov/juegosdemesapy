@@ -15,7 +15,10 @@ const OBJETOS = {
   nanduti: {e:'🕸️', n:'Escudo de ñandutí', d:'Te cubre de un golpe por un rato.'},
   tormenta:{e:'⛈️', n:'Tormenta',          d:'Llueve sobre todos los demás y van más lento.'},
   viento:  {e:'🌬️', n:'Viento norte',      d:'Volás un rato: nadie te para y volteás al que tocás.'},
-  guampa:  {e:'🧊', n:'Guampa helada',      d:'Vas tomando tereré con 3 cargas de hielo: no se tira, congela al que te choca o al que chocás. Apretá usar para tirarla y poder agarrar otra cosa.', x:3},
+  guampa:  {e:'🧊', n:'Guampa helada',      d:'Vas tomando tereré con 3 cargas de hielo: congela al que te choca o al que chocás. Si apretás usar, la lanzás para adelante y congela al primero que toca.', x:3},
+  mango5:  {e:'🥭', n:'Mazo de mangos',     d:'Cinco cáscaras para ir tirando de a una (cada una también se puede mantener colgando y lanzar adelante).', x:5},
+  sol:     {e:'☀️', n:'Fuerza del Kuarahy', d:'Brillás como el sol: vas más rápido, nada te hace daño y volteás a todo el que chocás.'},
+  mainumby:{e:'🐦', n:'Mainumby furioso',   d:'Un picaflor que vuela directo al que va primero y le pega sí o sí, aunque tenga escudo. Si alguien se le cruza en el camino, también lo voltea.'},
 };
 const COD_OBJ = Object.keys(OBJETOS);
 const NIVELES = [{id:'facil', n:'Tranquilo', f:.83}, {id:'medio', n:'Normal', f:.92}, {id:'dificil', n:'Mbarete', f:1}];
@@ -77,21 +80,21 @@ function pasoCarrera(R, dt, miInp){
 function pasoKart(R, k, dt, corre){
   const T=R.T, N=T.N, p=piloto(k.ch), inp=k.inp, f=R.ritmoF;
   if(k.muerto){ k.v*=Math.max(0, 1-dt*3); k.boost=k.viento=0; k.drift=0; return; }
-  for(const c of ['boost','spin','hielo','escudo','lento','viento','parpadeo','ruleta']) if(k[c]>0) k[c]=Math.max(0, k[c]-dt);
+  for(const c of ['boost','spin','hielo','escudo','lento','viento','sol','parpadeo','ruleta']) if(k[c]>0) k[c]=Math.max(0, k[c]-dt);
   if(k.itemPend && k.ruleta<=0){ k.item=k.itemPend; k.itemN=OBJETOS[k.item].x||1; k.itemT=R.t; k.itemPend=null; k.sost=false; k.mDesde=null; if(k.pid===R.miPid) R.alFx({k:'tengo', o:k.item}); }
   if(!corre){ if(inp.gas){ if(k.gasDesde==null) k.gasDesde=R.t; } else k.gasDesde=null; return; }
   // la largada: el que aprieta antes del 2 patina; el que aprieta justo en el 1, sale con turbo
   if(!k.largo){ k.largo=true;
     if(k.gasDesde!=null && k.gasDesde<=-2){ k.spin=1.1; k.v=0; if(k.pid===R.miPid) R.alFx({k:'quemo'}); }
     else if(k.gasDesde!=null && k.gasDesde>-.95 && k.gasDesde<-.15){ k.boost=1.2; if(k.pid===R.miPid) R.alFx({k:'largada'}); } }
-  const trabado=k.hielo>0||k.spin>0, turbo=k.boost>0||k.viento>0, suelo=k.aire<=0;
+  const trabado=k.hielo>0||k.spin>0, turbo=k.boost>0||k.viento>0||k.sol>0, suelo=k.aire<=0;
   const gas=trabado?0:inp.gas, freno=trabado?0:inp.freno, dir=trabado?0:inp.dir;
   /* velocidad */
   let vmax=(26.5+p.vel*1.15)*f;
   if(k.fuera && !turbo) vmax*=.5;
-  if(k.lento>0 && k.viento<=0) vmax*=.7;
+  if(k.lento>0 && k.viento<=0 && !(k.sol>0)) vmax*=.7;
   if(k.rebufo) vmax*=1.09;
-  if(k.viento>0) vmax*=1.42; else if(k.boost>0) vmax*=1.32;
+  if(k.viento>0) vmax*=1.42; else if(k.sol>0) vmax*=1.3; else if(k.boost>0) vmax*=1.32;
   if(k.bot) vmax*=k.bot.f*(k.bot.goma||1);
   const ace=(11+p.ace*1.7)*f*(turbo?2.6:1);
   if(turbo && k.v<vmax) k.v=Math.min(vmax, k.v+ace*dt);
@@ -191,7 +194,7 @@ function pasoKart(R, k, dt, corre){
 // el botón de usar: el mango se puede mantener apretado (colgando atrás) y se tira al soltar
 function usoObjeto(R, k, inp, trabado){
   const us=!!inp.usar, vale=k.fin==null && !k.muerto;
-  if(k.item==='mango' && vale){
+  if((k.item==='mango'||k.item==='mango5') && vale){
     if(us && !k.usarPrev && !trabado) k.mDesde=R.t;
     if(us && k.mDesde!=null && R.t-k.mDesde>.3 && !k.sost){ k.sost=true; if(k.pid===R.miPid) R.alFx({k:'sost'}); }
     if(!us && k.mDesde!=null){ const ad=k.sost && !inp.freno; k.mDesde=null; k.sost=false; usarObjeto(R, k, {ad:ad?1:0}); }
@@ -200,11 +203,13 @@ function usoObjeto(R, k, inp, trabado){
 }
 function usarObjeto(R, k, extra){
   const o=k.item;
-  if(o==='guampa'){ k.item=null; k.itemN=0; if(k.pid===R.miPid) R.alFx({k:'tira'}); return; }
+  if(o==='guampa'){ R.pedir({k:'usar', o, pid:k.pid, x:k.x, y:k.y, z:k.z, h:k.h, f:k.f0, lat:k.lat||0}); k.item=null; k.itemN=0; if(k.pid===R.miPid) R.alFx({k:'tira'}); return; }
+  if(o==='sol'){ k.sol=7.5; k.lento=0; k.hielo=0; k.spin=0; }
   if(o==='coco' && !R.arena && k.puesto===1 && R.orden.length>1 && k.pid===R.miPid) R.alFx({k:'cocoAtras'});
   if(o==='chipa' || o==='chipa3') k.boost=Math.max(k.boost, 1.5);
   else if(o==='nanduti') k.escudo=9;
   else if(o==='viento'){ k.viento=5.5; k.lento=0; }
+  else if(o==='sol'){}
   else R.pedir(Object.assign({k:'usar', o, pid:k.pid, x:k.x, y:k.y, z:k.z, h:k.h, f:k.f0, lat:k.lat||0, prog:k.prog, v:Math.round(k.v*10)/10}, extra||{}));
   if(k.pid===R.miPid) R.alFx({k:'uso', o});
   k.itemN--; if(k.itemN<=0){ k.item=null; k.itemN=0; }
@@ -225,13 +230,13 @@ function pasoRemoto(R, k, dt){
   for(const c of ['spin','parpadeo']) if(k[c]>0) k[c]=Math.max(0, k[c]-dt);
 }
 const empacar = k => [Math.round(k.x*20)/20, Math.round(k.y*20)/20, Math.round(k.z*20)/20, Math.round(k.h*200)/200, Math.round(k.v*10)/10, Math.round(k.prog*50)/50,
-  (k.drift>0?1:0)|(k.drift<0?2:0)|(k.boost>0?4:0)|(k.spin>0?8:0)|(k.hielo>0?16:0)|(k.escudo>0?32:0)|(k.viento>0?64:0)|(k.aire>0?128:0)|(k.lento>0?256:0)|((k.dNivel&3)<<10)|(k.parpadeo>0?4096:0)|(k.sost?8192:0),
+  (k.drift>0?1:0)|(k.drift<0?2:0)|(k.boost>0?4:0)|(k.spin>0?8:0)|(k.hielo>0?16:0)|(k.escudo>0?32:0)|(k.viento>0?64:0)|(k.aire>0?128:0)|(k.lento>0?256:0)|((k.dNivel&3)<<10)|(k.parpadeo>0?4096:0)|(k.sost?8192:0)|(k.sol>0?16384:0),
   Math.round(k.steer*10)/10, k.fin==null?0:Math.round(k.fin*1000)/1000, k.item?COD_OBJ.indexOf(k.item)+1:0, k.vidas==null?-1:k.vidas, k.muerto?1:0, k.itemN|0];
 function desempacar(R, k, a){
   const fl=a[6];
   k.net={x:a[0], y:a[1], z:a[2], h:a[3], v:a[4], st:a[7], at:R.reloj};
   k.prog=a[5]; k.drift=fl&1?1:fl&2?-1:0; k.boost=fl&4?1:0; if(fl&8){ if(k.spin<=0) k.spin=.4; } else k.spin=0;
-  k.hielo=fl&16?1:0; k.escudo=fl&32?1:0; k.viento=fl&64?1:0; k.aire=fl&128?1:0; k.lento=fl&256?1:0; k.dNivel=(fl>>10)&3; if(fl&4096) k.parpadeo=.3; k.sost=!!(fl&8192);
+  k.hielo=fl&16?1:0; k.escudo=fl&32?1:0; k.viento=fl&64?1:0; k.aire=fl&128?1:0; k.lento=fl&256?1:0; k.dNivel=(fl>>10)&3; if(fl&4096) k.parpadeo=.3; k.sost=!!(fl&8192); k.sol=fl&16384?1:0;
   k.fin=a[8]||null; k.item=a[9]?COD_OBJ[a[9]-1]:null; k.itemN=a[12]|0; k.lapN=Math.floor(k.prog/R.T.N);
   if(R.arena && a[10]!=null && a[10]>=0){ if(R.host){ k.muerto=k.muerto||!!a[11]; } else { k.vidas=a[10]; k.muerto=!!a[11]; } }
 }
@@ -268,17 +273,16 @@ function botInput(R, k, dt){
   // mini turbos al salir de las curvas (los buenos)
   if(b.niv!=='facil' && !b.auto){ b.turboEn-=dt; if(b.turboEn<=0 && curva<.012 && T.vmax[(k.idx+N-8)%N]>.03){ k.boost=Math.max(k.boost, b.niv==='dificil'?.9:.55); b.turboEn=b.niv==='dificil'?5:10; } }
   // objetos
-  if(k.item==='mango' && !b.auto){
+  if((k.item==='mango'||k.item==='mango5') && !b.auto){
     // la lleva colgando atrás; la suelta cuando viene alguien atrás, o la tira adelante si hay uno a tiro
     const atr=R.karts.some(q=>q!==k && !q.fantasma && q.prog<k.prog && k.prog-q.prog<6), ade=R.karts.some(q=>q!==k && !q.fantasma && q.prog-k.prog>4 && q.prog-k.prog<9);
-    const suelta=R.t-(k.itemT||0)>.8 && (atr || (ade && Math.random()<.03) || R.t-(k.itemT||0)>25);
-    inp.usar=suelta?0:1; if(suelta && atr) inp.freno=1;
+    botMango(R, k, atr, ade && Math.random()<.03, inp);
   }
   else if(k.item && !b.auto){
     if(!b.usaEn || b.usaEn>R.t+9) b.usaEn=R.t+.8+Math.random()*3.5;
     if(R.t>=b.usaEn){
       const o=k.item, adelante=R.karts.some(q=>q!==k && !q.fantasma && q.prog>k.prog && q.prog-k.prog<18), atras=R.karts.some(q=>q!==k && !q.fantasma && q.prog<k.prog && k.prog-q.prog<10);
-      const ok = o==='chipa'||o==='chipa3' ? curva<.012 && !k.fuera : o==='mango' ? atras || Math.random()<.01 : o==='coco' ? (k.puesto===1 ? atras : adelante) : o==='terere' ? adelante : o==='guampa' ? R.t-(k.itemT||0)>20 : true;
+      const ok = o==='chipa'||o==='chipa3' ? curva<.012 && !k.fuera : o==='mango' ? atras || Math.random()<.01 : o==='coco' ? (k.puesto===1 ? atras : adelante) : o==='terere' ? adelante : o==='guampa' ? (adelante && Math.random()<.25) || R.t-(k.itemT||0)>20 : true;
       if(ok){ inp.usar=1; k.usarPrev=0; b.usaEn=R.t+1+Math.random()*2.5; }
     }
   }
@@ -286,16 +290,26 @@ function botInput(R, k, dt){
   if(k.quieto>2.2 || k.alReves>2.5) recolocar(R, k);
 }
 
+// los bots con mango: lo mantienen colgando y lo sueltan (atrás o adelante) de a uno
+function botMango(R, k, atr, ade, inp){
+  const b=k.bot, listo=R.t-(k.itemT||0)>.8 && R.t-(b.mSolto||0)>1.5, quiere=atr || ade || R.t-(b.mSolto||k.itemT||0)>22;
+  if(k.mDesde==null) inp.usar=1;
+  else if(listo && quiere){ inp.usar=0; b.mSolto=R.t; if(atr || !ade) inp.freno=1; }
+  else inp.usar=1;
+}
 /* ---------- lo que decide el anfitrión: objetos sueltos, golpes, quién gana ---------- */
 function sortear(R, k){
   if(R.arena){   // en la batalla: al que le quedan menos corazones le tocan cosas más fuertes
     const poco=1-((k.vidas||1)-1)/Math.max(1, R.vidas-1);
-    const W={chipa:1.6, chipa3:.6, mango:2.6, coco:3.6+poco, terere:1.8+2*poco, nanduti:1.6+poco, tormenta:.4+poco*.6, viento:.3+poco*1.4, guampa:1.1};
+    const W={chipa:1.6, chipa3:.6, mango:2.2, mango5:.8, coco:3.6+poco, terere:1.8+2*poco, nanduti:1.6+poco, tormenta:.4+poco*.6, viento:.3+poco*1.2, guampa:1.1, sol:.2+poco*1.2, mainumby:R.objs.some(o=>o.t==='mainumby')?0:.2+poco*.8};
     let tot=0; for(const o in W) tot+=W[o]; let x=Math.random()*tot; for(const o in W){ x-=W[o]; if(x<=0) return o; } return 'coco';
   }
   const n=R.orden.length, rel=n>1 ? (k.puesto-1)/(n-1) : .5;
-  const W={chipa:3+2*rel, chipa3:rel>.3?4*rel:0, mango:4*(1-rel)+.8, coco:3, terere:rel>.1?1.8+2.2*rel:0, nanduti:2.4*(1-rel)+.6, tormenta:rel>.55?1.6*rel:0, viento:rel>.7?3.2*rel:0, guampa:rel>.15?1.2+1.2*rel:.4};
-  if(n<2){ W.coco=W.terere=W.tormenta=W.mango=W.guampa=0; }
+  // el que va adelante recibe cosas flojas (cáscaras, cocos, escudo); el del fondo tiene chance de lo bueno para alcanzar a los primeros
+  const hay=R.objs.some(o=>o.t==='mainumby');
+  const W={chipa:3+rel, chipa3:rel>.3?3.5*rel:0, mango:4.5*(1-rel)+.4, mango5:rel<.75?1.5:.3, coco:3*(1-rel*.5), terere:rel>.1?1.4+1.6*rel:0, guampa:rel<.7?1.4:.5,
+    nanduti:2.4*(1-rel)+.4, tormenta:rel>.55?1.4*rel:0, viento:rel>.65?2.2*rel:0, sol:rel>.6?2.6*rel:0, mainumby:!hay && rel>.45?1.8*rel:0};
+  if(n<2){ W.coco=W.terere=W.tormenta=W.mango=W.mango5=W.guampa=W.mainumby=0; }
   let tot=0; for(const o in W) tot+=W[o]; let x=Math.random()*tot;
   for(const o in W){ x-=W[o]; if(x<=0) return o; } return 'chipa';
 }
@@ -307,6 +321,7 @@ function hostPedido(R, d){
     if(k.local){ k.itemPend=o; if(k.ruleta<=0) k.ruleta=1.2; } else R.emitir({k:'obj', pid:k.pid, o});
   } else if(d.k==='usar'){
     const T=R.T, id='o'+(++R.seq);
+    if(d.o==='mango5') d.o='mango';
     if(d.o==='mango' && d.ad){   // tirada adelante: vuela en arco y cae en tu carril
       const sx=Math.sin(d.h), cz=Math.cos(d.h), L=22+Math.max(0, d.v||0)*.5, x0=d.x+sx*1.6, z0=d.z+cz*1.6, y0=d.y+1.2; let x1, y1, z1;
       if(R.arena){ x1=d.x+sx*L; z1=d.z+cz*L; const dd=Math.hypot(x1, z1), lim=T.radio-3; if(dd>lim){ x1*=lim/dd; z1*=lim/dd; } y1=alturaArena(T, x1, z1); }
@@ -314,23 +329,34 @@ function hostPedido(R, d){
       R.objs.push({id, t:'mango', x:x0, y:y0, z:z0, x0, y0, z0, x1, y1, z1, vuelo:0, dur:.8, de:d.pid, edad:0, vida:70});
     }
     else if(d.o==='mango') R.objs.push({id, t:'mango', x:d.x-Math.sin(d.h)*2.8, y:d.y, z:d.z-Math.cos(d.h)*2.8, de:d.pid, edad:0, vida:70});
-    else if(R.arena && (d.o==='coco' || d.o==='terere')){
+    else if(d.o==='mainumby'){   // va siempre por el que va primero
+      const lider=objetivoMainumby(R, null); const sx=Math.sin(d.h), cz=Math.cos(d.h);
+      if(R.arena) R.objs.push({id, t:'mainumby', x:d.x+sx*2.6, y:d.y+1, z:d.z+cz*2.6, vx:sx*48*R.ritmoF, vz:cz*48*R.ritmoF, de:d.pid, a:lider?lider.pid:null, edad:0, vida:25, vel:48*R.ritmoF});
+      else R.objs.push({id, t:'mainumby', f:d.f+1.2, lat:d.lat, x:d.x, y:d.y+1, z:d.z, de:d.pid, a:lider?lider.pid:null, edad:0, vida:35, vel:78*R.ritmoF});
+    }
+    else if(R.arena && (d.o==='coco' || d.o==='terere' || d.o==='guampa')){
       // en la arena el coco sale derecho y rebota en las paredes; el tereré busca al más cercano que tenga adelante
-      const vel=(d.o==='coco'?54:44)*R.ritmoF, sx=Math.sin(d.h), cz=Math.cos(d.h);
+      const vel=(d.o==='terere'?44:54)*R.ritmoF, sx=Math.sin(d.h), cz=Math.cos(d.h);
       let blanco=null, mejor=1e9; for(const q of R.karts){ if(q.pid===d.pid || q.muerto || q.fantasma) continue; const dx=q.x-d.x, dz=q.z-d.z, dd=Math.hypot(dx,dz), fr=(dx*sx+dz*cz)/(dd||1), pe=dd*(fr>.2?1:2.5); if(pe<mejor){ mejor=pe; blanco=q; } }
-      R.objs.push({id, t:d.o, x:d.x+sx*2.6, y:d.y, z:d.z+cz*2.6, vx:sx*vel, vz:cz*vel, de:d.pid, a:d.o==='terere'&&blanco?blanco.pid:null, edad:0, vida:d.o==='coco'?6:9, vel});
+      R.objs.push({id, t:d.o, x:d.x+sx*2.6, y:d.y, z:d.z+cz*2.6, vx:sx*vel, vz:cz*vel, de:d.pid, a:d.o==='terere'&&blanco?blanco.pid:null, edad:0, vida:d.o==='terere'?9:6, vel});
     }
     else if(d.o==='coco'){ const atras=k.puesto===1 && R.orden.length>1;   // el que va primero lo tira para atrás
       R.objs.push({id, t:'coco', f:d.f+(atras?-1.4:1.2), lat:d.lat, x:d.x, y:d.y, z:d.z, de:d.pid, edad:0, vida:atras?5:7, vel:(atras?-44:58)*R.ritmoF}); }
+    else if(d.o==='guampa') R.objs.push({id, t:'guampa', f:d.f+1.2, lat:d.lat, x:d.x, y:d.y, z:d.z, de:d.pid, edad:0, vida:6, vel:56*R.ritmoF});
     else if(d.o==='terere'){ const ad=R.orden[k.puesto-2]; R.objs.push({id, t:'terere', f:d.f+1.2, lat:d.lat, x:d.x, y:d.y, z:d.z, de:d.pid, a:ad&&ad.fin==null?ad.pid:null, edad:0, vida:11, vel:52*R.ritmoF}); }
     else if(d.o==='tormenta') R.emitir({k:'tormenta', de:d.pid, dur:5.5});
     R.emitir({k:'uso', pid:d.pid, o:d.o});
   }
 }
-function golpear(R, k, c, por){
+function objetivoMainumby(R, o){
+  const vivos=R.orden.filter(q=>!q.fantasma && !q.muerto && q.fin==null);
+  return vivos[0] || null;
+}
+function golpear(R, k, c, por, forzar){
   if(k.muerto || (R.arena && R.estado==='fin')) return;   // terminada la batalla ya nadie pierde corazones
   if(k.fin!=null || k.spin>0 || k.hielo>0 || k.parpadeo>0) return;
-  if(k.viento>0) return;
+  if(forzar){ R.emitir({k:'golpe', pid:k.pid, c, por}); return true; }   // el mainumby al primero: le da sí o sí
+  if(k.viento>0 || k.sol>0) return;
   if(k.escudo>0){ R.emitir({k:'escudo', pid:k.pid}); return false; }
   R.emitir({k:'golpe', pid:k.pid, c, por}); return true;
 }
@@ -341,24 +367,29 @@ function pasoHost(R, dt){
     if(o.dur){ o.vuelo+=dt; const t=Math.min(1, o.vuelo/o.dur); o.x=o.x0+(o.x1-o.x0)*t; o.z=o.z0+(o.z1-o.z0)*t; o.y=o.y0+(o.y1-o.y0)*t+Math.sin(t*Math.PI)*4.5; if(t<1) continue; o.dur=0; o.y=o.y1; }
     if(R.arena && o.t!=='mango') moverObjArena(R, o, dt);
     else if(o.t!=='mango'){
+      if(o.t==='mainumby'){ const l=objetivoMainumby(R, o); if(!l){ R.objs.splice(q,1); continue; } o.a=l.pid; }
       const obj=o.a ? R.porPid[o.a] : null;
-      if(obj && obj.fin==null && Math.hypot(obj.x-o.x, obj.z-o.z)<22){ const dx=obj.x-o.x, dz=obj.z-o.z, dd=Math.hypot(dx,dz)||1, pas=Math.min(dd, o.vel*1.15*dt); o.x+=dx/dd*pas; o.z+=dz/dd*pas; o.y+=(obj.y-o.y)*.3; o.f=obj.idx; o.lat=obj.lat||0; }
+      if(obj && obj.fin==null && Math.hypot(obj.x-o.x, obj.z-o.z)<22){ const dx=obj.x-o.x, dz=obj.z-o.z, dd=Math.hypot(dx,dz)||1, pas=Math.min(dd, o.vel*1.15*dt); o.x+=dx/dd*pas; o.z+=dz/dd*pas; o.y+=(obj.y+(o.t==='mainumby'?1:0)-o.y)*.3; o.f=obj.idx; o.lat=obj.lat||0; }
       else { o.f+=o.vel*dt/T.paso; if(obj){ const lo=obj.local ? (obj.lat||0) : detalle(T, obj.x, obj.z, obj.idx).lat; o.lat+=(lo-o.lat)*Math.min(1, dt*2.5); }
         const j=((Math.floor(o.f)%N)+N)%N, s=S[j], s2=S[(j+1)%N], t=o.f-Math.floor(o.f), la=Math.max(-s.w, Math.min(s.w, o.lat));
-        o.x=s.x+(s2.x-s.x)*t+s.nx*la; o.z=s.z+(s2.z-s.z)*t+s.nz*la; o.y=s.y+(s2.y-s.y)*t; }
+        o.x=s.x+(s2.x-s.x)*t+s.nx*la; o.z=s.z+(s2.z-s.z)*t+s.nz*la; o.y=s.y+(s2.y-s.y)*t+(o.t==='mainumby'?1:0); }
     }
     if(!fuera) for(const k of R.karts){
       if(k.fantasma || k.muerto || (k.pid===o.de && o.edad<(o.t==='mango'?1.2:(R.arena?1.4:.6)))) continue;
       const dx=k.x-o.x, dz=k.z-o.z, r=o.t==='mango'?2:2.3;
-      if(dx*dx+dz*dz<r*r && Math.abs(k.y-o.y)<2.4){
+      if(dx*dx+dz*dz<r*r && Math.abs(k.y-o.y)<2.6){
+        if(o.t==='mainumby'){   // al primero le da sí o sí; a los que se le cruzan los voltea y sigue de largo
+          if(k.pid===o.a){ if(golpear(R, k, 'boom', o.de, true)){ fuera=true; break; } }
+          else golpear(R, k, 'spin', o.de);
+          continue; }
         if(o.t==='coco' && k.sost) R.emitir({k:'quita', pid:k.pid, por:o.de});   // el coco le saca el mango que lleva colgando, sin hacerle daño
-        else golpear(R, k, o.t==='terere'?'hielo':'spin', o.de);
+        else golpear(R, k, o.t==='terere'||o.t==='guampa'?'hielo':'spin', o.de);
         fuera=true; break; }
     }
     if(fuera) R.objs.splice(q, 1);
   }
   // el que va con viento norte voltea al que toca
-  for(const a of R.karts) if(a.viento>0 && !a.muerto) for(const b of R.karts){ if(b===a || b.fantasma || b.muerto) continue; const dx=a.x-b.x, dz=a.z-b.z; if(dx*dx+dz*dz<5.3) golpear(R, b, 'spin', a.pid); }
+  for(const a of R.karts) if((a.viento>0 || a.sol>0) && !a.muerto) for(const b of R.karts){ if(b===a || b.fantasma || b.muerto) continue; const dx=a.x-b.x, dz=a.z-b.z; if(dx*dx+dz*dz<5.3) golpear(R, b, 'spin', a.pid); }
   // la guampa helada congela al que toca (o al que la toca), gastando una carga
   for(const a of R.karts){ if(a.item!=='guampa' || a.fantasma || a.muerto || a.fin!=null || (a.gT||0)>R.reloj) continue;
     for(const b of R.karts){ if(b===a || b.fantasma || b.muerto) continue; const dx=a.x-b.x, dz=a.z-b.z;
@@ -387,20 +418,21 @@ function aplicarEvento(R, e){
   const k=R.porPid[e.pid];
   if(e.k==='golpe' && k){ if(k.local && k.sost){ k.item=null; k.itemN=0; } k.sost=false; k.mDesde=null; }   // si te pegan, se te cae el mango que llevabas
   if(e.k==='gasta' && k){ if(k.local && k.item==='guampa'){ k.itemN--; if(k.itemN<=0){ k.item=null; k.itemN=0; } } return R.alFx(e); }
-  if(e.k==='quita' && k){ if(k.local && k.item==='mango'){ k.item=null; k.itemN=0; } k.sost=false; k.mDesde=null; return R.alFx(e); }
+  if(e.k==='quita' && k){ if(k.local && (k.item==='mango'||k.item==='mango5')){ k.itemN--; if(k.itemN<=0){ k.item=null; k.itemN=0; } } k.sost=false; k.mDesde=null; return R.alFx(e); }
+  if(e.k==='golpe' && k && e.c==='boom' && k.local){ k.vy=7; k.aire=.001; }   // el mainumby lo hace volar
   if(e.k==='golpe' && k && R.arena){
     if(k.muerto) return R.alFx(e);
     k.vidas=Math.max(0, (k.vidas==null?R.vidas:k.vidas)-1); const por=R.porPid[e.por]; if(por && por!==k) por.golpes=(por.golpes|0)+1;
-    if(k.local){ if(e.c==='hielo'){ k.hielo=1.7; k.v*=.2; } else { k.spin=1.1; k.v*=.35; } k.drift=0; k.dCarga=0; k.dNivel=0; k.boost=0; k.parpadeo=3.2; }
+    if(k.local){ if(e.c==='hielo'){ k.hielo=1.7; k.v*=.2; } else { k.spin=e.c==='boom'?1.7:1.1; k.v*=e.c==='boom'?.1:.35; } k.drift=0; k.dCarga=0; k.dNivel=0; k.boost=0; k.sol=0; k.viento=0; k.parpadeo=3.2; }
     else { if(e.c==='hielo') k.hielo=1; else k.spin=1; k.parpadeo=3.2; }
     if(k.vidas<=0 && R.host && !k.muerto) R.emitir({k:'afuera', pid:k.pid, t:Math.round(R.t*100)/100});
   } else if(e.k==='afuera' && k){
     k.muerto=true; k.vidas=0; k.finT=e.t; k.item=null; k.itemPend=null; k.ruleta=0; k.v=0; k.escudo=0; k.viento=0;
   } else if(e.k==='golpe' && k){
-    if(k.local){ if(e.c==='hielo'){ k.hielo=1.7; k.v*=.2; } else { k.spin=1.1; k.v*=.35; } k.drift=0; k.dCarga=0; k.dNivel=0; k.boost=0; k.parpadeo=0; }
+    if(k.local){ if(e.c==='hielo'){ k.hielo=1.7; k.v*=.2; } else { k.spin=e.c==='boom'?1.7:1.1; k.v*=e.c==='boom'?.1:.35; } k.drift=0; k.dCarga=0; k.dNivel=0; k.boost=0; k.sol=0; k.viento=0; k.parpadeo=0; }
     else if(e.c==='hielo') k.hielo=1; else k.spin=1;
   } else if(e.k==='escudo' && k){ k.escudo=0; k.parpadeo=k.local?.9:0; }
-  else if(e.k==='tormenta'){ R.tormenta=e.dur; for(const q of R.karts) if(q.local && q.pid!==e.de && q.viento<=0 && q.fin==null) q.lento=e.dur; }
+  else if(e.k==='tormenta'){ R.tormenta=e.dur; for(const q of R.karts) if(q.local && q.pid!==e.de && q.viento<=0 && !(q.sol>0) && q.fin==null) q.lento=e.dur; }
   else if(e.k==='obj' && k && k.local){ if(e.o){ k.itemPend=e.o; if(k.ruleta<=0) k.ruleta=.6; } else k.ruleta=0; }
   R.alFx(e);
 }
@@ -451,12 +483,13 @@ function pasoArena(R, k, dt, p, sx, cz, trabado, inp){
 // el anfitrión mueve el coco (derecho, rebota) y el tereré (persigue)
 function moverObjArena(R, o, dt){
   const T=R.T;
-  if(o.t==='terere' && o.a){ const q=R.porPid[o.a]; if(q && !q.muerto){ const dx=q.x-o.x, dz=q.z-o.z, dd=Math.hypot(dx,dz)||1, ang=Math.atan2(o.vx,o.vz), obj=Math.atan2(dx,dz), gi=angC(obj-ang), na=ang+Math.max(-dt*2.6, Math.min(dt*2.6, gi)); o.vx=Math.sin(na)*o.vel; o.vz=Math.cos(na)*o.vel; o.y+=(q.y-o.y)*.2; } else o.a=null; }
+  if(o.t==='mainumby'){ const l=objetivoMainumby(R, o); o.a=l?l.pid:null; if(l){ const dx=l.x-o.x, dz=l.z-o.z, ang=Math.atan2(o.vx,o.vz), gi=angC(Math.atan2(dx,dz)-ang), na=ang+Math.max(-dt*5, Math.min(dt*5, gi)); o.vx=Math.sin(na)*o.vel; o.vz=Math.cos(na)*o.vel; o.y+=(l.y+1-o.y)*.2; } }
+  else if(o.t==='terere' && o.a){ const q=R.porPid[o.a]; if(q && !q.muerto){ const dx=q.x-o.x, dz=q.z-o.z, dd=Math.hypot(dx,dz)||1, ang=Math.atan2(o.vx,o.vz), obj=Math.atan2(dx,dz), gi=angC(obj-ang), na=ang+Math.max(-dt*2.6, Math.min(dt*2.6, gi)); o.vx=Math.sin(na)*o.vel; o.vz=Math.cos(na)*o.vel; o.y+=(q.y-o.y)*.2; } else o.a=null; }
   o.x+=o.vx*dt; o.z+=o.vz*dt;
   const d=Math.hypot(o.x, o.z), lim=T.radio-1.2;
   if(d>lim){ const nx=o.x/d, nz=o.z/d, vn=o.vx*nx+o.vz*nz; o.x=nx*lim; o.z=nz*lim; if(vn>0){ o.vx-=2*vn*nx; o.vz-=2*vn*nz; } }
   for(const b of T.obst){ const dx=o.x-b.x, dz=o.z-b.z, dd=Math.hypot(dx,dz), m=b.r+.8; if(dd<m && dd>.01){ const nx=dx/dd, nz=dz/dd, vn=o.vx*nx+o.vz*nz; o.x=b.x+nx*m; o.z=b.z+nz*m; if(vn<0){ o.vx-=2*vn*nx; o.vz-=2*vn*nz; } } }
-  if(o.t==='coco') o.y=Math.max(0, alturaArena(T, o.x, o.z));
+  if(o.t==='coco' || o.t==='guampa') o.y=Math.max(0, alturaArena(T, o.x, o.z));
 }
 function ordenArena(R){
   return R.karts.filter(k=>!k.fantasma).sort((a,b)=>{
@@ -478,7 +511,7 @@ function botArena(R, k, dt){
   const sx=Math.sin(k.h), cz=Math.cos(k.h);
   let tx=0, tz=0, blanco=null;
   if(!k.item){ let m=1e9; R.cajas.forEach((c,i)=>{ if(R.cajasOff[i]>R.reloj) return; const d=Math.hypot(c.x-k.x, c.z-k.z)*(((c.x-k.x)*sx+(c.z-k.z)*cz)>0?1:1.8); if(d<m){ m=d; tx=c.x; tz=c.z; } }); if(m===1e9){ tx=-k.x*.3; tz=-k.z*.3; } }
-  else { let m=1e9; for(const q of R.karts){ if(q===k || q.muerto || q.fantasma) continue; const d=Math.hypot(q.x-k.x, q.z-k.z); if(d<m){ m=d; blanco=q; } } if(blanco){ tx=blanco.x; tz=blanco.z; if(k.item==='mango'){ tx=k.x+(k.x-blanco.x); tz=k.z+(k.z-blanco.z); } } }
+  else { let m=1e9; for(const q of R.karts){ if(q===k || q.muerto || q.fantasma) continue; const d=Math.hypot(q.x-k.x, q.z-k.z); if(d<m){ m=d; blanco=q; } } if(blanco){ tx=blanco.x; tz=blanco.z; if((k.item==='mango'||k.item==='mango5')){ tx=k.x+(k.x-blanco.x); tz=k.z+(k.z-blanco.z); } } }
   // lejos de la pared y de los obstáculos
   const d=Math.hypot(k.x, k.z); if(d>T.radio-12){ tx=tx*.4-k.x*.6; tz=tz*.4-k.z*.6; }
   for(const o of T.obst){ const ox=o.x-k.x, oz=o.z-k.z, al=ox*sx+oz*cz, la=ox*cz-oz*sx; if(al>0 && al<o.r+12 && Math.abs(la)<o.r+2.5){ const lado=la>0?-1:1; tx=o.x+cz*lado*(o.r+5); tz=o.z-sx*lado*(o.r+5); } }
@@ -486,19 +519,18 @@ function botArena(R, k, dt){
   inp.dir=Math.max(-1, Math.min(1, -dh*2.4)); inp.gas=1; inp.freno=0; inp.derrape=0; inp.usar=0;
   if(Math.abs(dh)>1.9 && k.v>6){ inp.gas=0; inp.freno=1; }
   // usar el objeto
-  if(k.item==='mango'){
-    let suelta=false, atr=false;
-    if(blanco){ const dx=blanco.x-k.x, dz=blanco.z-k.z, dd=Math.hypot(dx,dz), fr=(dx*sx+dz*cz)/(dd||1); if(fr<-.6 && dd<18){ suelta=true; atr=true; } else if(fr>.9 && dd>14 && dd<32 && Math.random()<.05) suelta=true; }
-    if(R.t-(k.itemT||0)<.8) suelta=false; else if(R.t-(k.itemT||0)>20) suelta=true;
-    inp.usar=suelta?0:1; if(suelta && atr) inp.freno=1;
+  if((k.item==='mango'||k.item==='mango5')){
+    let atr=false, ade=false;
+    if(blanco){ const dx=blanco.x-k.x, dz=blanco.z-k.z, dd=Math.hypot(dx,dz), fr=(dx*sx+dz*cz)/(dd||1); if(fr<-.6 && dd<18) atr=true; else if(fr>.9 && dd>14 && dd<32 && Math.random()<.05) ade=true; }
+    botMango(R, k, atr, ade, inp);
   }
   else if(k.item){
     if(!b.usaEn || b.usaEn>R.t+9) b.usaEn=R.t+.6+Math.random()*2.5;
     if(R.t>=b.usaEn){
       const o=k.item; let ok=true;
       if(blanco){ const dx=blanco.x-k.x, dz=blanco.z-k.z, dd=Math.hypot(dx,dz), fr=(dx*sx+dz*cz)/(dd||1);
-        if(o==='coco') ok = fr>.93 && dd<45; else if(o==='terere') ok = dd<60; else if(o==='mango') ok = fr<-.6 && dd<25 || Math.random()<.004; }
-      if(o==='guampa') ok=R.t-(k.itemT||0)>18;
+        if(o==='coco' || o==='guampa') ok = fr>.93 && dd<45; else if(o==='terere') ok = dd<60; else if(o==='mango') ok = fr<-.6 && dd<25 || Math.random()<.004; }
+      if(o==='guampa') ok=ok && Math.random()<.3 || R.t-(k.itemT||0)>18;
       if(b.niv==='facil' && Math.random()<.5) ok=ok && Math.random()<.02;
       if(ok){ inp.usar=1; k.usarPrev=0; b.usaEn=R.t+1+Math.random()*2; }
     }

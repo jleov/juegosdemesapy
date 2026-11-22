@@ -237,6 +237,12 @@ const PISTAS = {
   },
 };
 const ORDEN_PISTAS = COPAS.flatMap(c => c.pistas);
+// las pistas de una copa de 4, 6 u 8 carreras: las suyas y después las de la copa siguiente
+function pistasCopa(id, n){
+  const c=COPAS.find(x=>x.id===id)||COPAS[0], r=c.pistas.slice(), i=ORDEN_PISTAS.indexOf(c.pistas[c.pistas.length-1]);
+  for(let j=1; r.length<(n||4) && j<=ORDEN_PISTAS.length; j++){ const p=ORDEN_PISTAS[(i+j)%ORDEN_PISTAS.length]; if(!r.includes(p)) r.push(p); }
+  return r.slice(0, n||4);
+}
 
 /* =====================================================================
    Arenas del modo batalla (Ñorairõ): una cancha redonda y abierta donde

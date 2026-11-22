@@ -15,6 +15,7 @@ const genCode = () => { const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; fo
 let myToken=load('kg_token'); if(!myToken){ myToken=Math.random().toString(36).slice(2)+Date.now().toString(36); store('kg_token', myToken); }
 const NET={mode:null, peer:null, code:null, conns:{}, hostConn:null, myPid:null, obs:null, welcomed:false};
 let CHAT=[], V=null, R=null;
+const VERSION = 17;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
 const me = () => NET.myPid || NET.obs;
 const VP = id => V && (V.players.find(p=>p.id===id) || (V.observers||[]).find(o=>o.id===id));
 const amHost = () => NET.mode==='local' || (V && V.hostPid===NET.myPid && NET.mode==='host');
@@ -45,7 +46,9 @@ function refreshResume(){ const h=load('kg_host'), c=load('kg_client'), ok=x=>x 
 (function(){   // enlace con #CÓDIGO o ?sala=CÓDIGO
   const m=(location.hash.slice(1) || new URLSearchParams(location.search).get('sala') || '').toUpperCase();
   if(/^[A-Z0-9]{4,6}$/.test(m)){ $('#joinCode').value=m;
-    if(new URLSearchParams(location.search).get('dueno')){ if(!$('#myName').value.trim()) $('#myName').value='Dueño'; setTimeout(()=>clientJoin(m), 300); }
+    let recargo=null; try{ recargo=sessionStorage.getItem('kg_recargo'); }catch(e){}
+    if(recargo && $('#myName').value.trim()){ toast('✅ Juego actualizado: volviendo a la sala '+m+'…'); setTimeout(()=>clientJoin(m), 300); }
+    else if(new URLSearchParams(location.search).get('dueno')){ if(!$('#myName').value.trim()) $('#myName').value='Dueño'; setTimeout(()=>clientJoin(m), 300); }
     else toast('Te invitaron a la sala '+m+': escribí tu nombre y tocá “Entrar”.'); }
 })();
 /* el kart elegido girando en el menú */
@@ -67,13 +70,13 @@ function ajustesModal(){ modal(`<h2>⚙️ Ajustes</h2><label style="margin-top:
 const TIEMPOS = () => load('kg_tiempos') || {};
 function pistaCard(id, fn){ const p=PISTAS[id], t=TIEMPOS()[id]; return `<button class="pcard" onclick="${fn}('${id}')"><span class="pe">${p.e}</span><span class="pn"><b>${esc(p.n)}</b><small>${esc(p.ciudad)}${t?` · ⏱️ ${fmtT(t.t)}`:''}</small></span></button>`; }
 const selHTML = (id, list, val) => `<select id="${id}">${list.map(([v,t])=>`<option value="${v}" ${String(val)===String(v)?'selected':''}>${t}</option>`).join('')}</select>`;
-const LOC = Object.assign({nivel:'medio', ritmo:'normal', vueltas:3, karts:8}, load('kg_local')||{});
+const LOC = Object.assign({nivel:'medio', ritmo:'normal', vueltas:3, karts:8, carreras:4}, load('kg_local')||{});
 function comunesHTML(conKarts){
   return `<div class="row2"><div><label>Bots</label>${selHTML('lNivel', NIVELES.map(n=>[n.id,n.n]), LOC.nivel)}</div><div><label>Velocidad</label>${selHTML('lRitmo', RITMOS.map(n=>[n.id,n.n]), LOC.ritmo)}</div>
     ${conKarts?`<div><label>Vueltas</label>${selHTML('lVueltas', [[2,'2'],[3,'3'],[4,'4'],[5,'5']], LOC.vueltas)}</div><div><label>Karts</label>${selHTML('lKarts', [[2,'2'],[4,'4'],[6,'6'],[8,'8']], LOC.karts)}</div>`:''}</div>`;
 }
-function leerComunes(){ for(const [id,k] of [['lNivel','nivel'],['lRitmo','ritmo'],['lVueltas','vueltas'],['lKarts','karts'],['lVidas','vidas'],['lTiempo','tiempo']]){ const e=$('#'+id); if(e) LOC[k]=/^\d+$/.test(e.value)?+e.value:e.value; } store('kg_local', LOC); }
-function gpModal(){ if(needName()) return; modal(`<h2>🏆 Gran Premio</h2><p class="muted" style="margin-top:0">Cuatro carreras seguidas. Sumás puntos según cómo llegues y el que más junta se lleva la copa.</p>${comunesHTML(false)}
+function leerComunes(){ for(const [id,k] of [['lNivel','nivel'],['lRitmo','ritmo'],['lCarreras','carreras'],['lVueltas','vueltas'],['lKarts','karts'],['lVidas','vidas'],['lTiempo','tiempo']]){ const e=$('#'+id); if(e) LOC[k]=/^\d+$/.test(e.value)?+e.value:e.value; } store('kg_local', LOC); }
+function gpModal(){ if(needName()) return; modal(`<h2>🏆 Gran Premio</h2><p class="muted" style="margin-top:0">Varias carreras seguidas. Sumás puntos según cómo llegues y el que más junta se lleva la copa.</p>${comunesHTML(false)}<label>Carreras</label>${selHTML('lCarreras', [[4,'4 carreras'],[6,'6 carreras (suma pistas de la copa siguiente)'],[8,'8 carreras (suma pistas de la copa siguiente)']], LOC.carreras||4)}
   ${COPAS.map(c=>`<button class="pcard copa" onclick="localStart('copa','${c.id}')"><span class="pe">${c.e}</span><span class="pn"><b>${c.n}</b><small>${c.pistas.map(i=>PISTAS[i].ciudad).join(' · ')}</small></span></button>`).join('')}
   <button class="btn gray wide" onclick="closeModal()">Volver</button>`); }
 function batallaModal(){ if(needName()) return; modal(`<h2>💥 Batalla: Ñorairõ</h2><p class="muted" style="margin-top:0">Todos en una cancha abierta. Cada uno tiene corazones ❤️ arriba del kart: cada golpe con un objeto te saca uno. El que se queda sin corazones queda afuera y <b>gana el último que aguanta</b>.</p>
@@ -113,7 +116,7 @@ function localStart(kind, x){
   NET.mode='local'; NET.code=null; CHAT=[];
   S=lobbyState();
   Object.assign(S.opts, {nivel:LOC.nivel, ritmo:LOC.ritmo});
-  if(kind==='copa') Object.assign(S.opts, {modo:'copa', copa:x, vueltas:3, karts:8});
+  if(kind==='copa') Object.assign(S.opts, {modo:'copa', copa:x, carreras:LOC.carreras||4, vueltas:3, karts:8});
   else if(kind==='libre') Object.assign(S.opts, {modo:'libre', pista:x, vueltas:LOC.vueltas, karts:LOC.karts});
   else if(kind==='arena') Object.assign(S.opts, {modo:'arena', arena:x, karts:LOC.karts, vidas:LOC.vidas||3, tiempo:LOC.tiempo||180, objetos:true});
   else { Object.assign(S.opts, {modo:'libre', pista:x, vueltas:3, karts:1, objetos:false, ritmo:'normal'}); S.crono=true; }
@@ -211,6 +214,7 @@ function hostOnData(conn, d){
   if(d.t==='ping'){ try{ conn.send({t:'pong'}); }catch(e){} return; }
   if(d.t==='pong') return;
   if(d.t==='hello'){
+    if((d.v||0)>VERSION) toast('🔄 Hay una versión nueva del juego: recargá la página cuando termine esta carrera.');
     if(d.token===myToken) d.token+='-'+conn.peer;   // mismo navegador que el anfitrión (otra pestaña)
     S.observers=S.observers||[];
     let p=S.players.find(x=>x.token && x.token===d.token), ob=null, why='';
@@ -235,8 +239,8 @@ function hostOnData(conn, d){
     const who=p||ob;
     if(NET.conns[who.id] && NET.conns[who.id]!==conn) try{ NET.conns[who.id].close(); }catch(e){}
     conn.pid=who.id; NET.conns[who.id]=conn; who.conn=true; who.peerId=conn.peer; who.mic=false; who.cam=false; delete who.offAt;
-    if(p) conn.send({t:'welcome', pid:p.id, code:NET.code});
-    else conn.send({t:'welcome', pid:null, obs:ob.id, why, code:NET.code});
+    if(p) conn.send({t:'welcome', pid:p.id, code:NET.code, v:VERSION});
+    else conn.send({t:'welcome', pid:null, obs:ob.id, why, code:NET.code, v:VERSION});
     conn.send({t:'chatlog', list:chatFor(who.id)});
     conn.send({t:'faces', map:FACES});
     commit(); return;
@@ -365,7 +369,7 @@ function connectHost(){
   if(NET.hostConn && NET.hostConn.open) return;
   const c=NET.peer.connect(PREFIX+NET.code, {reliable:true});
   NET.hostConn=c;
-  c.on('open', ()=>{ netBar(false); clearTimeout(NET.takeoverTimer); NET.takeoverTimer=null; c.send({t:'hello', name:myName(), ch:miCh, token:myToken}); });
+  c.on('open', ()=>{ netBar(false); clearTimeout(NET.takeoverTimer); NET.takeoverTimer=null; c.send({t:'hello', name:myName(), ch:miCh, token:myToken, v:VERSION}); });
   c.on('data', d=>{ if(NET.hostConn!==c) return; NET.lastHostMsg=Date.now(); if(NET.hostLost){ NET.hostLost=false; netBar(false); } clientOnData(d); });
   c.on('close', ()=>{ if(NET.mode!=='client' || NET.hostConn!==c) return; netBar(true,'Se perdió la conexión con el anfitrión. Reconectando…'); setTimeout(connectHost,3000); scheduleTakeover(); });
 }
@@ -376,6 +380,8 @@ function clientOnData(d){
   if(d.t==='ping'){ try{ NET.hostConn.send({t:'pong'}); }catch(e){} return; }
   if(d.t==='pong') return;
   if(d.t==='welcome'){
+    // el anfitrión tiene una versión más nueva: este aparato se actualiza solo (una vez) para ver lo mismo que todos
+    if((d.v||0)>VERSION){ let ya=null; try{ ya=sessionStorage.getItem('kg_recargo'); }catch(e){} if(ya!==String(d.v)){ try{ sessionStorage.setItem('kg_recargo', String(d.v)); }catch(e){} toast('🔄 Actualizando el juego…'); setTimeout(()=>location.replace(location.pathname+'?v='+d.v+'#'+NET.code), 600); return; } }
     const cambia=NET.myPid!==d.pid;
     NET.myPid=d.pid; NET.obs=d.obs||null; NET.welcomed=true;
     store('kg_client',{code:NET.code, at:Date.now()}); if(location.hash!=='#'+NET.code) history.replaceState(null,'','#'+NET.code);
@@ -416,7 +422,7 @@ function prepararCarrera(){
   R.alTerminar = res => { if(simulo()) cerrarCarrera(res); };
   HUD.fant=[]; HUD.fantT=0; HUD.obsI=0; HUD.mini=null; HUD.cuentaN=null; LAST.res=null;
   ponerEtiquetas(); dibujarMiniBase();
-  $('#pistaNombre').innerHTML=`${PISTAS[c.pista].e} <b>${esc(PISTAS[c.pista].n)}</b>${c.modo==='copa'?` <small>· ${esc((COPAS.find(x=>x.id===S.opts.copa)||{}).n||'')} ${S.iCopa+1}/4</small>`:c.modo==='arena'?' <small>· 💥 batalla</small>':''}`;
+  $('#pistaNombre').innerHTML=`${PISTAS[c.pista].e} <b>${esc(PISTAS[c.pista].n)}</b>${c.modo==='copa'?` <small>· ${esc((COPAS.find(x=>x.id===S.opts.copa)||{}).n||'')} ${S.iCopa+1}/${S.opts.carreras||4}</small>`:c.modo==='arena'?' <small>· 💥 batalla</small>':''}`;
   $('#cartelPista').innerHTML=`<span>${PISTAS[c.pista].e}</span><b>${esc(PISTAS[c.pista].n)}</b><small>${esc(PISTAS[c.pista].d)}</small>`; $('#cartelPista').classList.remove('fuera'); void $('#cartelPista').offsetWidth; $('#cartelPista').classList.add('on');
   setTimeout(()=>$('#cartelPista').classList.remove('on'), 4200);
   motorOn(); renderTouch();
@@ -578,16 +584,16 @@ function fxCarrera(e){
     case 'rebufo': aviso('🌪️ ¡Rebufo!'); break;
     case 'caja': sfx.caja(); break;
     case 'tengo': sfx.tengo(); break;
-    case 'uso': if(e.pid==null){ sfx.usar(e.o); } else if(e.pid!==yo && e.o==='tormenta') aviso('⛈️ '+nom(e.pid)+' trajo la tormenta'); break;
+    case 'uso': if(e.pid==null){ sfx.usar(e.o); } else if(e.o==='mainumby'){ const l=R.orden.find(q=>!q.muerto && q.fin==null); aviso(l && l.pid===yo && e.pid!==yo ? '🐦 ¡Un mainumby viene por vos!' : '🐦 '+(e.pid===yo?'Largaste':nom(e.pid)+' largó')+' un mainumby: va por el primero', l && l.pid===yo && e.pid!==yo ? 'rojo' : 'oro'); sfx.trueno(); } else if(e.pid!==yo && e.o==='tormenta') aviso('⛈️ '+nom(e.pid)+' trajo la tormenta'); break;
     case 'vuelta': if(e.ultima){ aviso('🔔 ¡Última vuelta!','oro'); sfx.ultima(); } else if(e.n<=R.vueltas) { aviso('Vuelta '+e.n+' · '+fmtT(e.t)); sfx.vuelta(); } break;
     case 'meta': sfx.meta(); bigText('🏁 ¡Llegaste!', R.porPid[yo] ? R.porPid[yo].puesto+'º puesto' : ''); break;
     case 'afuera': if(e.pid===yo){ sfx.golpe('spin'); vib([200,80,300]); const vv=R.orden.filter(q=>!q.muerto).length; bigText('💀 ¡Quedaste afuera!', (vv+1)+'º puesto · ahora mirás la batalla'); $('#obsbar').style.display='block'; $('#obsbar').innerHTML='💀 Quedaste afuera. <button class="btn sm dark" onclick="camSiguiente()">🎥 Cambiar de kart</button>'; } else aviso('💥 '+nom(e.pid)+' quedó afuera'); break;
-    case 'golpe': if(e.pid===yo && R.arena){ const k=R.porPid[yo]; aviso((e.c==='hielo'?'🧊 ':'💥 ')+(k.vidas>0?'¡Te quedan '+'❤️'.repeat(k.vidas)+'!':'¡Sin corazones!'),'rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.pid===yo){ aviso(e.c==='hielo'?'🧊 ¡Te congelaron!':'💫 ¡Patinaste!','rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.por===yo){ aviso('🎯 ¡Le diste a '+nom(e.pid)+'!','oro'); sfx.acierto(); } break;
+    case 'golpe': if(e.pid===yo && e.c==='boom' && !R.arena){ aviso('🐦 ¡Te agarró el mainumby!','rojo'); sfx.golpe('spin'); vib([120,60,200]); } else if(e.pid===yo && R.arena){ const k=R.porPid[yo]; aviso((e.c==='hielo'?'🧊 ':'💥 ')+(k.vidas>0?'¡Te quedan '+'❤️'.repeat(k.vidas)+'!':'¡Sin corazones!'),'rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.pid===yo){ aviso(e.c==='hielo'?'🧊 ¡Te congelaron!':'💫 ¡Patinaste!','rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.por===yo){ aviso('🎯 ¡Le diste a '+nom(e.pid)+'!','oro'); sfx.acierto(); } break;
     case 'escudo': if(e.pid===yo){ aviso('🕸️ ¡El ñandutí te salvó!','oro'); sfx.escudo(); } break;
     case 'tormenta': sfx.trueno(); if(e.de===yo) aviso('⛈️ ¡Tormenta para todos!','oro'); break;
     case 'gasta': if(e.pid===yo){ const k=R.porPid[yo], n=k&&k.item==='guampa'?k.itemN:0; aviso('🧊 ¡Congelaste a '+nom(e.a)+'!'+(n?' Te quedan '+n:' Se terminó el tereré'),'oro'); sfx.acierto(); vib(40); } break;
     case 'quita': if(e.pid===yo){ aviso('🥥 ¡Te volaron el mango! Sin daño','rojo'); sfx.escudo(); vib(60); } else if(e.por===yo){ aviso('🎯 Le sacaste el mango a '+nom(e.pid),'oro'); sfx.acierto(); } break;
-    case 'tira': aviso('🧉 Tiraste la guampa: ya podés agarrar otra cosa'); sfx.sel(); break;
+    case 'tira': aviso('🧊 ¡Guampa lanzada! Ya podés agarrar otra cosa'); sfx.sel(); break;
     case 'cocoAtras': aviso('🥥 ¡Coco para atrás!','oro'); break;
     case 'sost': if((HUD.sostN=(HUD.sostN||0)+1)<=3) aviso('🥭 Soltá para tirarlo adelante · frenando cae atrás'); break;
   }
@@ -656,7 +662,7 @@ function hud(dt, cam){
   rev.textContent = yo && yo.alReves>1 ? '⛔ ¡Vas al revés! Tocá ↺ para volver' : '↺ ¿Te trabaste? Tocá para volver a la pista';
   $('#obsbar').style.display = NET.obs ? 'block' : 'none';
   $('#btnReco').style.display = yo && !yo.bot ? '' : 'none';
-  $('#hud').classList.toggle('turbo', k.boost>0||k.viento>0); $('#hud').classList.toggle('lluvia', R.tormenta>0);
+  $('#hud').classList.toggle('turbo', k.boost>0||k.viento>0||k.sol>0); $('#hud').classList.toggle('lluvia', R.tormenta>0);
 }
 
 /* ====================== CHAT (general y privado) ====================== */
@@ -825,7 +831,7 @@ const sfx={
   salto(){ tone(300,.25,'sine',.1,0,700); },
   caja(){ [784,988,1175,1568].forEach((f,i)=>tone(f,.09,'square',.05,i*.06)); },
   tengo(){ tone(1175,.1,'triangle',.1); tone(1568,.18,'triangle',.1,.09); },
-  usar(o){ if(o==='chipa'||o==='chipa3'||o==='viento') this.turbo(); else if(o==='nanduti'){ tone(880,.3,'sine',.09,0,1760); } else { tone(500,.14,'triangle',.1,0,250); noise(.12,.15,0,1200); } },
+  usar(o){ if(o==='chipa'||o==='chipa3'||o==='viento'||o==='sol') this.turbo(); else if(o==='nanduti'){ tone(880,.3,'sine',.09,0,1760); } else { tone(500,.14,'triangle',.1,0,250); noise(.12,.15,0,1200); } },
   golpe(c){ if(c==='hielo'){ [2093,1568,1175,784].forEach((f,i)=>tone(f,.16,'triangle',.09,i*.05)); } else { noise(.3,.4,0,500,'lowpass'); tone(400,.5,'sawtooth',.09,0,90); } },
   acierto(){ tone(988,.1,'square',.07); tone(1319,.16,'square',.07,.09); },
   escudo(){ tone(1568,.2,'sine',.1,0,523); },
@@ -946,10 +952,10 @@ function optsHTML(host){
   const pista = o.modo==='arena'
     ? `<label>Arena</label>${sel('arena', [['azar','🎲 Al azar']].concat(ORDEN_ARENAS.map(i=>[i, PISTAS[i].e+' '+PISTAS[i].n])))}<div class="row2"><div><label>Corazones</label>${sel('vidas', [1,2,3,4,5].map(n=>[n,'❤️ '+n]))}</div><div><label>Tiempo</label>${sel('tiempo', [[120,'2 minutos'],[180,'3 minutos'],[300,'5 minutos']])}</div></div>`
     : o.modo==='copa'
-    ? `<label>Copa</label>${sel('copa', COPAS.map(c=>[c.id, c.e+' '+c.n+': '+c.pistas.map(i=>PISTAS[i].ciudad).join(', ')]))}`
+    ? `<label>Copa</label>${sel('copa', COPAS.map(c=>[c.id, c.e+' '+c.n+': '+c.pistas.map(i=>PISTAS[i].ciudad).join(', ')]))}<label>Carreras</label>${sel('carreras', [[4,'4 carreras'],[6,'6 carreras'],[8,'8 carreras']])}${(o.carreras||4)>4?`<p class="muted">Se suman: ${pistasCopa(o.copa, o.carreras).slice(4).map(i=>PISTAS[i].ciudad).join(', ')}.</p>`:''}`
     : `<label>Pista</label>${sel('pista', [['azar','🎲 Al azar']].concat(ORDEN_PISTAS.map(i=>[i, PISTAS[i].e+' '+PISTAS[i].n])))}<label>Vueltas</label>${sel('vueltas', [[2,'2'],[3,'3'],[4,'4'],[5,'5']])}`;
   const pd = o.modo==='arena' && PISTAS[o.arena] ? `<p class="muted">${esc(PISTAS[o.arena].d)} Gana el último que aguanta con corazones.</p>` : o.modo==='libre' && PISTAS[o.pista] ? `<p class="muted">${esc(PISTAS[o.pista].d)}</p>` : '';
-  return `<label style="margin-top:0">Qué se corre ${host?'':'<span class="muted">(lo elige el anfitrión)</span>'}</label>${sel('modo', [['libre','🏁 Carrera suelta'],['copa','🏆 Copa de 4 carreras con puntos'],['arena','💥 Batalla: gana el último con corazones']])}${pista}${pd}
+  return `<label style="margin-top:0">Qué se corre ${host?'':'<span class="muted">(lo elige el anfitrión)</span>'}</label>${sel('modo', [['libre','🏁 Carrera suelta'],['copa','🏆 Copa con puntos (4, 6 u 8 carreras)'],['arena','💥 Batalla: gana el último con corazones']])}${pista}${pd}
     <div class="row2"><div><label>Karts en la parrilla</label>${sel('karts', [1,2,3,4,5,6,7,8].map(k=>[k, k+(k>V.players.length?' (con bots)':'')]))}</div><div><label>Bots</label>${sel('nivel', NIVELES.map(n=>[n.id,n.n]))}</div>
     <div><label>Velocidad</label>${sel('ritmo', RITMOS.map(n=>[n.id,n.n]))}</div><div><label>Objetos</label>${sel('objetos', [[1,'Con objetos'],[0,'Sin objetos']]).replace(`value="${o.objetos?1:0}"`, `value="${o.objetos?1:0}" selected`).replace('this.value})','this.value==1})')}</div></div>`;
 }
@@ -973,7 +979,7 @@ function resultados(force){
   // terminó la copa entera: después del podio de la carrera viene la entrega de la copa
   const fin = podio && V.opts.modo==='copa' && V.final;
   if(fin){ const tabla=V.players.slice().sort((a,b)=>b.pts-a.pts).map(p=>({pid:p.id, ch:p.ch|0, color:p.color, nombre:p.name, pts:p.pts, cara:CFG.calidad==='baja'?null:FACES[p.id]}));
-    setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key && R){ closeModal(); abrirPodio(tabla, COPAS.find(x=>x.id===V.opts.copa)||COPAS[0]); } }, 7600); }
+    setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key && R){ closeModal(); $('#side').classList.remove('open'); abrirPodio(tabla, COPAS.find(x=>x.id===V.opts.copa)||COPAS[0]); } }, 7600); }
   setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key) modal(resHTML()); }, force?0:fin?17500:podio?8200:1200);
 }
 // el podio de los tres primeros, con su cartel y un botón para ver la tabla
@@ -996,11 +1002,11 @@ function resHTML(){
   if(S.crono){ const r=V.res[0]; h+=`<p style="font-size:18px;text-align:center">⏱️ <b>${fmtT(r.t)}</b>${r.mejor?`<br><span class="muted">Mejor vuelta: ${fmtT(r.mejor)}</span>`:''}</p><p style="text-align:center;font-weight:800">${LAST.record?'🏆 ¡Nuevo récord tuyo!'+(LAST.antes?` (antes ${fmtT(LAST.antes)})`:''):`Tu récord sigue siendo ${fmtT(LAST.antes)}`}</p>`; }
   else h+=`<div class="podio">${(V.res||[]).map(fila).join('')}</div>`;
   if(copa){ const tabla=V.players.slice().sort((a,b)=>b.pts-a.pts);
-    h+=`<h3>${c.e} ${esc(c.n)} · ${V.final?'tabla final':`carrera ${V.iCopa+1} de ${c.pistas.length}`}</h3><div class="podio">${tabla.map((p,i)=>`<div class="prow ${p.id===yo?'yo':''}"><span class="md">${V.final?MEDAL[i]:(i+1)+'º'}</span>${carita(p,20)}<span class="nm"><b>${esc(p.name)}${p.bot?' 🤖':''}</b></span><span class="pts">${p.pts} pts</span></div>`).join('')}</div>`;
+    h+=`<h3>${c.e} ${esc(c.n)} · ${V.final?'tabla final':`carrera ${V.iCopa+1} de ${V.opts.carreras||4}`}</h3><div class="podio">${tabla.map((p,i)=>`<div class="prow ${p.id===yo?'yo':''}"><span class="md">${V.final?MEDAL[i]:(i+1)+'º'}</span>${carita(p,20)}<span class="nm"><b>${esc(p.name)}${p.bot?' 🤖':''}</b></span><span class="pts">${p.pts} pts</span></div>`).join('')}</div>`;
     if(V.final) h+=`<p style="text-align:center;font-size:18px">🏆 <b>${esc(tabla[0].name)}</b> se lleva la ${esc(c.n)}.</p>`; }
   if(host){
     if(S.crono) h+=`<button class="btn green wide" onclick="closeModal();doAct({type:'next'})">🔁 Otra vez</button>`;
-    else if(copa) h+=`<button class="btn green wide" onclick="closeModal();doAct({type:'next'})">${V.final?'🏆 Correr la copa siguiente':'▶️ Siguiente carrera: '+esc(PISTAS[c.pistas[V.iCopa+1]].n)}</button>`;
+    else if(copa) h+=`<button class="btn green wide" onclick="closeModal();doAct({type:'next'})">${V.final?'🏆 Correr la copa siguiente':'▶️ Siguiente carrera: '+esc(PISTAS[pistasCopa(V.opts.copa, V.opts.carreras)[V.iCopa+1]].n)}</button>`;
     else if(V.carrera.modo==='arena') h+=`<div class="row"><button class="btn green" onclick="closeModal();doAct({type:'next'})">🔁 Otra batalla acá</button><button class="btn" onclick="closeModal();doAct({type:'next',sig:1})">▶️ Otra arena</button></div>`;
     else h+=`<div class="row"><button class="btn green" onclick="closeModal();doAct({type:'next'})">🔁 Otra vez acá</button><button class="btn" onclick="closeModal();doAct({type:'next',sig:1})">▶️ Pista siguiente</button></div>`;
     h+=`<button class="btn gray wide" style="margin-top:6px" onclick="closeModal();${NET.mode==='local'?'leaveToMenu()':`doAct({type:'lobby'})`}">${NET.mode==='local'?'🏠 Volver al menú':'↩️ Volver a la sala'}</button>`;

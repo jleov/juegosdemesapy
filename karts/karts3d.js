@@ -115,7 +115,8 @@ function crearKart3D(ch, color){
     K3.gSombra=new THREE.CircleGeometry(1.5,12); K3.mSombra=new THREE.MeshBasicMaterial({color:0, transparent:true, opacity:.32, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-8, polygonOffsetUnits:-80});
     K3.gLlama=new THREE.ConeGeometry(.28,1.5,6); K3.gLlama.rotateX(-Math.PI/2); K3.gLlama.translate(0,0,-.75); K3.mLlama=new THREE.MeshBasicMaterial({color:'#ffb52e', transparent:true, opacity:.9});
     K3.gChispa=new THREE.BoxGeometry(.22,.22,.22); K3.gEscudo=new THREE.IcosahedronGeometry(1.9,1); K3.mEscudo=new THREE.MeshBasicMaterial({color:'#ffffff', wireframe:true, transparent:true, opacity:.7});
-    K3.gHielo=new THREE.BoxGeometry(2.4,2.6,3.2); K3.mHielo=new THREE.MeshLambertMaterial({color:'#bfeaff', transparent:true, opacity:.55}); K3.mViento=new THREE.MeshBasicMaterial({color:'#fff3a0', wireframe:true, transparent:true, opacity:.8}); }
+    K3.gHielo=new THREE.BoxGeometry(2.4,2.6,3.2); K3.mHielo=new THREE.MeshLambertMaterial({color:'#bfeaff', transparent:true, opacity:.55}); K3.mViento=new THREE.MeshBasicMaterial({color:'#fff3a0', wireframe:true, transparent:true, opacity:.8});
+    K3.mSol=new THREE.MeshBasicMaterial({color:'#ffd23a', transparent:true, opacity:.38, depthWrite:false}); }
   const ruedas=ruedasDef.map((r,i)=>{ if(p.id==='jakare' && i===1) return null; const m=new THREE.Mesh(K3.gRueda, K3.mRueda); m.scale.set(r[4], r[3], r[3]); m.position.set(r[0], r[1], r[2]); m.rotation.order='YXZ'; cuerpo.add(m); return m; });
   const sombra=new THREE.Mesh(K3.gSombra, K3.mSombra); sombra.rotation.x=-Math.PI/2; g.add(sombra);
   // corazones del modo batalla (se muestran solo en la arena)
@@ -194,6 +195,10 @@ const M3 = (() => {
     trofeo(){ const b=new Obra(), o='#f2c14e', o2='#ffd96a'; b.caja(0,0,0,.42,.14,.42,'#6b4a2b'); b.cil(0,.14,0,.07,.11,.26,o,8); b.cil(0,.4,0,.34,.13,.44,o2,12); b.cil(0,.84,0,.36,.34,.05,o,12);
       b.esf(-.38,.66,0,.12,o,1,6,.7); b.esf(.38,.66,0,.12,o,1,6,.7); b.esf(0,.9,0,.09,'#fff3b0'); return b.malla(); },
     medalla(c){ const b=new Obra(); b.caja(-.09,.12,0,.05,.42,.03,'#1d6fe0',0,0); b.caja(.09,.12,0,.05,.42,.03,'#d52b1e',0,0); b.cil(0,0,0,.17,.17,.05,c,12,1.5708); return b.malla(); },
+    mainumby(){ const b=new Obra(), c='#1fa87a', c2='#2f7fe0';
+      b.esf(0,1,0,.5,c,1,8,1,1.5); b.esf(0,1.25,.6,.32,c2,1,7); b.esf(0,1.2,.48,.28,'#e8344a',.6,6); b.cil(0,1.25,.85,.02,.07,.9,'#222',5,1.5708);
+      b.esf(-.14,1.36,.78,.07,'#ffffff',1,5); b.esf(.14,1.36,.78,.07,'#ffffff',1,5); b.esf(-.15,1.37,.83,.04,'#111',1,4); b.esf(.15,1.37,.83,.04,'#111',1,4);
+      b.caja(-.75,1.1,0,1.1,.06,.55,c2,0,0,.35); b.caja(.75,1.1,0,1.1,.06,.55,c2,0,0,-.35); b.caja(0,.95,-.85,.45,.05,.6,c,0,-.3); return b.malla(); },
     terere(){ const b=new Obra(); b.cil(0,.2,0,.42,.42,1.5,'#2f6fb0',9); b.cil(0,1.7,0,.3,.42,.25,'#d8dde6',9); b.cil(0,1.95,0,.16,.16,.3,'#d8dde6',7); b.caja(.5,.9,0,.14,.7,.14,'#d8dde6'); b.cil(-.75,.2,.3,.3,.22,.75,'#e8dcc0',8); b.cil(-.75,.9,.3,.03,.03,.8,'#c8ccd4',4,0,.3); b.esf(0,1,0,1.1,'#bfeaff',1.2,7); return b.malla(new THREE.MeshLambertMaterial({vertexColors:true, transparent:true, opacity:.9})); },
   };
   /* un cuadro: R = la carrera, yo = el kart que sigue la cámara */
@@ -213,12 +218,14 @@ const M3 = (() => {
       v.sombra.position.y=(k.ySuelo!=null?k.ySuelo:k.y)-k.y+.16; const al=Math.max(0, k.y-(k.ySuelo!=null?k.ySuelo:k.y)); v.sombra.scale.setScalar(Math.max(.5, 1-al*.08));
       const giroR=k.rodado||0;
       v.ruedas.forEach((r,i)=>{ if(!r) return; r.rotation.x=giroR; r.rotation.y=i<2?-(k.steerVis||0)*.45:0; });
-      const turbo=k.boost>0||k.viento>0;
+      const turbo=k.boost>0||k.viento>0||k.sol>0;
       v.llamas.forEach((l,i)=>{ l.visible=turbo; if(turbo){ const s=.8+Math.random()*.7; l.scale.set(1,1,s*(k.viento>0?1.5:1)); } });
       const dn=k.drift?k.dNivel:0;
       v.chispas.forEach((c,i)=>{ c.visible=!!k.drift && k.aire<=0 && (dn>0 || i<2); if(c.visible){ c.position.y=.15+Math.random()*.5; c.rotation.set(Math.random()*3,Math.random()*3,0); } });
       if(k.drift) v.mCh.color.set(dn>=3?'#d86bff':dn===2?'#ff8a1e':dn===1?'#5ad0ff':'#dddddd');
-      v.escudo.visible=k.escudo>0||k.viento>0; if(v.escudo.visible){ v.escudo.material=k.viento>0?K3.mViento:K3.mEscudo; v.escudo.rotation.y+=dt*2; v.escudo.rotation.x+=dt*.7; }
+      const sol=k.sol>0;
+      v.escudo.visible=k.escudo>0||k.viento>0||sol; if(v.escudo.visible){ v.escudo.material=sol?K3.mSol:k.viento>0?K3.mViento:K3.mEscudo; v.escudo.rotation.y+=dt*2; v.escudo.rotation.x+=dt*.7; v.escudo.scale.setScalar(sol?1.05+Math.sin(t*12)*.08:1); }
+      if(sol) K3.mSol.color.setHSL((t*.6)%1, 1, .6);
       v.hielo.visible=k.hielo>0; if(v.hielo.visible) v.hielo.rotation.y=k.h;
       // el mango que lleva colgando atrás
       if(k.sost && !v.mangoM){ v.mangoM=OBJ3.mango(); v.mangoM.scale.setScalar(.75); v.mangoM.position.set(0,.05,-2.4); v.cuerpo.add(v.mangoM); v.extras.push(v.mangoM); }
@@ -235,8 +242,9 @@ const M3 = (() => {
     for(const pid in vis) if(!R.karts.some(k=>k.pid===pid)){ esc.remove(vis[pid].g); vis[pid].tirar(); delete vis[pid]; }
     // objetos sueltos en la pista
     const vivos={};
-    for(const o of R.objs){ vivos[o.id]=1; let m=objs[o.id]; if(!m){ m=objs[o.id]=(OBJ3[o.t]||OBJ3.coco)(); esc.add(m); }
-      m.position.set(o.x, o.y, o.z); if(o.t!=='mango'){ m.rotation.y+=dt*6; if(o.t==='coco') m.rotation.x+=dt*9; } }
+    for(const o of R.objs){ vivos[o.id]=1; let m=objs[o.id]; if(!m){ m=objs[o.id]=(OBJ3[o.t]||OBJ3.coco)(); if(o.t==='guampa') m.scale.setScalar(2.4); if(o.t==='mainumby') m.scale.setScalar(1.3); esc.add(m); }
+      if(o.t==='mainumby'){ const dx=o.x-m.position.x, dz=o.z-m.position.z; if(dx*dx+dz*dz>.0004) m.rotation.y=Math.atan2(dx, dz); m.position.set(o.x, o.y+Math.sin(t*14)*.15, o.z); m.rotation.z=Math.sin(t*30)*.12; continue; }
+      m.position.set(o.x, o.y, o.z); if(o.t!=='mango'){ m.rotation.y+=dt*6; if(o.t==='coco'||o.t==='guampa') m.rotation.x+=dt*9; } }
     for(const id in objs) if(!vivos[id]){ esc.remove(objs[id]); objs[id].geometry.dispose(); objs[id].material.dispose(); delete objs[id]; }
     // cajas
     const cj=mundo.userData.cajas; for(let i=0;i<cj.length;i++){ const c=cj[i], on=!(R.cajasOff[i]>t); c.m.visible=on; if(on){ c.m.rotation.y=t*1.6+i; c.m.rotation.x=t*.9; c.m.position.y=c.y+Math.sin(t*2.4+i)*.25; } }
