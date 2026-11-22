@@ -80,7 +80,10 @@ function pasoKart(R, k, dt, corre){
   for(const c of ['boost','spin','hielo','escudo','lento','viento','parpadeo','ruleta']) if(k[c]>0) k[c]=Math.max(0, k[c]-dt);
   if(k.itemPend && k.ruleta<=0){ k.item=k.itemPend; k.itemN=OBJETOS[k.item].x||1; k.itemT=R.t; k.itemPend=null; k.sost=false; k.mDesde=null; if(k.pid===R.miPid) R.alFx({k:'tengo', o:k.item}); }
   if(!corre){ if(inp.gas){ if(k.gasDesde==null) k.gasDesde=R.t; } else k.gasDesde=null; return; }
-  if(!k.largo){ k.largo=true; if(k.gasDesde!=null && k.gasDesde>-.95 && k.gasDesde<-.15){ k.boost=1.2; if(k.pid===R.miPid) R.alFx({k:'largada'}); } }
+  // la largada: el que aprieta antes del 2 patina; el que aprieta justo en el 1, sale con turbo
+  if(!k.largo){ k.largo=true;
+    if(k.gasDesde!=null && k.gasDesde<=-2){ k.spin=1.1; k.v=0; if(k.pid===R.miPid) R.alFx({k:'quemo'}); }
+    else if(k.gasDesde!=null && k.gasDesde>-.95 && k.gasDesde<-.15){ k.boost=1.2; if(k.pid===R.miPid) R.alFx({k:'largada'}); } }
   const trabado=k.hielo>0||k.spin>0, turbo=k.boost>0||k.viento>0, suelo=k.aire<=0;
   const gas=trabado?0:inp.gas, freno=trabado?0:inp.freno, dir=trabado?0:inp.dir;
   /* velocidad */
@@ -245,7 +248,9 @@ function pasoFantasma(R, k){
 function botInput(R, k, dt){
   const T=R.T, N=T.N, S=T.S, b=k.bot, inp=k.inp, p=piloto(k.ch);
   inp.gas=1; inp.freno=0; inp.derrape=0; inp.usar=0;
-  if(R.t<0){ inp.gas = R.t>-.6+(b.niv==='facil'?.5:b.niv==='dificil'?0:.25) || R.t<-3 ? 0 : 1; if(b.niv==='facil') inp.gas=0; inp.dir=0; return; }
+  if(R.t<0){   // los buenos aprietan justo en el 1; los tranquilos a veces se apuran y patinan
+    if(b.larga==null) b.larga = b.niv==='dificil' ? -.75+Math.random()*.4 : b.niv==='medio' ? (Math.random()<.1 ? -2.4 : -1.5+Math.random()*1.3) : (Math.random()<.25 ? -2.6 : -.4+Math.random()*.4);
+    inp.gas = R.t>=b.larga ? 1 : 0; inp.dir=0; return; }
   if(R.arena) return botArena(R, k, dt);
   // por dónde va: cambia de carril cada tanto y esquiva al de adelante
   b.cambia-=dt; if(b.cambia<=0){ b.cambia=2.5+Math.random()*4; b.lat=(Math.random()-.5)*S[k.idx].w*1.1; }

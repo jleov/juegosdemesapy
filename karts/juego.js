@@ -569,6 +569,7 @@ function fxCarrera(e){
   const yo=NET.myPid, nom=id=>{ const p=VP(id); return p?p.name:''; };
   switch(e.k){
     case 'largada': aviso('🚀 ¡Largada turbo!','oro'); sfx.turbo(); break;
+    case 'quemo': aviso('💫 ¡Aceleraste antes de tiempo! Apretá en el 2 o el 1','rojo'); sfx.golpe('spin'); vib([80,40,80]); break;
     case 'chispa': sfx.chispa(e.n); break;
     case 'miniturbo': sfx.turbo(); if(e.n>=2) aviso(e.n>=3?'🔥 ¡Súper mini turbo!':'💨 ¡Mini turbo!','oro'); vib(30); break;
     case 'truco': aviso('🤸 ¡Pirueta!','oro'); sfx.sel(); break;
@@ -969,16 +970,22 @@ function resultados(force){
   const podio = !force && !S.crono && V.res && V.res.length && R && M3.listo;
   if(podio){ const lista=V.res.slice(0,3).map(r=>{ const p=VP(r.pid)||{}; return {pid:r.pid, ch:p.ch|0, color:p.color||'#888', nombre:p.name||'?', cara:CFG.calidad==='baja'?null:FACES[r.pid]}; });
     setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key && R) abrirPodio(lista); }, 1400); }
-  setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key) modal(resHTML()); }, force?0:podio?8200:1200);
+  // terminó la copa entera: después del podio de la carrera viene la entrega de la copa
+  const fin = podio && V.opts.modo==='copa' && V.final;
+  if(fin){ const tabla=V.players.slice().sort((a,b)=>b.pts-a.pts).map(p=>({pid:p.id, ch:p.ch|0, color:p.color, nombre:p.name, pts:p.pts, cara:CFG.calidad==='baja'?null:FACES[p.id]}));
+    setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key && R){ closeModal(); abrirPodio(tabla, COPAS.find(x=>x.id===V.opts.copa)||COPAS[0]); } }, 7600); }
+  setTimeout(()=>{ if(V && V.phase==='results' && V.carrera.id===key) modal(resHTML()); }, force?0:fin?17500:podio?8200:1200);
 }
 // el podio de los tres primeros, con su cartel y un botón para ver la tabla
-function abrirPodio(lista){
-  M3.mostrarPodio(lista, R && R.T.tema); document.body.classList.add('enpodio');
-  const w=lista[0], yo=me(), d=$('#podioCartel')||document.createElement('div'); d.id='podioCartel';
-  const arena=V.carrera.modo==='arena', copa=V.opts.modo==='copa' && V.final;
-  d.innerHTML=`<b>${arena?'💥':'🏆'} ${esc(w.nombre)}${w.pid===yo?' (vos)':''}</b><small>${arena?'ganó la batalla':'ganó la carrera'}${lista.findIndex(q=>q.pid===yo)>0?' · vos saliste '+(lista.findIndex(q=>q.pid===yo)+1)+'º':''}</small><button class="btn gold sm" onclick="resultados(true)">📋 Ver resultados</button>`;
-  if(!d.parentElement) $('#stage').appendChild(d);
-  const pos=lista.findIndex(q=>q.pid===yo); if(pos===0){ sfx.meta(); vib([60,40,60,40,160]); }
+function abrirPodio(lista, copa){
+  M3.mostrarPodio(lista, R && R.T.tema, !!copa); document.body.classList.add('enpodio');
+  const w=lista[0], yo=me(), pos=lista.findIndex(q=>q.pid===yo), d=$('#podioCartel')||document.createElement('div'); d.id='podioCartel';
+  const arena=V.carrera.modo==='arena';
+  const sub = copa ? `se lleva la ${esc(copa.n)} con ${w.pts} puntos${pos===0?' · ¡sos el campeón!':pos>0?' · vos terminaste '+(pos+1)+'º':''}`
+    : `${arena?'ganó la batalla':'ganó la carrera'}${pos>0?' · vos saliste '+(pos+1)+'º':''}`;
+  d.innerHTML=`<b>${copa?copa.e+' 🏆':arena?'💥':'🏆'} ${esc(w.nombre)}${w.pid===yo?' (vos)':''}</b><small>${sub}</small><button class="btn gold sm" onclick="resultados(true)">📋 Ver resultados</button>`;
+  if(!d.parentElement) $('#stage').appendChild(d); else { d.style.animation='none'; void d.offsetWidth; d.style.animation=''; }
+  if(pos===0){ sfx.meta(); vib([60,40,60,40,160]); }
 }
 function cerrarPodio(){ M3.cerrarPodio(); document.body.classList.remove('enpodio'); const d=$('#podioCartel'); if(d) d.remove(); }
 function resHTML(){
@@ -1042,7 +1049,7 @@ function showRules(){
   <ul><li><b>Celular:</b> ◀ ▶ para doblar (o inclinando el celular, en ⚙️ Ajustes), <b>↯</b> para saltar y derrapar, <b>🎁</b> para usar el objeto y <b>freno</b>. El kart puede acelerar solo.</li>
   <li><b>PC:</b> flechas o WASD, <b>Espacio</b> derrapa, <b>X</b> o <b>Enter</b> usa el objeto, <b>R</b> te vuelve a la pista. También anda con mando.</li></ul>
   <h3>💨 Trucos para ir más rápido</h3>
-  <ul><li><b>Largada turbo:</b> empezá a acelerar justo cuando la cuenta pasa del 2 al 1 (no antes).</li>
+  <ul><li><b>Largada turbo:</b> empezá a acelerar justo cuando la cuenta pasa del 2 al 1. Si aceleras con el 3 (o antes), el kart patina al largar.</li>
   <li><b>Derrape y mini turbo:</b> doblando, mantené apretado ↯: el kart salta y derrapa. Mientras más aguantes, las chispas pasan de <b style="color:#3ba0e0">celestes</b> a <b style="color:#ff8a1e">naranjas</b> y a <b style="color:#b04fd8">violetas</b>. Al soltar sale el turbo.</li>
   <li><b>Rebufo:</b> andá pegado atrás de otro kart un ratito y tomás más velocidad.</li>
   <li><b>Saltos:</b> en las rampas amarillas, apretá ↯ justo en el aire para hacer una pirueta y caer con turbo.</li>

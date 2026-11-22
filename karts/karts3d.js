@@ -274,7 +274,8 @@ const M3 = (() => {
   }
   function texto(t, color, tam){ const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d'); g.font='900 '+(tam||96)+'px system-ui,"Segoe UI Emoji",sans-serif'; g.textAlign='center'; g.textBaseline='middle';
     if(color){ g.lineWidth=10; g.strokeStyle='rgba(0,0,0,.55)'; g.strokeText(t,64,70); g.fillStyle=color; } g.fillText(t,64,70); return new THREE.CanvasTexture(c); }
-  function mostrarPodio(lista, tema){
+  // final=true: entrega de la copa al terminar la copa completa (el campeón festeja, los demás quedan tristes)
+  function mostrarPodio(lista, tema, final){
     if(!rend) return; cerrarPodio();
     const e=new THREE.Scene(), tirar=[];
     e.background = tema ? cielo(tema) : new THREE.Color('#2a3a7a');
@@ -288,28 +289,40 @@ const M3 = (() => {
     const base=b.malla(); e.add(base); tirar.push(base);
     // números en el frente de cada escalón
     lista.slice(0,3).forEach((q,i)=>{ const sp=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.5), new THREE.MeshBasicMaterial({map:texto(String(i+1), cols[i]), transparent:true})); sp.position.set(xs[i], alt[i]*.5, 1.92); e.add(sp); tirar.push(sp); });
-    const ks=lista.slice(0,3).map((q,i)=>{
-      const v=crearKart3D(q.ch, q.color); v.g.position.set(xs[i], alt[i], 0); v.g.rotation.y=i===1?.32:i===2?-.32:0; v.sombra.visible=false; e.add(v.g);
-      etiquetaKart(v, q.nombre, q.color, q.cara); v.etiqueta.position.y=4.6; v.etiqueta.scale.set(4.6,1.7,1);
-      if(i===0){ const tr=OBJ3.trofeo(); tr.position.set(0,-.05,.8); tr.scale.setScalar(1.75); v.brazos[1].add(tr); v.extras.push(tr); v.trofeo=tr; }
-      else { const m=OBJ3.medalla(cols[i]); m.position.set(0,1.05,.52); v.pil.add(m); v.extras.push(m); }
-      const cara=new THREE.Sprite(new THREE.SpriteMaterial({map:texto(['😁','😄','🥲'][i]), transparent:true, depthWrite:false})); cara.scale.set(.95,.95,1); cara.position.set(-1,2.45,.3); v.pil.add(cara); v.extras.push(cara);
-      return v; });
+    // los que no subieron al podio (solo en la final): abajo, a los costados
+    const abajo=[[-7.6,2.6,.55],[7.6,2.6,-.55],[-4.4,7.2,.25],[4.4,7.2,-.25],[-9.8,6.2,.55],[9.8,6.2,-.55]];
+    const ks=lista.slice(0, final?9:3).map((q,i)=>{
+      const v=crearKart3D(q.ch, q.color), ab=abajo[i-3]; if(i>=3 && !ab) return null;
+      if(i<3){ v.g.position.set(xs[i], alt[i], 0); v.g.rotation.y=i===1?.32:i===2?-.32:0; } else { v.g.position.set(ab[0], 0, ab[1]); v.g.rotation.y=ab[2]; v.g.scale.setScalar(.85); }
+      v.sombra.visible=false; e.add(v.g);
+      etiquetaKart(v, q.nombre+(final&&q.pts!=null?' · '+q.pts:''), q.color, q.cara); v.etiqueta.position.y=i<3?4.6:3.9; if(i<3) v.etiqueta.scale.set(4.6,1.7,1); else v.etiqueta.scale.set(3.6,1.33,1);
+      v.anim = !final ? ['gana','contento','triste'][i] : i===0 ? 'campeon' : i<3 ? 'triste' : 'llora';
+      if(i===0){ const tr=OBJ3.trofeo(); tr.position.set(0,-.05,.8); tr.scale.setScalar(final?2.5:1.75); v.brazos[1].add(tr); v.extras.push(tr); v.trofeo=tr; v.trofeoE=final?2.5:1.75; }
+      else if(i<3){ const m=OBJ3.medalla(cols[i]); m.position.set(0,1.05,.52); v.pil.add(m); v.extras.push(m); }
+      const emo = !final ? ['😁','😄','🥲'][i] : i===0 ? '🤩' : ['😢','😞','😭','😩','😢','😔'][(i-1)%6];
+      const cara=new THREE.Sprite(new THREE.SpriteMaterial({map:texto(emo), transparent:true, depthWrite:false})); cara.scale.set(.95,.95,1); cara.position.set(-1,2.45,.3); v.pil.add(cara); v.extras.push(cara);
+      return v; }).filter(Boolean);
     // papelitos
     const n=calidad==='baja'?160:340, p=new Float32Array(n*3), c=new Float32Array(n*3), paleta=['#d52b1e','#ffffff','#1d6fe0','#f2c14e','#2fae5a','#ff7a1e'].map(x=>new THREE.Color(x));
     for(let i=0;i<n;i++){ p[i*3]=(Math.random()-.5)*20; p[i*3+1]=Math.random()*13; p[i*3+2]=(Math.random()-.5)*10; const k=paleta[i%paleta.length]; c[i*3]=k.r; c[i*3+1]=k.g; c[i*3+2]=k.b; }
     const gp=new THREE.BufferGeometry(); gp.setAttribute('position', new THREE.BufferAttribute(p,3)); gp.setAttribute('color', new THREE.BufferAttribute(c,3));
     const conf=new THREE.Points(gp, new THREE.PointsMaterial({size:.24, vertexColors:true})); conf.frustumCulled=false; e.add(conf); tirar.push(conf);
-    podio={esc:e, ks, conf, tirar, t0:performance.now()/1000};
+    podio={esc:e, ks, conf, tirar, final:!!final, t0:performance.now()/1000};
   }
   function cuadroPodio(dt){
     if(!podio) return; const t=performance.now()/1000-podio.t0, S=Math.sin, A=Math.abs;
-    podio.ks.forEach((v,i)=>{ const P=v.pil, bi=v.brazos[0], bd=v.brazos[1];
-      if(i===0){   // salta con la copa en alto y saluda con la otra mano
+    podio.ks.forEach((v,i)=>{ const P=v.pil, bi=v.brazos[0], bd=v.brazos[1], an=v.anim;
+      if(an==='campeon' && t<2.2){   // le entregan la copa: baja girando del cielo hasta sus manos
+        const q=Math.min(1, t/1.8), ease=1-Math.pow(1-q,3); P.position.y=.4; P.rotation.set(0,0,0);
+        bd.rotation.set(-2.5, 0, -.12); bi.rotation.set(-2.5, 0, .12);
+        if(v.trofeo){ v.trofeo.rotation.x=-bd.rotation.x; v.trofeo.rotation.y=t*7*(1-ease)+t; v.trofeo.position.y=-.05+(1-ease)*7; v.trofeo.scale.setScalar(v.trofeoE*(.4+.6*ease)); }
+      } else if(an==='gana' || an==='campeon'){   // salta con la copa en alto y saluda con la otra mano
         const s=A(S(t*4.4)); P.position.y=.5+s*.75; P.rotation.set(0, S(t*1.3)*.4, 0); v.cuerpo.position.y=A(S(t*4.4+1.2))*.12;
         bd.rotation.set(-2.55+S(t*4.4)*.3, 0, -.12); bi.rotation.set(-2.2+S(t*9)*.3, 0, .55+S(t*9)*.3);
-        if(v.trofeo){ v.trofeo.rotation.x=-bd.rotation.x; v.trofeo.rotation.y=t*1.5; }
-      } else if(i===1){   // contento: brinca y levanta los brazos de a uno
+        if(v.trofeo){ v.trofeo.position.y=-.05; v.trofeo.scale.setScalar(v.trofeoE); v.trofeo.rotation.x=-bd.rotation.x; v.trofeo.rotation.y=t*1.5; }
+      } else if(an==='llora'){   // se quedó sin nada: sentado, la cara entre las manos y moqueando
+        P.position.y=0; P.rotation.set(.34, 0, S(t*14)*.025); bi.rotation.set(-1.55+S(t*11)*.05, 0, -.45); bd.rotation.set(-1.55+S(t*11+1)*.05, 0, .45);
+      } else if(an==='contento'){   // contento: brinca y levanta los brazos de a uno
         P.position.y=.35+A(S(t*3.1))*.3; P.rotation.set(0, S(t*.9)*.3, 0);
         bi.rotation.set(-1.9+S(t*3.1)*.6, 0, .4); bd.rotation.set(-1.9-S(t*3.1)*.6, 0, -.4);
       } else {   // festeja medio triste: cabizbajo, se hamaca despacio y saluda flojito
@@ -319,7 +332,7 @@ const M3 = (() => {
     });
     const p=podio.conf.geometry.attributes.position.array; for(let i=0;i<p.length;i+=3){ p[i+1]-=dt*(1.6+(i%7)*.25); p[i]+=S(t*2+i)*dt*.6; if(p[i+1]<0) p[i+1]+=13; } podio.conf.geometry.attributes.position.needsUpdate=true;
     const vert=cam.aspect<1; cam.fov=vert?62:44; cam.updateProjectionMatrix(); fov=cam.fov;
-    cam.position.set(S(t*.2)*2.6, vert?5:4.4, vert?17:14); cam.lookAt(0, vert?3:2.7, 0);
+    const lejos=podio.final?1.45:1; cam.position.set(S(t*.2)*2.6, (vert?5:4.4)*lejos, (vert?17:14)*lejos); cam.lookAt(0, vert?3:2.7, podio.final?1.5:0);
     rend.render(podio.esc, cam);
   }
   /* vitrina del menú: el kart elegido girando */
