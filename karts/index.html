@@ -68,7 +68,7 @@ input[type=text],select,textarea{width:100%;padding:10px 12px;border:1px solid #
 .pinfo{background:#fff;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px}
 .stats{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:3px 8px;align-items:center;font-size:12px;margin-top:6px;color:#444}
 .bar{display:flex;gap:2px}.bar i{flex:1;height:8px;border-radius:3px;background:#ddd}.bar i.on{background:linear-gradient(#ffb52e,#e2571e)}
-.modos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.modos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .modos .btn{padding:12px 4px;font-size:14px;line-height:1.25}
 .modos .btn span{display:block;font-size:26px}
 .code{font-size:38px;font-weight:900;letter-spacing:6px;text-align:center;color:var(--blue);margin:4px 0}
@@ -287,6 +287,7 @@ body.editando #editCtrl{display:block}
       <button class="btn green" onclick="gpModal()"><span>🏆</span>Gran Premio</button>
       <button class="btn" onclick="libreModal()"><span>🏁</span>Carrera libre</button>
       <button class="btn dark" onclick="cronoModal()"><span>⏱️</span>Contrarreloj</button>
+      <button class="btn red" onclick="batallaModal()"><span>💥</span>Batalla</button>
     </div>
   </div>
   <div class="box">
@@ -416,16 +417,16 @@ body.editando #editCtrl{display:block}
 <div id="modal"><div class="mbox" id="mbox"></div></div>
 <div id="toast"></div>
 
-<script src="pistas.js?v=9"></script>
-<script src="mundo.js?v=9"></script>
-<script src="karts3d.js?v=9"></script>
-<script src="carrera.js?v=9"></script>
-<script src="sala.js?v=9"></script>
-<script src="juego.js?v=10"></script>
-<script src="mando.js?v=2"></script>
-<script src="caras.js?v=9"></script>
+<script src="pistas.js?v=12"></script>
+<script src="mundo.js?v=12"></script>
+<script src="karts3d.js?v=12"></script>
+<script src="carrera.js?v=13"></script>
+<script src="sala.js?v=12"></script>
+<script src="juego.js?v=13"></script>
+<script src="mando.js?v=3"></script>
+<script src="caras.js?v=12"></script>
 <script src="../dueno-link.js"></script>
-<script src="../inicio.js?v=9"></script>
+<script src="../inicio.js?v=12"></script>
 <script>window.INICIO={enJuego:()=>!!NET.mode, preguntar:()=>leaveClick(), salida:'leaveToMenu', suave:true, sonidos:[], ocultar:[], barra:'.topbar'};</script>
 <script>
 // le cuenta al panel del dueño cómo va esta sala (solo lo hace el anfitrión o la partida contra bots)
@@ -433,10 +434,10 @@ if(window.DuenoLink) DuenoLink.start({game:"karts",
   info(){
     if(!S || (NET.mode!=="host" && NET.mode!=="local")) return null;
     const local=NET.mode==="local"; if(local && !S.localCode) S.localCode="L"+genCode();
-    const pista=S.carrera ? PISTAS[S.carrera.pista].n : null;
+    const pista=S.carrera ? (S.carrera.modo==="arena"?"💥 ":"")+PISTAS[S.carrera.pista].n : null;
     return {code: local ? S.localCode : NET.code, local, phase:S.phase, started:S.startedAt||null,
       host:(P(S.hostPid)||{}).name||"", pista, modo:S.crono?"crono":S.opts.modo, nCarrera:S.nCarrera||0,
-      players:S.players.map(p=>{ const k=R && R.porPid[p.id]; return {n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot, pos:k?k.puesto:0, lap:k?Math.max(0,k.lapN)+1:0, pts:p.pts||0}; }),
+      players:S.players.map(p=>{ const k=R && R.porPid[p.id]; return {n:p.name, e:p.emoji, bot:!!p.bot, conn:!!p.conn || !!p.bot, vidas:k&&R.arena?(k.muerto?0:k.vidas):null, pos:k?k.puesto:0, lap:k?Math.max(0,k.lapN)+1:0, pts:p.pts||0}; }),
       obs:(S.observers||[]).filter(o=>o.conn).map(o=>({n:o.name, owner:!!o.owner}))};
   },
   onIam(tok){ if(NET.mode!=="host") return; S.ownerTok=[...new Set([...(S.ownerTok||[]), tok])].slice(-4); commit(); }

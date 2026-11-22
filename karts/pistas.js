@@ -239,6 +239,43 @@ const PISTAS = {
 const ORDEN_PISTAS = COPAS.flatMap(c => c.pistas);
 
 /* =====================================================================
+   Arenas del modo batalla (Ñorairõ): una cancha redonda y abierta donde
+   todos se ven. Están en PISTAS (con arena:true) para que el nombre, el
+   ícono y la descripción sirvan igual que en las pistas.
+   obst: [x, z, radio del choque, decorado, tamaño]   cajas: [x, z]
+   turbos y rampas: [x, z, rumbo]
+   ===================================================================== */
+const anillo = (n, r, a0) => Array.from({length:n}, (_,i)=>{ const a=(a0||0)+i/n*Math.PI*2; return [Math.round(Math.sin(a)*r*10)/10, Math.round(Math.cos(a)*r*10)/10]; });
+const tangente = (n, r, a0) => Array.from({length:n}, (_,i)=>{ const a=(a0||0)+i/n*Math.PI*2; return [Math.sin(a)*r, Math.cos(a)*r, a+Math.PI/2]; });
+PISTAS.plaza = {arena:true, n:'Plaza de los Héroes', ciudad:'Asunción', e:'⚔️',
+  d:'Batalla alrededor del Panteón de los Héroes, entre fuentes, lapachos y faroles.',
+  radio:70, piso:'baldosa',
+  tema:{cielo:['#3f8fe0','#cfe9ff'], niebla:'#cfe6f7', lejos:420, suelo:'#5aa846', suelo2:'#4b9a3f', camino:'#b3aa98', borde:['#d52b1e','#ffffff'], cerros:'#6fa37a', nCerros:5},
+  obst:[[0,0,13.5,'panteon',1], ...anillo(4,40,Math.PI/4).map(([x,z])=>[x,z,4.2,'fuente',1]), ...anillo(4,44,0).map(([x,z])=>[x,z,1.6,'lapacho',1]), ...anillo(8,58,Math.PI/8).map(([x,z])=>[x,z,.6,'farol',1])],
+  cajas:[...anillo(8,24,Math.PI/8), ...anillo(6,54,0)],
+  turbos:tangente(4,30,0), rampas:tangente(2,52,Math.PI/4),
+  fuera:'ciudad'};
+PISTAS.expo = {arena:true, n:'Predio de la Expo', ciudad:'Mariano Roque Alonso', e:'🐂',
+  d:'La cancha de la feria: carretas, puestos de chipa, el tanque de agua y el molino.',
+  radio:78, piso:'tierra',
+  tema:{cielo:['#4b97e6','#ffe9c7'], niebla:'#f3e6cf', lejos:420, suelo:'#6aa84a', suelo2:'#7a9a3f', camino:'#c39a68', borde:['#8a5a34','#e8d8b0'], cerros:'#7b9c5b', nCerros:7, tierra:1},
+  obst:[[0,0,4.2,'tanque',1], [10,7,2.4,'molino',1], ...anillo(3,34,.4).map(([x,z])=>[x,z,3.2,'carreta',1.4]), ...anillo(4,52,1.1).map(([x,z])=>[x,z,2.6,'puesto',1.3]),
+    ...anillo(5,21,2.75).map(([x,z])=>[x,z,1.8,'roca',1.1]), [-46,18,4,'cantaro',3.2], [44,-26,3,'frutilla',2.6]],
+  cajas:[...anillo(7,16,.2), ...anillo(8,44,.6), ...anillo(4,66,0)],
+  turbos:tangente(4,60,Math.PI/4), rampas:tangente(3,28,1.3),
+  fuera:'campo'};
+const ORDEN_ARENAS = ['plaza', 'expo'];
+function armarArena(id){
+  if(_PISTA_CACHE[id]) return _PISTA_CACHE[id];
+  const def=PISTAS[id], r=def.radio;
+  const T = {id, def, arena:true, radio:r, tema:def.tema, S:[], N:1, paso:PASO, L:2*Math.PI*r, atajos:[], saltos:[], puentes:[], agua:[], nivelAgua:-5,
+    obst:def.obst.map(([x,z,rr,t,s])=>({x,z,r:rr,t,s:s||1})), cajas:def.cajas.map(([x,z])=>({x,z})),
+    turbos:def.turbos.map(([x,z,h])=>({x,z,h})), rampas:def.rampas.map(([x,z,h])=>({x,z,h})),
+    caja:{x0:-r, x1:r, z0:-r, z1:r, cx:0, cz:0}};
+  _PISTA_CACHE[id]=T; return T;
+}
+
+/* =====================================================================
    Geometría
    ===================================================================== */
 const suave = t => { t = t<0?0:t>1?1:t; return t*t*(3-2*t); };
@@ -247,6 +284,7 @@ function cr(a, b, c, d, t){ const t2=t*t, t3=t2*t; return .5*((2*b) + (-a+c)*t +
 const _PISTA_CACHE = {};
 function armarPista(id){
   if(_PISTA_CACHE[id]) return _PISTA_CACHE[id];
+  if(PISTAS[id] && PISTAS[id].arena) return armarArena(id);
   const def = PISTAS[id], P = def.pts, n = P.length, K = 28;
   const at = cp => {
     const i = Math.floor(cp), t = cp - i, g = k => P[((i+k)%n+n)%n];
@@ -378,4 +416,4 @@ function terreno(T, x, z){
   return _ter;
 }
 
-if(typeof module!=='undefined') module.exports = {PISTAS, COPAS, ORDEN_PISTAS, armarPista, ubicar, ubicarGlobal, enAtajo, terreno, enAgua, PASO, MARGEN};
+if(typeof module!=='undefined') module.exports = {PISTAS, COPAS, ORDEN_PISTAS, ORDEN_ARENAS, armarPista, armarArena, ubicar, ubicarGlobal, enAtajo, terreno, enAgua, PASO, MARGEN};

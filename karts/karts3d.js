@@ -113,11 +113,15 @@ function crearKart3D(ch, color){
     K3.gHielo=new THREE.BoxGeometry(2.4,2.6,3.2); K3.mHielo=new THREE.MeshLambertMaterial({color:'#bfeaff', transparent:true, opacity:.55}); K3.mViento=new THREE.MeshBasicMaterial({color:'#fff3a0', wireframe:true, transparent:true, opacity:.8}); }
   const ruedas=ruedasDef.map((r,i)=>{ if(p.id==='jakare' && i===1) return null; const m=new THREE.Mesh(K3.gRueda, K3.mRueda); m.scale.set(r[4], r[3], r[3]); m.position.set(r[0], r[1], r[2]); m.rotation.order='YXZ'; cuerpo.add(m); return m; });
   const sombra=new THREE.Mesh(K3.gSombra, K3.mSombra); sombra.rotation.x=-Math.PI/2; g.add(sombra);
+  // corazones del modo batalla (se muestran solo en la arena)
+  if(!K3.mCor){ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); x.font='52px system-ui,"Segoe UI Emoji",sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('❤️',32,36);
+    K3.mCor=new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false}); }
+  const cors=[0,1,2,3,4].map(i=>{ const s=new THREE.Sprite(K3.mCor); s.scale.set(.75,.75,1); s.position.y=2.75; s.visible=false; g.add(s); return s; });
   const llamas=[-.4,.4].map(x=>{ const m=new THREE.Mesh(K3.gLlama, K3.mLlama); m.position.set(x,.5,-1.3); m.visible=false; cuerpo.add(m); return m; });
   const mCh=new THREE.MeshBasicMaterial({color:'#5ad0ff'}); const chispas=[-.85,.85,-.7,.7].map((x,i)=>{ const m=new THREE.Mesh(K3.gChispa, mCh); m.position.set(x,.2,-1-(i>1?.3:0)); m.visible=false; cuerpo.add(m); return m; });
   const escudo=new THREE.Mesh(K3.gEscudo, K3.mEscudo); escudo.position.y=1; escudo.visible=false; g.add(escudo);
   const hielo=new THREE.Mesh(K3.gHielo, K3.mHielo); hielo.position.y=1.2; hielo.visible=false; g.add(hielo);
-  return {g, cuerpo, malla, ruedas, sombra, llamas, chispas, mCh, escudo, hielo, etiqueta:null, giro:0,
+  return {g, cuerpo, malla, ruedas, sombra, llamas, chispas, mCh, escudo, hielo, cors, etiqueta:null, giro:0,
     tirar(){ malla.geometry.dispose(); malla.material.dispose(); mCh.dispose(); if(this.etiqueta){ this.etiqueta.material.map.dispose(); this.etiqueta.material.dispose(); } }};
 }
 /* cartelito con el nombre (y la foto, si tiene) arriba del kart */
@@ -207,6 +211,7 @@ const M3 = (() => {
       if(k.drift) v.mCh.color.set(dn>=3?'#d86bff':dn===2?'#ff8a1e':dn===1?'#5ad0ff':'#dddddd');
       v.escudo.visible=k.escudo>0||k.viento>0; if(v.escudo.visible){ v.escudo.material=k.viento>0?K3.mViento:K3.mEscudo; v.escudo.rotation.y+=dt*2; v.escudo.rotation.x+=dt*.7; }
       v.hielo.visible=k.hielo>0; if(v.hielo.visible) v.hielo.rotation.y=k.h;
+      if(R.arena){ const n=k.muerto||k===yo?0:Math.max(0, k.vidas|0); v.cors.forEach((c,i)=>{ c.visible=i<n; c.position.x=(i-(n-1)/2)*.72; c.position.y=2.75+Math.sin(t*3+i)*.08; }); if(k.muerto){ v.g.visible=false; if(v.etiqueta) v.etiqueta.visible=false; continue; } }
       g.visible = !(k.parpadeo>0 && Math.floor(t*14)%2);
       if(v.etiqueta) v.etiqueta.visible = k!==yo && !k.oculto;
     }
@@ -240,6 +245,7 @@ const M3 = (() => {
   }
   /* vista de paseo por la pista (antes de largar o mirando el final) */
   function paseo(R, t){
+    if(T && T.arena){ if(!esc || !mundo) return; const a=t*.25, d=T.radio*1.1; cam.position.set(Math.sin(a)*d, 32, Math.cos(a)*d); cam.lookAt(0,0,0); camH=null; return; }
     if(!esc || !mundo) return; const s=T.S[Math.floor((t*9)%T.N)], o=T.S[Math.floor((t*9+14)%T.N)];
     cam.position.set(s.x+s.nx*6, s.y+13, s.z+s.nz*6); cam.lookAt(o.x, o.y+1, o.z); camH=null;
   }

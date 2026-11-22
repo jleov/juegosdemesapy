@@ -9,7 +9,7 @@ let S = null;
 const rnd = n => Math.floor(Math.random()*n);
 const P = id => S && S.players.find(p=>p.id===id);
 const OB = id => S && (S.observers||[]).find(o=>o.id===id);
-const defaultOpts = () => ({modo:'libre', pista:'asu', copa:'chipa', vueltas:3, karts:8, nivel:'medio', ritmo:'normal', objetos:true});
+const defaultOpts = () => ({modo:'libre', pista:'asu', copa:'chipa', arena:'plaza', vidas:3, tiempo:180, vueltas:3, karts:8, nivel:'medio', ritmo:'normal', objetos:true});
 function lobbyState(){ return {phase:'lobby', seq:0, players:[], observers:[], hostPid:null, opts:defaultOpts(), carrera:null, res:null, nCarrera:0, iCopa:0, startedAt:null, final:false}; }
 function addPlayer(name, ch, token, peerId){
   const usados=S.players.map(p=>p.color), color=COLORES.find(c=>!usados.includes(c))||COLORES[S.players.length%COLORES.length];
@@ -25,14 +25,14 @@ function llenarBots(){
   }
   while(S.players.length>quiero && S.players.some(p=>p.bot)){ const i=S.players.map(p=>p.bot).lastIndexOf(true); S.players.splice(i,1); }
 }
-const pistaDe = () => S.opts.modo==='copa' ? (COPAS.find(c=>c.id===S.opts.copa)||COPAS[0]).pistas[S.iCopa] : S.opts.pista;
+const pistaDe = () => S.opts.modo==='arena' ? (S.opts.arena==='azar' || !PISTAS[S.opts.arena] ? ORDEN_ARENAS[rnd(ORDEN_ARENAS.length)] : S.opts.arena) : S.opts.modo==='copa' ? (COPAS.find(c=>c.id===S.opts.copa)||COPAS[0]).pistas[S.iCopa] : S.opts.pista;
 function nuevaCarrera(){
   S.nCarrera++; S.phase='race'; S.res=null; S.final=false;
   let orden;
   if(S.ultimo && S.ultimo.length) orden=S.ultimo.filter(id=>P(id)).concat(S.players.filter(p=>!S.ultimo.includes(p.id)).map(p=>p.id));
   else { orden=S.players.map(p=>p.id); for(let i=orden.length-1;i>0;i--){ const j=rnd(i+1); [orden[i],orden[j]]=[orden[j],orden[i]]; } }
   const pista = S.opts.modo==='libre' && S.opts.pista==='azar' ? ORDEN_PISTAS[rnd(ORDEN_PISTAS.length)] : pistaDe();
-  S.carrera={id:S.seq+'-'+S.nCarrera+'-'+Date.now().toString(36), pista, vueltas:S.opts.vueltas|0||3, ritmo:S.opts.ritmo, nivel:S.opts.nivel, objetos:S.opts.objetos!==false, modo:S.opts.modo, parrilla:orden};
+  S.carrera={id:S.seq+'-'+S.nCarrera+'-'+Date.now().toString(36), pista, vueltas:S.opts.vueltas|0||3, ritmo:S.opts.ritmo, nivel:S.opts.nivel, objetos:S.opts.objetos!==false||S.opts.modo==='arena', modo:S.opts.modo, vidas:S.opts.vidas|0||3, tiempo:S.opts.tiempo|0||180, parrilla:orden};
 }
 // el anfitrión avisa cómo terminó
 function cerrarCarrera(res){
@@ -42,7 +42,7 @@ function cerrarCarrera(res){
   S.phase='results';
   const copa=COPAS.find(c=>c.id===S.opts.copa)||COPAS[0];
   S.final = S.opts.modo==='copa' && S.iCopa>=copa.pistas.length-1;
-  const g=P(S.res[0] && S.res[0].pid); if(g) sysChat(`🏁 ${piloto(g.ch).e} ${g.name} ganó en ${PISTAS[S.carrera.pista].n}.`);
+  const g=P(S.res[0] && S.res[0].pid); if(g) sysChat(S.carrera.modo==='arena' ? `💥 ${piloto(g.ch).e} ${g.name} ganó la batalla en ${PISTAS[S.carrera.pista].n}.` : `🏁 ${piloto(g.ch).e} ${g.name} ganó en ${PISTAS[S.carrera.pista].n}.`);
   if(S.final){ const c=S.players.slice().sort((a,b)=>b.pts-a.pts)[0]; if(c) sysChat(`🏆 ${c.name} se lleva la ${copa.n} con ${c.pts} puntos.`); }
   commit();
 }
@@ -77,8 +77,11 @@ function act(pid, a){
   if(t==='opt'){
     if(S.phase==='race') return;
     const o=S.opts, k=a.k, v=a.v;
-    if(k==='modo' && (v==='libre'||v==='copa')) o.modo=v;
-    else if(k==='pista' && (PISTAS[v]||v==='azar')) o.pista=v;
+    if(k==='modo' && (v==='libre'||v==='copa'||v==='arena')) o.modo=v;
+    else if(k==='pista' && ((PISTAS[v] && !PISTAS[v].arena)||v==='azar')) o.pista=v;
+    else if(k==='arena' && ((PISTAS[v] && PISTAS[v].arena)||v==='azar')) o.arena=v;
+    else if(k==='vidas') o.vidas=Math.max(1, Math.min(5, v|0));
+    else if(k==='tiempo') o.tiempo=Math.max(60, Math.min(600, v|0));
     else if(k==='copa' && COPAS.some(c=>c.id===v)){ o.copa=v; }
     else if(k==='vueltas') o.vueltas=Math.max(1, Math.min(7, v|0));
     else if(k==='karts') o.karts=Math.max(1, Math.min(MAXP, v|0));
@@ -95,6 +98,7 @@ function act(pid, a){
   if(t==='next'){
     if(S.phase!=='results') return;
     if(S.opts.modo==='copa'){ if(S.final){ S.players.forEach(x=>x.pts=0); S.iCopa=0; S.ultimo=null; const i=COPAS.findIndex(c=>c.id===S.opts.copa); S.opts.copa=COPAS[(i+1)%COPAS.length].id; } else S.iCopa++; }
+    else if(S.opts.modo==='arena'){ if(a.sig){ const i=ORDEN_ARENAS.indexOf(S.carrera.pista); S.opts.arena=ORDEN_ARENAS[(i+1)%ORDEN_ARENAS.length]; } }
     else if(a.pista && (PISTAS[a.pista]||a.pista==='azar')) S.opts.pista=a.pista;
     else if(a.sig){ const i=ORDEN_PISTAS.indexOf(S.carrera.pista); S.opts.pista=ORDEN_PISTAS[(i+1)%ORDEN_PISTAS.length]; }
     llenarBots(); nuevaCarrera(); return commit();

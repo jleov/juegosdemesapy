@@ -72,9 +72,14 @@ function comunesHTML(conKarts){
   return `<div class="row2"><div><label>Bots</label>${selHTML('lNivel', NIVELES.map(n=>[n.id,n.n]), LOC.nivel)}</div><div><label>Velocidad</label>${selHTML('lRitmo', RITMOS.map(n=>[n.id,n.n]), LOC.ritmo)}</div>
     ${conKarts?`<div><label>Vueltas</label>${selHTML('lVueltas', [[2,'2'],[3,'3'],[4,'4'],[5,'5']], LOC.vueltas)}</div><div><label>Karts</label>${selHTML('lKarts', [[2,'2'],[4,'4'],[6,'6'],[8,'8']], LOC.karts)}</div>`:''}</div>`;
 }
-function leerComunes(){ for(const [id,k] of [['lNivel','nivel'],['lRitmo','ritmo'],['lVueltas','vueltas'],['lKarts','karts']]){ const e=$('#'+id); if(e) LOC[k]=/^\d+$/.test(e.value)?+e.value:e.value; } store('kg_local', LOC); }
+function leerComunes(){ for(const [id,k] of [['lNivel','nivel'],['lRitmo','ritmo'],['lVueltas','vueltas'],['lKarts','karts'],['lVidas','vidas'],['lTiempo','tiempo']]){ const e=$('#'+id); if(e) LOC[k]=/^\d+$/.test(e.value)?+e.value:e.value; } store('kg_local', LOC); }
 function gpModal(){ if(needName()) return; modal(`<h2>🏆 Gran Premio</h2><p class="muted" style="margin-top:0">Cuatro carreras seguidas. Sumás puntos según cómo llegues y el que más junta se lleva la copa.</p>${comunesHTML(false)}
   ${COPAS.map(c=>`<button class="pcard copa" onclick="localStart('copa','${c.id}')"><span class="pe">${c.e}</span><span class="pn"><b>${c.n}</b><small>${c.pistas.map(i=>PISTAS[i].ciudad).join(' · ')}</small></span></button>`).join('')}
+  <button class="btn gray wide" onclick="closeModal()">Volver</button>`); }
+function batallaModal(){ if(needName()) return; modal(`<h2>💥 Batalla: Ñorairõ</h2><p class="muted" style="margin-top:0">Todos en una cancha abierta. Cada uno tiene corazones ❤️ arriba del kart: cada golpe con un objeto te saca uno. El que se queda sin corazones queda afuera y <b>gana el último que aguanta</b>.</p>
+  <div class="row2"><div><label>Bots</label>${selHTML('lNivel', NIVELES.map(n=>[n.id,n.n]), LOC.nivel)}</div><div><label>Karts</label>${selHTML('lKarts', [[2,'2'],[4,'4'],[6,'6'],[8,'8']], LOC.karts)}</div>
+  <div><label>Corazones</label>${selHTML('lVidas', [[1,'❤️ 1'],[2,'❤️ 2'],[3,'❤️ 3'],[4,'❤️ 4'],[5,'❤️ 5']], LOC.vidas||3)}</div><div><label>Tiempo</label>${selHTML('lTiempo', [[120,'2 minutos'],[180,'3 minutos'],[300,'5 minutos']], LOC.tiempo||180)}</div></div>
+  <div class="pgrid">${ORDEN_ARENAS.map(i=>`<button class="pcard" onclick="localStart('arena','${i}')"><span class="pe">${PISTAS[i].e}</span><span class="pn"><b>${esc(PISTAS[i].n)}</b><small>${esc(PISTAS[i].ciudad)}</small></span></button>`).join('')}</div>
   <button class="btn gray wide" onclick="closeModal()">Volver</button>`); }
 function libreModal(){ if(needName()) return; modal(`<h2>🏁 Carrera libre</h2>${comunesHTML(true)}<div class="pgrid">${ORDEN_PISTAS.map(i=>pistaCard(i,'libreGo')).join('')}</div><button class="btn gray wide" onclick="closeModal()">Volver</button>`); }
 function libreGo(id){ localStart('libre', id); }
@@ -110,6 +115,7 @@ function localStart(kind, x){
   Object.assign(S.opts, {nivel:LOC.nivel, ritmo:LOC.ritmo});
   if(kind==='copa') Object.assign(S.opts, {modo:'copa', copa:x, vueltas:3, karts:8});
   else if(kind==='libre') Object.assign(S.opts, {modo:'libre', pista:x, vueltas:LOC.vueltas, karts:LOC.karts});
+  else if(kind==='arena') Object.assign(S.opts, {modo:'arena', arena:x, karts:LOC.karts, vidas:LOC.vidas||3, tiempo:LOC.tiempo||180, objetos:true});
   else { Object.assign(S.opts, {modo:'libre', pista:x, vueltas:3, karts:1, objetos:false, ritmo:'normal'}); S.crono=true; }
   const p=addPlayer(myName(), miCh, myToken, null); NET.myPid=p.id; S.hostPid=p.id;
   FACES={}; shareMyFace(); act(p.id, {type:'start'});
@@ -400,7 +406,7 @@ function prepararCarrera(){
   M3.tam(); M3.cargar(T);
   const fant = S.crono ? load('kg_fant_'+c.pista) : null;
   if(fant) parrilla.push({pid:'fantasma', ch:miCh, color:'#ffffff', nombre:'Tu fantasma', fantasma:true, local:true});
-  R=crearCarrera({pista:c.pista, vueltas:c.vueltas, ritmo:c.ritmo, nivel:c.nivel, objetos:c.objetos, parrilla, host:soyHost, miPid:yo});
+  R=crearCarrera({pista:c.pista, vueltas:c.vueltas, ritmo:c.ritmo, nivel:c.nivel, objetos:c.objetos, parrilla, host:soyHost, miPid:yo, vidas:c.vidas, tiempo:c.tiempo});
   R.id=c.id; R.listo=soyHost;
   R.karts.forEach(k=>{ const e=parrilla.find(x=>x.pid===k.pid); if(e.ausente){ k.ausente=true; k.humano=true; } if(k.fantasma){ k.datos=fant; const v=M3.kart(k); v.malla.material.transparent=true; v.malla.material.opacity=.38; v.sombra.visible=false; } });
   if(S.crono){ const k=R.porPid[yo]; k.item='chipa3'; k.itemN=3; }
@@ -410,7 +416,7 @@ function prepararCarrera(){
   R.alTerminar = res => { if(simulo()) cerrarCarrera(res); };
   HUD.fant=[]; HUD.fantT=0; HUD.obsI=0; HUD.mini=null; HUD.cuentaN=null; LAST.res=null;
   ponerEtiquetas(); dibujarMiniBase();
-  $('#pistaNombre').innerHTML=`${PISTAS[c.pista].e} <b>${esc(PISTAS[c.pista].n)}</b>${c.modo==='copa'?` <small>· ${esc((COPAS.find(x=>x.id===S.opts.copa)||{}).n||'')} ${S.iCopa+1}/4</small>`:''}`;
+  $('#pistaNombre').innerHTML=`${PISTAS[c.pista].e} <b>${esc(PISTAS[c.pista].n)}</b>${c.modo==='copa'?` <small>· ${esc((COPAS.find(x=>x.id===S.opts.copa)||{}).n||'')} ${S.iCopa+1}/4</small>`:c.modo==='arena'?' <small>· 💥 batalla</small>':''}`;
   $('#cartelPista').innerHTML=`<span>${PISTAS[c.pista].e}</span><b>${esc(PISTAS[c.pista].n)}</b><small>${esc(PISTAS[c.pista].d)}</small>`; $('#cartelPista').classList.remove('fuera'); void $('#cartelPista').offsetWidth; $('#cartelPista').classList.add('on');
   setTimeout(()=>$('#cartelPista').classList.remove('on'), 4200);
   motorOn(); renderTouch();
@@ -421,7 +427,7 @@ function clienteFoto(d){
   if(!R || d.id!==R.id) return;
   const yo=R.porPid[NET.myPid];
   if(!R.listo){ R.listo=true; R.t=d.rt;
-    if(d.rt>.5 && yo && d.k[yo.pid]){ const a=d.k[yo.pid]; yo.x=a[0]; yo.y=a[1]; yo.z=a[2]; yo.h=a[3]; yo.v=a[4]; yo.prog=a[5]; const L=ubicarGlobal(R.T, yo.x, yo.z); yo.idx=L.i; yo.f0=L.f; yo.lapN=Math.floor(yo.prog/R.T.N); yo.tVuelta=R.t; yo.largo=true; yo.fin=a[8]||null; } }
+    if(d.rt>.5 && yo && d.k[yo.pid]){ const a=d.k[yo.pid]; yo.x=a[0]; yo.y=a[1]; yo.z=a[2]; yo.h=a[3]; yo.v=a[4]; yo.prog=a[5]; const L=R.arena?{i:0,f:0}:ubicarGlobal(R.T, yo.x, yo.z); yo.idx=L.i; yo.f0=L.f; if(R.arena){ yo.vidas=a[10]>=0?a[10]:yo.vidas; yo.muerto=!!a[11]; } yo.lapN=Math.floor(yo.prog/R.T.N); yo.tVuelta=R.t; yo.largo=true; yo.fin=a[8]||null; } }
   else if(Math.abs(R.t-d.rt)>.5) R.t=d.rt;
   for(const pid in d.k){ const k=R.porPid[pid]; if(k && !k.local) desempacar(R, k, d.k[pid]); }
   R.objs=(d.o||[]).map(a=>({id:a[0], t:a[1], x:a[2], y:a[3], z:a[4]}));
@@ -574,7 +580,8 @@ function fxCarrera(e){
     case 'uso': if(e.pid==null){ sfx.usar(e.o); } else if(e.pid!==yo && e.o==='tormenta') aviso('⛈️ '+nom(e.pid)+' trajo la tormenta'); break;
     case 'vuelta': if(e.ultima){ aviso('🔔 ¡Última vuelta!','oro'); sfx.ultima(); } else if(e.n<=R.vueltas) { aviso('Vuelta '+e.n+' · '+fmtT(e.t)); sfx.vuelta(); } break;
     case 'meta': sfx.meta(); bigText('🏁 ¡Llegaste!', R.porPid[yo] ? R.porPid[yo].puesto+'º puesto' : ''); break;
-    case 'golpe': if(e.pid===yo){ aviso(e.c==='hielo'?'🧊 ¡Te congelaron!':'💫 ¡Patinaste!','rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.por===yo){ aviso('🎯 ¡Le diste a '+nom(e.pid)+'!','oro'); sfx.acierto(); } break;
+    case 'afuera': if(e.pid===yo){ sfx.golpe('spin'); vib([200,80,300]); const vv=R.orden.filter(q=>!q.muerto).length; bigText('💀 ¡Quedaste afuera!', (vv+1)+'º puesto · ahora mirás la batalla'); $('#obsbar').style.display='block'; $('#obsbar').innerHTML='💀 Quedaste afuera. <button class="btn sm dark" onclick="camSiguiente()">🎥 Cambiar de kart</button>'; } else aviso('💥 '+nom(e.pid)+' quedó afuera'); break;
+    case 'golpe': if(e.pid===yo && R.arena){ const k=R.porPid[yo]; aviso((e.c==='hielo'?'🧊 ':'💥 ')+(k.vidas>0?'¡Te quedan '+'❤️'.repeat(k.vidas)+'!':'¡Sin corazones!'),'rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.pid===yo){ aviso(e.c==='hielo'?'🧊 ¡Te congelaron!':'💫 ¡Patinaste!','rojo'); sfx.golpe(e.c); vib([80,40,120]); } else if(e.por===yo){ aviso('🎯 ¡Le diste a '+nom(e.pid)+'!','oro'); sfx.acierto(); } break;
     case 'escudo': if(e.pid===yo){ aviso('🕸️ ¡El ñandutí te salvó!','oro'); sfx.escudo(); } break;
     case 'tormenta': sfx.trueno(); if(e.de===yo) aviso('⛈️ ¡Tormenta para todos!','oro'); break;
   }
@@ -590,7 +597,7 @@ function cuadro(dt, dibujar){
     HUD.netT+=dt; if(HUD.netT>=.08){ HUD.netT=0; mandarRed(); }
     if(S && S.crono && yo && R.t>=0 && yo.fin==null){ HUD.fantT+=dt; while(HUD.fantT>=.1){ HUD.fantT-=.1; HUD.fant.push([Math.round(yo.x*10), Math.round(yo.y*10), Math.round(yo.z*10), Math.round(yo.h*100)]); } }
     if(dibujar){
-      const cam = yo || R.orden[HUD.obsI%Math.max(1,R.orden.length)];
+      const vivos=R.orden.filter(q=>!q.muerto), cam = yo && !yo.muerto ? yo : (vivos.length ? vivos[HUD.obsI%vivos.length] : yo || R.orden[0]);
       if(!R.listo && !R.host) M3.paseo(R, R.reloj);
       M3.sync(R, cam, dt); hud(dt, cam);
       if(yo) motorSet(yo.v, yo.drift, yo.boost>0||yo.viento>0, yo.fuera, false); else if(cam) motorSet(cam.v, cam.drift, cam.boost>0, false, false);
@@ -610,6 +617,7 @@ function dibujarMiniBase(){
   const T=R.T, c=document.createElement('canvas'), W=150; c.width=c.height=W;
   const g=c.getContext('2d'), b=T.caja, esc2=Math.min((W-16)/(b.x1-b.x0), (W-16)/(b.z1-b.z0)), ox=W/2-(b.x0+b.x1)/2*esc2, oz=W/2-(b.z0+b.z1)/2*esc2;
   HUD.mini={c, e:esc2, ox, oz, W};
+  if(T.arena){ g.beginPath(); g.arc(W/2,W/2,T.radio*esc2,0,6.283); g.fillStyle='rgba(255,255,255,.28)'; g.fill(); g.lineWidth=4; g.strokeStyle='#fff'; g.stroke(); g.fillStyle='rgba(20,20,40,.75)'; for(const o of T.obst){ g.beginPath(); g.arc(o.x*esc2+ox, o.z*esc2+oz, Math.max(1.5,o.r*esc2), 0, 6.283); g.fill(); } return; }
   const tr=()=>{ g.beginPath(); T.S.forEach((s,i)=>{ const x=s.x*esc2+ox, y=s.z*esc2+oz; i?g.lineTo(x,y):g.moveTo(x,y); }); g.closePath(); };
   g.lineJoin='round'; tr(); g.strokeStyle='rgba(0,0,0,.55)'; g.lineWidth=9; g.stroke(); tr(); g.strokeStyle='#fff'; g.lineWidth=5; g.stroke();
   g.setLineDash([3,3]); g.strokeStyle='#ffd77a'; g.lineWidth=2; for(const a of T.atajos){ g.beginPath(); a.pts.forEach((p,i)=>{ const x=p.x*esc2+ox, y=p.z*esc2+oz; i?g.lineTo(x,y):g.moveTo(x,y); }); g.stroke(); }
@@ -628,13 +636,14 @@ function hud(dt, cam){
   const k=cam; if(!k) return;
   const tot=R.orden.length, fin=k.fin!=null;
   $('#hPos').innerHTML = S && S.crono ? '⏱️' : `${k.puesto}<small>º</small><i>/${tot}</i>`;
-  $('#hVuelta').textContent = 'Vuelta '+Math.min(R.vueltas, Math.max(0,k.lapN)+1)+'/'+R.vueltas;
-  $('#hTiempo').textContent = fmtT(fin ? k.fin : Math.max(0, R.t));
+  if(R.arena){ const vv=R.orden.filter(q=>!q.muerto).length; const yoA=R.porPid[NET.myPid], mirando = yoA && yoA.muerto && k!==yoA ? '👀 '+((VP(k.pid)||{}).name||k.nombre)+': ' : ''; $('#hVuelta').textContent = k.muerto ? '💀 afuera' : mirando+('❤️'.repeat(Math.max(0,k.vidas|0))+'🖤'.repeat(Math.max(0,R.vidas-(k.vidas|0)))+' · quedan '+vv); $('#hTiempo').textContent = fmtT(Math.max(0, R.limite-Math.max(0,R.t))).replace(/\.\d+$/,''); }
+  else { $('#hVuelta').textContent = 'Vuelta '+Math.min(R.vueltas, Math.max(0,k.lapN)+1)+'/'+R.vueltas;
+  $('#hTiempo').textContent = fmtT(fin ? k.fin : Math.max(0, R.t)); }
   $('#hVel').innerHTML = Math.round(Math.abs(k.v)*3.4)+'<small>km/h</small>';
   const ob=$('#hObj'), it=k.ruleta>0 ? COD_OBJ[Math.floor(R.reloj*14)%COD_OBJ.length] : k.item;
   ob.innerHTML = it ? `<span>${OBJETOS[it].e}</span>${k.ruleta<=0 && k.itemN>1?`<i>×${k.itemN}</i>`:''}` : ''; ob.classList.toggle('lleno', !!k.item && k.ruleta<=0); ob.classList.toggle('gira', k.ruleta>0);
   $('#tObj').classList.toggle('lleno', !!k.item && k.ruleta<=0); $('#tObj').firstChild.textContent = k.item && k.ruleta<=0 ? OBJETOS[k.item].e : '🎁';
-  $('#hRank').innerHTML = R.orden.map((q,i)=>{ const p=VP(q.pid); return `<div class="${q===k?'yo':''} ${q.fin!=null?'fin':''}"><b>${i+1}</b><i style="background:${q.color}"></i>${piloto(q.ch).e} <span>${esc(p?p.name:q.nombre)}</span>${q.fin!=null?' 🏁':''}</div>`; }).join('');
+  $('#hRank').innerHTML = R.orden.map((q,i)=>{ const p=VP(q.pid); return `<div class="${q===k?'yo':''} ${q.fin!=null?'fin':''}"><b>${i+1}</b><i style="background:${q.color}"></i>${piloto(q.ch).e} <span>${esc(p?p.name:q.nombre)}</span>${R.arena?(q.muerto?' 💀':' '+'❤️'.repeat(Math.max(0,q.vidas|0))):q.fin!=null?' 🏁':''}</div>`; }).join('');
   const rev=$('#hAviso'), yo=R.porPid[NET.myPid];
   rev.style.display = yo && !yo.bot && (yo.alReves>1 || yo.quieto>3) && R.t>2 ? 'block' : 'none';
   rev.textContent = yo && yo.alReves>1 ? '⛔ ¡Vas al revés! Tocá ↺ para volver' : '↺ ¿Te trabaste? Tocá para volver a la pista';
@@ -927,11 +936,13 @@ function renderLobby(){
 function optsHTML(host){
   const o=V.opts, dis = host ? '' : 'disabled';
   const sel=(k, list)=>`<select ${dis} onchange="doAct({type:'opt',k:'${k}',v:this.value})">${list.map(([v,t])=>`<option value="${v}" ${String(o[k])===String(v)?'selected':''}>${t}</option>`).join('')}</select>`;
-  const pista = o.modo==='copa'
+  const pista = o.modo==='arena'
+    ? `<label>Arena</label>${sel('arena', [['azar','🎲 Al azar']].concat(ORDEN_ARENAS.map(i=>[i, PISTAS[i].e+' '+PISTAS[i].n])))}<div class="row2"><div><label>Corazones</label>${sel('vidas', [1,2,3,4,5].map(n=>[n,'❤️ '+n]))}</div><div><label>Tiempo</label>${sel('tiempo', [[120,'2 minutos'],[180,'3 minutos'],[300,'5 minutos']])}</div></div>`
+    : o.modo==='copa'
     ? `<label>Copa</label>${sel('copa', COPAS.map(c=>[c.id, c.e+' '+c.n+': '+c.pistas.map(i=>PISTAS[i].ciudad).join(', ')]))}`
     : `<label>Pista</label>${sel('pista', [['azar','🎲 Al azar']].concat(ORDEN_PISTAS.map(i=>[i, PISTAS[i].e+' '+PISTAS[i].n])))}<label>Vueltas</label>${sel('vueltas', [[2,'2'],[3,'3'],[4,'4'],[5,'5']])}`;
-  const pd = o.modo==='libre' && PISTAS[o.pista] ? `<p class="muted">${esc(PISTAS[o.pista].d)}</p>` : '';
-  return `<label style="margin-top:0">Qué se corre ${host?'':'<span class="muted">(lo elige el anfitrión)</span>'}</label>${sel('modo', [['libre','🏁 Carrera suelta'],['copa','🏆 Copa de 4 carreras con puntos']])}${pista}${pd}
+  const pd = o.modo==='arena' && PISTAS[o.arena] ? `<p class="muted">${esc(PISTAS[o.arena].d)} Gana el último que aguanta con corazones.</p>` : o.modo==='libre' && PISTAS[o.pista] ? `<p class="muted">${esc(PISTAS[o.pista].d)}</p>` : '';
+  return `<label style="margin-top:0">Qué se corre ${host?'':'<span class="muted">(lo elige el anfitrión)</span>'}</label>${sel('modo', [['libre','🏁 Carrera suelta'],['copa','🏆 Copa de 4 carreras con puntos'],['arena','💥 Batalla: gana el último con corazones']])}${pista}${pd}
     <div class="row2"><div><label>Karts en la parrilla</label>${sel('karts', [1,2,3,4,5,6,7,8].map(k=>[k, k+(k>V.players.length?' (con bots)':'')]))}</div><div><label>Bots</label>${sel('nivel', NIVELES.map(n=>[n.id,n.n]))}</div>
     <div><label>Velocidad</label>${sel('ritmo', RITMOS.map(n=>[n.id,n.n]))}</div><div><label>Objetos</label>${sel('objetos', [[1,'Con objetos'],[0,'Sin objetos']]).replace(`value="${o.objetos?1:0}"`, `value="${o.objetos?1:0}" selected`).replace('this.value})','this.value==1})')}</div></div>`;
 }
@@ -953,8 +964,9 @@ function resultados(force){
 }
 function resHTML(){
   const host=amHost(), copa=V.opts.modo==='copa', c=COPAS.find(x=>x.id===V.opts.copa)||COPAS[0], yo=me();
-  const fila=(r,i)=>{ const p=VP(r.pid)||{name:'?', ch:0, color:'#888', emoji:'❔'}; return `<div class="prow ${r.pid===yo?'yo':''}" style="border-left:6px solid ${p.color}"><span class="md">${MEDAL[i]}</span>${carita(p,22)}<span class="nm"><b>${esc(p.name)}${r.pid===yo?' (vos)':''}${p.bot?' 🤖':''}</b><small>${esc(piloto(p.ch).n)} · ${r.est?'no llegó':'⏱️ '+fmtT(r.t)}${r.mejor?' · mejor vuelta '+fmtT(r.mejor):''}</small></span>${S.crono?'':`<span class="pts">+${r.pts}</span>`}</div>`; };
+  const fila=(r,i)=>{ const p=VP(r.pid)||{name:'?', ch:0, color:'#888', emoji:'❔'}; return `<div class="prow ${r.pid===yo?'yo':''}" style="border-left:6px solid ${p.color}"><span class="md">${MEDAL[i]}</span>${carita(p,22)}<span class="nm"><b>${esc(p.name)}${r.pid===yo?' (vos)':''}${p.bot?' 🤖':''}</b><small>${esc(piloto(p.ch).n)} · ${r.vidas!=null ? (r.afuera?'💀 aguantó '+fmtT(r.t).replace(/\.\d+$/,''):'❤️'.repeat(r.vidas)+' quedó en pie')+' · 💥 pegó '+r.golpes : r.est?'no llegó':'⏱️ '+fmtT(r.t)}${r.mejor?' · mejor vuelta '+fmtT(r.mejor):''}</small></span>${S.crono?'':`<span class="pts">+${r.pts}</span>`}</div>`; };
   let h=`<div id="resBox"><h2>${PISTAS[V.carrera.pista].e} ${esc(PISTAS[V.carrera.pista].n)}</h2>`;
+  if(V.carrera.modo==='arena' && V.res && V.res[0]){ const w=VP(V.res[0].pid); if(w) h+=`<p style="text-align:center;font-size:18px">💥 <b>${esc(w.name)}</b> ${V.res[0].afuera?'aguantó más que todos':'fue el último en pie'}.</p>`; }
   if(S.crono){ const r=V.res[0]; h+=`<p style="font-size:18px;text-align:center">⏱️ <b>${fmtT(r.t)}</b>${r.mejor?`<br><span class="muted">Mejor vuelta: ${fmtT(r.mejor)}</span>`:''}</p><p style="text-align:center;font-weight:800">${LAST.record?'🏆 ¡Nuevo récord tuyo!'+(LAST.antes?` (antes ${fmtT(LAST.antes)})`:''):`Tu récord sigue siendo ${fmtT(LAST.antes)}`}</p>`; }
   else h+=`<div class="podio">${(V.res||[]).map(fila).join('')}</div>`;
   if(copa){ const tabla=V.players.slice().sort((a,b)=>b.pts-a.pts);
@@ -963,6 +975,7 @@ function resHTML(){
   if(host){
     if(S.crono) h+=`<button class="btn green wide" onclick="closeModal();doAct({type:'next'})">🔁 Otra vez</button>`;
     else if(copa) h+=`<button class="btn green wide" onclick="closeModal();doAct({type:'next'})">${V.final?'🏆 Correr la copa siguiente':'▶️ Siguiente carrera: '+esc(PISTAS[c.pistas[V.iCopa+1]].n)}</button>`;
+    else if(V.carrera.modo==='arena') h+=`<div class="row"><button class="btn green" onclick="closeModal();doAct({type:'next'})">🔁 Otra batalla acá</button><button class="btn" onclick="closeModal();doAct({type:'next',sig:1})">▶️ Otra arena</button></div>`;
     else h+=`<div class="row"><button class="btn green" onclick="closeModal();doAct({type:'next'})">🔁 Otra vez acá</button><button class="btn" onclick="closeModal();doAct({type:'next',sig:1})">▶️ Pista siguiente</button></div>`;
     h+=`<button class="btn gray wide" style="margin-top:6px" onclick="closeModal();${NET.mode==='local'?'leaveToMenu()':`doAct({type:'lobby'})`}">${NET.mode==='local'?'🏠 Volver al menú':'↩️ Volver a la sala'}</button>`;
   } else h+=`<p class="muted" style="text-align:center">⏳ Esperando que el anfitrión 👑 largue la próxima…</p>${NET.obs?`<button class="btn gold wide" onclick="doAct({type:'joinNext',ch:${miCh}})">🪑 Sumarme a la próxima carrera</button>`:''}`;
@@ -984,7 +997,7 @@ function renderMesaTab(){
       ${host&&p.id!==V.hostPid&&NET.mode!=='local'&&!p.bot?`<button class="btn sm gray" onclick="if(confirm('¿Sacar a ${esc(p.name)} de la sala?'))doAct({type:'kick',pid:'${p.id}'})" title="Sacar">✕</button>`:''}</div>`;
   }).join('');
   const obs=(V.observers||[]).map(o=>`<div class="prow"><span style="font-size:20px">${o.owner?'👑':'👀'}</span><span class="nm"><b>${esc(o.name)}${o.id===me()?' (vos)':''}</b><small>mirando${o.mic?' · 🎙️':''}</small></span></div>`).join('');
-  const info = carr && V.carrera ? `<p class="muted">${PISTAS[V.carrera.pista].e} ${esc(PISTAS[V.carrera.pista].n)} · ${V.carrera.vueltas} vueltas · bots ${(NIVELES.find(n=>n.id===V.carrera.nivel)||{}).n} · ${(RITMOS.find(n=>n.id===V.carrera.ritmo)||{}).n}</p>` : '';
+  const info = carr && V.carrera ? `<p class="muted">${PISTAS[V.carrera.pista].e} ${esc(PISTAS[V.carrera.pista].n)} · ${V.carrera.modo==='arena'?'💥 batalla con '+V.carrera.vidas+' ❤️':V.carrera.vueltas+' vueltas'} · bots ${(NIVELES.find(n=>n.id===V.carrera.nivel)||{}).n} · ${(RITMOS.find(n=>n.id===V.carrera.ritmo)||{}).n}</p>` : '';
   const fin = host && carr && NET.mode!=='local' ? `<button class="btn gray wide" onclick="if(confirm('¿Cortar la carrera y volver a la sala de espera?'))doAct({type:'lobby'})">↩️ Volver todos a la sala</button>` : '';
   $('#mesaList').innerHTML = info + `<b>Parrilla (${V.players.length}/${MAXP})</b>` + ps + (obs?`<b>Mirando</b>${obs}`:'') + fin
     + (NET.mode!=='local'&&NET.code?`<p class="muted" style="margin-top:12px">Invitá con el código <b>${NET.code}</b> <button class="btn sm" onclick="shareRoom()">📤 Compartir</button></p>`:'')
@@ -1021,6 +1034,8 @@ function showRules(){
   <p>A los que van atrás les tocan los objetos más fuertes.</p>
   <h3>🏆 Modos</h3>
   <p><b>Gran Premio:</b> copas de 4 carreras con puntos (${PUNTOS.join(', ')}). <b>Carrera libre:</b> elegís pista, vueltas y bots. <b>Contrarreloj:</b> solo contra el reloj y tu fantasma. <b>En línea:</b> creá una sala y pasá el código; los que llegan con la carrera empezada miran 👀 y se suman a la próxima.</p>
+  <h3>💥 Batalla (Ñorairõ)</h3>
+  <p>Todos en una arena abierta: la <b>Plaza de los Héroes</b> de Asunción o el <b>Predio de la Expo</b>. Cada kart tiene corazones ❤️ arriba (3, o los que elija el anfitrión). Cada golpe con un objeto (coco, tereré, cáscara de mango, viento norte) te saca uno, y después de un golpe parpadeás unos segundos sin que te puedan pegar. El que se queda sin corazones queda afuera y mira la batalla. <b>Gana el último que queda en pie</b>; si se termina el tiempo, gana el que tiene más corazones. El coco rebota en las paredes y el tereré persigue al más cercano.</p>
   <h3>🗺️ Copas y pistas</h3>
   ${COPAS.map(c=>`<p style="margin:3px 0">${c.e} <b>${c.n}:</b> ${c.pistas.map(i=>PISTAS[i].n).join(' · ')}</p>`).join('')}
   <h3>💬 Chat y voz</h3>

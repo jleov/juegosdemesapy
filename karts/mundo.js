@@ -174,6 +174,7 @@ const DECO = {
   casilla(b){ b.caja(0,0,0,4,3,4,'#e8e8e8'); b.caja(0,3,0,5,.3,5,'#0038a8'); b.caja(0,1.4,2.02,2.4,1.2,.1,'#3a6a8a'); b.caja(3.4,1,0,3,.2,.2,'#d52b1e'); b.caja(3.4,1.2,0,.6,.2,.22,'#ffffff'); },
   tucanPalo(b,r){ b.cil(0,0,0,.14,.18,4,'#6b4a2b',5); b.caja(0,3.9,0,1.6,.14,.14,'#6b4a2b'); b.esf(.4,4.5,0,.45,'#1a1a1a',1.3,6); b.esf(.4,4.75,.25,.28,'#ffffff',1,5); b.caja(.4,5,.6,.2,.26,.9,'#ff9a1e'); b.caja(.4,4.95,1.05,.18,.2,.2,'#222'); },
 };
+DECO.fuente = (b,r)=>{ b.cil(0,0,0,4,4.2,.9,'#d8d2c4',14); b.cil(0,.75,0,3.5,3.5,.2,'#5ab0d8',14); b.cil(0,.9,0,.6,.8,2.2,'#e8e2d4',8); b.cil(0,3,0,1.6,.5,.4,'#e8e2d4',10); b.esf(0,3.6,0,.5,'#bfeaff',1.6,6); for(let i=0;i<6;i++){ const a=i/6*6.283; b.esf(Math.sin(a)*1.2,2.4,Math.cos(a)*1.2,.25,'#dff4ff',1.4,5); } };
 const RADIO = {palacio:30, basilica:22, panteon:13, iglesia:11, hotel:14, estacion:13, ruinaFachada:20, campanario:6, tribuna:8, edificio:9, torre:10, casa:7, casaChaco:7, cabana:6, monumento:9, cascada:13, cerroPiedra:22, tanque:4, molino:3, mirador:5, carroza:6, arcoFutbol:26, hotel2:14};
 const FLOTA = {velero:1, lancha:1};
 const LIBRE = {puenteLejos:1, saltoMonday:1, cascada:1, ruinaArco:1, sambaArco:1, muelle:1};
@@ -185,7 +186,64 @@ function texLienzo(w, h, pintar, repetir){
   const c=document.createElement('canvas'); c.width=w; c.height=h; pintar(c.getContext('2d'), w, h);
   const t=new THREE.CanvasTexture(c); if(repetir){ t.wrapS=t.wrapT=THREE.RepeatWrapping; } t.anisotropy=4; return t;
 }
+/* ---------- la arena del modo batalla: cancha redonda, baranda, tribunas y obstáculos ---------- */
+function armarArena3D(T, calidad){
+  const tema=T.tema, R0=T.radio, baja=calidad==='baja', r=azar(R0*131|0), G=new THREE.Group(), tirar=[];
+  const reg = o => { tirar.push(o); return o; };
+  const off={polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-30};
+  // pasto alrededor
+  const pasto=new THREE.Mesh(reg(new THREE.PlaneGeometry(3000,3000)), reg(new THREE.MeshLambertMaterial({color:tema.suelo2}))); pasto.rotation.x=-Math.PI/2; pasto.position.y=-.05; G.add(pasto);
+  const anillo2=new THREE.Mesh(reg(new THREE.CircleGeometry(R0+70, 48)), reg(new THREE.MeshLambertMaterial({color:tema.suelo}))); anillo2.rotation.x=-Math.PI/2; anillo2.position.y=-.02; G.add(anillo2);
+  // piso de la cancha: baldosas o tierra
+  const tierra=T.def.piso==='tierra';
+  const tex=reg(texLienzo(256,256,(g,w,h)=>{
+    g.fillStyle='#fff'; g.fillRect(0,0,w,h);
+    if(tierra){ for(let i=0;i<2200;i++){ const v=200+Math.random()*55|0; g.fillStyle=`rgba(${v},${v-20},${v-50},.5)`; g.fillRect(Math.random()*w, Math.random()*h, 3, 3); } }
+    else { g.strokeStyle='rgba(120,110,95,.55)'; g.lineWidth=3; for(let i=0;i<=8;i++){ g.beginPath(); g.moveTo(i*32,0); g.lineTo(i*32,h); g.stroke(); g.beginPath(); g.moveTo(0,i*32); g.lineTo(w,i*32); g.stroke(); }
+      for(let i=0;i<500;i++){ const v=215+Math.random()*40|0; g.fillStyle=`rgba(${v},${v},${v},.45)`; g.fillRect(Math.random()*w, Math.random()*h, 2, 2); } }
+  }, true)); tex.repeat.set(R0/9, R0/9);
+  const piso=new THREE.Mesh(reg(new THREE.CircleGeometry(R0, 64)), reg(new THREE.MeshLambertMaterial(Object.assign({map:tex, color:tema.camino}, off)))); piso.rotation.x=-Math.PI/2; piso.position.y=.02; G.add(piso);
+  // dibujos en el piso: círculo del medio
+  const aro=new THREE.Mesh(reg(new THREE.RingGeometry(R0*.36, R0*.36+.9, 64)), reg(new THREE.MeshBasicMaterial(Object.assign({color:'#ffffff', transparent:true, opacity:.55}, off, {polygonOffsetFactor:-5, polygonOffsetUnits:-50})))); aro.rotation.x=-Math.PI/2; aro.position.y=.05; G.add(aro);
+  const b=new Obra(); b.rnd=r;
+  // baranda roja y blanca alrededor
+  const nB=Math.round(2*Math.PI*R0/3);
+  for(let i=0;i<nB;i++){ const a=i/nB*Math.PI*2, x=Math.sin(a)*(R0+.6), z=Math.cos(a)*(R0+.6); b.en(x,0,z,a,1,o=>{ o.caja(0,0,0,3.2,1.2,1,tema.borde[i%2]); }); }
+  // obstáculos
+  for(const o of T.obst){ const f=DECO[o.t]; if(f) b.en(o.x,0,o.z,Math.atan2(-o.x,-o.z),o.s,q=>f(q,r)); }
+  // tribunas con gente mirando la batalla, y alrededor la ciudad o el campo
+  const nT=baja?6:10;
+  for(let i=0;i<nT;i++){ const a=i/nT*Math.PI*2+.2, d=R0+9; b.en(Math.sin(a)*d,0,Math.cos(a)*d,a+Math.PI,1.2,o=>DECO.tribuna(o,r)); }
+  for(let i=0;i<nT;i++){ const a=(i+.5)/nT*Math.PI*2+.2, d=R0+7; b.en(Math.sin(a)*d,0,Math.cos(a)*d,a+Math.PI,1,o=>DECO.bandera(o,r)); }
+  const fuera = T.def.fuera==='ciudad' ? ['edificio','edificio','casa','lapacho','palmera','arbol'] : ['casa','vaca','vaca','palmera','arbol','lapachoA','molino'];
+  for(let i=0;i<(baja?40:90);i++){ const a=r()*Math.PI*2, d=R0+26+r()*110, t=fuera[Math.floor(r()*fuera.length)]; b.en(Math.sin(a)*d,0,Math.cos(a)*d,r()*6.28,.9+r()*.4,o=>DECO[t](o,r)); }
+  // rampas (misma forma que usa el juego)
+  for(const p of T.rampas){ const ang=Math.atan2(ALTO_RAMPA, RAMPA), L=Math.hypot(ALTO_RAMPA, RAMPA), w=8.4, gr=.35;
+    b.en(p.x,0,p.z,p.h,1,o=>{ const cy=ALTO_RAMPA/2-gr/2*Math.cos(ang);
+      o.caja(0,cy-gr/2,-RAMPA/2+gr/2*Math.sin(ang),w,gr,L,'#f2c14e',0,-ang);
+      for(let x=-w/2+1.2;x<w/2-.6;x+=2.4) o.caja(x,cy-gr/2+.02,-RAMPA/2+gr/2*Math.sin(ang),1.1,gr,L*.92,'#d52b1e',0,-ang);
+      o.caja(0,0,-.12,w,ALTO_RAMPA,.24,'#c8902a');
+      for(const x of [-w/2,w/2]) for(let q=0;q<4;q++){ const h=ALTO_RAMPA*(1-(q+.5)/4); o.caja(x,0,-RAMPA*(q+.5)/4,.2,h,RAMPA/4,'#b07a22'); } }); }
+  // nubes y cerros lejanos
+  for(let i=0;i<(baja?8:14);i++){ const a=r()*Math.PI*2, d=160+r()*260, x=Math.sin(a)*d, z=Math.cos(a)*d, y=90+r()*50, e=10+r()*12;
+    b.esf(x,y,z,e,'#ffffff',.38,7,1.6); b.esf(x+e*1.2,y-1,z+3,e*.7,'#ffffff',.4,7,1.5); }
+  for(let i=0;i<(tema.nCerros||0);i++){ const a=i/tema.nCerros*6.283+r()*.3, d=330+r()*90, h=40+r()*70; b.cil(Math.sin(a)*d,-4,Math.cos(a)*d,10+r()*20,90+r()*60,h,tono(tema.cerros,r,.08),7); }
+  const deco=b.malla(reg(new THREE.MeshLambertMaterial({vertexColors:true}))); reg(deco.geometry); G.add(deco);
+  // cajas de objetos
+  const texCaja=reg(texLienzo(64,64,(g)=>{ const gr=g.createLinearGradient(0,0,64,64); gr.addColorStop(0,'#ffe37a'); gr.addColorStop(.5,'#ff8a3d'); gr.addColorStop(1,'#d52b1e'); g.fillStyle=gr; g.fillRect(0,0,64,64);
+    g.strokeStyle='#fff'; g.lineWidth=4; g.strokeRect(3,3,58,58); g.fillStyle='#fff'; g.font='900 46px system-ui,sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('?',32,35); }));
+  const gCaja=reg(new THREE.BoxGeometry(1.7,1.7,1.7)), mCaja=reg(new THREE.MeshLambertMaterial({map:texCaja, transparent:true, opacity:.93, emissive:'#553300'}));
+  const cajas=T.cajas.map((c,i)=>{ const m=new THREE.Mesh(gCaja, mCaja); m.position.set(c.x,1.5,c.z); G.add(m); return {m, x:c.x, y:1.5, z:c.z, i}; });
+  // flechas turbo
+  const texTurbo=reg(texLienzo(64,64,(g)=>{ g.fillStyle='#ff7a1e'; g.fillRect(0,0,64,64); g.fillStyle='#fff3a0'; for(const y of [6,34]){ g.beginPath(); g.moveTo(8,y+22); g.lineTo(32,y); g.lineTo(56,y+22); g.lineTo(56,y+26); g.lineTo(32,y+12); g.lineTo(8,y+26); g.fill(); } }, true));
+  const mTurbo=reg(new THREE.MeshBasicMaterial(Object.assign({map:texTurbo}, off, {polygonOffsetFactor:-6, polygonOffsetUnits:-60})));
+  for(const t of T.turbos){ const m=new THREE.Mesh(reg(new THREE.PlaneGeometry(5.5,7)), mTurbo); m.rotation.order='YXZ'; m.rotation.y=t.h+Math.PI; m.rotation.x=-Math.PI/2; m.position.set(t.x,.08,t.z); G.add(m); }
+  G.userData.cajas=cajas; G.userData.texTurbo=texTurbo;
+  G.userData.tirar=()=>{ for(const o of tirar) try{ o.dispose(); }catch(e){} };
+  return G;
+}
 function armarMundo(T, calidad){
+  if(T.arena) return armarArena3D(T, calidad);
   const tema=T.tema, S=T.S, N=T.N, baja=calidad==='baja', r=azar(T.L*7|0);
   const G=new THREE.Group(), tirar=[];
   const reg = o => { tirar.push(o); return o; };
