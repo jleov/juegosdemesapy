@@ -493,6 +493,41 @@
       g2.gain.setValueAtTime(0.35 * vol, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.14); o.connect(g2); g2.connect(actx.destination); o.start(t); o.stop(t + 0.16);
     } catch (e) { }
   }
+  // ruiditos de metal para recargar: golpe seco, clic, raspado del cerrojo
+  function metal(t0, dur, f0, f1, vol, q) {
+    if (!soundOn || !actx) return;
+    try {
+      const t = actx.currentTime + t0, src = actx.createBufferSource(), fl = actx.createBiquadFilter(), g = actx.createGain();
+      src.buffer = ruido(); fl.type = 'bandpass'; fl.Q.value = q || 4;
+      fl.frequency.setValueAtTime(f0, t); fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(fl); fl.connect(g); g.connect(actx.destination); src.start(t, Math.random() * 0.3); src.stop(t + dur + 0.02);
+    } catch (e) { }
+  }
+  const clic = (t, f, v) => { metal(t, 0.025, f || 3200, (f || 3200) * 0.8, v || 0.35, 8); tono((f || 3200) / 2, t, 0.02, 'square', (v || 0.35) * 0.08); };
+  const golpe = (t, v) => { metal(t, 0.07, 900, 300, v || 0.4, 2); tono(160, t, 0.08, 'sine', (v || 0.4) * 0.35); };
+  const raspa = (t, dur, f0, f1, v) => metal(t, dur, f0, f1, v || 0.22, 3);
+  // cada arma suena distinto al recargar (los tiempos siguen lo que dura la recarga)
+  const RECARGA = {
+    // fusil: saca el cargador, mete el nuevo y tira del cerrojo
+    fusil: () => { clic(0.08, 2600); raspa(0.12, 0.16, 1200, 700); golpe(0.85, 0.45); clic(0.9, 3000); raspa(1.3, 0.1, 1600, 3200, 0.28); clic(1.4, 3600, 0.4); raspa(1.47, 0.07, 3000, 1500, 0.25); golpe(1.52, 0.3); },
+    // subfusil: lo mismo pero más rápido y agudo
+    subfusil: () => { clic(0.06, 3200); raspa(0.09, 0.12, 1500, 900); golpe(0.6, 0.35); clic(0.64, 3600); raspa(1.0, 0.08, 2000, 3800, 0.25); clic(1.08, 4200, 0.4); golpe(1.13, 0.25); },
+    // escopeta: un cartucho por vez y al final "chik-chak" de la corredera
+    escopeta: n => {
+      const k = Math.max(1, Math.min(6, n || 6)), paso = 1.5 / k;
+      for (let i = 0; i < k; i++) { raspa(0.15 + i * paso, 0.09, 700, 1400, 0.2); golpe(0.22 + i * paso, 0.3); }
+      chikChak(1.75);
+    },
+    // francotirador: levanta el cerrojo, lo tira atrás, mete balas, adelante y abajo
+    franco: () => { clic(0.1, 2200, 0.4); raspa(0.18, 0.18, 1000, 2600, 0.3); clic(0.38, 3400); golpe(0.9, 0.3); clic(1.1, 2800, 0.3); clic(1.35, 2800, 0.3); raspa(1.9, 0.18, 2600, 1000, 0.3); golpe(2.1, 0.35); clic(2.25, 2000, 0.45); },
+    // pistola: cargador afuera, adentro y suelta la corredera
+    pistola: () => { clic(0.07, 3400); raspa(0.1, 0.1, 1600, 1000, 0.18); golpe(0.6, 0.35); clic(0.63, 3800); raspa(0.95, 0.06, 3500, 1800, 0.3); clic(1.0, 4400, 0.45); },
+  };
+  // corredera de la escopeta: atrás y adelante
+  function chikChak(t) { raspa(t, 0.09, 900, 2200, 0.32); golpe(t + 0.06, 0.35); raspa(t + 0.16, 0.08, 2200, 900, 0.32); golpe(t + 0.22, 0.45); clic(t + 0.23, 2600, 0.3); }
+  // cerrojo del francotirador después de cada tiro
+  function cerrojo(t) { clic(t, 2200, 0.35); raspa(t + 0.06, 0.12, 1000, 2600, 0.28); raspa(t + 0.26, 0.12, 2600, 1000, 0.28); golpe(t + 0.38, 0.3); clic(t + 0.44, 2000, 0.35); }
   function tono(f, t0, dur, type, vol) {
     if (!soundOn || !actx) return;
     try {
@@ -770,7 +805,8 @@
   function cambiar() { ponerArma(yo.w === 'pistola' ? yo.prim : 'pistola'); }
   function recargar() {
     const w = A[yo.w]; if (!yo.alive || yo.reloadT > 0 || yo.ammo[yo.w] >= w.mag) return;
-    yo.reloadT = yo.reloadOf = w.rec / 1000; SFX.recarga();
+    yo.reloadT = yo.reloadOf = w.rec / 1000;
+    const r = RECARGA[yo.w]; if (r) r(w.mag - (yo.ammo[yo.w] | 0)); else SFX.recarga();
   }
   function disparar(now) {
     const w = A[yo.w];
@@ -803,6 +839,7 @@
     yo.rx = Math.min(1.5, yo.rx + w.kick * (apunta ? 0.45 : 0.7)); yo.ry += (Math.random() - 0.5) * w.kick * 0.4;
     if (w.auto) yo.bloom = Math.min(0.05, yo.bloom + 0.004);
     fogon.visible = true; fogon.t = 0.05;
+    if (yo.ammo[yo.w] > 0) { if (yo.w === 'escopeta') chikChak(0.32); else if (yo.w === 'franco') cerrojo(0.42); }
     if (yo.ammo[yo.w] <= 0) setTimeout(recargar, 120);
     armaHUD();
   }
