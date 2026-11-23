@@ -176,6 +176,7 @@
     g = new T.Group(); box(g, 0.08, 0.08, 0.5, 0, 0, -0.2, met); box(g, 0.05, 0.05, 0.4, 0, -0.06, -0.3, mad); box(g, 0.07, 0.1, 0.25, 0, -0.03, 0.15, mad); mano(g); VM.escopeta = g;
     g = new T.Group(); box(g, 0.06, 0.08, 0.6, 0, 0, -0.18, met); box(g, 0.03, 0.03, 0.4, 0, 0.01, -0.65, met2); box(g, 0.05, 0.05, 0.28, 0, 0.08, -0.15, met2); box(g, 0.07, 0.1, 0.22, 0, -0.02, 0.22, mad); mano(g); VM.franco = g;
     g = new T.Group(); box(g, 0.05, 0.06, 0.2, 0, 0.02, -0.12, met); box(g, 0.045, 0.12, 0.06, 0, -0.06, -0.04, met2); mano(g); VM.pistola = g;
+    g = new T.Group(); box(g, 0.065, 0.1, 0.32, 0, 0, -0.08, met); box(g, 0.03, 0.03, 0.12, 0, 0.02, -0.3, met2); box(g, 0.04, 0.2, 0.05, 0, -0.14, -0.12, met2); box(g, 0.04, 0.1, 0.05, 0, -0.08, 0.03, met2); box(g, 0.03, 0.03, 0.2, 0, 0.01, 0.17, met2); box(g, 0.015, 0.035, 0.015, 0, 0.065, -0.2, met2); mano(g); VM.subfusil = g;
     for (const k in VM) { VM[k].visible = false; vmGrupo.add(VM[k]); }
     const fc = document.createElement('canvas'); fc.width = fc.height = 64; const fg = fc.getContext('2d');
     const gr = fg.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,220,1)'); gr.addColorStop(0.3, 'rgba(255,200,60,.9)'); gr.addColorStop(1, 'rgba(255,120,0,0)');
@@ -183,7 +184,7 @@
     fogon = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(fc), blending: T.AdditiveBlending, depthTest: false, transparent: true }));
     fogon.scale.set(0.22, 0.22, 1); fogon.visible = false; vmGrupo.add(fogon);
   }
-  const PUNTA = { fusil: -0.62, escopeta: -0.5, franco: -0.88, pistola: -0.24 };
+  const PUNTA = { fusil: -0.62, escopeta: -0.5, franco: -0.88, pistola: -0.24, subfusil: -0.37 };
 
   // ================= rastros de bala y polvito =================
   const efectos = [];
@@ -218,12 +219,38 @@
     ruidoBuf = actx.createBuffer(1, actx.sampleRate * 0.5, actx.sampleRate); const d = ruidoBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return ruidoBuf;
   }
+  // un paso: ruido corto filtrado + golpe grave; el piso cambia el sonido (tierra más suave)
+  function pasoSnd(vol, pan) {
+    if (!soundOn || !actx || vol < 0.01) return;
+    try {
+      const t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+      const tierra = mapaId === 'chaco';
+      src.buffer = ruido(); f.type = 'bandpass'; f.frequency.value = (tierra ? 320 : 650) + Math.random() * 250; f.Q.value = 1.2;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + (tierra ? 0.12 : 0.08));
+      let out = g;
+      if (actx.createStereoPanner) { const p = actx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); out = p; }
+      out.connect(actx.destination);
+      src.connect(f); f.connect(g); src.start(t, Math.random() * 0.3); src.stop(t + 0.15);
+      const o = actx.createOscillator(), g2 = actx.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.07);
+      g2.gain.setValueAtTime(vol * 0.8, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); o.connect(g2);
+      if (out !== g) { const p2 = actx.createStereoPanner(); p2.pan.value = Math.max(-1, Math.min(1, pan)); g2.connect(p2); p2.connect(actx.destination); } else g2.connect(actx.destination);
+      o.start(t); o.stop(t + 0.1);
+    } catch (e) { }
+  }
+  // pasos de otro jugador: más fuerte cuanto más cerca, y del lado donde está
+  function pasoDe(p, vel) {
+    const dx = p.x - cam.position.x, dz = p.z - cam.position.z, d = Math.hypot(dx, dz);
+    if (d > 30) return;
+    const vol = Math.pow(1 - d / 30, 1.6) * 0.75 * Math.min(1, vel / 6);
+    const rel = Math.atan2(-dx, -dz) - cam.rotation.y;
+    pasoSnd(vol, -Math.sin(rel) * Math.min(1, d / 3));
+  }
   function tiroSnd(w, vol) {
     if (!soundOn || !actx || vol < 0.02) return;
     try {
       const t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
       src.buffer = ruido();
-      const cfg = { fusil: [1400, 0.12], escopeta: [700, 0.28], franco: [900, 0.45], pistola: [2000, 0.1] }[w] || [1200, 0.15];
+      const cfg = { fusil: [1400, 0.12], escopeta: [700, 0.28], franco: [900, 0.45], pistola: [2000, 0.1], subfusil: [2400, 0.07] }[w] || [1200, 0.15];
       f.type = 'lowpass'; f.frequency.setValueAtTime(cfg[0] * 2, t); f.frequency.exponentialRampToValueAtTime(cfg[0] / 3, t + cfg[1]);
       g.gain.setValueAtTime(0.5 * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + cfg[1]);
       src.connect(f); f.connect(g); g.connect(actx.destination); src.start(t); src.stop(t + cfg[1] + 0.05);
@@ -409,8 +436,8 @@
       if (C.obs()) { if (e.key === 'ArrowRight' || e.key === ' ') mira++; if (e.key === 'ArrowLeft') mira--; if (e.key === 'Tab') { e.preventDefault(); inp.tabla = true; tabla(); } return; }
       const k = e.code;
       if (k === 'Tab') { e.preventDefault(); inp.tabla = true; tabla(); return; }
-      // muerto: 1, 2 o 3 elige el arma de la próxima vida
-      if (!yo.alive && ['Digit1', 'Digit2', 'Digit3'].includes(k)) { const w = ['fusil', 'escopeta', 'franco'][+k.slice(5) - 1]; const b = document.querySelector(`#mArmas [data-w="${w}"]`); if (b) b.click(); else J.elegirArma(w); return; }
+      // muerto: 1, 2, 3 o 4 elige el arma de la próxima vida
+      if (!yo.alive && ['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(k)) { const w = ['fusil', 'subfusil', 'escopeta', 'franco'][+k.slice(5) - 1]; const b = document.querySelector(`#mArmas [data-w="${w}"]`); if (b) b.click(); else J.elegirArma(w); return; }
       inp.keys.add(k);
       if (k === 'Space') { inp.jumpQ = true; e.preventDefault(); }
       if (k === 'KeyR') recargar();
@@ -561,8 +588,14 @@
       const k = c.t > a.t ? Math.max(0, Math.min(1, (rt - a.t) / (c.t - a.t))) : 1;
       let dr = c.ry - a.ry; while (dr > Math.PI) dr -= 2 * Math.PI; while (dr < -Math.PI) dr += 2 * Math.PI;
       const cur = { x: a.x + (c.x - a.x) * k, y: a.y + (c.y - a.y) * k, z: a.z + (c.z - a.z) * k, ry: a.ry + dr * k, rx: a.rx + (c.rx - a.rx) * k };
-      const vel = r.cur ? Math.hypot(cur.x - r.cur.x, cur.z - r.cur.z) / Math.max(dt, 0.001) : 0;
+      const vel0 = r.cur ? Math.hypot(cur.x - r.cur.x, cur.z - r.cur.z) / Math.max(dt, 0.001) : 0;
+      const vel = vel0 > 15 ? 0 : vel0;   // un salto grande es que reapareció: no es caminar
+      const enPiso = !r.cur || Math.abs(cur.y - r.cur.y) < 0.03;
+      r.velS = (r.velS || 0) * 0.85 + vel * 0.15;
       r.cur = cur;
+      // pasos: se escuchan si camina o corre parado (agachado no hace ruido)
+      const st = Math.floor(r.paso * 3 / Math.PI);
+      if (st !== r.st) { r.st = st; if (r.velS > 2.2 && !r.crouch && enPiso) pasoDe(cur, r.velS); }
       g.visible = !(obs && mirado() === id);
       g.position.set(cur.x, cur.y, cur.z); g.rotation.set(0, cur.ry, 0);
       const ag = r.crouch ? 0.55 : 1;
@@ -618,6 +651,9 @@
     cam.position.set(s.x, s.y + yo.eye, s.z); cam.rotation.set(yo.rx, yo.ry, s.slideT > 0 ? 0.06 : 0);
     // arma en la mano: balanceo al caminar, retroceso, apuntar al medio
     const v = Math.hypot(s.vx, s.vz); yo.bob += dt * v * (s.ground ? 1.7 : 0);
+    // mis propios pasos, más bajitos
+    const mp = Math.floor(yo.bob / Math.PI);
+    if (mp !== yo.mp) { yo.mp = mp; if (v > 2.2 && s.ground && !s.crouch) pasoSnd(0.16 * Math.min(1, v / 6), 0); }
     for (const k in VM) VM[k].visible = k === yo.w;
     const bx = Math.sin(yo.bob) * 0.012 * (1 - yo.aimK), by = Math.abs(Math.cos(yo.bob)) * 0.012 * (1 - yo.aimK);
     const hip = [0.16, -0.16, -0.4], ads = [0, yo.w === 'pistola' ? -0.115 : -0.105, -0.34];

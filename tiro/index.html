@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#121826">
 <!-- SEO (buscadores y vista previa al compartir) -->
 <title>Tiro Guasu: juego de disparos en 3D online gratis con amigos | Juegos PY</title>
-<meta name="description" content="Tiro Guasu: juego de tiros en primera persona en 3D, online y gratis desde el navegador. Mapas paraguayos (Mercado 4, Puerto de Asunción, una estancia en el Chaco), fusil, escopeta, francotirador y pistola, todos contra todos o Albirroja contra Azules. Salas con amigos hasta 12, chat, voz y bots.">
+<meta name="description" content="Tiro Guasu: juego de tiros en primera persona en 3D, online y gratis desde el navegador. Mapas paraguayos (Mercado 4, Puerto de Asunción, una estancia en el Chaco), fusil, subfusil, escopeta, francotirador y pistola, todos contra todos o Albirroja contra Azules. Salas con amigos hasta 12, chat, voz y bots.">
 <link rel="canonical" href="https://juegospy.com/tiro/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Juegos Paraguay Digitales">
@@ -54,7 +54,7 @@ input:focus,select:focus{border-color:var(--azul2)}
 .avatars{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
 .avatars button{padding:6px 0;font-size:21px;background:#11182a;border:2px solid transparent}
 .avatars button.sel{border-color:var(--azul2);background:#1c2a4d}
-.armas{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.armas{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .armas button{padding:.55em .2em;font-size:.86em;background:#11182a;border:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:2px}
 .armas button b{font-size:1.5em}
 .armas button small{color:var(--mut);font-weight:600;font-size:.78em}
@@ -285,7 +285,7 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div id="muerte" class="capa hidden">
     <h2 id="mTxt"></h2>
     <div id="mCuenta"></div>
-    <div class="lbl" style="margin-top:10px">Para la próxima, ¿qué arma? <span class="pc-solo">(tocala o apretá 1, 2 o 3)</span></div>
+    <div class="lbl" style="margin-top:10px">Para la próxima, ¿qué arma? <span class="pc-solo">(tocala o apretá 1, 2, 3 o 4)</span></div>
     <div class="armas" id="mArmas"></div>
   </div>
   <div id="pausa" class="capa hidden">
@@ -303,9 +303,9 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div id="audios"></div>
 </div>
 
-<script src="mundo.js?v=6"></script>
-<script src="sala.js?v=6"></script>
-<script src="juego.js?v=6"></script>
+<script src="mundo.js?v=7"></script>
+<script src="sala.js?v=7"></script>
+<script src="juego.js?v=7"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -331,9 +331,9 @@ AVATARS.forEach(a => {
   b.onclick = () => { avatar = a; store.set('tg_avatar', a); $('#avatars').querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b)); };
   $('#avatars').appendChild(b);
 });
-const ARM_TXT = { fusil: 'de todo un poco', escopeta: 'de cerquita', franco: 'de lejos' };
+const ARM_TXT = { fusil: 'de todo un poco', subfusil: 'rapidísimo', escopeta: 'de cerquita', franco: 'de lejos' };
 function armarArmas(box) {
-  box.innerHTML = ['fusil', 'escopeta', 'franco'].map(w => `<button type="button" data-w="${w}"><b>${W.ARMAS[w].ico}</b>${W.ARMAS[w].n}<small>${ARM_TXT[w]}</small></button>`).join('');
+  box.innerHTML = ['fusil', 'subfusil', 'escopeta', 'franco'].map(w => `<button type="button" data-w="${w}"><b>${W.ARMAS[w].ico}</b>${W.ARMAS[w].n}<small>${ARM_TXT[w]}</small></button>`).join('');
   box.querySelectorAll('[data-w]').forEach(b => b.onclick = () => elegirPrim(b.dataset.w));
 }
 ['#armasH', '#armasL', '#mArmas'].forEach(q => armarArmas($(q)));

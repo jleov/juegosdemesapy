@@ -73,7 +73,7 @@
       if (this.players.size >= this.settings.max) return;
       const used = new Set([...this.players.values()].map(p => p.name));
       const n = BOT_N.find(x => !used.has(x)) || 'Bot ' + (this.players.size + 1);
-      const prim = ['fusil', 'fusil', 'escopeta', 'franco'][(Math.random() * 4) | 0];
+      const prim = ['fusil', 'fusil', 'escopeta', 'franco', 'subfusil'][(Math.random() * 5) | 0];
       const p = this.nuevo({ name: n, avatar: '🤖', bot: { lookT: 0, seen: 0, strafe: 1, strafeT: 0, nextFire: 0, ammo: A[prim].mag, relT: 0, goal: null, goalT: 0, err: [0, 0], errT: 0, stuck: 0 }, connected: true, prim, w: prim });
       this.players.set(p.id, p); this.order.push(p.id);
       this.broadcastState();
@@ -198,6 +198,8 @@
     }
     calc(w, head, dist) {
       let v = w.dmg * (head ? w.head : 1);
+      // subfusil: de lejos (más de 15 m) pega menos
+      if (w === A.subfusil && dist > 15) v *= Math.max(0.5, 1 - (dist - 15) / 40);
       // escopeta: muy fuerte de cerca (hasta 4 m vale 1,5 veces), baja hasta los 8 m y después se debilita
       if (w === A.escopeta) v *= dist <= 4 ? 1.5 : dist <= 8 ? 1.5 - (dist - 4) / 8 : Math.max(0.3, 1 - (dist - 8) / 22);
       if (w === A.franco && head) v = 200;
@@ -280,7 +282,7 @@
         b.errT -= dt;
         if (b.errT <= 0) { b.errT = 0.35 + Math.random() * 0.4; b.err = [(Math.random() * 2 - 1) * sk.err, (Math.random() * 2 - 1) * sk.err * 0.7]; }
         quiereRy = Math.atan2(-dx, -dz) + b.err[0]; quiereRx = Math.atan2(dy, L) + b.err[1];
-        const ideal = p.w === 'escopeta' ? 5 : p.w === 'franco' ? 32 : p.w === 'pistola' ? 12 : 15;
+        const ideal = p.w === 'escopeta' ? 5 : p.w === 'franco' ? 32 : p.w === 'pistola' ? 12 : p.w === 'subfusil' ? 9 : 15;
         b.strafeT -= dt; if (b.strafeT <= 0) { b.strafeT = 0.5 + Math.random() * 1.2; b.strafe = Math.random() < 0.5 ? -1 : 1; if (Math.random() < 0.18) jump = true; }
         let fw = L > ideal + 4 ? 1 : L < ideal - 3 ? -0.7 : 0;
         let st = p.w === 'franco' ? 0.25 : 1;
