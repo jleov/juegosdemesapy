@@ -11,7 +11,7 @@
     STEP: 0.56, SLIDE: 11.5, SLIDE_T: 0.65, ACC: 70, AIR: 14,
   };
   // colores de las cajas (índice → color)
-  const PAL = ['#9aa0a8', '#b5543c', '#8a5a33', '#2f5fae', '#c0392b', '#e5b52a', '#3c8d4a', '#e9e4d8', '#5d6670', '#d97b2b', '#6c4a8a', '#2b2b2b'];
+  const PAL = ['#9aa0a8', '#b5543c', '#8a5a33', '#2f5fae', '#c0392b', '#e5b52a', '#3c8d4a', '#e9e4d8', '#5d6670', '#d97b2b', '#6c4a8a', '#2b2b2b', '#dcc39c', '#4f7a33', '#8c8577'];
 
   // ---------- armas ----------
   const ARMAS = {
@@ -98,22 +98,50 @@
     }),
 
     chaco: () => armar('chaco', 'Estancia en el Chaco', 30, (b, esc) => {
-      // casa de la estancia (con puertas, sin techo para ver)
+      // casa de la estancia con techo de tejas y puertas
       const t = 0.35, h = 3.2;
-      b(-4, -6, 6, t, h, 7); b(5, -6, 4, t, h, 7); b(-4, 6, 6, t, h, 7); b(5, 6, 4, t, h, 7);
-      b(-7, -3.5, t, 5, h, 7); b(-7, 3.5, t, 5, h, 7); b(7, 0, t, 12.3, h, 7);
-      b(0, 0, t, 5, h, 7); b(-3.5, 0, 1.8, 1, 0.9, 2);
+      b(-4, -6, 6, t, h, 12); b(5, -6, 4, t, h, 12); b(-4, 6, 6, t, h, 12); b(5, 6, 4, t, h, 12);
+      b(-7, -3.5, t, 5, h, 12); b(-7, 3.5, t, 5, h, 12); b(7, 0, t, 12.3, h, 12);
+      b(0, 0, t, 5, h, 12); b(-3.5, 0, 1.8, 1, 0.9, 2); b(4, 3.5, 2, 1, 0.8, 2);
+      b(0, 0, 15.2, 13.2, 0.25, 1, h);
       // tanque de agua alto con escalera (mirador)
       b(18, -18, 4, 4, 4.2, 8); b(18, -18, 4.6, 4.6, 0.3, 11, 4.2); esc(16, -18, -1, 0, 4.2, 1.6, 2);
+      // molino de viento con bebedero
+      b(24, 4, 0.45, 0.45, 8, 8); b(24.35, 4, 0.12, 4.2, 0.35, 7, 7.6); b(24.35, 4, 0.12, 0.35, 4.2, 7, 5.7); b(22, 7.5, 3, 1, 0.7, 8);
+      // galpón con techo de chapa y fardos adentro
+      [[-24.5, -23.5], [-15.5, -23.5], [-24.5, -16.5], [-15.5, -16.5]].forEach(([x, z]) => b(x, z, 0.3, 0.3, 3.2, 11));
+      b(-20, -20, 9.6, 7.6, 0.2, 3, 3.2);
+      b(-22, -21, 2.2, 1.3, 1.2, 5); b(-22, -21, 2.2, 1.3, 1.2, 5, 1.2); b(-18, -18.5, 2.2, 1.3, 1.2, 5);
+      // capilla con campanario
+      b(-4, -25.5, 5, 0.3, 3.6, 12); b(-6.5, -22, 0.3, 7, 3.6, 12); b(-1.5, -22, 0.3, 7, 3.6, 12);
+      b(-5.6, -18.5, 1.8, 0.3, 3.6, 12); b(-2.4, -18.5, 1.8, 0.3, 3.6, 12); b(-4, -18.5, 1.4, 0.3, 1.2, 12, 2.4);
+      b(-4, -22, 5.6, 7.6, 0.25, 1, 3.6); b(-4, -18.5, 1, 0.5, 2, 12, 3.6); b(-4, -18.5, 0.15, 0.15, 1, 11, 5.6); b(-4, -18.5, 0.6, 0.15, 0.15, 11, 6.2);
+      b(-4, -23.5, 3, 0.6, 0.5, 2);
+      // tractor
+      b(-11, -24, 1.6, 3, 1.4, 4); b(-11, -23.2, 1.4, 1.2, 1.2, 11, 1.4); b(-12, -25, 0.35, 1.4, 1.4, 11); b(-10, -25, 0.35, 1.4, 1.4, 11);
       // corrales de troncos (bajitos, se saltan)
       [[-18, 14], [16, 14]].forEach(([x, z]) => { b(x, z - 4, 8, 0.3, 1.1, 2); b(x, z + 4, 8, 0.3, 1.1, 2); b(x - 4, z, 0.3, 8, 1.1, 2); });
-      // fardos y árboles (palos borrachos: tronco gordo)
-      [[-20, -16], [-12, -22], [8, 20], [22, 2], [-24, 2], [0, -20], [0, 22], [12, -10], [-12, 12]].forEach(([x, z], i) => {
-        if (i % 2) { b(x, z, 1.4, 1.4, 4.5, 2); b(x, z, 4, 4, 1.2, 6, 4.5); }
-        else { b(x, z, 2.2, 1.3, 1.2, 5); b(x + 2.3, z, 2.2, 1.3, 1.2, 5); }
-      });
+      b(-18, 14, 2, 0.8, 0.7, 8); b(16, 13, 2.2, 1.3, 1.2, 5);
+      // pozo de agua
+      b(11, -3, 1.6, 1.6, 0.9, 14); b(10.3, -3, 0.15, 0.15, 2.2, 2); b(11.7, -3, 0.15, 0.15, 2.2, 2); b(11, -3, 1.7, 0.2, 0.15, 2, 2.2);
       // camioneta abandonada
       b(-18, -4, 2, 4.6, 1.5, 4); b(-18, -5, 1.9, 1.8, 0.7, 11, 1.5);
+      // palos borrachos (tronco gordo y copa ancha)
+      [[-12, -12], [22, -2], [-24, 6], [6, 20], [12, 10], [-14, 4], [24, 24], [-26, 26]].forEach(([x, z]) => {
+        b(x, z, 1.5, 1.5, 4.2, 2); b(x, z, 4.4, 4.4, 1.3, 6, 4.2); b(x, z, 2.8, 2.8, 0.8, 6, 5.5);
+      });
+      // cardones (cactus del Chaco)
+      [[-26, -8], [-8, 14], [4, -13], [26, -9], [8, 27], [-27, -27], [21, -27], [-8, 27], [27, 15], [-27, 17], [14, -24], [-14, -28]].forEach(([x, z]) => {
+        b(x, z, 0.55, 0.55, 3, 13); b(x + 0.5, z, 0.5, 0.35, 0.35, 13, 1.4); b(x + 0.65, z, 0.3, 0.3, 1.2, 13, 1.4);
+        b(x - 0.5, z, 0.5, 0.35, 0.35, 13, 1.9); b(x - 0.65, z, 0.3, 0.3, 1, 13, 1.9);
+      });
+      // troncos de quebracho apilados (para cubrirse agachado)
+      [[-6, 10], [24, -14], [-27, -14], [4, -10], [-12, 20], [18, 24]].forEach(([x, z], i) => {
+        if (i % 2) { b(x, z, 0.7, 3.2, 0.6, 2); b(x, z, 0.7, 3.2, 0.6, 2, 0.6); } else { b(x, z, 3.2, 0.7, 0.6, 2); b(x, z, 3.2, 0.7, 0.6, 2, 0.6); }
+      });
+      // pircas de piedra y fardos sueltos
+      b(0, 16, 8, 0.6, 1.1, 14); b(2, 25, 6, 0.6, 1.1, 14); b(27, -21, 0.6, 6, 1.1, 14);
+      [[-14, 24], [22, 20], [24, -24], [-25, -2], [9, 7.5]].forEach(([x, z]) => b(x, z, 2.2, 1.3, 1.2, 5));
     }),
   };
   const MAPA_IDS = Object.keys(MAPAS);
@@ -263,6 +291,16 @@
       // cajitas bajas (escalones) se pueden pisar
       if (!ok[j * N + i]) { const g = piso(M, x, z, F.STEP); if (g > 0 && g <= F.STEP && !choca(M, x, g, z, F.H)) ok[j * N + i] = 1; }
     }
+    // solo vale la zona conectada más grande (rincones encerrados no sirven para aparecer ni para los bots)
+    const comp = new Int32Array(N * N).fill(-1); let mejor = -1, tam = 0;
+    for (let c0 = 0; c0 < N * N; c0++) {
+      if (!ok[c0] || comp[c0] >= 0) continue;
+      const pila = [c0]; comp[c0] = c0; let n = 0;
+      while (pila.length) { const c = pila.pop(); n++; const i = c % N, j = (c / N) | 0;
+        for (const [a, bb] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = i + a, y = j + bb; if (x < 0 || y < 0 || x >= N || y >= N) continue; const k = y * N + x; if (ok[k] && comp[k] < 0) { comp[k] = c0; pila.push(k); } } }
+      if (n > tam) { tam = n; mejor = c0; }
+    }
+    for (let c = 0; c < N * N; c++) if (comp[c] !== mejor) ok[c] = 0;
     return { S, N, ok, flows: new Map() };
   }
   const celda = (nav, x, z) => { const i = Math.floor(x + nav.S), j = Math.floor(z + nav.S); return i < 0 || j < 0 || i >= nav.N || j >= nav.N ? -1 : j * nav.N + i; };

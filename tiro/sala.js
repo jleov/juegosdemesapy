@@ -158,7 +158,13 @@
         for (const q of en) { const v = Math.hypot(q.x - c[0], q.z - c[2]) * ((this.settings.mode === 'equipos' && q.team === p.team) ? 3 : 1); if (v < d) d = v; }
         if (d > bd) { bd = d; best = c; }
       }
-      [p.x, p.y, p.z] = best; p.ry = Math.atan2(p.x, p.z); p.rx = 0; p.crouch = false;
+      [p.x, p.y, p.z] = best; p.rx = 0; p.crouch = false;
+      // mirar hacia donde hay más lugar libre (no aparecer con la cara contra una pared)
+      let lejos = -1;
+      for (let a = 0; a < 16; a++) {
+        const ry = a / 16 * Math.PI * 2, d = W.rayMundo(M, [p.x, 1.55, p.z], W.dir(ry, 0), 60) + Math.random() * 3;
+        if (d > lejos) { lejos = d; p.ry = ry; }
+      }
       p.hp = 100; p.alive = true; p.prot = Date.now() + 1800; p.lastHurt = 0; p.w = p.prim;
       if (p.bot) { p.bot.s = { x: p.x, y: p.y, z: p.z, vx: 0, vy: 0, vz: 0, ground: true, crouch: false, slideT: 0 }; p.bot.ammo = A[p.w].mag; p.bot.relT = 0; p.bot.tgt = null; p.bot.goal = null; }
       if (!sinAviso) this.spawnMsg(p);

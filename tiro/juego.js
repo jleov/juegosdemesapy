@@ -15,7 +15,7 @@
   const CAMIS = ['#d52b1e', '#0038a8', '#f1c40f', '#27ae60', '#8e44ad', '#e67e22', '#16a085', '#ff6fb1', '#ecf0f1', '#34495e'];
   const TEAM = { r: '#d52b1e', a: '#1d4fd8' };
   const CAMIS_TXT = ['#ff7a6e', '#7fa8ff', '#f1c40f', '#4cd47f', '#c18be0', '#ffa24d', '#3fd1b4', '#ff8fc4', '#ffffff', '#a9b8c9'];
-  const CIELO = { mercado: ['#9fd3ff', '#8d8a84', 'baldosa'], puerto: ['#b9d3e8', '#5b5e63', 'asfalto'], chaco: ['#f4cf97', '#b87444', 'tierra'] };
+  const CIELO = { mercado: ['#9fd3ff', '#8d8a84', 'baldosa'], puerto: ['#b9d3e8', '#5b5e63', 'asfalto'], chaco: ['#cfe2ef', '#b87444', 'tierra'] };
   const J = window.Juego = {};
   let C = null;                 // {send, S(), me(), obs(), toast}
   let ren, scene, cam, vmScene, vmCam, mapaId = null, mapGroup = null, activo = false, raf = 0, last = 0;
@@ -67,7 +67,7 @@
     const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4;
     return texCache[tipo] = t;
   }
-  const TIPO = { 1: 'ladrillo', 2: 'madera', 9: 'madera', 3: 'chapa', 4: 'chapa', 5: 'chapa', 6: 'chapa', 10: 'chapa' };
+  const TIPO = { 14: 'ladrillo', 1: 'ladrillo', 2: 'madera', 9: 'madera', 3: 'chapa', 4: 'chapa', 5: 'chapa', 6: 'chapa', 10: 'chapa' };
   const matCache = {};
   function matCaja(c) { return matCache[c] || (matCache[c] = new T.MeshLambertMaterial({ color: W.PAL[c], map: tex(TIPO[c] || 'ruido') })); }
   function cajaGeo(w, h, d) {
