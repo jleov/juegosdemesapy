@@ -44,6 +44,8 @@
     luz.linterna = new T.SpotLight(0xfff3d6, 0, 38, 0.42, 0.45, 1.3); luz.linterna.position.set(0.2, -0.15, 0);
     luz.linterna.target.position.set(0, -0.3, -10); cam.add(luz.linterna); cam.add(luz.linterna.target);
     luz.destello = new T.PointLight(0xffc870, 0, 14, 2); luz.destello.position.set(0.2, -0.1, -0.6); cam.add(luz.destello);
+    luz.boom = new T.PointLight(0xffa040, 0, 22, 2); scene.add(luz.boom);
+    luz.fuego = new T.PointLight(0xff7a20, 0, 11, 2); scene.add(luz.fuego);
     vmScene = new T.Scene(); vmCam = new T.PerspectiveCamera(62, 1, 0.01, 10);
     luz.vm1 = new T.HemisphereLight(0xffffff, 0x555555, 1.0); vmScene.add(luz.vm1);
     luz.vm2 = new T.DirectionalLight(0xffffff, 0.5); luz.vm2.position.set(1, 2, 1); vmScene.add(luz.vm2);
@@ -346,7 +348,7 @@
   function animarZ(z, dt) {
     const u = z.g.userData;
     if (!u.modelo) { if (z.estado === 2) z.g.rotation.x = -Math.min(1.5, (z.muerto || 0) * 4); return; }
-    const q = z.estado === 2 ? 'muere' : z.estado === 1 ? 'ataca' : z.vel > 3 ? 'corre' : z.velS > 0.3 ? 'camina' : 'quieto';
+    const q = z.estado === 2 ? 'muere' : z.estado === 1 || z.estado === 3 ? 'ataca' : z.vel > 3 ? 'corre' : z.velS > 0.3 ? 'camina' : 'quieto';
     if (q !== u.actual) {
       const antes = u.acc[u.actual], luego = u.acc[q] || u.acc.camina;
       if (luego && luego !== antes) { luego.reset(); luego.play(); if (antes) antes.crossFadeTo(luego, q === 'muere' ? 0.1 : 0.25, false); }
@@ -407,6 +409,158 @@
     } catch (e) { }
   }
   const esZombi = id => typeof id === 'string' && zombis.has(id);
+
+  // ================= granadas, molotov y ácido =================
+  const PROY = ['granada', 'molotov', 'acido'];
+  const proys = new Map(), areas = [], humos = [];
+  let geoG = null;
+  function proyNuevo(tipo) {
+    if (!geoG) geoG = { esfera: new T.SphereGeometry(1, 10, 8), botella: new T.CylinderGeometry(0.05, 0.07, 0.28, 8) };
+    const g = new T.Group();
+    if (tipo === 'granada') { g.add(new T.Mesh(geoG.esfera, new T.MeshPhongMaterial({ color: '#3d4a2a' }))); g.children[0].scale.setScalar(0.1); }
+    else if (tipo === 'molotov') {
+      const b = new T.Mesh(geoG.botella, new T.MeshPhongMaterial({ color: '#6b3d12', transparent: true, opacity: 0.85 })); g.add(b);
+      const llama = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ffb040'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); llama.scale.set(0.35, 0.35, 1); llama.position.y = 0.2; g.add(llama);
+    } else {
+      const a = new T.Sprite(new T.SpriteMaterial({ map: brillo('#7dff3a'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); a.scale.set(0.7, 0.7, 1); g.add(a);
+      const c = new T.Mesh(geoG.esfera, new T.MeshBasicMaterial({ color: '#8cff2a' })); c.scale.setScalar(0.14); g.add(c);
+    }
+    scene.add(g); return g;
+  }
+  const brillos = {};
+  function brillo(col) {
+    if (brillos[col]) return brillos[col];
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+    const gr = g.createRadialGradient(32, 32, 1, 32, 32, 30); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.25, col); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return brillos[col] = new T.CanvasTexture(c);
+  }
+  function proysSnap(G) {
+    const vistos = new Set();
+    for (const [id, ti, x, y, z] of G) {
+      vistos.add(id);
+      let p = proys.get(id);
+      if (!p) { p = { g: proyNuevo(PROY[ti] || 'granada'), tipo: PROY[ti], obj: [x, y, z] }; p.g.position.set(x, y, z); proys.set(id, p); }
+      p.obj = [x, y, z];
+    }
+    for (const [id, p] of proys) if (!vistos.has(id)) { scene.remove(p.g); proys.delete(id); }
+  }
+  function proysTick(dt) {
+    const k = Math.min(1, dt * 14);
+    for (const p of proys.values()) {
+      p.g.position.x += (p.obj[0] - p.g.position.x) * k; p.g.position.y += (p.obj[1] - p.g.position.y) * k; p.g.position.z += (p.obj[2] - p.g.position.z) * k;
+      p.g.rotation.x += dt * 9; p.g.rotation.z += dt * 6;
+    }
+    // fuegos y charcos de ácido
+    let fuegoCerca = null, fd = 1e9;
+    for (let i = areas.length - 1; i >= 0; i--) {
+      const a = areas[i]; a.t += dt;
+      if (a.t >= a.dur) { scene.remove(a.g); areas.splice(i, 1); continue; }
+      const fin = Math.min(1, (a.dur - a.t) / 0.8);
+      a.g.children.forEach((c, j) => {
+        if (c.isSprite) {
+          const u = c.userData;
+          if (a.tipo === 'fuego') { u.f += dt * (2 + u.v); const s = (0.9 + Math.sin(u.f * 5) * 0.25) * u.s * fin; c.scale.set(s, s * 1.5, 1); c.position.y = u.y + s * 0.5; }
+          else { u.f += dt * u.v; c.position.y = 0.05 + (u.f % 1) * 0.5; c.material.opacity = (1 - (u.f % 1)) * 0.8 * fin; }
+        } else if (c.material) c.material.opacity = (a.tipo === 'fuego' ? 0.35 : 0.55) * fin;
+      });
+      if (a.tipo === 'fuego') { const d = cam ? Math.hypot(a.x - cam.position.x, a.z - cam.position.z) : 0; if (d < fd) { fd = d; fuegoCerca = a; } if ((a.crepT -= dt) <= 0) { a.crepT = 0.12 + Math.random() * 0.25; crepita(a); } }
+    }
+    if (luz.fuego) {
+      if (fuegoCerca) { luz.fuego.position.set(fuegoCerca.x, fuegoCerca.y + 1, fuegoCerca.z); luz.fuego.intensity = (noche ? 2.2 : 1) * (0.8 + Math.random() * 0.4); }
+      else luz.fuego.intensity = 0;
+    }
+    if (luz.boom && luz.boom.intensity > 0) luz.boom.intensity = Math.max(0, luz.boom.intensity - dt * 14);
+    for (let i = humos.length - 1; i >= 0; i--) {
+      const h = humos[i]; h.t += dt;
+      if (h.t >= h.max) { scene.remove(h.o); humos.splice(i, 1); continue; }
+      const k2 = h.t / h.max; h.o.scale.setScalar(h.s0 + h.s1 * k2); h.o.material.opacity = h.op * (1 - k2); h.o.position.y += dt * h.sube;
+    }
+  }
+  function area(m) {
+    const g = new T.Group(); g.position.set(m.x, m.y + 0.03, m.z);
+    const a = { tipo: m.tipo, x: m.x, y: m.y, z: m.z, dur: (m.dur || 6000) / 1000, t: 0, g, crepT: 0 };
+    if (m.tipo === 'fuego') {
+      const disco = new T.Mesh(new T.CircleGeometry(m.r, 24), new T.MeshBasicMaterial({ color: '#ff5a10', transparent: true, opacity: 0.35, blending: T.AdditiveBlending, depthWrite: false }));
+      disco.rotation.x = -Math.PI / 2; g.add(disco);
+      for (let i = 0; i < 16; i++) {
+        const an = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * m.r * 0.9;
+        const sp = new T.Sprite(new T.SpriteMaterial({ map: brillo(i % 3 ? '#ff8a1a' : '#ffd040'), blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
+        sp.position.set(Math.cos(an) * r, 0.3, Math.sin(an) * r); sp.userData = { f: Math.random() * 6, v: Math.random(), s: 0.7 + Math.random() * 0.8, y: 0 }; g.add(sp);
+      }
+      fuegoSnd(m);
+    } else {
+      const disco = new T.Mesh(new T.CircleGeometry(m.r, 24), new T.MeshBasicMaterial({ color: '#5aff1a', transparent: true, opacity: 0.55, blending: T.AdditiveBlending, depthWrite: false }));
+      disco.rotation.x = -Math.PI / 2; g.add(disco);
+      for (let i = 0; i < 10; i++) {
+        const an = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * m.r * 0.85;
+        const sp = new T.Sprite(new T.SpriteMaterial({ map: brillo('#9dff4a'), blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
+        sp.scale.set(0.25, 0.25, 1); sp.position.set(Math.cos(an) * r, 0.05, Math.sin(an) * r); sp.userData = { f: Math.random(), v: 0.6 + Math.random() }; g.add(sp);
+      }
+      chisporrotea(m);
+    }
+    scene.add(g); areas.push(a);
+  }
+  function boom(m) {
+    const d = cam ? Math.hypot(m.x - cam.position.x, m.y - cam.position.y, m.z - cam.position.z) : 30;
+    if (luz.boom) { luz.boom.position.set(m.x, m.y + 1.5, m.z); luz.boom.intensity = noche ? 9 : 5; }
+    const bola = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ff9a2a'), blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 1 }));
+    bola.position.set(m.x, m.y + 0.6, m.z); scene.add(bola); humos.push({ o: bola, t: 0, max: 0.45, s0: 1, s1: 9, op: 1, sube: 0 });
+    for (let i = 0; i < 9; i++) {
+      const h = new T.Mesh(polvoGeo, new T.MeshBasicMaterial({ color: '#3a3a3a', transparent: true }));
+      h.position.set(m.x + (Math.random() - 0.5) * 2.5, m.y + 0.3 + Math.random(), m.z + (Math.random() - 0.5) * 2.5); scene.add(h);
+      humos.push({ o: h, t: 0, max: 1.6 + Math.random(), s0: 4, s1: 10, op: 0.7, sube: 1.2 });
+    }
+    if (d < 9) { yo.temblor = Math.max(yo.temblor || 0, (9 - d) / 9 * 0.35); }
+    boomSnd(1 / (1 + d / 12));
+  }
+  // sonidos
+  function boomSnd(vol) {
+    if (!soundOn || !actx) return;
+    try {
+      const t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+      src.buffer = ruido(); f.type = 'lowpass'; f.frequency.setValueAtTime(1800, t); f.frequency.exponentialRampToValueAtTime(120, t + 1.1);
+      g.gain.setValueAtTime(0.9 * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+      src.connect(f); f.connect(g); g.connect(actx.destination); src.start(t); src.stop(t + 1.3);
+      const o = actx.createOscillator(), g2 = actx.createGain(); o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(28, t + 0.6);
+      g2.gain.setValueAtTime(0.8 * vol, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.7); o.connect(g2); g2.connect(actx.destination); o.start(t); o.stop(t + 0.75);
+    } catch (e) { }
+  }
+  function aDistancia(p) { if (!cam) return 0; const d = Math.hypot(p.x - cam.position.x, p.z - cam.position.z); return Math.max(0, 1 - d / 28); }
+  function fuegoSnd(m) { const v = aDistancia(m); metal(0, 0.5, 600, 200, 0.5 * v, 1); golpe(0, 0.4 * v); raspa(0.02, 0.35, 3000, 900, 0.3 * v); }
+  function crepita(a) { const v = aDistancia(a) * 0.5; if (v > 0.02) clic(0, 1500 + Math.random() * 2500, 0.15 * v); }
+  function chisporrotea(m) { const v = aDistancia(m); if (v <= 0) return; metal(0, 0.9, 5000, 2500, 0.35 * v, 1.5); }
+  function escupeSnd(z) {
+    if (!z || !z.cur) return; const v = aDistancia(z.cur); if (v <= 0.02 || !soundOn || !actx) return;
+    try {
+      const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(60, t + 0.5);
+      f.type = 'lowpass'; f.frequency.value = 900; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.35 * v, t + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      o.connect(f); f.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.6);
+      metal(0.45, 0.25, 1200, 400, 0.35 * v, 2);
+    } catch (e) { }
+  }
+  // tirar (G granada, V molotov)
+  function lanzar(tipo) {
+    const S = C.S(); if (!S || S.settings.mode !== 'zombis' || !yo.alive) return;
+    const me = S.players.find(p => p.id === C.me()); if (!me || (tipo === 'granada' ? me.gr : me.mo) <= 0) return;
+    C.send({ t: 'lanza', tipo, d: W.dir(yo.ry, yo.rx).map(v => Math.round(v * 1000) / 1000) });
+    yo.cambioT = 0.35; raspa(0, 0.2, 400, 1600, 0.25);
+  }
+  J.lanzar = lanzar;
+  function tiraHUD() {
+    const S = C.S(), el = $('#aTira'); if (!S || !el) return;
+    const z = S.settings.mode === 'zombis', me = S.players.find(p => p.id === C.me());
+    el.classList.toggle('hidden', !z || C.obs());
+    if (z && me) el.textContent = `💣 ${me.gr | 0}   🔥 ${me.mo | 0}`;
+    document.querySelectorAll('[data-b="granada"],[data-b="molotov"]').forEach(b => b.classList.toggle('hidden', !z));
+  }
+  function limpiarTiros() {
+    for (const p of proys.values()) scene.remove(p.g); proys.clear();
+    for (const a of areas) scene.remove(a.g); areas.length = 0;
+    for (const h of humos) scene.remove(h.o); humos.length = 0;
+    if (luz.fuego) luz.fuego.intensity = 0; if (luz.boom) luz.boom.intensity = 0;
+  }
 
   // ================= arma en la mano (primera persona) =================
   const VM = {};
@@ -611,6 +765,7 @@
     activo = false; cancelAnimationFrame(raf);
     for (const r of remotos.values()) scene.remove(r.g); remotos.clear();
     for (const z of zombis.values()) scene.remove(z.g); zombis.clear(); yo.ola = null;
+    limpiarTiros();
     yo.alive = false; inp.fire = false; inp.aim = false;
     if (document.pointerLockElement) document.exitPointerLock();
     $('#juego').classList.add('hidden'); $('#muerte').classList.add('hidden'); $('#pausa').classList.add('hidden');
@@ -625,7 +780,7 @@
     const ids = new Set();
     for (const p of S.players) { if (p.id === C.me()) { yo.prim = p.prim; continue; } ids.add(p.id); remoto(p); }
     for (const [id, r] of remotos) if (!ids.has(id)) { scene.remove(r.g); remotos.delete(id); }
-    marcador(); tabla();
+    marcador(); tabla(); tiraHUD();
   };
 
   // ================= mensajes de la sala =================
@@ -644,6 +799,7 @@
         }
         yo.tl = m.tl; yo.tlAt = performance.now();
         if (m.Z) { zombisSnap(m.Z); yo.ola = m.ol; marcador(); } else if (zombis.size) zombisSnap([]);
+        if (m.G) proysSnap(m.G); else if (proys.size) proysSnap([]);
         break;
       }
       case 'spawn': {
@@ -669,6 +825,10 @@
       }
       case 'kill': feedKill(m); break;
       case 'ola': if (m.n) { aviso('🧟 ¡Oleada ' + m.n + '!', 'Vienen zombis...'); SFX.aparece(); } else if (m.fin) aviso('✅ ¡Pasaron la oleada ' + m.fin + '!', 'Respiren: la próxima en 8 segundos'); break;
+      case 'boom': boom(m); break;
+      case 'area': area(m); break;
+      case 'escupe': escupeSnd(zombis.get(m.id)); break;
+      case 'tira': { if (m.id !== C.me()) { const r = remotos.get(m.id); if (r && r.cur) raspa(0, 0.2, 400, 1600, 0.25 * aDistancia(r.cur)); } break; }
       case 'muerde': { const z = zombis.get(m.id); if (z && z.cur) gruDe(z.cur, 'brazo'); break; }
       case 'hurt': {
         yo.hp = m.hp; SFX.duele();
@@ -692,7 +852,7 @@
     return S.settings.mode === 'equipos' ? (p.team === 'r' ? '#ff8a80' : '#8ab4ff') : CAMIS_TXT[p.col % CAMIS_TXT.length];
   }
   function feedKill(m) {
-    const me = C.me(), w = m.w === 'zombi' ? { ico: '🧟' } : (A[m.w] || A.fusil);
+    const me = C.me(), w = { zombi: { ico: '🧟' }, granada: { ico: '💣' }, molotov: { ico: '🔥' }, acido: { ico: '🧪' } }[m.w] || A[m.w] || A.fusil;
     const d = document.createElement('div'); d.className = 'fk' + (m.a === me || m.v === me ? ' mio' : '');
     d.innerHTML = m.a && m.a !== m.v ? `<b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> <span>${w.ico}${m.h ? '🎯' : ''}</span> <b style="color:${colorDe(m.v)}">${esc(nombre(m.v))}</b>` : `💀 <b>${esc(nombre(m.v))}</b>`;
     const f = $('#feed'); f.prepend(d); while (f.children.length > 5) f.lastChild.remove();
@@ -713,7 +873,7 @@
     if (estaba) SFX.muero();
     if (m && m.a && m.a !== C.me()) yo.killer = m.a; else if (m) yo.killer = null;
     const w = m && A[m.w];
-    $('#mTxt').innerHTML = m && m.w === 'zombi' ? 'Te agarró un zombi 🧟' : m && m.a && m.a !== m.v ? `Te bajó <b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> con ${w ? w.ico + ' ' + w.n : 'un tiro'}${m.h ? ' <b>¡a la cabeza!</b> 🎯' : ''}` : 'Caíste 💀';
+    $('#mTxt').innerHTML = m && m.w === 'acido' ? 'Te derritió el ácido de un zombi 🧪' : m && m.w === 'zombi' ? 'Te agarró un zombi 🧟' : m && m.a && m.a !== m.v ? `Te bajó <b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> con ${w ? w.ico + ' ' + w.n : 'un tiro'}${m.h ? ' <b>¡a la cabeza!</b> 🎯' : ''}` : 'Caíste 💀';
     $('#muerte').classList.remove('hidden');
     // en la PC se suelta el mouse para poder tocar el arma de la próxima vida
     if (document.pointerLockElement) document.exitPointerLock();
@@ -766,6 +926,8 @@
       if (k === 'Space') { inp.jumpQ = true; e.preventDefault(); }
       if (k === 'KeyR') recargar();
       if (k === 'KeyF' && noche) J.linterna();
+      if (k === 'KeyG') lanzar('granada');
+      if (k === 'KeyV') lanzar('molotov');
       if (k === 'Digit1') ponerArma(yo.prim); if (k === 'Digit2') ponerArma('pistola'); if (k === 'KeyQ') cambiar();
     });
     addEventListener('keyup', e => { inp.keys.delete(e.code); if (e.code === 'Tab') { inp.tabla = false; tabla(); } });
@@ -808,6 +970,7 @@
           else if (b === 'tabla') { inp.tabla = !inp.tabla; tabla(); }
           else if (b === 'chat') abrirChat();
           else if (b === 'luz') { if (noche) J.linterna(); }
+          else if (b === 'granada' || b === 'molotov') lanzar(b);
           continue;
         }
         if (C.obs()) { mira++; continue; }
@@ -951,6 +1114,7 @@
       if (r.fuego > 0) { r.fuego -= dt; u.arma.material = r.fuego > 0 ? fuegoMat : u.armaMat; }
     }
     if (zombis.size) zombisTick(dt, rt);
+    if (proys.size || areas.length || humos.length || (luz.boom && luz.boom.intensity > 0)) proysTick(dt);
     if (obs) camObs(dt);
     efectosTick(dt);
     if (fogon.visible) { fogon.t -= dt; if (fogon.t <= 0) fogon.visible = false; }
@@ -999,6 +1163,8 @@
     const z = 1 + (w.zoom - 1) * yo.aimK;
     cam.fov = fovBase / z; cam.updateProjectionMatrix();
     cam.position.set(s.x, s.y + yo.eye, s.z); cam.rotation.set(yo.rx, yo.ry, s.slideT > 0 ? 0.06 : 0);
+    // temblor de una explosión cerca
+    if (yo.temblor > 0) { yo.temblor = Math.max(0, yo.temblor - dt * 0.8); cam.position.x += (Math.random() - 0.5) * yo.temblor; cam.position.y += (Math.random() - 0.5) * yo.temblor; }
     // arma en la mano: balanceo al caminar, retroceso, apuntar al medio
     const v = Math.hypot(s.vx, s.vz); yo.bob += dt * v * (s.ground ? 1.7 : 0);
     // mis propios pasos, más bajitos

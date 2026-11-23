@@ -25,7 +25,15 @@
     medio: { hp: 60,  alto: 0.75, camina: 1.5, corre: 1.5, dmg: 10 },
   };
   const TIPOS_Z = ['zombi', 'gordo', 'brazo', 'medio'];
-  const MAX_Z = 16;   // zombis a la vez (para que no se trabe el celular)
+  const MAX_Z = 16;
+  const PG = 18;   // gravedad de lo que se tira (granadas, molotov, ácido)
+  const PROY = ['granada', 'molotov', 'acido'];
+  // punto adentro de una caja del mapa
+  function dentro(M, x, y, z) {
+    const B = M.boxes;
+    for (let i = 0; i < B.length; i++) { const b = B[i]; if (x > b[0] && x < b[3] && y > b[1] && y < b[4] && z > b[2] && z < b[5]) return b; }
+    return null;
+  }   // zombis a la vez (para que no se trabe el celular)
   const RACHA = { 2: '¡Doble! 🔥', 3: '¡Triple! 🔥🔥', 5: '¡Imparable! 💪', 7: '¡Hetaiterei! 😱', 10: '¡Leyenda guasu! 👑' };
 
   class Room {
@@ -36,6 +44,7 @@
       this.phase = 'lobby'; this.endAt = 0; this.score = { r: 0, a: 0 }; this.ranking = null; this.winner = null;
       this.dead = false; this.last = Date.now(); this.snapAcc = 0;
       this.zombis = new Map(); this.ola = null; this.zc = 0;
+      this.proy = []; this.areas = []; this.pc = 0;
       this.timer = setInterval(() => this.tick(), 33);
     }
     destroy() { this.dead = true; clearInterval(this.timer); }
@@ -51,7 +60,7 @@
       const now = Date.now();
       return {
         t: 'state', me: id, code: this.code, phase: this.phase, hostId: this.hostId, settings: this.settings,
-        players: this.list().map(p => ({ id: p.id, name: p.name, avatar: p.avatar, bot: !!p.bot, team: p.team, col: p.col, k: p.k, d: p.d, connected: !!p.bot || p.connected, voice: !!p.voice, prim: p.prim, skin: p.skin })),
+        players: this.list().map(p => ({ id: p.id, name: p.name, avatar: p.avatar, bot: !!p.bot, team: p.team, col: p.col, k: p.k, d: p.d, connected: !!p.bot || p.connected, voice: !!p.voice, prim: p.prim, skin: p.skin, gr: p.granadas | 0, mo: p.molotov | 0 })),
         remaining: this.phase === 'play' ? Math.max(0, this.endAt - now) : 0, ola: this.ola ? { n: this.ola.n, quedan: this.ola.quedan + this.zVivos() } : null, score: this.score, ranking: this.ranking, winner: this.winner,
         maps: W.MAPA_IDS.map(k => [k, W.mapa(k).n]),
       };
@@ -141,7 +150,7 @@
       this.score = { r: 0, a: 0 }; this.ranking = null; this.winner = null;
       for (const p of this.players.values()) { p.k = 0; p.d = 0; p.streak = 0; this.respawn(p, true); }
       this.phase = 'play'; this.endAt = Date.now() + this.settings.time * 60000;
-      this.zombis.clear(); this.ola = null;
+      this.zombis.clear(); this.ola = null; this.proy = []; this.areas = [];
       if (this.settings.mode === 'zombis') { this.endAt = Date.now() + 24 * 3600e3; this.ola = { n: 0, quedan: 0, spawnT: 0, pausaHasta: Date.now() + 4000 }; }
       this.broadcastState();
       if (this.settings.mode === 'zombis') this.sys(`🧟 ¡Supervivencia en ${this.M.n}! Aguanten todas las oleadas de zombis que puedan. Si caen, vuelven en la próxima oleada.`);
@@ -185,6 +194,7 @@
         if (d > lejos) { lejos = d; p.ry = ry; }
       }
       p.hp = 100; p.alive = true; p.prot = Date.now() + 1800; p.lastHurt = 0; p.w = p.prim;
+      p.granadas = 2; p.molotov = 1;   // para la supervivencia zombi
       if (p.bot) { p.bot.s = { x: p.x, y: p.y, z: p.z, vx: 0, vy: 0, vz: 0, ground: true, crouch: false, slideT: 0 }; p.bot.ammo = A[p.w].mag; p.bot.relT = 0; p.bot.tgt = null; p.bot.goal = null; }
       if (!sinAviso) this.spawnMsg(p);
     }
@@ -267,7 +277,7 @@
         if (p.hp < 100 && now - p.lastHurt > 4500) p.hp = Math.min(100, p.hp + 22 * dt);
         if (p.bot) this.botTick(p, dt, now);
       }
-      if (this.ola) { this.olaTick(dt, now); for (const z of this.zombis.values()) this.zombiTick(z, dt, now); if (this.phase !== 'play') return; }
+      if (this.ola) { this.olaTick(dt, now); for (const z of this.zombis.values()) this.zombiTick(z, dt, now); this.proyTick(dt, now); this.areasTick(dt, now); if (this.phase !== 'play') return; }
       if (now >= this.endAt) { this.finish('time'); return; }
       this.snapAcc += dt;
       if (this.snapAcc >= 0.05) {
@@ -276,6 +286,7 @@
         const m = { t: 'snap', P, tl: Math.max(0, this.endAt - now) };
         if (this.ola) {
           m.Z = [...this.zombis.values()].map(z => [z.id, TIPOS_Z.indexOf(z.tipo), r2(z.x), r2(z.y), r2(z.z), r2(z.ry), z.alive ? z.estado : 2, r2(z.vel)]);
+          m.G = this.proy.map(p => [p.id, PROY.indexOf(p.tipo), r2(p.x), r2(p.y), r2(p.z)]);
           m.ol = [this.ola.n, this.ola.quedan + this.zVivos(), this.ola.pausaHasta ? 1 : 0];
         }
         this.all(m);
@@ -289,7 +300,7 @@
       if (o.pausaHasta) {
         if (now < o.pausaHasta) return;
         o.pausaHasta = 0; o.n++; o.quedan = this.cuantos(o.n); o.spawnT = 0;
-        for (const p of this.players.values()) if (!p.alive) this.respawn(p);
+        for (const p of this.players.values()) { if (!p.alive) this.respawn(p); else { p.granadas = Math.min(3, (p.granadas | 0) + 1); p.molotov = Math.min(2, (p.molotov | 0) + 1); } }
         this.all({ t: 'ola', n: o.n });
         this.sys(`🧟 ¡Oleada ${o.n}! Vienen ${o.quedan} zombis.`);
         this.broadcastState();
@@ -319,7 +330,7 @@
         if (d > 22) break;
       }
       const corre = (tipo === 'zombi' || tipo === 'brazo') && Math.random() < Math.min(0.65, (n - 1) * 0.13);
-      const z = { id: 'z' + (++this.zc), zombi: true, tipo, x: best[0], y: best[1], z: best[2], ry: 0, crouch: false, alto: T.alto,
+      const z = { id: 'z' + (++this.zc), zombi: true, tipo, escupe: tipo === 'gordo' || tipo === 'medio', escT: 2 + Math.random() * 3, escupiendo: 0, x: best[0], y: best[1], z: best[2], ry: 0, crouch: false, alto: T.alto,
         hp: T.hp * (1 + 0.15 * (n - 1)), vel: corre ? T.corre : T.camina, dmg: T.dmg * (1 + 0.05 * (n - 1)), alive: true, estado: 0, atkT: 0.6, pathT: 0, paso: null, quieto: 0,
         s: { x: best[0], y: best[1], z: best[2], vx: 0, vy: 0, vz: 0, ground: true, crouch: false, slideT: 0 } };
       this.zombis.set(z.id, z);
@@ -332,6 +343,19 @@
       if (!t) { z.estado = 0; return; }
       const dx = t.x - z.x, dz = t.z - z.z, d = Math.hypot(dx, dz);
       let mx = 0, mz = 0;
+      // el gordo y el que se arrastra escupen ácido de lejos: nadie se puede quedar quieto en un lugar
+      if (z.escupe) {
+        const boca = [z.x, z.y + z.alto * 0.85, z.z];
+        if (z.escupiendo > 0) {
+          z.escupiendo -= dt; z.estado = 3; z.ry = Math.atan2(-dx, -dz);
+          if (z.escupiendo <= 0) this.lanzar('acido', boca, this.lob(boca, [t.x, t.y + 0.4, t.z], 0.55), z);
+          W.mover(M, z.s, { mx: 0, mz: 0, jump: false, crouch: false, aim: false }, dt);
+          z.x = z.s.x; z.y = z.s.y; z.z = z.s.z;
+          return;
+        }
+        z.escT -= dt;
+        if (z.escT <= 0 && d > 4 && d < 24 && W.seVe(M, boca, [t.x, t.y + 1.2, t.z])) { z.escT = 4 + Math.random() * 2.5; z.escupiendo = 0.6; this.all({ t: 'escupe', id: z.id }); }
+      }
       if (d < 1.35 && Math.abs(t.y - z.y) < 1.3) {
         z.estado = 1; z.ry = Math.atan2(-dx, -dz);
         z.atkT -= dt;
@@ -360,6 +384,88 @@
       W.liberar(M, s);
       if (z.estado === 0 && Math.hypot(s.x - ox, s.z - oz) < dt * 0.3) { if ((z.quieto += dt) > 0.7) { z.quieto = 0; z.paso = null; z.pathT = 0; if (s.ground) s.vy = F.JUMP * 0.8; } } else z.quieto = 0;
       z.x = s.x; z.y = s.y; z.z = s.z;
+    }
+    // velocidad para que algo tirado en arco caiga en "b"
+    lob(a, b, ang) {
+      const dx = b[0] - a[0], dz = b[2] - a[2], dy = b[1] - a[1], D = Math.hypot(dx, dz) || 0.01;
+      let th = ang;
+      for (let i = 0; i < 6; i++) {
+        const c = Math.cos(th), den = 2 * c * c * (D * Math.tan(th) - dy);
+        if (den > 0.01) { const v = Math.sqrt(PG * D * D / den); return [dx / D * v * c, v * Math.sin(th), dz / D * v * c]; }
+        th += 0.15;
+      }
+      return [dx / D * 8, 8, dz / D * 8];
+    }
+    lanzar(tipo, o, v, dueno) {
+      this.proy.push({ id: 'p' + (++this.pc), tipo, x: o[0], y: o[1], z: o[2], vx: v[0], vy: v[1], vz: v[2], t: 0, dueno });
+    }
+    tirar(p, m) {   // un jugador tira una granada o un molotov
+      if (!this.ola || !p.alive || (m.tipo !== 'granada' && m.tipo !== 'molotov')) return;
+      const k = m.tipo === 'granada' ? 'granadas' : 'molotov';
+      if ((p[k] | 0) <= 0) return;
+      let d = Array.isArray(m.d) ? m.d.slice(0, 3).map(Number) : W.dir(p.ry, p.rx);
+      const L = Math.hypot(d[0], d[1], d[2]); if (!(L > 0)) return; d = d.map(v => v / L);
+      p[k]--;
+      const vel = m.tipo === 'granada' ? 15 : 14;
+      this.lanzar(m.tipo, [p.x + d[0] * 0.4, p.y + 1.45, p.z + d[2] * 0.4], [d[0] * vel, d[1] * vel + 2.5, d[2] * vel], p);
+      this.all({ t: 'tira', id: p.id, tipo: m.tipo });
+      this.broadcastState();
+    }
+    proyTick(dt, now) {
+      const M = this.M;
+      for (let i = this.proy.length - 1; i >= 0; i--) {
+        const p = this.proy[i]; p.t += dt; let pego = false;
+        const N = 4, h = dt / N;
+        for (let k = 0; k < N; k++) {
+          p.vy -= PG * h;
+          const nx = p.x + p.vx * h; if (dentro(M, nx, p.y, p.z)) { p.vx *= -0.45; pego = true; } else p.x = nx;
+          const nz = p.z + p.vz * h; if (dentro(M, p.x, p.y, nz)) { p.vz *= -0.45; pego = true; } else p.z = nz;
+          const ny = p.y + p.vy * h, bx = dentro(M, p.x, ny, p.z);
+          if (ny <= 0.06 || bx) { if (p.vy < 0) p.y = bx ? bx[4] + 0.06 : 0.06; p.vy *= -0.35; p.vx *= 0.65; p.vz *= 0.65; pego = true; } else p.y = ny;
+        }
+        // el ácido que le pega directo a alguien
+        if (p.tipo === 'acido') for (const q of this.players.values()) if (q.alive && Math.hypot(q.x - p.x, q.z - p.z) < 0.6 && p.y > q.y && p.y < q.y + 1.9) { pego = true; this.danarJugador(q, 15, p.dueno, 'acido', now, p); }
+        if (p.tipo === 'granada') { if (p.t >= 2.2) { this.explotar(p); this.proy.splice(i, 1); } }
+        else if (pego || p.t > 6) { this.area(p.tipo === 'molotov' ? 'fuego' : 'acido', p, now); this.proy.splice(i, 1); }
+      }
+    }
+    explotar(p) {
+      this.all({ t: 'boom', x: r2(p.x), y: r2(p.y), z: r2(p.z) });
+      for (const z of this.zombis.values()) {
+        if (!z.alive) continue;
+        const d = Math.hypot(z.x - p.x, z.y + 0.8 - p.y, z.z - p.z);
+        if (d < 6.5) this.hurt(z, 40 + 280 * (1 - d / 6.5), p.dueno, false, 'granada');
+      }
+    }
+    area(tipo, p, now) {
+      const M = this.M, y = W.piso(M, p.x, p.z, p.y + 0.3), fuego = tipo === 'fuego';
+      const a = { id: 'a' + (++this.pc), tipo, x: p.x, y, z: p.z, r: fuego ? 3.2 : 2.3, hasta: now + (fuego ? 7000 : 6000), dueno: p.dueno };
+      this.areas.push(a);
+      this.all({ t: 'area', id: a.id, tipo, x: r2(a.x), y: r2(a.y), z: r2(a.z), r: a.r, dur: a.hasta - now });
+    }
+    areasTick(dt, now) {
+      for (let i = this.areas.length - 1; i >= 0; i--) {
+        const a = this.areas[i];
+        if (now >= a.hasta) { this.areas.splice(i, 1); continue; }
+        if (a.tipo === 'fuego') {
+          for (const z of this.zombis.values()) {
+            if (!z.alive || Math.hypot(z.x - a.x, z.z - a.z) > a.r || Math.abs(z.y - a.y) > 1.5) continue;
+            z.hp -= 45 * dt;
+            if (z.hp <= 0) this.matarZombi(z, a.dueno, 'molotov', false);
+          }
+        } else {
+          for (const q of this.players.values()) {
+            if (!q.alive || Math.hypot(q.x - a.x, q.z - a.z) > a.r || Math.abs(q.y - a.y) > 1.2) continue;
+            this.danarJugador(q, 16 * dt, a.dueno, 'acido', now, a);
+          }
+        }
+      }
+    }
+    danarJugador(q, v, z, w, now, src) {
+      if (now < q.prot || !q.alive) return;
+      q.hp -= v; q.lastHurt = now;
+      if (!q.avisoT || now - q.avisoT > 350 || q.hp <= 0) { q.avisoT = now; this.to(q.id, { t: 'hurt', a: z ? z.id : null, hp: Math.max(0, Math.round(q.hp)), from: [r2(src.x), r2(src.z)], w }); }
+      if (q.hp <= 0) this.die(q, z && z.zombi ? z : null, w, false);
     }
     mordida(t, z, now) {
       if (!t.alive || now < t.prot) return;
@@ -403,6 +509,14 @@
         if (!best && b.tgt) b.tgt = null;
       }
       // recargar
+      if (this.ola && b.tgt && b.tgt.zombi && (p.granadas | 0) > 0) {
+        b.granT = (b.granT == null ? 4 : b.granT) - dt;
+        const q = b.tgt, dq = Math.hypot(q.x - p.x, q.z - p.z);
+        if (b.granT <= 0 && dq > 6 && dq < 20) {
+          let n = 0; for (const z of this.zombis.values()) if (z.alive && Math.hypot(z.x - q.x, z.z - q.z) < 4) n++;
+          if (n >= 3) { b.granT = 8; p.granadas--; this.lanzar('granada', [p.x, p.y + 1.45, p.z], this.lob([p.x, p.y + 1.45, p.z], [q.x, q.y, q.z], 0.6), p); this.all({ t: 'tira', id: p.id, tipo: 'granada' }); }
+        }
+      }
       if (b.relT > 0) { b.relT -= dt; if (b.relT <= 0) b.ammo = w.mag; }
       let mx = 0, mz = 0, jump = false, aim = false, quiereRy = p.ry, quiereRx = 0;
       if (b.tgt) {
@@ -440,6 +554,7 @@
         if (--b.ammo <= 0) b.relT = w.rec / 1000;
       }
       // moverse
+      for (const a of this.areas) if (a.tipo === 'acido') { const ax = p.x - a.x, az = p.z - a.z, d = Math.hypot(ax, az); if (d < a.r + 1) { mx += ax / (d || 1) * 1.5; mz += az / (d || 1) * 1.5; } }
       const L = Math.hypot(mx, mz); if (L > 1) { mx /= L; mz /= L; }
       const s = b.s, ox = s.x, oz = s.z;
       W.mover(M, s, { mx, mz, jump, crouch: false, aim }, dt);
@@ -474,6 +589,7 @@
         case 'removeBot': return this.removeBot(pid, m.id);
         case 'team': return this.setTeam(pid, String(m.id || pid), m.team);
         case 'prim': return this.setPrim(pid, m.w);
+        case 'lanza': return this.tirar(p, m);
         case 'skin': if (SKINS.includes(m.skin)) { p.skin = m.skin; this.broadcastState(); } return;
         case 'start': return this.start(pid);
         case 'lobby': return this.toLobby(pid);

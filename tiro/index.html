@@ -118,6 +118,7 @@ input:focus,select:focus{border-color:var(--azul2)}
 .vbar{height:10px;background:rgba(0,0,0,.5);border-radius:6px;overflow:hidden;margin-top:4px;border:1px solid rgba(255,255,255,.25)}
 #vBar{height:100%;width:100%;background:#2ecc71;transition:width .15s}
 .armahud{text-align:right}#aNom{font-size:14px;color:#ddd}#aBal{font-size:20px}#aBal b{font-size:32px}
+#aTira{font-size:15px;margin-bottom:2px}
 #aRec{display:none;width:120px;height:6px;background:rgba(0,0,0,.5);border-radius:4px;overflow:hidden;margin:4px 0 0 auto}#aRec div{height:100%;background:#ffc83d;width:0}
 #aviso{position:absolute;top:30%;left:0;right:0;text-align:center;font-size:clamp(16px,3.4vw,24px);opacity:0}
 #aviso .racha{font-size:1.4em;color:#ffc83d}
@@ -172,6 +173,7 @@ body.tactil .pc-solo{display:none}
 .tb[data-b=reload]{right:126px;bottom:84px}.tb[data-b=swap]{right:162px;bottom:24px}
 .tb[data-b=tabla]{right:14px;top:calc(max(8px,env(safe-area-inset-top)) + 52px);width:40px;height:40px;font-size:16px}
 .tb[data-b=luz]{right:106px;top:calc(max(8px,env(safe-area-inset-top)) + 52px);width:40px;height:40px;font-size:16px}
+.tb[data-b=granada]{right:200px;bottom:110px}.tb[data-b=molotov]{right:200px;bottom:174px}
 .tb[data-b=chat]{right:60px;top:calc(max(8px,env(safe-area-inset-top)) + 52px);width:40px;height:40px;font-size:16px}
 body.tactil #feed{top:calc(max(8px,env(safe-area-inset-top)) + 100px)}
 body.tactil #abajo{left:12px;right:auto;bottom:auto;top:calc(max(8px,env(safe-area-inset-top)) + 54px);flex-direction:column;align-items:flex-start;gap:6px}
@@ -249,7 +251,7 @@ body.tactil #chatF{bottom:auto;top:30%}
         <form id="chatForm"><input id="chatIn" maxlength="120" placeholder="Escribí algo..." autocomplete="off"><button class="btn-p">➤</button></form></div>
       <div class="panel card ayuda">
         <b>Cómo se juega</b><br>
-        🖥️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · mouse apuntar · clic izquierdo tirar · clic derecho mira · <kbd>Espacio</kbd> saltar · <kbd>Shift</kbd> agacharse (corriendo, te deslizás) · <kbd>R</kbd> recargar · <kbd>Q</kbd>/<kbd>1</kbd>/<kbd>2</kbd> cambiar arma · <kbd>Tab</kbd> tabla · <kbd>Enter</kbd> chat · <kbd>Esc</kbd> ajustes · <kbd>F</kbd> linterna (de noche, con zombis)<br>
+        🖥️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · mouse apuntar · clic izquierdo tirar · clic derecho mira · <kbd>Espacio</kbd> saltar · <kbd>Shift</kbd> agacharse (corriendo, te deslizás) · <kbd>R</kbd> recargar · <kbd>Q</kbd>/<kbd>1</kbd>/<kbd>2</kbd> cambiar arma · <kbd>Tab</kbd> tabla · <kbd>Enter</kbd> chat · <kbd>Esc</kbd> ajustes · <kbd>F</kbd> linterna, <kbd>G</kbd> granada y <kbd>V</kbd> molotov (con zombis)<br>
         📱 palanca a la izquierda para caminar, arrastrá a la derecha para mirar, y botones para tirar, apuntar, saltar y agacharte.<br>
         🎯 A la cabeza hace el doble. La vida se recupera sola si no te pegan un rato.<br>
         <small>Personajes y armas en 3D: <a href="https://quaternius.com/packs/toonshootergamekit.html" target="_blank" rel="noopener" style="color:inherit">Toon Shooter Game Kit de Quaternius</a> (CC0, uso libre). Zombis: Zombie Apocalypse Kit de Quaternius vía <a href="https://poly.pizza/bundle/Post-Apocolypse-Pack-jg0We8Clu0" target="_blank" rel="noopener" style="color:inherit">Poly Pizza</a> (CC0 y CC-BY 3.0).</small>
@@ -272,7 +274,7 @@ body.tactil #chatF{bottom:auto;top:30%}
     <div id="clog"></div>
     <div id="abajo">
       <div class="vida"><div class="num">❤️ <span id="vNum">100</span></div><div class="vbar"><div id="vBar"></div></div></div>
-      <div class="armahud"><div id="aNom"></div><div id="aBal"></div><div id="aRec"><div></div></div></div>
+      <div class="armahud"><div id="aTira" class="hidden"></div><div id="aNom"></div><div id="aBal"></div><div id="aRec"><div></div></div></div>
     </div>
     <div id="obsTxt"></div>
     <div id="tabla" class="hidden"></div>
@@ -282,7 +284,7 @@ body.tactil #chatF{bottom:auto;top:30%}
     <div id="palanca"><div id="bolita"></div></div>
     <div class="tb" data-b="fire">🔫</div><div class="tb" data-b="aim">🎯</div><div class="tb" data-b="jump">⬆️</div>
     <div class="tb" data-b="crouch">⬇️</div><div class="tb" data-b="reload">🔄</div><div class="tb" data-b="swap">🔁</div>
-    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div><div class="tb" data-b="luz">🔦</div>
+    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div><div class="tb" data-b="luz">🔦</div><div class="tb" data-b="granada">💣</div><div class="tb" data-b="molotov">🔥</div>
   </div>
   <div id="topBtns">
     <button id="cfgBtn" title="Ajustes">⚙️</button>
@@ -312,9 +314,9 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div id="audios"></div>
 </div>
 
-<script src="mundo.js?v=12"></script>
-<script src="sala.js?v=12"></script>
-<script src="juego.js?v=12"></script>
+<script src="mundo.js?v=13"></script>
+<script src="sala.js?v=13"></script>
+<script src="juego.js?v=13"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -546,7 +548,7 @@ function onMsg(m) {
       break;
     case 'state': setState(m); break;
     case 'chat': addMsg(m); if (Juego.activo()) Juego.chat(m); break;
-    case 'snap': case 'spawn': case 'fx': case 'kill': case 'hurt': case 'hitm': if (Juego.activo()) Juego.msg(m); break;
+    case 'snap': case 'spawn': case 'fx': case 'kill': case 'hurt': case 'hitm': case 'ola': case 'muerde': case 'boom': case 'area': case 'escupe': case 'tira': if (Juego.activo()) Juego.msg(m); break;
     case 'sfx': Juego.sfx(m.name); break;
     case 'rtc': onRtc(m.from, m.data); break;
     case 'err': toast(m.msg); if (m.expired) { sess.set('tg_session', null); goHome(true); } break;
