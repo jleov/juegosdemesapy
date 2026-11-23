@@ -198,7 +198,8 @@
     }
     calc(w, head, dist) {
       let v = w.dmg * (head ? w.head : 1);
-      if (w === A.escopeta) v *= Math.max(0.35, Math.min(1, 1 - (dist - 7) / 26));
+      // escopeta: muy fuerte de cerca (hasta 4 m vale 1,5 veces), baja hasta los 8 m y después se debilita
+      if (w === A.escopeta) v *= dist <= 4 ? 1.5 : dist <= 8 ? 1.5 - (dist - 4) / 8 : Math.max(0.3, 1 - (dist - 8) / 22);
       if (w === A.franco && head) v = 200;
       return v;
     }

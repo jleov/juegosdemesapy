@@ -16,7 +16,7 @@
   // ---------- armas ----------
   const ARMAS = {
     fusil:    { n: 'Fusil',         ico: '🔫', dmg: 22, head: 2,   cad: 105,  mag: 30, rec: 1800, hip: 0.018, aim: 0.004, auto: true,  pel: 1, range: 140, zoom: 1.45, kick: 0.012 },
-    escopeta: { n: 'Escopeta',      ico: '💥', dmg: 11, head: 1.5, cad: 820,  mag: 6,  rec: 2300, hip: 0.075, aim: 0.055, auto: false, pel: 9, range: 34,  zoom: 1.2,  kick: 0.06 },
+    escopeta: { n: 'Escopeta',      ico: '💥', dmg: 14, head: 1.5, cad: 750,  mag: 6,  rec: 2300, hip: 0.055, aim: 0.04,  auto: false, pel: 9, range: 34,  zoom: 1.2,  kick: 0.06 },
     franco:   { n: 'Francotirador', ico: '🎯', dmg: 85, head: 2,   cad: 1150, mag: 5,  rec: 2600, hip: 0.09,  aim: 0,     auto: false, pel: 1, range: 260, zoom: 4,    kick: 0.08 },
     pistola:  { n: 'Pistola',       ico: '🔫', dmg: 26, head: 2,   cad: 230,  mag: 12, rec: 1300, hip: 0.012, aim: 0.005, auto: false, pel: 1, range: 90,  zoom: 1.3,  kick: 0.025 },
   };
