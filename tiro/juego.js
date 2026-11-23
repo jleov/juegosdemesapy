@@ -788,6 +788,39 @@
     } catch (e) { }
   }
   // pasos de otro jugador: más fuerte cuanto más cerca, y del lado donde está
+  // deslizarse: nubecitas de polvo en los pies y un roce largo
+  let polvoTex = null;
+  function polvo(x, y, z) {
+    if (!polvoTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+      const gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,.4)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64); polvoTex = new T.CanvasTexture(c);
+    }
+    const col = noche ? '#4a463f' : { chaco: '#c9a079', laberinto: '#9c9a78', estadio: '#a9b090' }[mapaId] || '#c8c2b4';
+    const h = new T.Sprite(new T.SpriteMaterial({ map: polvoTex, color: col, transparent: true, depthWrite: false, opacity: 0.6 }));
+    h.position.set(x + (Math.random() - 0.5) * 0.5, y + 0.15 + Math.random() * 0.2, z + (Math.random() - 0.5) * 0.5); scene.add(h);
+    humos.push({ o: h, t: 0, max: 0.55 + Math.random() * 0.3, s0: 0.35, s1: 1.1, op: 0.6, sube: 0.5 });
+  }
+  function deslizSnd(vol, pan) {
+    if (!soundOn || !actx || vol < 0.01) return;
+    try {
+      const t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+      const tierra = mapaId === 'chaco' || mapaId === 'laberinto' || mapaId === 'estadio';
+      src.buffer = ruido(); f.type = 'bandpass'; f.Q.value = 0.9;
+      f.frequency.setValueAtTime(tierra ? 900 : 1500, t); f.frequency.exponentialRampToValueAtTime(tierra ? 260 : 420, t + 0.55);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      let out = g;
+      if (actx.createStereoPanner) { const p = actx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); out = p; }
+      out.connect(actx.destination);
+      src.connect(f); f.connect(g); src.start(t, Math.random() * 0.2); src.stop(t + 0.65);
+    } catch (e) {}
+  }
+  function deslizDe(p) {
+    const dx = p.x - cam.position.x, dz = p.z - cam.position.z, d = Math.hypot(dx, dz);
+    if (d > 32) return;
+    const rel = Math.atan2(-dx, -dz) - cam.rotation.y;
+    deslizSnd(Math.pow(1 - d / 32, 1.5) * 0.6, -Math.sin(rel) * Math.min(1, d / 3));
+  }
   function pasoDe(p, vel) {
     const dx = p.x - cam.position.x, dz = p.z - cam.position.z, d = Math.hypot(dx, dz);
     if (d > 30) return;
@@ -1276,7 +1309,13 @@
       const st = Math.floor(r.paso * 3 / Math.PI);
       if (st !== r.st) { r.st = st; if (r.velS > 2.2 && !r.crouch && enPiso) pasoDe(cur, r.velS); }
       g.visible = !(obs && mirado() === id);
-      g.position.set(cur.x, cur.y, cur.z); g.rotation.set(0, cur.ry, 0);
+      if (r.crouch && vel > 6.2 && enPiso) r.deslT = 0.15; else r.deslT = (r.deslT || 0) - dt;
+      const desl = r.deslT > 0;
+      if (desl && !r.desl) deslizDe(cur);
+      r.desl = desl;
+      r.deslK = (r.deslK || 0) + ((desl ? 1 : 0) - (r.deslK || 0)) * Math.min(1, dt * 12);
+      if (desl) { r.polvoT = (r.polvoT || 0) - dt; if (r.polvoT <= 0) { r.polvoT = 0.035; polvo(cur.x, cur.y, cur.z); } }
+      g.position.set(cur.x, cur.y, cur.z); g.rotation.order = 'YXZ'; g.rotation.set(r.deslK * 0.75, cur.ry, 0);
       r.paso += Math.min(vel, 8) * dt * 1.6;
       if (u.modelo) {
         u.nom.position.y = r.crouch ? 1.6 : 2.1;
@@ -1329,6 +1368,8 @@
     const aim = inp.aim && yo.reloadT <= 0;
     W.mover(W.mapa(mapaId), s, { mx, mz, jump: inp.jumpQ || K.has('Space'), crouch, aim }, dt);
     inp.jumpQ = false;
+    if (s.slideT > 0 && !yo.desl) deslizSnd(0.35, 0);
+    yo.desl = s.slideT > 0;
     // por las dudas: si la posición se rompe (NaN), vuelve a la última buena
     if (!Number.isFinite(s.x + s.y + s.z + s.vx + s.vy + s.vz)) { const b = yo.bueno || yo.aparecio || { x: 0, y: 0, z: 0 }; Object.assign(s, { x: b.x, y: b.y, z: b.z, vx: 0, vy: 0, vz: 0, ground: true }); }
     else yo.bueno = { x: s.x, y: s.y, z: s.z };
