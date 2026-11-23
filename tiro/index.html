@@ -26,6 +26,9 @@
 <script src="peerjs.min.js"></script>
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
 <script src="three.min.js"></script>
+<!-- para cargar los personajes y armas en 3D (modelos de Quaternius, CC0); si no cargan, se juega con muñecos de cajas -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
 <script src="../ice.js"></script>
 <style>
 :root{--rojo:#D52B1E;--azul:#0038A8;--azul2:#3a6df0;--bg:#0f1420;--card:#1a2233;--card2:#222c42;--tx:#eef2fb;--mut:#93a0bd;--ok:#22b35e;--line:#2e3a55;--r:14px}
@@ -189,6 +192,8 @@ body.tactil #chatF{bottom:auto;top:30%}
     <input id="nameIn" maxlength="16" placeholder="Ej: Kalé" autocomplete="nickname">
     <span class="lbl">Tu cara</span>
     <div class="avatars" id="avatars"></div>
+    <span class="lbl">Tu personaje</span>
+    <div class="armas" id="skinsH"></div>
     <span class="lbl">Tu arma (la pistola va siempre)</span>
     <div class="armas" id="armasH"></div>
     <div class="home-actions">
@@ -219,7 +224,9 @@ body.tactil #chatF{bottom:auto;top:30%}
         <div id="lobbyPlayers"></div>
       </div>
       <div class="panel card">
-        <h3>Tu arma</h3>
+        <h3>Tu personaje</h3>
+        <div class="armas" id="skinsL"></div>
+        <h3 style="margin-top:12px">Tu arma</h3>
         <div class="armas" id="armasL"></div>
       </div>
       <div class="panel card">
@@ -243,7 +250,8 @@ body.tactil #chatF{bottom:auto;top:30%}
         <b>Cómo se juega</b><br>
         🖥️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · mouse apuntar · clic izquierdo tirar · clic derecho mira · <kbd>Espacio</kbd> saltar · <kbd>Shift</kbd> agacharse (corriendo, te deslizás) · <kbd>R</kbd> recargar · <kbd>Q</kbd>/<kbd>1</kbd>/<kbd>2</kbd> cambiar arma · <kbd>Tab</kbd> tabla · <kbd>Enter</kbd> chat · <kbd>Esc</kbd> ajustes<br>
         📱 palanca a la izquierda para caminar, arrastrá a la derecha para mirar, y botones para tirar, apuntar, saltar y agacharte.<br>
-        🎯 A la cabeza hace el doble. La vida se recupera sola si no te pegan un rato.
+        🎯 A la cabeza hace el doble. La vida se recupera sola si no te pegan un rato.<br>
+        <small>Personajes y armas en 3D: <a href="https://quaternius.com/packs/toonshootergamekit.html" target="_blank" rel="noopener" style="color:inherit">Toon Shooter Game Kit de Quaternius</a> (CC0, uso libre).</small>
       </div>
     </div>
   </div>
@@ -303,9 +311,9 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div id="audios"></div>
 </div>
 
-<script src="mundo.js?v=7"></script>
-<script src="sala.js?v=7"></script>
-<script src="juego.js?v=7"></script>
+<script src="mundo.js?v=8"></script>
+<script src="sala.js?v=8"></script>
+<script src="juego.js?v=8"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -342,6 +350,19 @@ function elegirPrim(w) {
   document.querySelectorAll('.armas [data-w]').forEach(b => b.classList.toggle('sel', b.dataset.w === w));
 }
 document.querySelectorAll('.armas [data-w]').forEach(b => b.classList.toggle('sel', b.dataset.w === prim));
+// personaje 3D
+const SKINS = { soldado: ['🪖', 'Soldado', 'verde oliva'], albirrojo: ['🇵🇾', 'Albirrojo', 'rojo y blanco'], enemigo: ['🥷', 'Comando', 'pasamontañas'], hazmat: ['☣️', 'Hazmat', 'traje amarillo'] };
+let skin = store.get('tg_skin', 'soldado'); if (!SKINS[skin]) skin = 'soldado';
+function armarSkins(box) {
+  box.innerHTML = Object.entries(SKINS).map(([k, v]) => `<button type="button" data-skin="${k}"><b>${v[0]}</b>${v[1]}<small>${v[2]}</small></button>`).join('');
+  box.querySelectorAll('[data-skin]').forEach(b => b.onclick = () => elegirSkin(b.dataset.skin));
+}
+['#skinsH', '#skinsL'].forEach(q => armarSkins($(q)));
+function elegirSkin(k) {
+  skin = k; store.set('tg_skin', k); send({ t: 'skin', skin: k });
+  document.querySelectorAll('[data-skin]').forEach(b => b.classList.toggle('sel', b.dataset.skin === k));
+}
+document.querySelectorAll('[data-skin]').forEach(b => b.classList.toggle('sel', b.dataset.skin === skin));
 function myName(){ const n = $('#nameIn').value.trim() || 'Jugador'; store.set('tg_name', n); return n; }
 
 // ================= salas en línea (PeerJS, como los demás juegos) =================
@@ -382,7 +403,7 @@ setTimeout(() => {
 
 // ---------- anfitrión ----------
 function createRoom(tries) {
-  closeNet(); mode = 'online';
+  closeNet(); mode = 'online'; Juego.cargarModelos();
   const code = genCode(), p = newPeer(PREF + code); peer = p;
   banner('Abriendo la sala...');
   p.on('open', () => {
@@ -390,7 +411,7 @@ function createRoom(tries) {
     hideBanner(); roomCode = code;
     localRoom = new R.Room(code, { send: hostSend, onEmpty() {} });
     hookObservers(localRoom);
-    const me = localRoom.addPlayer({ name: myName(), avatar });
+    const me = localRoom.addPlayer({ name: myName(), avatar, skin });
     myId = me.id; token = me.token; localRoom.setPrim(myId, prim);
     history.replaceState(null, '', location.pathname + '#' + code);
     localRoom.broadcastState();
@@ -448,7 +469,7 @@ function hostAccept(c) {
 
 // ---------- invitado ----------
 function joinRoom(code, first) {
-  closeNet(); mode = 'online'; roomCode = code; firstMsg = first; amObs = first.t === 'watch'; reconnectTries = 0;
+  Juego.cargarModelos(); closeNet(); mode = 'online'; roomCode = code; firstMsg = first; amObs = first.t === 'watch'; reconnectTries = 0;
   banner('Conectando con la sala...');
   connectHost();
 }
@@ -481,9 +502,9 @@ function lost() {
 
 // ---------- práctica y salida ----------
 function startLocal() {
-  closeNet(); mode = 'local'; amObs = false;
+  Juego.cargarModelos(); closeNet(); mode = 'local'; amObs = false;
   localRoom = new R.Room('PRÁCTICA', { send: (pid, msg) => { if (pid === myId) setTimeout(() => onMsg(msg), 0); }, onEmpty() {} });
-  const p = localRoom.addPlayer({ name: myName(), avatar });
+  const p = localRoom.addPlayer({ name: myName(), avatar, skin });
   myId = p.id; roomCode = null; localRoom.setPrim(myId, prim);
   for (let i = 0; i < 5; i++) localRoom.addBot(myId);
 }
@@ -519,7 +540,7 @@ function onMsg(m) {
   switch (m.t) {
     case 'welcome':
       myId = m.id; roomCode = m.code; amObs = !!m.obs;
-      if (!m.obs) { token = m.token; sess.set('tg_session', { code: m.code, token: m.token }); send({ t: 'prim', w: prim }); }
+      if (!m.obs) { token = m.token; sess.set('tg_session', { code: m.code, token: m.token }); send({ t: 'prim', w: prim }); send({ t: 'skin', skin }); }
       history.replaceState(null, '', location.pathname + '#' + m.code);
       break;
     case 'state': setState(m); break;

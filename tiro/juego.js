@@ -41,6 +41,7 @@
     vmScene.add(new T.HemisphereLight(0xffffff, 0x555555, 1.0));
     const l2 = new T.DirectionalLight(0xffffff, 0.5); l2.position.set(1, 2, 1); vmScene.add(l2);
     armarVM();
+    if (modelosListos) { try { armasVM(); } catch (e) { console.warn('armas 3D', e); } }   // si los modelos cargaron antes que la pantalla 3D
     addEventListener('resize', medir); medir();
     controles();
   }
@@ -131,6 +132,7 @@
     s.scale.set(1.7, 0.42, 1); return s;
   }
   function muneco(p, modo) {
+    if (modelosListos) { const m = modeloDe(p, modo); if (m) return m; }
     const g = new T.Group(), camisa = matCamisa(p, modo), skin = skinM.clone(), pants = pantsM.clone(), negro = negroM.clone();
     const pierna1 = new T.Mesh(new T.BoxGeometry(0.22, 0.82, 0.24), pants), pierna2 = pierna1.clone();
     pierna1.position.set(-0.14, 0.41, 0); pierna2.position.set(0.14, 0.41, 0);
@@ -154,7 +156,7 @@
   }
   function remoto(p) {
     const S = C.S(); let r = remotos.get(p.id);
-    const key = (S.settings.mode === 'equipos' ? p.team : 'c' + p.col) + p.name;
+    const key = (S.settings.mode === 'equipos' ? p.team : 'c' + p.col) + p.name + (modelosListos ? 'M' + (p.skin || '') : 'B');
     if (r && r.key !== key) { scene.remove(r.g); r = null; }
     if (!r) {
       r = { g: muneco(p, S.settings.mode), key, buf: [], alive: false, hp: 100, w: 0, crouch: false, prot: false, caida: 0, team: p.team, cur: null, paso: 0 };
@@ -164,6 +166,122 @@
     return r;
   }
 
+  // ================= personajes y armas en 3D =================
+  // Modelos "Toon Shooter Game Kit" de Quaternius (licencia CC0, uso libre): modelos/*.glb.
+  // Cada personaje trae todas las armas en la mano derecha; se muestra solo la que usa.
+  // Si no cargan (sin internet para el cargador), quedan los muñecos de cajas.
+  const ARCHIVOS = { soldado: 'modelos/soldado.glb', enemigo: 'modelos/enemigo.glb', hazmat: 'modelos/hazmat.glb' };
+  const PERSONAJES = {
+    soldado:   { base: 'soldado' },
+    albirrojo: { base: 'soldado', pintar: { Character_Main: '#c8241a', Pants: '#e8e8e8' } },
+    enemigo:   { base: 'enemigo' },
+    hazmat:    { base: 'hazmat' },
+  };
+  const MAIN = { soldado: 'Character_Main', enemigo: 'Enemy_Red', hazmat: 'Hazmat_Main' };
+  const ARMA_NODO = { fusil: 'AK', subfusil: 'SMG', escopeta: 'Shotgun', franco: 'Sniper', pistola: 'Pistol' };
+  const NODOS_ARMA = ['AK', 'SMG', 'Shotgun', 'Sniper', 'Sniper_2', 'Pistol', 'Revolver', 'Revolver_Small', 'GrenadeLauncher', 'ShortCannon', 'RocketLauncher', 'Shovel', 'Knife_1', 'Knife_2'];
+  const GLB = {}; let modelosListos = false, cargando = null;
+  J.cargarModelos = () => {
+    if (cargando) return cargando;
+    if (!T.GLTFLoader || !T.SkeletonUtils) return Promise.resolve(false);
+    const L = new T.GLTFLoader();
+    cargando = Promise.all(Object.entries(ARCHIVOS).map(([k, u]) => new Promise(res =>
+      L.load(u, g => { prepararGLB(g); GLB[k] = g; res(); }, null, () => res()))))
+      .then(() => {
+        modelosListos = !!GLB.soldado;
+        if (modelosListos) { try { armasVM(); } catch (e) { console.warn('armas 3D', e); } rehacer(); }
+        return modelosListos;
+      });
+    return cargando;
+  };
+  J.modelosListos = () => modelosListos;
+  // los colores de los modelos vienen "lineales": se pasan a como se ve el resto del juego
+  function prepararGLB(g) {
+    const vistos = new Set();
+    g.scene.traverse(o => {
+      if (!o.isMesh) return;
+      o.frustumCulled = false;
+      for (const m of [].concat(o.material)) { if (vistos.has(m)) continue; vistos.add(m); if (m.color) m.color.convertLinearToSRGB(); m.metalness = 0; m.roughness = 0.8; }
+    });
+  }
+  // cuando terminan de cargar, se cambian los muñecos de cajas por los modelos
+  function rehacer() {
+    if (!scene || !C || !C.S()) return;
+    for (const r of remotos.values()) scene.remove(r.g);
+    remotos.clear();
+    if (activo) J.estado(C.S());
+  }
+  function modeloDe(p, modo) {
+    const per = PERSONAJES[p.skin] || PERSONAJES.soldado, gl = GLB[per.base] || GLB.soldado;
+    if (!gl) return null;
+    const m = T.SkeletonUtils.clone(gl.scene);
+    // materiales propios de este muñeco (para pintarlo y hacerlo transparente al reaparecer)
+    const mats = new Map(), cm = x => { if (!mats.has(x)) mats.set(x, x.clone()); return mats.get(x); };
+    m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.material = Array.isArray(o.material) ? o.material.map(cm) : cm(o.material); } });
+    const pintar = Object.assign({}, per.pintar || {});
+    if (modo === 'equipos') pintar[MAIN[per.base]] = p.team === 'r' ? '#c8241a' : '#1d4fd8';
+    mats.forEach(c => { if (pintar[c.name]) c.color.set(pintar[c.name]); });
+    const g = new T.Group(), dentro = new T.Group();
+    dentro.add(m); dentro.rotation.y = Math.PI; dentro.scale.setScalar(0.82); g.add(dentro);
+    const armas = {};
+    for (const n of NODOS_ARMA) { const o = m.getObjectByName(n); if (o) { o.visible = false; armas[n] = o; } }
+    const mixer = new T.AnimationMixer(m), clip = re => gl.animations.find(a => re.test(a.name));
+    const acc = {};
+    for (const [k, re] of [['quieto', /(^|\|)Idle$/], ['corre', /(^|\|)Run_Gun$/], ['agacha', /(^|\|)Duck$/], ['muere', /(^|\|)Death$/], ['tira', /(^|\|)Idle_Shoot$/]]) {
+      const c = clip(re); if (c) acc[k] = mixer.clipAction(c);
+    }
+    if (acc.muere) { acc.muere.setLoop(T.LoopOnce, 1); acc.muere.clampWhenFinished = true; }
+    const nom = cartel(p.name, modo === 'equipos' ? (p.team === 'r' ? '#ff8a80' : '#8ab4ff') : '#ffffff'); nom.position.y = 2.1; g.add(nom);
+    g.userData = { modelo: true, mixer, acc, armas, mats: [...mats.values()], nom, actual: null, armaVis: null };
+    scene.add(g);
+    return g;
+  }
+  // elige la animación según lo que hace y muestra el arma que tiene en la mano
+  function animar(r, vel, dt) {
+    const u = r.g.userData;
+    const nodo = ARMA_NODO[W.ARMA_IDS[r.w]] || 'AK';
+    if (u.armaVis !== nodo) { if (u.armas[u.armaVis]) u.armas[u.armaVis].visible = false; if (u.armas[nodo]) u.armas[nodo].visible = true; u.armaVis = nodo; }
+    if (r.tiroT > 0) r.tiroT -= dt;
+    const q = !r.alive ? 'muere' : r.crouch ? 'agacha' : vel > 0.8 ? 'corre' : r.tiroT > 0 ? 'tira' : 'quieto';
+    if (q !== u.actual) {
+      const antes = u.acc[u.actual], luego = u.acc[q];
+      if (luego) {
+        luego.reset(); luego.play();
+        if (antes) antes.crossFadeTo(luego, q === 'muere' ? 0.08 : 0.18, false);
+      }
+      u.actual = q;
+    }
+    // agachado: se queda en la parte baja de la animación
+    if (q === 'agacha' && u.acc.agacha && u.acc.agacha.time >= 0.6) { u.acc.agacha.time = 0.6; u.acc.agacha.paused = true; }
+    if (q === 'corre' && u.acc.corre) u.acc.corre.timeScale = Math.max(0.6, Math.min(1.5, vel / 5.5));
+    u.mixer.update(dt);
+  }
+  // armas 3D en primera persona: se sacan del soldado en pose de disparo para que apunten hacia adelante
+  const LARGO = { fusil: 0.78, subfusil: 0.5, escopeta: 0.85, franco: 1.0, pistola: 0.3 };
+  function armasVM() {
+    const gl = GLB.soldado, m = T.SkeletonUtils.clone(gl.scene), mix = new T.AnimationMixer(m);
+    const c = gl.animations.find(a => /(^|\|)Idle_Shoot$/.test(a.name));
+    if (c) { mix.clipAction(c).play(); mix.update(0); }
+    m.updateMatrixWorld(true);
+    const giro = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI);
+    for (const w in ARMA_NODO) {
+      const src = m.getObjectByName(ARMA_NODO[w]); if (!src || !VM[w]) continue;
+      const q = new T.Quaternion(), ws = new T.Vector3();
+      src.getWorldQuaternion(q); src.getWorldScale(ws);
+      const it = src.clone(); it.visible = true; it.position.set(0, 0, 0); it.quaternion.copy(giro.clone().multiply(q)); it.scale.copy(ws);
+      const h = new T.Group(); h.add(it); h.updateMatrixWorld(true);
+      let b = new T.Box3().setFromObject(h);
+      const largo = Math.max(1e-6, b.max.z - b.min.z);
+      it.scale.multiplyScalar(LARGO[w] / largo); h.updateMatrixWorld(true);
+      b = new T.Box3().setFromObject(h);
+      it.position.set(-(b.min.x + b.max.x) / 2, -b.max.y + 0.02, 0.12 - b.max.z);
+      const g = VM[w];
+      g.children.slice().forEach(ch => g.remove(ch));   // fuera el arma y las manos de cajas
+      g.add(h);
+      PUNTA[w] = 0.12 - LARGO[w];
+    }
+  }
+
   // ================= arma en la mano (primera persona) =================
   const VM = {};
   let vmGrupo, fogon;
@@ -171,7 +289,7 @@
     vmGrupo = new T.Group(); vmGrupo.scale.setScalar(0.8); vmScene.add(vmGrupo);
     const met = new T.MeshLambertMaterial({ color: '#2a2d33' }), met2 = new T.MeshLambertMaterial({ color: '#4a4f58' }), mad = new T.MeshLambertMaterial({ color: '#7a4b26' }), piel = new T.MeshLambertMaterial({ color: '#c99a73' }), manga = new T.MeshLambertMaterial({ color: '#d52b1e' });
     const box = (g, w, h, d, x, y, z, m) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
-    const mano = g => { box(g, 0.09, 0.09, 0.32, 0.02, -0.09, 0.12, piel); box(g, 0.11, 0.11, 0.3, 0.03, -0.12, 0.38, manga); };
+    const mano = g => { box(g, 0.09, 0.09, 0.32, 0.02, -0.09, 0.12, piel).userData.mano = true; box(g, 0.11, 0.11, 0.3, 0.03, -0.12, 0.38, manga).userData.mano = true; };
     let g = new T.Group(); box(g, 0.07, 0.1, 0.46, 0, 0, -0.1, met); box(g, 0.035, 0.035, 0.3, 0, 0.02, -0.45, met2); box(g, 0.05, 0.15, 0.08, 0, -0.1, -0.08, met2); box(g, 0.05, 0.08, 0.14, 0, -0.02, 0.17, mad); box(g, 0.015, 0.04, 0.015, 0, 0.07, -0.3, met2); mano(g); VM.fusil = g;
     g = new T.Group(); box(g, 0.08, 0.08, 0.5, 0, 0, -0.2, met); box(g, 0.05, 0.05, 0.4, 0, -0.06, -0.3, mad); box(g, 0.07, 0.1, 0.25, 0, -0.03, 0.15, mad); mano(g); VM.escopeta = g;
     g = new T.Group(); box(g, 0.06, 0.08, 0.6, 0, 0, -0.18, met); box(g, 0.03, 0.03, 0.4, 0, 0.01, -0.65, met2); box(g, 0.05, 0.05, 0.28, 0, 0.08, -0.15, met2); box(g, 0.07, 0.1, 0.22, 0, -0.02, 0.22, mad); mano(g); VM.franco = g;
@@ -277,7 +395,7 @@
 
   // ================= entrar / salir =================
   J.entrar = S => {
-    crear(); J.audio();
+    crear(); J.audio(); J.cargarModelos();
     cargarMapa(S.settings.map);
     J.estado(S);
     $('#juego').classList.remove('hidden');
@@ -342,7 +460,7 @@
         for (const e of m.e) { trazo(o, e); polvo(e, '#cfc6b0'); }
         const d = Math.hypot(o[0] - (yo.s ? yo.s.x : 0), o[2] - (yo.s ? yo.s.z : 0));
         tiroSnd(m.w, 1 / (1 + d / 10));
-        r.fuego = 0.06;
+        r.fuego = 0.06; r.tiroT = 0.45;
         break;
       }
       case 'kill': feedKill(m); break;
@@ -578,7 +696,10 @@
     for (const [id, r] of remotos) {
       const g = r.g, u = g.userData;
       if (!r.alive) {
-        if (r.caida > 0 && r.cur) { r.caida += dt; g.visible = r.caida < 1.4; g.rotation.x = -Math.min(1.5, r.caida * 4); g.position.y = r.cur.y; }
+        if (r.caida > 0 && r.cur) {
+          r.caida += dt; g.visible = r.caida < (u.modelo ? 2 : 1.4); g.position.y = r.cur.y;
+          if (u.modelo) animar(r, 0, dt); else g.rotation.x = -Math.min(1.5, r.caida * 4);
+        }
         else g.visible = false;
         continue;
       }
@@ -598,11 +719,18 @@
       if (st !== r.st) { r.st = st; if (r.velS > 2.2 && !r.crouch && enPiso) pasoDe(cur, r.velS); }
       g.visible = !(obs && mirado() === id);
       g.position.set(cur.x, cur.y, cur.z); g.rotation.set(0, cur.ry, 0);
+      r.paso += Math.min(vel, 8) * dt * 1.6;
+      if (u.modelo) {
+        u.nom.position.y = r.crouch ? 1.6 : 2.1;
+        animar(r, r.velS, dt);
+        if (r.prot || r.eraProt) { r.eraProt = r.prot; const op = r.prot ? 0.45 + 0.25 * Math.sin(now / 80) : 1; for (const m of u.mats) { m.transparent = r.prot; m.opacity = op; } }
+        if (r.fuego > 0) r.fuego -= dt;
+        continue;
+      }
       const ag = r.crouch ? 0.55 : 1;
       u.pierna1.scale.y = u.pierna2.scale.y = ag; u.pierna1.position.y = u.pierna2.position.y = 0.41 * ag; u.arriba.position.y = 0.82 * ag;
       u.nom.position.y = r.crouch ? 1.75 : 2.15;
       u.brazos.rotation.x = cur.rx;
-      r.paso += Math.min(vel, 8) * dt * 1.6;
       const sw = vel > 0.5 ? Math.sin(r.paso * 3) * 0.5 : 0;
       u.pierna1.rotation.x = sw; u.pierna2.rotation.x = -sw;
       if (r.prot || r.eraProt) { r.eraProt = r.prot; const op = r.prot ? 0.45 + 0.25 * Math.sin(now / 80) : 1; const vistos = new Set(); g.traverse(o => { if (o.material && o !== u.nom && !vistos.has(o.material)) { vistos.add(o.material); o.material.transparent = r.prot; o.material.opacity = op; } }); }
@@ -634,6 +762,9 @@
     const aim = inp.aim && yo.reloadT <= 0;
     W.mover(W.mapa(mapaId), s, { mx, mz, jump: inp.jumpQ || K.has('Space'), crouch, aim }, dt);
     inp.jumpQ = false;
+    // por las dudas: si la posición se rompe (NaN), vuelve a la última buena
+    if (!Number.isFinite(s.x + s.y + s.z + s.vx + s.vy + s.vz)) { const b = yo.bueno || { x: 0, y: 0, z: 0 }; Object.assign(s, { x: b.x, y: b.y, z: b.z, vx: 0, vy: 0, vz: 0, ground: true }); }
+    else yo.bueno = { x: s.x, y: s.y, z: s.z };
     yo.eye += ((s.crouch ? 0.95 : 1.55) - yo.eye) * Math.min(1, dt * 14);
     yo.aimK += ((aim ? 1 : 0) - yo.aimK) * Math.min(1, dt * 14);
     yo.bloom = Math.max(0, yo.bloom - dt * 0.06);
@@ -735,7 +866,7 @@
     const b = $('#clog'); b.appendChild(d); while (b.children.length > 7) b.firstChild.remove();
     setTimeout(() => d.classList.add('viejo'), 9000);
   };
-  J._dbg = { yo, inp, remotos };   // para probar desde la consola
+  J._dbg = { yo, inp, remotos, VM };   // para probar desde la consola
   J.vivo = () => yo.alive;
   J.prim = () => yo.prim;
   J.setPrim = w => { if (A[w]) yo.prim = w; };

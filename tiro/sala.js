@@ -12,7 +12,8 @@
     normal:  { react: 0.45, err: 0.06, turn: 5.5, sense: 60 },
     dificil: { react: 0.22, err: 0.032, turn: 9, sense: 80 },
   };
-  const COLS = 10;   // cantidad de colores de camiseta (todos contra todos)
+  const COLS = 10;
+  const SKINS = ['soldado', 'albirrojo', 'enemigo', 'hazmat'];   // personajes 3D (juego.js)   // cantidad de colores de camiseta (todos contra todos)
   const genId = () => Math.random().toString(36).slice(2, 10);
   const clean = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
   const r2 = v => Math.round(v * 100) / 100;
@@ -40,7 +41,7 @@
       const now = Date.now();
       return {
         t: 'state', me: id, code: this.code, phase: this.phase, hostId: this.hostId, settings: this.settings,
-        players: this.list().map(p => ({ id: p.id, name: p.name, avatar: p.avatar, bot: !!p.bot, team: p.team, col: p.col, k: p.k, d: p.d, connected: !!p.bot || p.connected, voice: !!p.voice, prim: p.prim })),
+        players: this.list().map(p => ({ id: p.id, name: p.name, avatar: p.avatar, bot: !!p.bot, team: p.team, col: p.col, k: p.k, d: p.d, connected: !!p.bot || p.connected, voice: !!p.voice, prim: p.prim, skin: p.skin })),
         remaining: this.phase === 'play' ? Math.max(0, this.endAt - now) : 0, score: this.score, ranking: this.ranking, winner: this.winner,
         maps: W.MAPA_IDS.map(k => [k, W.mapa(k).n]),
       };
@@ -58,9 +59,9 @@
       let r = 0, a = 0; for (const p of this.players.values()) { if (p.team === 'r') r++; else if (p.team === 'a') a++; }
       return r <= a ? 'r' : 'a';
     }
-    addPlayer({ name, avatar }) {
+    addPlayer({ name, avatar, skin }) {
       if (this.players.size >= this.settings.max) return null;
-      const p = this.nuevo({ token: genId() + genId(), name: clean(name, 16) || 'Jugador', avatar: clean(avatar, 8) || '😎', bot: false, connected: true });
+      const p = this.nuevo({ token: genId() + genId(), name: clean(name, 16) || 'Jugador', avatar: clean(avatar, 8) || '😎', bot: false, connected: true, skin: SKINS.includes(skin) ? skin : 'soldado' });
       this.players.set(p.id, p); this.order.push(p.id);
       if (!this.hostId) this.hostId = p.id;
       this.sys(`${p.avatar} ${p.name} entró a la sala`);
@@ -74,7 +75,7 @@
       const used = new Set([...this.players.values()].map(p => p.name));
       const n = BOT_N.find(x => !used.has(x)) || 'Bot ' + (this.players.size + 1);
       const prim = ['fusil', 'fusil', 'escopeta', 'franco', 'subfusil'][(Math.random() * 5) | 0];
-      const p = this.nuevo({ name: n, avatar: '🤖', bot: { lookT: 0, seen: 0, strafe: 1, strafeT: 0, nextFire: 0, ammo: A[prim].mag, relT: 0, goal: null, goalT: 0, err: [0, 0], errT: 0, stuck: 0 }, connected: true, prim, w: prim });
+      const p = this.nuevo({ name: n, avatar: '🤖', bot: { lookT: 0, seen: 0, strafe: 1, strafeT: 0, nextFire: 0, ammo: A[prim].mag, relT: 0, goal: null, goalT: 0, err: [0, 0], errT: 0, stuck: 0 }, connected: true, prim, w: prim, skin: SKINS[(Math.random() * SKINS.length) | 0] });
       this.players.set(p.id, p); this.order.push(p.id);
       this.broadcastState();
       if (this.phase === 'play') this.respawn(p);
@@ -343,6 +344,7 @@
         case 'removeBot': return this.removeBot(pid, m.id);
         case 'team': return this.setTeam(pid, String(m.id || pid), m.team);
         case 'prim': return this.setPrim(pid, m.w);
+        case 'skin': if (SKINS.includes(m.skin)) { p.skin = m.skin; this.broadcastState(); } return;
         case 'start': return this.start(pid);
         case 'lobby': return this.toLobby(pid);
         case 'chat': { const text = clean(m.text, 120); if (text) this.all({ t: 'chat', kind: 'msg', id: pid, name: p.name, avatar: p.avatar, team: this.settings.mode === 'equipos' ? p.team : null, text }); return; }
