@@ -15,7 +15,7 @@
   const CAMIS = ['#d52b1e', '#0038a8', '#f1c40f', '#27ae60', '#8e44ad', '#e67e22', '#16a085', '#ff6fb1', '#ecf0f1', '#34495e'];
   const TEAM = { r: '#d52b1e', a: '#1d4fd8' };
   const CAMIS_TXT = ['#ff7a6e', '#7fa8ff', '#f1c40f', '#4cd47f', '#c18be0', '#ffa24d', '#3fd1b4', '#ff8fc4', '#ffffff', '#a9b8c9'];
-  const CIELO = { mercado: ['#9fd3ff', '#8d8a84', 'baldosa'], puerto: ['#b9d3e8', '#5b5e63', 'asfalto'], chaco: ['#cfe2ef', '#b87444', 'tierra'] };
+  const CIELO = { mercado: ['#9fd3ff', '#8d8a84', 'baldosa'], puerto: ['#b9d3e8', '#5b5e63', 'asfalto'], chaco: ['#cfe2ef', '#b87444', 'tierra'], laberinto: ['#cfe6d2', '#6f9a52', 'cesped'], estadio: ['#bcd4ea', '#ffffff', 'estadio'] };
   const J = window.Juego = {};
   const luz = {};   // luces de la escena (de día o de noche)
   let noche = false, linternaOn = true;
@@ -72,6 +72,7 @@
     else if (tipo === 'chapa') { for (let x = 0; x < 128; x += 10) { g.fillStyle = '#ffffff'; g.fillRect(x, 0, 4, 128); g.fillStyle = '#b4b4b4'; g.fillRect(x + 6, 0, 2, 128); } ruido(14); }
     else if (tipo === 'baldosa') { g.fillStyle = '#d8d8d8'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#a8a8a8'; g.fillRect(0, 0, 128, 3); g.fillRect(0, 0, 3, 128); g.fillRect(0, 63, 128, 3); g.fillRect(63, 0, 3, 128); ruido(26); }
     else if (tipo === 'asfalto') { ruido(40); g.fillStyle = 'rgba(255,220,0,.7)'; g.fillRect(0, 60, 128, 6); }
+    else if (tipo === 'cesped') { ruido(40); for (let i = 0; i < 500; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(80,80,80,.22)' : 'rgba(255,255,255,.2)'; g.fillRect(Math.random() * 128, Math.random() * 128, 1, 2 + Math.random() * 4); } }
     else if (tipo === 'tierra') { ruido(55); for (let i = 0; i < 60; i++) { g.fillStyle = 'rgba(90,60,20,.18)'; g.beginPath(); g.arc(Math.random() * 128, Math.random() * 128, 2 + Math.random() * 6, 0, 7); g.fill(); } }
     else ruido(28);
     const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4;
@@ -94,13 +95,14 @@
     mapaId = id; const M = W.mapa(id), cfg = CIELO[id] || CIELO.mercado;
     mapGroup = new T.Group();
     scene.background = new T.Color(cfg[0]); scene.fog = new T.Fog(cfg[0], 45, 150);
-    const ft = tex(cfg[2]).clone(); ft.needsUpdate = true; ft.repeat.set(M.S, M.S);
+    let ft; if (cfg[2] === 'estadio') ft = pisoEstadio(M); else { ft = tex(cfg[2]).clone(); ft.needsUpdate = true; ft.repeat.set(M.S, M.S); }
     const piso = new T.Mesh(new T.PlaneGeometry(2 * M.S + 2, 2 * M.S + 2), new T.MeshPhongMaterial({ color: cfg[1], map: ft, shininess: 4, specular: 0x0a0a0a }));
     piso.rotation.x = -Math.PI / 2; mapGroup.add(piso);
     // afuera: agua en el puerto, campo en las demás
-    const afuera = new T.Mesh(new T.PlaneGeometry(600, 600), new T.MeshLambertMaterial({ color: id === 'puerto' ? '#3b6f8f' : id === 'chaco' ? '#9a7a3e' : '#6f8a52' }));
+    const afuera = new T.Mesh(new T.PlaneGeometry(600, 600), new T.MeshLambertMaterial({ color: { puerto: '#3b6f8f', chaco: '#9a7a3e', laberinto: '#4f7a3a', estadio: '#55585e' }[id] || '#6f8a52' }));
     afuera.rotation.x = -Math.PI / 2; afuera.position.y = -0.05; mapGroup.add(afuera);
     for (const b of M.boxes) {
+      if (b[7]) continue;
       const w = b[3] - b[0], h = b[4] - b[1], d = b[5] - b[2];
       const m = new T.Mesh(cajaGeo(w, h, d), matCaja(b[6]));
       m.position.set((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2); mapGroup.add(m);
@@ -121,6 +123,155 @@
     const band = new T.Mesh(new T.PlaneGeometry(2.4, 1.6), new T.MeshLambertMaterial({ map: new T.CanvasTexture(bc), side: T.DoubleSide }));
     band.position.set(M.S - 3 - 1.25, 8, -M.S + 3); mapGroup.add(band);
     scene.add(mapGroup);
+    // objetos 3D: mientras cargan se ven cajas, después los modelos
+    propsGroup = null;
+    if (M.props && M.props.length) {
+      const tipos = [...new Set(M.props.map(p => p.t))];
+      if (tipos.every(t => t in GLBP)) ponerProps(M);
+      else { ponerProps(M); Promise.all(tipos.map(cargarProp)).then(() => { if (mapaId === id && mapGroup) ponerProps(M); }); }
+    }
+  }
+
+  // ================= objetos 3D de los mapas =================
+  // Modelos gratis de Poly Pizza (Quaternius, Isa y Kay: CC0; los demás CC-BY, nombrados en los créditos)
+  const GLBP = {}, cargaP = {};
+  const TINTE = {
+    lapacho: c => { if (c.r > c.g * 1.4) c.set('#f06aae'); },
+    columna: c => c.lerp(new T.Color('#b9b2a5'), 0.7),
+    fuente: c => c.lerp(new T.Color('#d8d2c4'), 0.3),
+  };
+  let propsGroup = null, lamparas = [];
+  function cargarProp(t) {
+    if (cargaP[t]) return cargaP[t];
+    if (!T.GLTFLoader || W.PROPS[t].archivo === false) { GLBP[t] = null; return cargaP[t] = Promise.resolve(null); }
+    return cargaP[t] = new Promise(res => new T.GLTFLoader().load('modelos/props/' + t + '.glb', g => {
+      prepararGLB(g); g.scene.updateMatrixWorld(true);
+      // retoques de color: lapacho bien rosado, columnas de piedra clara
+      if (TINTE[t]) { const vistos = new Set(); g.scene.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(m => { if (!vistos.has(m) && m.color) { vistos.add(m); TINTE[t](m.color); } }); }); }
+      g.caja = new T.Box3().setFromObject(g.scene); GLBP[t] = g; res(g);
+    }, null, () => { GLBP[t] = null; res(null); }));
+  }
+  let lampMat = null;
+  function brilloLampara() {
+    if (!lampMat) {
+      const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+      const gr = g.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,250,225,1)'); gr.addColorStop(0.25, 'rgba(255,220,140,.55)'); gr.addColorStop(1, 'rgba(255,190,90,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      lampMat = new T.SpriteMaterial({ map: new T.CanvasTexture(c), blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false });
+    }
+    return new T.Sprite(lampMat);
+  }
+  function ponerProps(M) {
+    if (propsGroup) { mapGroup.remove(propsGroup); propsGroup.traverse(o => { if (o.geometry && o.userData.propio) o.geometry.dispose(); }); }
+    propsGroup = new T.Group(); lamparas = [];
+    const sueltos = new T.Group();
+    for (const p of M.props) {
+      const P = W.PROPS[p.t], piv = new T.Group();
+      piv.rotation.y = p.q * Math.PI / 2; piv.position.set(p.x, p.y, p.z);
+      if (p.t === 'publi') { piv.add(cartelPubli(p)); propsGroup.add(piv); continue; }
+      const g = GLBP[p.t];
+      if (!g) {
+        // todavía no cargó (o no hay internet): una caja del color del objeto
+        if (P.solido === false) continue;
+        const col = P.col || [1, 1, 1], w = p.w * col[0], h = p.h * col[1], d = p.d * col[2];
+        const m = new T.Mesh(cajaGeo(w, h, d), matCaja(P.c)); m.position.y = h / 2; m.userData.propio = true; piv.add(m); propsGroup.add(piv);
+        continue;
+      }
+      const c = g.caja, sz = c.getSize(new T.Vector3()), ce = c.getCenter(new T.Vector3());
+      const sx = p.w / sz.x, sy = p.h / sz.y, sz2 = p.d / sz.z;
+      const hold = new T.Group(); hold.add(g.scene.clone(true));
+      hold.scale.set(sx, sy, sz2); hold.position.set(-ce.x * sx, -c.min.y * sy, -ce.z * sz2);
+      piv.add(hold); sueltos.add(piv);
+      if (P.brillo) {
+        const b = brilloLampara(), k = p.t === 'torre_luz' ? 7 : 1.3;
+        b.scale.set(k, k, 1); b.position.set(P.brillo[0] * p.w, P.brillo[1] * p.h, P.brillo[2] * p.d); b.visible = noche;
+        const bp = new T.Group(); bp.rotation.y = p.q * Math.PI / 2; bp.position.set(p.x, p.y, p.z); bp.add(b); propsGroup.add(bp); lamparas.push(b);
+      }
+    }
+    fundir(sueltos, propsGroup);
+    mapGroup.add(propsGroup);
+  }
+  // junta todos los objetos que comparten material en una sola malla (mucho más liviano para el celular)
+  function fundir(raiz, destino) {
+    raiz.updateMatrixWorld(true);
+    const grupos = new Map();
+    raiz.traverse(o => {
+      if (!o.isMesh) return;
+      if (Array.isArray(o.material) || o.isSkinnedMesh || o.morphTargetInfluences) {
+        const c = new T.Mesh(o.geometry, o.material); c.matrixAutoUpdate = false; c.matrix.copy(o.matrixWorld); destino.add(c); return;
+      }
+      const at = ['position', 'normal', 'uv', 'color'].filter(a => o.geometry.attributes[a]);
+      const k = o.material.uuid + '|' + at.join(',') + '|' + at.map(a => o.geometry.attributes[a].itemSize).join(',');
+      if (!grupos.has(k)) grupos.set(k, { mat: o.material, at, list: [] });
+      grupos.get(k).list.push(o);
+    });
+    const v = new T.Vector3(), nm = new T.Matrix3();
+    const den = a => !a.normalized ? 1 : a.array instanceof Uint8Array ? 255 : a.array instanceof Uint16Array ? 65535 : a.array instanceof Int8Array ? 127 : a.array instanceof Int16Array ? 32767 : 1;
+    for (const gr of grupos.values()) {
+      let nv = 0, ni = 0;
+      for (const o of gr.list) { const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+      const out = {}; for (const a of gr.at) out[a] = new Float32Array(nv * gr.list[0].geometry.attributes[a].itemSize);
+      const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let ov = 0, oi = 0;
+      for (const o of gr.list) {
+        const g = o.geometry, n = g.attributes.position.count; nm.getNormalMatrix(o.matrixWorld);
+        for (const a of gr.at) {
+          const src = g.attributes[a], is = src.itemSize, dst = out[a], q = den(src);
+          for (let i = 0; i < n; i++) {
+            const j = (ov + i) * is;
+            if (a === 'position') { v.fromBufferAttribute(src, i).applyMatrix4(o.matrixWorld); dst[j] = v.x; dst[j + 1] = v.y; dst[j + 2] = v.z; }
+            else if (a === 'normal') { v.fromBufferAttribute(src, i).applyMatrix3(nm).normalize(); dst[j] = v.x; dst[j + 1] = v.y; dst[j + 2] = v.z; }
+            else { dst[j] = src.getX(i) / q; if (is > 1) dst[j + 1] = src.getY(i) / q; if (is > 2) dst[j + 2] = src.getZ(i) / q; if (is > 3) dst[j + 3] = src.getW(i) / q; }
+          }
+        }
+        if (g.index) for (let k = 0; k < g.index.count; k++) idx[oi + k] = g.index.getX(k) + ov;
+        else for (let k = 0; k < n; k++) idx[oi + k] = ov + k;
+        ov += n; oi += g.index ? g.index.count : n;
+      }
+      const geo = new T.BufferGeometry();
+      for (const a of gr.at) geo.setAttribute(a, new T.BufferAttribute(out[a], gr.list[0].geometry.attributes[a].itemSize));
+      geo.setIndex(new T.BufferAttribute(idx, 1)); geo.computeBoundingSphere();
+      const m = new T.Mesh(geo, gr.mat); m.userData.propio = true; destino.add(m);
+    }
+  }
+  // carteles de publicidad del estadio
+  const publiCache = {};
+  function cartelPubli(p) {
+    const n = Object.keys(publiCache).length;
+    if (!publiCache[p.txt]) {
+      const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d');
+      const fondo = ['#c8241a', '#1d4fd8', '#f4f4f4'][n % 3], letra = n % 3 === 2 ? '#c8241a' : '#ffffff';
+      g.fillStyle = fondo; g.fillRect(0, 0, 512, 96);
+      g.fillStyle = letra; g.font = 'bold 54px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(p.txt, 256, 50, 490);
+      publiCache[p.txt] = new T.MeshPhongMaterial({ map: new T.CanvasTexture(c), shininess: 20 });
+    }
+    const lado = matCaja(8), mats = [lado, lado, lado, lado, publiCache[p.txt], publiCache[p.txt]];
+    const m = new T.Mesh(new T.BoxGeometry(p.w, p.h, p.d), mats); m.position.y = p.h / 2; m.userData.propio = true;
+    return m;
+  }
+  // la cancha pintada (pasto a rayas y las líneas blancas)
+  function pisoEstadio(M) {
+    const R = 1024, L = 2 * M.S + 2, k = R / L, X = x => (x + M.S + 1) * k;
+    const c = document.createElement('canvas'); c.width = c.height = R; const g = c.getContext('2d');
+    g.fillStyle = '#80838a'; g.fillRect(0, 0, R, R);
+    for (let i = 0; i < 9000; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.06)'; g.fillRect(Math.random() * R, Math.random() * R, 2, 2); }
+    g.fillStyle = '#2f7230'; g.fillRect(X(-25), X(-14.6), 50 * k, 29.2 * k);
+    for (let x = -25, i = 0; x < 25; x += 4, i++) if (i % 2) { g.fillStyle = '#367d35'; g.fillRect(X(x), X(-14.6), Math.min(4, 25 - x) * k, 29.2 * k); }
+    for (let i = 0; i < 14000; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(0,40,0,.12)' : 'rgba(200,255,160,.08)'; g.fillRect(X(-25) + Math.random() * 50 * k, X(-14.6) + Math.random() * 29.2 * k, 1, 3); }
+    g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 0.14 * k;
+    const rect = (x0, z0, x1, z1) => g.strokeRect(X(x0), X(z0), (x1 - x0) * k, (z1 - z0) * k);
+    rect(-22.4, -13, 22.4, 13);
+    g.beginPath(); g.moveTo(X(0), X(-13)); g.lineTo(X(0), X(13)); g.stroke();
+    g.beginPath(); g.arc(X(0), X(0), 4.5 * k, 0, 7); g.stroke();
+    [-1, 1].forEach(sg => {
+      rect(sg > 0 ? 22.4 - 6.5 : -22.4, -8, sg > 0 ? 22.4 : -22.4 + 6.5, 8);
+      rect(sg > 0 ? 22.4 - 2.5 : -22.4, -4, sg > 0 ? 22.4 : -22.4 + 2.5, 4);
+      g.beginPath(); g.arc(X(sg * 17.2), X(0), 4.5 * k, sg > 0 ? Math.PI * 0.71 : -Math.PI * 0.29, sg > 0 ? Math.PI * 1.29 : Math.PI * 0.29); g.stroke();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(X(sg * 16.9), X(0), 0.2 * k, 0, 7); g.fill();
+    });
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(X(0), X(0), 0.22 * k, 0, 7); g.fill();
+    const t = new T.CanvasTexture(c); t.anisotropy = 8;
+    return t;
   }
 
   // ================= muñecos de los otros =================
@@ -623,7 +774,7 @@
     if (!soundOn || !actx || vol < 0.01) return;
     try {
       const t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-      const tierra = mapaId === 'chaco';
+      const tierra = mapaId === 'chaco' || mapaId === 'laberinto' || mapaId === 'estadio';
       src.buffer = ruido(); f.type = 'bandpass'; f.frequency.value = (tierra ? 320 : 650) + Math.random() * 250; f.Q.value = 1.2;
       g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + (tierra ? 0.12 : 0.08));
       let out = g;
@@ -728,6 +879,7 @@
     }
     luz.linterna.intensity = noche && linternaOn ? 2.6 : 0;
     for (const r of remotos.values()) if (r.g.userData.haz) r.g.userData.haz.visible = noche;
+    for (const b of lamparas) b.visible = noche;
   }
   // mira nocturna del francotirador: imagen verde que ve lejos, y los zombis brillan por el calor
   let visionNoche = false;
@@ -1057,7 +1209,8 @@
     const S = C.S(), eq = S.settings.mode === 'equipos', miEq = (S.players.find(p => p.id === C.me()) || {}).team;
     const cuerpos = [];
     const zomb = S.settings.mode === 'zombis';
-    if (!zomb) for (const [id, r] of remotos) if (r.alive && r.cur && !(eq && r.team === miEq)) cuerpos.push({ id, x: r.cur.x, y: r.cur.y, z: r.cur.z, crouch: r.crouch });
+    const fa = !!S.settings.fa;   // fuego amigo: también se le puede pegar a los compañeros
+    if (!zomb || fa) for (const [id, r] of remotos) if (r.alive && r.cur && (fa || !(eq && r.team === miEq))) cuerpos.push({ id, x: r.cur.x, y: r.cur.y, z: r.cur.z, crouch: r.crouch });
     for (const [id, z] of zombis) if (z.estado !== 2 && z.cur) cuerpos.push({ id, x: z.cur.x, y: z.cur.y, z: z.cur.z, alto: ALTO_Z[z.tipo] || 1.75 });
     const M = W.mapa(mapaId), hits = [], ends = [];
     for (let i = 0; i < w.pel; i++) {

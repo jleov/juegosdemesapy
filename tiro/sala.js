@@ -40,7 +40,7 @@
     constructor(code, io) {
       this.code = code; this.io = io;
       this.players = new Map(); this.order = []; this.hostId = null;
-      this.settings = { mode: 'ffa', map: 'mercado', goal: 20, time: 5, bots: 'normal', max: 12 };
+      this.settings = { mode: 'ffa', map: 'mercado', goal: 20, time: 5, bots: 'normal', max: 12, fa: false };
       this.phase = 'lobby'; this.endAt = 0; this.score = { r: 0, a: 0 }; this.ranking = null; this.winner = null;
       this.dead = false; this.last = Date.now(); this.snapAcc = 0;
       this.zombis = new Map(); this.ola = null; this.zc = 0;
@@ -131,6 +131,7 @@
       if ([10, 15, 20, 30, 40, 50].includes(+s.goal)) st.goal = +s.goal;
       if ([3, 5, 8, 10, 15].includes(+s.time)) st.time = +s.time;
       if (SKILL[s.bots]) st.bots = s.bots;
+      if (typeof s.fa === 'boolean') st.fa = s.fa;
       this.broadcastState();
     }
     setTeam(pid, id, team) {
@@ -155,6 +156,7 @@
       this.broadcastState();
       if (this.settings.mode === 'zombis') this.sys(`🧟 ¡Supervivencia en ${this.M.n}! Aguanten todas las oleadas de zombis que puedan. Si caen, vuelven en la próxima oleada.`);
       else this.sys(`🔫 ¡Arranca! ${this.settings.mode === 'equipos' ? 'Rojos contra azules' : 'Todos contra todos'} en ${this.M.n}: gana el primero en llegar a ${this.settings.goal} bajas.`);
+      if (this.settings.fa && this.settings.mode !== 'ffa') this.sys('🔥 Fuego amigo prendido: cuidado con los tiros, las granadas y el fuego, que también lastiman a los compañeros.');
       for (const p of this.players.values()) this.spawnMsg(p);
     }
     toLobby(pid) {
@@ -213,9 +215,8 @@
       for (const h of hits) {
         if (!Array.isArray(h)) continue;
         const t = this.players.get(String(h[0])) || this.zombis.get(String(h[0]));
-        if (t && !t.zombi && this.settings.mode === 'zombis') continue;   // entre compañeros no se lastiman
         if (!t || t === p || !t.alive) continue;
-        if (this.settings.mode === 'equipos' && t.team === p.team) continue;
+        if (!t.zombi && this.companero(p, t) && !this.settings.fa) continue;   // sin fuego amigo, entre compañeros no se lastiman
         const dist = Math.hypot(t.x - p.x, t.y - p.y, t.z - p.z);
         if (dist > w.range + 6) continue;
         const d = dano.get(t) || { v: 0, head: false };
@@ -225,6 +226,11 @@
       const e = Array.isArray(m.e) ? m.e.slice(0, 9).filter(Array.isArray).map(v => v.slice(0, 3).map(Number)) : [];
       this.all({ t: 'fx', id: pid, w: m.w, o, e }, pid);
       dano.forEach((d, t) => this.hurt(t, d.v, p, d.head, m.w));
+    }
+    // del mismo lado: en supervivencia todos los jugadores, en equipos los del mismo color
+    companero(a, b) {
+      if (!a || !b || a.zombi || b.zombi) return false;
+      return this.settings.mode === 'zombis' || (this.settings.mode === 'equipos' && a.team === b.team);
     }
     calc(w, head, dist) {
       let v = w.dmg * (head ? w.head : 1);
@@ -249,14 +255,16 @@
       const kill = t.hp <= 0;
       this.to(t.id, { t: 'hurt', a: a.id, hp: Math.max(0, Math.round(t.hp)), from: [r2(a.x), r2(a.z)] });
       this.to(a.id, { t: 'hitm', head, kill, id: t.id });
-      if (t.bot && !t.bot.tgt && a.alive) { t.bot.tgt = a; t.bot.seen = 0.15; }
+      if (t.bot && !t.bot.tgt && a.alive && !this.companero(a, t)) { t.bot.tgt = a; t.bot.seen = 0.15; }
       if (kill) this.die(t, a, w, head);
     }
     die(t, a, w, head) {
       t.alive = false; t.hp = 0; t.d++; t.streak = 0; t.respawnAt = Date.now() + 3500;
       const zomb = this.settings.mode === 'zombis';
       if (zomb) t.respawnAt = Infinity;   // en supervivencia se vuelve en la próxima oleada
-      if (a && a !== t && !a.zombi) {
+      const amigo = a && a !== t && this.companero(a, t);
+      if (amigo) this.sys(`🔥 Fuego amigo: ${a.name} bajó a ${t.name}`);
+      if (a && a !== t && !a.zombi && !amigo) {
         a.k++; a.streak++;
         if (this.settings.mode === 'equipos') this.score[a.team]++;
       }
@@ -436,6 +444,11 @@
         const d = Math.hypot(z.x - p.x, z.y + 0.8 - p.y, z.z - p.z);
         if (d < 6.5) this.hurt(z, 40 + 280 * (1 - d / 6.5), p.dueno, false, 'granada');
       }
+      if (this.settings.fa && p.dueno && !p.dueno.zombi) for (const q of this.players.values()) {
+        if (!q.alive) continue;
+        const d = Math.hypot(q.x - p.x, q.y + 0.9 - p.y, q.z - p.z);
+        if (d < 6.5 && W.seVe(this.M, [p.x, p.y + 0.2, p.z], [q.x, q.y + 1, q.z])) this.hurt(q, 25 + 150 * (1 - d / 6.5), p.dueno, false, 'granada');
+      }
     }
     area(tipo, p, now) {
       const M = this.M, y = W.piso(M, p.x, p.z, p.y + 0.3), fuego = tipo === 'fuego';
@@ -452,6 +465,10 @@
             if (!z.alive || Math.hypot(z.x - a.x, z.z - a.z) > a.r || Math.abs(z.y - a.y) > 1.5) continue;
             z.hp -= 45 * dt;
             if (z.hp <= 0) this.matarZombi(z, a.dueno, 'molotov', false);
+          }
+          if (this.settings.fa) for (const q of this.players.values()) {
+            if (!q.alive || Math.hypot(q.x - a.x, q.z - a.z) > a.r || Math.abs(q.y - a.y) > 1.5) continue;
+            this.danarJugador(q, 22 * dt, a.dueno, 'molotov', now, a);
           }
         } else {
           for (const q of this.players.values()) {

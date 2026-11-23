@@ -23,9 +23,56 @@
   };
   const ARMA_IDS = ['fusil', 'escopeta', 'franco', 'pistola', 'subfusil'];
 
+  // ---------- objetos 3D de los mapas (modelos/props/*.glb) ----------
+  // n: medida original del modelo (para mantener la forma), c: color si no carga,
+  // col: qué parte de la caja ocupa el choque (ancho, alto, fondo), brillo: lámpara (de noche)
+  const PROPS = {
+    seto:        { n: [4, 1.5, 1.5], c: 6 },
+    fuente:      { n: [4, 1.6, 4], c: 7, col: [0.85, 0.7, 0.85] },
+    lapacho:     { n: [120.65, 149.73, 165.53], c: 2, col: [0.08, 1, 0.08] },
+    angel:       { n: [2.48, 3.81, 3.51], c: 7, col: [0.75, 1, 0.75] },
+    caballo:     { n: [1.74, 5.85, 3.38], c: 8, col: [0.7, 1, 0.6] },
+    columna:     { n: [1.3, 4.07, 1.3], c: 8, col: [0.75, 1, 0.75] },
+    farol:       { n: [0.64, 3.3, 1.57], c: 11, col: [0.5, 1, 0.25], brillo: [0, 0.63, 0.3] },
+    banco:       { n: [0.4, 0.1, 0.15], c: 2 },
+    porton:      { n: [79.9, 387.73, 515.54], c: 1 },
+    arco:        { n: [672741.81, 541016.6, 458577], c: 7, solido: false },
+    banderin:    { n: [1.41, 2.33, 0.38], c: 4, solido: false },
+    torre_luz:   { n: [22.67, 35.77, 3.88], c: 8, col: [0.05, 1, 0.3], brillo: [0, 0.94, 0.1] },
+    colectivo:   { n: [498.96, 254.61, 636.14], c: 5 },
+    auto:        { n: [2.64, 1.76, 5.49], c: 2 },
+    contenedor:  { n: [3.16, 3.34, 2.63], c: 6, col: [1, 0.7, 1] },
+    barril:      { n: [0.7, 1.14, 0.7], c: 3 },
+    barril_rojo: { n: [0.78, 1.02, 0.78], c: 4 },
+    cajon:       { n: [0.16, 0.16, 0.16], c: 2 },
+    bolsas:      { n: [3.16, 1.19, 0.78], c: 12 },
+    barrera:     { n: [1.31, 0.81, 0.6], c: 0 },
+    valla:       { n: [2.66, 1.05, 0.62], c: 0, col: [1, 1, 0.4] },
+    gomas:       { n: [1.76, 1.09, 1.14], c: 11 },
+    carrito:     { n: [0.46, 0.8, 0.93], c: 2 },
+    cantina:     { n: [0.53, 0.48, 0.28], c: 4 },
+    basurero:    { n: [1.22, 1.85, 1.22], c: 0, col: [0.8, 1, 0.8] },
+    pelota:      { n: [1, 1, 1], c: 7, solido: false },
+    publi:       { n: [1, 1, 1], c: 7, archivo: false },   // cartel de publicidad con letras
+  };
+
   // ---------- mapas ----------
-  function armar(id, n, S, extra) {
-    const B = [];
+  function armar(id, n, S, extra, pared) {
+    const B = [], props = [];
+    // un objeto 3D: op = { h, w, d (medidas), q (cuartos de vuelta), y, txt }
+    // si se da una sola medida, las otras salen de la forma original del modelo
+    const o = (t, x, z, op) => {
+      op = op || {}; const P = PROPS[t], q = (op.q | 0) & 3, y = op.y || 0;
+      const k = op.h ? op.h / P.n[1] : op.w ? op.w / P.n[0] : op.d ? op.d / P.n[2] : 1;
+      const w = op.w || P.n[0] * k, h = op.h || P.n[1] * k, d = op.d || P.n[2] * k;
+      props.push({ t, x, y, z, w, h, d, q, txt: op.txt || null });
+      if (P.solido === false) return;
+      const col = P.col || [1, 1, 1]; let cw = w * col[0], cd = d * col[2]; const ch = h * col[1];
+      if (q % 2) { const t2 = cw; cw = cd; cd = t2; }
+      B.push([x - cw / 2, y, z - cd / 2, x + cw / 2, y + ch, z + cd / 2, P.c, 1]);
+    };
+    // choque sin dibujo (los palos del arco, por ejemplo)
+    const oculta = (cx, cz, w, d, h, y) => { y = y || 0; B.push([cx - w / 2, y, cz - d / 2, cx + w / 2, y + h, cz + d / 2, 7, 1]); };
     const b = (cx, cz, w, d, h, c, y) => { y = y || 0; B.push([cx - w / 2, y, cz - d / 2, cx + w / 2, y + h, cz + d / 2, c]); };
     // escalera de cajas de 0,5 m pegada a un lado de algo alto (dir: hacia dónde baja)
     const escalera = (x, z, dx, dz, alto, ancho, c) => {
@@ -36,10 +83,11 @@
       }
     };
     // paredes de afuera
-    b(0, -S - 0.5, 2 * S + 2, 1, 7, 8); b(0, S + 0.5, 2 * S + 2, 1, 7, 8);
-    b(-S - 0.5, 0, 1, 2 * S + 2, 7, 8); b(S + 0.5, 0, 1, 2 * S + 2, 7, 8);
-    extra(b, escalera);
-    return { id, n, S, boxes: B };
+    const pc = pared == null ? 8 : pared;
+    b(0, -S - 0.5, 2 * S + 2, 1, 7, pc); b(0, S + 0.5, 2 * S + 2, 1, 7, pc);
+    b(-S - 0.5, 0, 1, 2 * S + 2, 7, pc); b(S + 0.5, 0, 1, 2 * S + 2, 7, pc);
+    extra(b, escalera, o, oculta);
+    return { id, n, S, boxes: B, props };
   }
 
   const MAPAS = {
@@ -144,6 +192,109 @@
       b(0, 16, 8, 0.6, 1.1, 14); b(2, 25, 6, 0.6, 1.1, 14); b(27, -21, 0.6, 6, 1.1, 14);
       [[-14, 24], [22, 20], [24, -24], [-25, -2], [9, 7.5]].forEach(([x, z]) => b(x, z, 2.2, 1.3, 1.2, 5));
     }),
+
+    // laberinto de setos en un jardín (como el Botánico de Asunción): pasillos angostos,
+    // plaza con fuente y lapachos en el medio, faroles y estatuas. Siempre sale igual.
+    laberinto: () => armar('laberinto', 'Laberinto del Botánico', 30, (b, esc, o) => {
+      const S = 30, C = 6, N = 10;
+      let sd = 20261123; const rnd = () => { sd = (Math.imul(sd, 1103515245) + 12345) & 0x7fffffff; return sd / 0x7fffffff; };
+      // H[i][j]: seto entre la celda (i,j) y (i,j+1);  V[i][j]: entre (i,j) y (i+1,j)
+      const H = [], V = [];
+      for (let i = 0; i < N; i++) { H.push(new Array(N).fill(true)); V.push(new Array(N).fill(true)); }
+      const vis = new Set(['0,0']), pila = [[0, 0]];
+      while (pila.length) {
+        const [i, j] = pila[pila.length - 1];
+        const op = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, c]) => [i + a, j + c]).filter(([a, c]) => a >= 0 && c >= 0 && a < N && c < N && !vis.has(a + ',' + c));
+        if (!op.length) { pila.pop(); continue; }
+        const [a, c] = op[(rnd() * op.length) | 0];
+        if (a !== i) V[Math.min(a, i)][j] = false; else H[i][Math.min(c, j)] = false;
+        vis.add(a + ',' + c); pila.push([a, c]);
+      }
+      // más caminos (para que no haya tantos callejones sin salida)
+      for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { if (rnd() < 0.3) H[i][j] = false; if (rnd() < 0.3) V[i][j] = false; }
+      // plaza del medio (4 celdas) con una entrada por lado
+      H[4][4] = H[5][4] = V[4][4] = V[4][5] = false;
+      V[3][4] = V[5][5] = H[4][3] = H[5][5] = false;
+      const cx = i => -S + C * (i + 0.5);
+      for (let i = 0; i < N; i++) for (let j = 0; j < N - 1; j++) if (H[i][j]) o('seto', cx(i), -S + C * (j + 1), { w: C + 1, h: 2.6, d: 1.1 });
+      for (let i = 0; i < N - 1; i++) for (let j = 0; j < N; j++) if (V[i][j]) o('seto', -S + C * (i + 1), cx(j), { w: C + 1, h: 2.6, d: 1.1, q: 1 });
+      // plaza: fuente, lapachos, bancos y columnas en las esquinas
+      o('fuente', 0, 0, { w: 4.4, h: 1.7, d: 4.4 });
+      [[-1, -1], [1, 1], [-1, 1], [1, -1]].forEach(([a, c], k) => {
+        o('lapacho', a * 4.2, c * 4.2, { h: 6.5 });
+        o('columna', a * 6, c * 6, { h: 3.3 });
+        o('banco', k < 2 ? a * 3.6 : 0, k < 2 ? 0 : c * 3.6, { w: 1.9, h: 0.5, d: 0.7, q: k < 2 ? 1 : 0 });
+      });
+      // estatuas en las esquinas del laberinto
+      o('angel', cx(1), cx(1), { h: 3.2 }); o('caballo', cx(8), cx(8), { h: 3.4 });
+      o('caballo', cx(1), cx(8), { h: 3.4, q: 1 }); o('angel', cx(8), cx(1), { h: 3.2, q: 2 });
+      // lapachos y faroles repartidos (pegados a una esquina de la celda para no tapar el paso)
+      const usadas = new Set(['1,1', '8,8', '1,8', '8,1', '4,4', '4,5', '5,4', '5,5']);
+      const libre = () => { for (;;) { const i = (rnd() * N) | 0, j = (rnd() * N) | 0; if (!usadas.has(i + ',' + j)) { usadas.add(i + ',' + j); return [i, j]; } } };
+      for (let k = 0; k < 6; k++) { const [i, j] = libre(); o('lapacho', cx(i) + 1.6, cx(j) - 1.6, { h: 5.5 + rnd() * 1.5 }); }
+      for (let k = 0; k < 12; k++) { const [i, j] = libre(); o('farol', cx(i) - 1.7, cx(j) + 1.7, { h: 3, q: k & 3 }); }
+      // portones de hierro contra el muro de afuera
+      o('porton', 0, -S + 0.35, { h: 3.4, q: 1 }); o('porton', 0, S - 0.35, { h: 3.4, q: 1 });
+      o('porton', -S + 0.35, 0, { h: 3.4 }); o('porton', S - 0.35, 0, { h: 3.4 });
+    }, 14),
+
+    // estadio de la Albirroja: cancha con arcos, tribunas rojas, blancas y azules que se suben,
+    // y barricadas de los sobrevivientes (colectivo, autos, bolsas de arena) en la cancha
+    estadio: () => armar('estadio', 'Estadio Albirrojo', 34, (b, esc, o, oculta) => {
+      const cols = [4, 7, 3];
+      // tribunas en los lados largos: 6 escalones de 0,5 m, con un pasillo en el medio
+      [-1, 1].forEach(sg => {
+        for (let i = 0; i < 6; i++) {
+          const z = sg * (15.75 + i * 1.5), h = 0.5 * (i + 1);
+          b(-14.4, z, 23.2, 1.5, h, cols[i % 3]); b(14.4, z, 23.2, 1.5, h, cols[i % 3]);
+        }
+        b(-14.4, sg * 24.3, 23.2, 0.4, 4.1, 8); b(14.4, sg * 24.3, 23.2, 0.4, 4.1, 8);   // baranda de atrás
+      });
+      // arcos (solo los palos chocan)
+      [-1, 1].forEach(sg => {
+        const x = sg * 22.4;
+        o('arco', x + sg * 0.9, 0, { w: 7.3, h: 2.5, d: 2.2, q: sg > 0 ? 3 : 1 });
+        oculta(x, -3.6, 0.2, 0.2, 2.5); oculta(x, 3.6, 0.2, 0.2, 2.5); oculta(x, 0, 0.2, 7.4, 0.2, 2.4);
+        oculta(x + sg * 1.9, 0, 0.2, 7.4, 2.5);   // la red de atrás
+      });
+      // banderines del córner, la pelota y los bancos de suplentes
+      [[-1, -1], [1, 1], [-1, 1], [1, -1]].forEach(([a, c]) => o('banderin', a * 22.2, c * 13.2, { h: 1.6, q: a > 0 ? 2 : 0 }));
+      o('pelota', 0.6, 0.4, { h: 0.45 });
+      o('banco', -6, -13.9, { w: 4, h: 0.5, d: 0.8 }); o('banco', 6, -13.9, { w: 4, h: 0.5, d: 0.8 });
+      // carteles de publicidad al costado de la cancha
+      const txt = ['ALBIRROJA', 'TERERÉ JEVY', 'CHIPA CALIENTE', 'JUEGOSPY.COM', 'SOPA PARAGUAYA', 'MBEJÚ', 'VAMOS PARAGUAY', 'COCIDO QUEMADO'];
+      [-16, -9.5, 9.5, 16].forEach((x, k) => {
+        o('publi', x, -14.2, { w: 5.6, h: 1, d: 0.25, txt: txt[k] });
+        o('publi', x, 14.2, { w: 5.6, h: 1, d: 0.25, q: 2, txt: txt[k + 4] });
+      });
+      // torres de luz en las cuatro esquinas
+      [[-1, -1], [1, 1], [-1, 1], [1, -1]].forEach(([a, c]) => o('torre_luz', a * 29.5, c * 29.5, { h: 17, q: a * c > 0 ? 1 : 0 }));
+      // en la cancha: fortín de bolsas de arena alrededor del círculo central
+      o('bolsas', 0, -5, { w: 3.6, h: 1.1, d: 0.9 }); o('bolsas', 0, 5, { w: 3.6, h: 1.1, d: 0.9, q: 2 });
+      o('bolsas', -5, 0, { w: 3.6, h: 1.1, d: 0.9, q: 1 }); o('bolsas', 5, 0, { w: 3.6, h: 1.1, d: 0.9, q: 3 });
+      // colectivo cruzado y autos abandonados
+      o('colectivo', -10, -6, { w: 2.9, h: 3.1, d: 9.5, q: 1 });
+      o('auto', 11, 6, { h: 1.6 }); o('auto', -13, 7.5, { h: 1.6, q: 1 }); o('auto', 15, -7, { h: 1.6, q: 2 });
+      // barreras de hormigón, barriles, cajones y gomas
+      [[8, -9, 0], [-4, 10, 0], [17, 2, 1], [-17, -2, 1], [4, -11, 0], [-19, 9, 1]].forEach(([x, z, q]) => o('barrera', x, z, { w: 2.2, h: 1.1, d: 0.7, q }));
+      [[13, -2], [-6, -11], [19, -10], [-19, 11.5], [6, 11]].forEach(([x, z], k) => o(k % 2 ? 'barril_rojo' : 'barril', x, z, { h: 1.15 }));
+      [[13.8, -1.2], [-7, 11.5], [8, 3]].forEach(([x, z]) => o('cajon', x, z, { w: 1.1 }));
+      o('gomas', -15, -10, { h: 1 }); o('gomas', 9, -12, { h: 1, q: 1 });
+      // detrás de los arcos: vallas y contenedores
+      [-1, 1].forEach(sg => {
+        [-9, -5.5, 5.5, 9].forEach(z => o('valla', sg * 26, z, { w: 2.8, h: 1.05, d: 0.6, q: 1 }));
+        o('contenedor', sg * 30, -9, { h: 1.9, q: 1 }); o('contenedor', sg * 29.5, 10, { h: 1.9, q: 3 });
+        o('bolsas', sg * 27.5, 0, { w: 3.6, h: 1.1, d: 0.9, q: 1 });
+        o('barril', sg * 31.5, 4, { h: 1.15 }); o('barril_rojo', sg * 31, -3, { h: 1.05 });
+      });
+      // afuera de las tribunas: cantinas, carrito de chipa, autos y el colectivo de la selección
+      o('cantina', -12, 27.6, { h: 2.6 }); o('cantina', 10, -27.6, { h: 2.6, q: 2 });
+      o('carrito', 6, 27.5, { h: 2, q: 1 }); o('carrito', -7, -27.5, { h: 2, q: 3 });
+      o('colectivo', 14, 29.2, { w: 2.9, h: 3.1, d: 9.5, q: 1 });
+      o('auto', -20, 29.5, { h: 1.6, q: 1 }); o('auto', -24, -29, { h: 1.6, q: 3 }); o('auto', 22, -29.5, { h: 1.6, q: 1 });
+      [[-3, 26.5], [3, -26.5], [-18, -26.6], [19, 26.4]].forEach(([x, z]) => o('basurero', x, z, { h: 1.1 }));
+      o('banco', -6, 31.5, { w: 2, h: 0.5, d: 0.7 }); o('banco', 5, -31.5, { w: 2, h: 0.5, d: 0.7 });
+    }, 0),
   };
   const MAPA_IDS = Object.keys(MAPAS);
   const cacheM = {};
@@ -380,5 +531,5 @@
     return [0, 0, 0];
   }
 
-  G.TiroMundo = { F, PAL, ARMAS, ARMA_IDS, MAPAS, MAPA_IDS, mapa, choca, piso, mover, liberar, rayMundo, rayCuerpos, dir, desvio, seVe, rumbo, puntoLibre, cabeza };
+  G.TiroMundo = { F, PAL, PROPS, ARMAS, ARMA_IDS, MAPAS, MAPA_IDS, mapa, choca, piso, mover, liberar, rayMundo, rayCuerpos, dir, desvio, seVe, rumbo, puntoLibre, cabeza };
 })(typeof window !== 'undefined' ? window : globalThis);
