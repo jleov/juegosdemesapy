@@ -251,11 +251,12 @@
     return t >= 0 && t <= max ? t : -1;
   }
   // cuerpos: lista de {id,x,y,z,crouch}
-  function cabeza(p) { const h = p.crouch ? F.HC : F.H; return [p.x, p.y + h - 0.22, p.z]; }
+  // alto: los zombis tienen su propio alto (el que se arrastra es bajito)
+  function cabeza(p) { const h = p.alto || (p.crouch ? F.HC : F.H); return [p.x, p.y + h - 0.22, p.z]; }
   function rayCuerpos(list, o, d, max) {
     let best = null;
     for (const p of list) {
-      const h = p.crouch ? F.HC : F.H;
+      const h = p.alto || (p.crouch ? F.HC : F.H);
       let t = raySphere(o, d, cabeza(p), 0.26, max), head = true;
       const tb = rayCaja(o, d, [p.x - 0.34, p.y, p.z - 0.34, p.x + 0.34, p.y + h - 0.44, p.z + 0.34], max);
       if (tb >= 0 && (t < 0 || tb < t - 0.05)) { t = tb; head = false; }

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#121826">
 <!-- SEO (buscadores y vista previa al compartir) -->
 <title>Tiro Guasu: juego de disparos en 3D online gratis con amigos | Juegos PY</title>
-<meta name="description" content="Tiro Guasu: juego de tiros en primera persona en 3D, online y gratis desde el navegador. Mapas paraguayos (Mercado 4, Puerto de Asunción, una estancia en el Chaco), fusil, subfusil, escopeta, francotirador y pistola, todos contra todos o Albirroja contra Azules. Salas con amigos hasta 12, chat, voz y bots.">
+<meta name="description" content="Tiro Guasu: juego de tiros en primera persona en 3D, online y gratis desde el navegador. Mapas paraguayos (Mercado 4, Puerto de Asunción, una estancia en el Chaco), fusil, subfusil, escopeta, francotirador y pistola, todos contra todos, Albirroja contra Azules o supervivencia contra oleadas de zombis. Salas con amigos hasta 12, chat, voz y bots.">
 <link rel="canonical" href="https://juegospy.com/tiro/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Juegos Paraguay Digitales">
@@ -232,10 +232,10 @@ body.tactil #chatF{bottom:auto;top:30%}
       <div class="panel card">
         <h3>Partida <small id="hostOnly" style="color:var(--mut);font-weight:600"></small></h3>
         <div class="sets">
-          <label>Modo<select id="sMode"><option value="ffa">🎯 Todos contra todos</option><option value="equipos">🔴🔵 Albirroja contra Azules</option></select></label>
+          <label>Modo<select id="sMode"><option value="ffa">🎯 Todos contra todos</option><option value="equipos">🔴🔵 Albirroja contra Azules</option><option value="zombis">🧟 Supervivencia zombi</option></select></label>
           <label>Mapa<select id="sMap"></select></label>
-          <label>Gana con<select id="sGoal"></select></label>
-          <label>Tiempo<select id="sTime"></select></label>
+          <label id="lGoal">Gana con<select id="sGoal"></select></label>
+          <label id="lTime">Tiempo<select id="sTime"></select></label>
           <label>Bots<select id="sBots"><option value="facil">🙂 Fáciles</option><option value="normal">😐 Normales</option><option value="dificil">😈 Difíciles</option></select></label>
           <label>&nbsp;<button id="addBotBtn">🤖 Agregar bot</button></label>
         </div>
@@ -251,7 +251,7 @@ body.tactil #chatF{bottom:auto;top:30%}
         🖥️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · mouse apuntar · clic izquierdo tirar · clic derecho mira · <kbd>Espacio</kbd> saltar · <kbd>Shift</kbd> agacharse (corriendo, te deslizás) · <kbd>R</kbd> recargar · <kbd>Q</kbd>/<kbd>1</kbd>/<kbd>2</kbd> cambiar arma · <kbd>Tab</kbd> tabla · <kbd>Enter</kbd> chat · <kbd>Esc</kbd> ajustes<br>
         📱 palanca a la izquierda para caminar, arrastrá a la derecha para mirar, y botones para tirar, apuntar, saltar y agacharte.<br>
         🎯 A la cabeza hace el doble. La vida se recupera sola si no te pegan un rato.<br>
-        <small>Personajes y armas en 3D: <a href="https://quaternius.com/packs/toonshootergamekit.html" target="_blank" rel="noopener" style="color:inherit">Toon Shooter Game Kit de Quaternius</a> (CC0, uso libre).</small>
+        <small>Personajes y armas en 3D: <a href="https://quaternius.com/packs/toonshootergamekit.html" target="_blank" rel="noopener" style="color:inherit">Toon Shooter Game Kit de Quaternius</a> (CC0, uso libre). Zombis: Zombie Apocalypse Kit de Quaternius vía <a href="https://poly.pizza/bundle/Post-Apocolypse-Pack-jg0We8Clu0" target="_blank" rel="noopener" style="color:inherit">Poly Pizza</a> (CC0 y CC-BY 3.0).</small>
       </div>
     </div>
   </div>
@@ -311,9 +311,9 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div id="audios"></div>
 </div>
 
-<script src="mundo.js?v=8"></script>
-<script src="sala.js?v=8"></script>
-<script src="juego.js?v=8"></script>
+<script src="mundo.js?v=9"></script>
+<script src="sala.js?v=9"></script>
+<script src="juego.js?v=9"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -601,9 +601,12 @@ function renderLobby() {
   fillSelect($('#sGoal'), [10, 15, 20, 30, 40, 50].map(n => [n, n + ' bajas']), st.goal);
   fillSelect($('#sTime'), [3, 5, 8, 10, 15].map(n => [n, n + ' minutos']), st.time);
   $('#sBots').value = st.bots;
+  const zomb = st.mode === 'zombis';
+  $('#lGoal').classList.toggle('hidden', zomb); $('#lTime').classList.toggle('hidden', zomb);
+  $('#startBtn').textContent = zomb ? '🧟 ¡Que vengan los zombis!' : '🔫 ¡Empezar!';
   ['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#addBotBtn', '#startBtn'].forEach(q => $(q).disabled = !host);
   $('#hostOnly').textContent = host ? '' : '(la elige el anfitrión)';
-  $('#waitNote').textContent = amObs ? '👀 Estás mirando la sala: no jugás, pero ves todo.' : host ? (s.players.length < 2 ? 'Esperando jugadores... o agregá bots 🤖' : '') : 'Esperando que el anfitrión empiece...';
+  $('#waitNote').textContent = zomb && !amObs ? '🧟 Todos juntos (y los bots de compañeros) contra oleadas de zombis cada vez más fuertes. Si caés, volvés en la próxima oleada.' : amObs ? '👀 Estás mirando la sala: no jugás, pero ves todo.' : host ? (s.players.length < 2 ? 'Esperando jugadores... o agregá bots 🤖' : '') : 'Esperando que el anfitrión empiece...';
   $('#armasL').parentNode.classList.toggle('hidden', amObs);
 }
 const sendSettings = () => send({ t: 'settings', s: { mode: $('#sMode').value, map: $('#sMap').value, goal: +$('#sGoal').value, time: +$('#sTime').value, bots: $('#sBots').value } });
@@ -635,10 +638,12 @@ function renderFin() {
   $('#pausa').classList.add('hidden'); $('#muerte').classList.add('hidden');
   const med = ['🥇', '🥈', '🥉'], eq = s.settings.mode === 'equipos';
   let tit = '🏆 ¡Fin de la partida!';
-  if (eq) tit = s.winner === 'empate' ? '🤝 ¡Empate!' : s.winner === 'r' ? '🔴 ¡Ganó la Albirroja!' : '🔵 ¡Ganaron los Azules!';
+  const zomb = s.settings.mode === 'zombis';
+  if (zomb) tit = `🧟 Llegaron hasta la oleada ${s.ola ? s.ola.n : 0}`;
+  else if (eq) tit = s.winner === 'empate' ? '🤝 ¡Empate!' : s.winner === 'r' ? '🔴 ¡Ganó la Albirroja!' : '🔵 ¡Ganaron los Azules!';
   else { const w = s.ranking[0]; if (w) tit = w.id === myId ? '🏆 ¡Ganaste vos!' : `🏆 Ganó ${esc(w.avatar)} ${esc(w.name)}`; }
   $('#finBox').innerHTML = `<h2>${tit}</h2>${eq ? `<div style="font-size:1.3em;margin-bottom:6px"><span class="tr">🔴 ${s.score.r}</span> — <span class="ta">${s.score.a} 🔵</span></div>` : ''}
-    ${s.ranking.map((p, i) => `<div class="rk ${p.id === myId ? 'me' : ''}"><span>${med[i] || (i + 1) + 'º'}</span><span>${esc(p.avatar)}</span><span class="n ${eq ? (p.team === 'r' ? 'tr' : 'ta') : ''}">${esc(p.name)}${p.bot ? ' 🤖' : ''}</span><span>🔫 ${p.k}</span><span style="color:var(--mut)">💀 ${p.d}</span></div>`).join('')}
+    ${s.ranking.map((p, i) => `<div class="rk ${p.id === myId ? 'me' : ''}"><span>${med[i] || (i + 1) + 'º'}</span><span>${esc(p.avatar)}</span><span class="n ${eq ? (p.team === 'r' ? 'tr' : 'ta') : ''}">${esc(p.name)}${p.bot ? ' 🤖' : ''}</span><span>${zomb ? '🧟' : '🔫'} ${p.k}</span><span style="color:var(--mut)">💀 ${p.d}</span></div>`).join('')}
     ${s.hostId === myId ? '<div class="row" style="margin-top:12px"><button class="btn-ok" id="againBtn" style="flex:1">🔁 Otra partida</button><button id="toLobbyBtn" style="flex:1">⚙️ Sala de espera</button></div>' : '<p class="note">Esperando al anfitrión...</p>'}`;
   f.classList.remove('hidden');
   const ag = $('#againBtn'); if (ag) ag.onclick = () => send({ t: 'start' });
@@ -730,7 +735,7 @@ if (window.DuenoLink) DuenoLink.start({ game: 'tiro',
     const r = localRoom; if (!r || r.dead || !S) return null;
     const local = mode === 'local'; if (local && !localCode) localCode = 'L' + genCode();
     return { code: local ? localCode : roomCode, local, phase: r.phase, started: startedAt,
-      host: (r.players.get(r.hostId) || {}).name || '', opts: { mode: r.settings.mode, map: W.mapa(r.settings.map).n, goal: r.settings.goal }, score: r.score,
+      host: (r.players.get(r.hostId) || {}).name || '', opts: { mode: r.settings.mode, map: W.mapa(r.settings.map).n, goal: r.settings.goal, ola: r.ola ? r.ola.n : null }, score: r.score,
       players: r.order.map(id => r.players.get(id)).filter(Boolean).map(p => ({ n: p.name, e: p.avatar, bot: !!p.bot, conn: !!p.bot || !!p.connected, k: p.k, d: p.d, team: r.settings.mode === 'equipos' ? p.team : null })),
       obs: [...obsConns.values()].map(o => ({ n: o.name, owner: !!o.owner })) };
   },

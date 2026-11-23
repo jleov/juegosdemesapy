@@ -201,7 +201,7 @@
     g.scene.traverse(o => {
       if (!o.isMesh) return;
       o.frustumCulled = false;
-      for (const m of [].concat(o.material)) { if (vistos.has(m)) continue; vistos.add(m); if (m.color) m.color.convertLinearToSRGB(); m.metalness = 0; m.roughness = 0.8; }
+      for (const m of [].concat(o.material)) { if (vistos.has(m)) continue; vistos.add(m); if (m.color) m.color.convertLinearToSRGB(); if (m.map) { m.map.encoding = T.LinearEncoding; m.needsUpdate = true; } m.metalness = 0; m.roughness = 0.8; }
     });
   }
   // cuando terminan de cargar, se cambian los muñecos de cajas por los modelos
@@ -281,6 +281,123 @@
       PUNTA[w] = 0.12 - LARGO[w];
     }
   }
+
+  // ================= zombis (modo supervivencia) =================
+  // Modelos del "Zombie Apocalypse Kit" de Quaternius (Poly Pizza): zombi común (CC0), gordo,
+  // de brazo grande y el que se arrastra (CC-BY 3.0, con crédito en la ayuda).
+  const TIPOS_Z = ['zombi', 'gordo', 'brazo', 'medio'];
+  const ARCH_Z = { zombi: 'modelos/zombi.glb', gordo: 'modelos/zombi_gordo.glb', brazo: 'modelos/zombi_brazo.glb', medio: 'modelos/zombi_medio.glb' };
+  const ALTO_Z = { zombi: 1.8, gordo: 1.85, brazo: 2.05, medio: 0.75 };
+  const GLBZ = {}; let cargandoZ = null;
+  const zombis = new Map();
+  J.cargarZombis = () => {
+    if (cargandoZ) return cargandoZ;
+    if (!T.GLTFLoader || !T.SkeletonUtils) return Promise.resolve(false);
+    const L = new T.GLTFLoader();
+    cargandoZ = Promise.all(Object.entries(ARCH_Z).map(([k, u]) => new Promise(res =>
+      L.load(u, g => { prepararGLB(g); medirZ(g, k); GLBZ[k] = g; res(); }, null, () => res()))))
+      .then(() => { for (const z of zombis.values()) scene.remove(z.g); zombis.clear(); return true; });
+    return cargandoZ;
+  };
+  // escala para que cada zombi tenga su alto
+  function medirZ(g, k) {
+    g.scene.updateMatrixWorld(true);
+    const b = new T.Box3().setFromObject(g.scene), h = Math.max(0.01, b.max.y - b.min.y);
+    g.userData.escala = ALTO_Z[k] / h;
+    g.userData.suelo = -b.min.y;
+  }
+  function zombiNuevo(tipo) {
+    const gl = GLBZ[tipo] || GLBZ.zombi;
+    const g = new T.Group(); let u;
+    if (gl) {
+      const m = T.SkeletonUtils.clone(gl.scene);
+      m.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+      const dentro = new T.Group(); dentro.add(m); dentro.rotation.y = Math.PI;
+      const e = gl.userData.escala || 1; dentro.scale.setScalar(e); dentro.position.y = (gl.userData.suelo || 0) * e;
+      g.add(dentro);
+      const mixer = new T.AnimationMixer(m), clip = re => gl.animations.find(a => re.test(a.name));
+      const acc = {};
+      const pide = { quieto: [/(^|\|)(Zombie)?Idle$/], camina: [/(^|\|)Walk$/, /(^|\|)Crawl$/], corre: [/(^|\|)Run_Arms$/, /(^|\|)Run$/, /(^|\|)Crawl$/],
+        ataca: [/(^|\|)Punch$/, /(^|\|)Idle_Attack$/, /(^|\|)Run_Attack$/, /(^|\|)Attack$/, /(^|\|)Crawl$/], muere: [/(^|\|)Death$/] };
+      if (tipo === 'medio') { pide.camina = [/(^|\|)Crawl$/]; pide.corre = [/(^|\|)Crawl$/]; pide.ataca = [/(^|\|)Crawl$/]; }
+      for (const k in pide) { for (const re of pide[k]) { const c = clip(re); if (c) { acc[k] = mixer.clipAction(c); break; } } }
+      if (acc.muere) { acc.muere.setLoop(T.LoopOnce, 1); acc.muere.clampWhenFinished = true; }
+      u = { modelo: true, mixer, acc, actual: null };
+    } else {
+      // sin modelos: un muñeco verde de cajas
+      const mat = new T.MeshLambertMaterial({ color: '#5f8a3a' }), ropa = new T.MeshLambertMaterial({ color: '#4a3b2a' });
+      const alto = ALTO_Z[tipo] || 1.8, c1 = new T.Mesh(new T.BoxGeometry(0.6, alto * 0.45, 0.35), ropa); c1.position.y = alto * 0.5;
+      const c2 = new T.Mesh(new T.BoxGeometry(0.4, 0.4, 0.4), mat); c2.position.y = alto * 0.85;
+      const b1 = new T.Mesh(new T.BoxGeometry(0.15, 0.15, 0.6), mat); b1.position.set(0.2, alto * 0.65, -0.3); const b2 = b1.clone(); b2.position.x = -0.2;
+      g.add(c1, c2, b1, b2); u = { modelo: false };
+    }
+    g.userData = u; scene.add(g);
+    return g;
+  }
+  function animarZ(z, dt) {
+    const u = z.g.userData;
+    if (!u.modelo) { if (z.estado === 2) z.g.rotation.x = -Math.min(1.5, (z.muerto || 0) * 4); return; }
+    const q = z.estado === 2 ? 'muere' : z.estado === 1 ? 'ataca' : z.vel > 3 ? 'corre' : z.velS > 0.3 ? 'camina' : 'quieto';
+    if (q !== u.actual) {
+      const antes = u.acc[u.actual], luego = u.acc[q] || u.acc.camina;
+      if (luego && luego !== antes) { luego.reset(); luego.play(); if (antes) antes.crossFadeTo(luego, q === 'muere' ? 0.1 : 0.25, false); }
+      u.actual = q;
+    }
+    if (q === 'camina' && u.acc.camina) u.acc.camina.timeScale = Math.max(0.6, Math.min(1.6, z.velS / 1.8));
+    u.mixer.update(dt);
+  }
+  function zombisSnap(Z) {
+    const now = performance.now(), vistos = new Set();
+    for (const e of Z) {
+      const [id, ti, x, y, zz, ry, estado, vel] = e; vistos.add(id);
+      let z = zombis.get(id);
+      if (!z) { const tipo = TIPOS_Z[ti] || 'zombi'; z = { id, tipo, g: zombiNuevo(tipo), buf: [], estado: 0, vel: 0, velS: 0, cur: null, gruT: 2 + Math.random() * 5, muerto: 0 }; zombis.set(id, z); }
+      if (estado === 2 && z.estado !== 2) z.muerto = 0.001;
+      z.estado = estado; z.vel = vel;
+      z.buf.push({ t: now, x, y, z: zz, ry, rx: 0 }); if (z.buf.length > 30) z.buf.shift();
+    }
+    for (const [id, z] of zombis) if (!vistos.has(id)) { scene.remove(z.g); zombis.delete(id); }
+  }
+  function interp(buf, rt) {
+    let a = buf[0], c = buf[buf.length - 1];
+    for (let i = buf.length - 1; i >= 0; i--) if (buf[i].t <= rt) { a = buf[i]; c = buf[i + 1] || buf[i]; break; }
+    const k = c.t > a.t ? Math.max(0, Math.min(1, (rt - a.t) / (c.t - a.t))) : 1;
+    let dr = c.ry - a.ry; while (dr > Math.PI) dr -= 2 * Math.PI; while (dr < -Math.PI) dr += 2 * Math.PI;
+    return { x: a.x + (c.x - a.x) * k, y: a.y + (c.y - a.y) * k, z: a.z + (c.z - a.z) * k, ry: a.ry + dr * k };
+  }
+  function zombisTick(dt, rt) {
+    for (const z of zombis.values()) {
+      if (!z.buf.length) continue;
+      const cur = interp(z.buf, rt);
+      const v = z.cur ? Math.hypot(cur.x - z.cur.x, cur.z - z.cur.z) / Math.max(dt, 0.001) : 0;
+      z.velS = z.velS * 0.85 + Math.min(v, 10) * 0.15;
+      z.cur = cur;
+      if (z.estado === 2) z.muerto += dt;
+      z.g.visible = z.estado !== 2 || z.muerto < 2.4;
+      z.g.position.set(cur.x, cur.y, cur.z); z.g.rotation.y = cur.ry;
+      animarZ(z, dt);
+      // gruñidos de vez en cuando (más seguido si está cerca)
+      if (z.estado !== 2 && (z.gruT -= dt) <= 0) { z.gruT = 3 + Math.random() * 6; gruDe(z.cur, z.tipo); }
+    }
+  }
+  function gruDe(p, tipo) {
+    if (!soundOn || !actx || !cam) return;
+    const dx = p.x - cam.position.x, dz = p.z - cam.position.z, d = Math.hypot(dx, dz);
+    if (d > 26) return;
+    const vol = Math.pow(1 - d / 26, 1.5) * 0.5, rel = Math.atan2(-dx, -dz) - cam.rotation.y;
+    try {
+      const t = actx.currentTime, dur = 0.6 + Math.random() * 0.6, o = actx.createOscillator(), f = actx.createBiquadFilter(), g = actx.createGain();
+      const base = tipo === 'gordo' ? 70 : tipo === 'brazo' ? 85 : tipo === 'medio' ? 140 : 105;
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(base * (0.9 + Math.random() * 0.3), t); o.frequency.linearRampToValueAtTime(base * 0.75, t + dur);
+      const lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = 7 + Math.random() * 6; lg.gain.value = base * 0.08; lfo.connect(lg); lg.connect(o.frequency);
+      f.type = 'bandpass'; f.frequency.value = 450 + Math.random() * 300; f.Q.value = 3;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      let out = g; if (actx.createStereoPanner) { const pn = actx.createStereoPanner(); pn.pan.value = Math.max(-1, Math.min(1, -Math.sin(rel) * Math.min(1, d / 3))); g.connect(pn); out = pn; }
+      o.connect(f); f.connect(g); out.connect(actx.destination);
+      o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    } catch (e) { }
+  }
+  const esZombi = id => typeof id === 'string' && zombis.has(id);
 
   // ================= arma en la mano (primera persona) =================
   const VM = {};
@@ -411,6 +528,7 @@
   J.salir = () => {
     activo = false; cancelAnimationFrame(raf);
     for (const r of remotos.values()) scene.remove(r.g); remotos.clear();
+    for (const z of zombis.values()) scene.remove(z.g); zombis.clear(); yo.ola = null;
     yo.alive = false; inp.fire = false; inp.aim = false;
     if (document.pointerLockElement) document.exitPointerLock();
     $('#juego').classList.add('hidden'); $('#muerte').classList.add('hidden'); $('#pausa').classList.add('hidden');
@@ -418,6 +536,7 @@
   };
   J.activo = () => activo;
   J.estado = S => {
+    if (S.settings.mode === 'zombis') J.cargarZombis();
     if (!scene) return;
     if (S.settings.map !== mapaId) cargarMapa(S.settings.map);
     const ids = new Set();
@@ -441,6 +560,7 @@
           if (alive) { r.buf.push({ t: now, x, y, z, ry, rx }); if (r.buf.length > 30) r.buf.shift(); }
         }
         yo.tl = m.tl; yo.tlAt = performance.now();
+        if (m.Z) { zombisSnap(m.Z); yo.ola = m.ol; marcador(); } else if (zombis.size) zombisSnap([]);
         break;
       }
       case 'spawn': {
@@ -464,6 +584,8 @@
         break;
       }
       case 'kill': feedKill(m); break;
+      case 'ola': if (m.n) { aviso('🧟 ¡Oleada ' + m.n + '!', 'Vienen zombis...'); SFX.aparece(); } else if (m.fin) aviso('✅ ¡Pasaron la oleada ' + m.fin + '!', 'Respiren: la próxima en 8 segundos'); break;
+      case 'muerde': { const z = zombis.get(m.id); if (z && z.cur) gruDe(z.cur, 'brazo'); break; }
       case 'hurt': {
         yo.hp = m.hp; SFX.duele();
         const v = $('#dano'); v.style.opacity = Math.min(0.85, 0.35 + (100 - m.hp) / 200); clearTimeout(v._t); v._t = setTimeout(() => v.style.opacity = 0, 350);
@@ -480,13 +602,13 @@
       }
     }
   };
-  function nombre(id) { const p = (C.S().players || []).find(x => x.id === id); return p ? p.name : '¿?'; }
+  function nombre(id) { if (esZombi(id) || /^z\d+$/.test(id || '')) return '🧟 Zombi'; const p = (C.S().players || []).find(x => x.id === id); return p ? p.name : '¿?'; }
   function colorDe(id) {
-    const S = C.S(), p = S.players.find(x => x.id === id); if (!p) return '#fff';
+    const S = C.S(), p = S.players.find(x => x.id === id); if (!p) return /^z\d+$/.test(id || '') ? '#9ccc65' : '#fff';
     return S.settings.mode === 'equipos' ? (p.team === 'r' ? '#ff8a80' : '#8ab4ff') : CAMIS_TXT[p.col % CAMIS_TXT.length];
   }
   function feedKill(m) {
-    const me = C.me(), w = A[m.w] || A.fusil;
+    const me = C.me(), w = m.w === 'zombi' ? { ico: '🧟' } : (A[m.w] || A.fusil);
     const d = document.createElement('div'); d.className = 'fk' + (m.a === me || m.v === me ? ' mio' : '');
     d.innerHTML = m.a && m.a !== m.v ? `<b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> <span>${w.ico}${m.h ? '🎯' : ''}</span> <b style="color:${colorDe(m.v)}">${esc(nombre(m.v))}</b>` : `💀 <b>${esc(nombre(m.v))}</b>`;
     const f = $('#feed'); f.prepend(d); while (f.children.length > 5) f.lastChild.remove();
@@ -507,7 +629,7 @@
     if (estaba) SFX.muero();
     if (m && m.a && m.a !== C.me()) yo.killer = m.a; else if (m) yo.killer = null;
     const w = m && A[m.w];
-    $('#mTxt').innerHTML = m && m.a && m.a !== m.v ? `Te bajó <b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> con ${w ? w.ico + ' ' + w.n : 'un tiro'}${m.h ? ' <b>¡a la cabeza!</b> 🎯' : ''}` : 'Caíste 💀';
+    $('#mTxt').innerHTML = m && m.w === 'zombi' ? 'Te agarró un zombi 🧟' : m && m.a && m.a !== m.v ? `Te bajó <b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> con ${w ? w.ico + ' ' + w.n : 'un tiro'}${m.h ? ' <b>¡a la cabeza!</b> 🎯' : ''}` : 'Caíste 💀';
     $('#muerte').classList.remove('hidden');
     // en la PC se suelta el mouse para poder tocar el arma de la próxima vida
     if (document.pointerLockElement) document.exitPointerLock();
@@ -662,7 +784,9 @@
     const o = [s.x, s.y + yo.eye, s.z], d0 = W.dir(yo.ry, yo.rx);
     const S = C.S(), eq = S.settings.mode === 'equipos', miEq = (S.players.find(p => p.id === C.me()) || {}).team;
     const cuerpos = [];
-    for (const [id, r] of remotos) if (r.alive && r.cur && !(eq && r.team === miEq)) cuerpos.push({ id, x: r.cur.x, y: r.cur.y, z: r.cur.z, crouch: r.crouch });
+    const zomb = S.settings.mode === 'zombis';
+    if (!zomb) for (const [id, r] of remotos) if (r.alive && r.cur && !(eq && r.team === miEq)) cuerpos.push({ id, x: r.cur.x, y: r.cur.y, z: r.cur.z, crouch: r.crouch });
+    for (const [id, z] of zombis) if (z.estado !== 2 && z.cur) cuerpos.push({ id, x: z.cur.x, y: z.cur.y, z: z.cur.z, alto: ALTO_Z[z.tipo] || 1.75 });
     const M = W.mapa(mapaId), hits = [], ends = [];
     for (let i = 0; i < w.pel; i++) {
       const d = W.desvio(d0, sp), tw = W.rayMundo(M, o, d, w.range), h = W.rayCuerpos(cuerpos, o, d, tw), t = h ? h.t : tw;
@@ -736,11 +860,13 @@
       if (r.prot || r.eraProt) { r.eraProt = r.prot; const op = r.prot ? 0.45 + 0.25 * Math.sin(now / 80) : 1; const vistos = new Set(); g.traverse(o => { if (o.material && o !== u.nom && !vistos.has(o.material)) { vistos.add(o.material); o.material.transparent = r.prot; o.material.opacity = op; } }); }
       if (r.fuego > 0) { r.fuego -= dt; u.arma.material = r.fuego > 0 ? fuegoMat : u.armaMat; }
     }
+    if (zombis.size) zombisTick(dt, rt);
     if (obs) camObs(dt);
     efectosTick(dt);
     if (fogon.visible) { fogon.t -= dt; if (fogon.t <= 0) fogon.visible = false; }
     // reloj del HUD
-    if (yo.tl != null) { const ms = Math.max(0, yo.tl - (now - yo.tlAt)), s = Math.ceil(ms / 1000); $('#tReloj').textContent = `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`; }
+    if (C.S() && C.S().settings.mode === 'zombis') $('#tReloj').textContent = yo.ola ? (yo.ola[2] ? '⏸️ Descanso' : '🧟 Oleada ' + yo.ola[0]) : '🧟 Preparense';
+    else if (yo.tl != null) { const ms = Math.max(0, yo.tl - (now - yo.tlAt)), s = Math.ceil(ms / 1000); $('#tReloj').textContent = `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`; }
     ren.clear(); ren.render(scene, cam);
     if (!obs && yo.alive && !(yo.w === 'franco' && yo.aimK > 0.85)) { ren.clearDepth(); ren.render(vmScene, vmCam); }
     $('#mirilla').classList.toggle('hidden', !(yo.alive && !obs && yo.w === 'franco' && yo.aimK > 0.85));
@@ -806,7 +932,7 @@
     } else cam.rotation.set(-0.5 * k, yo.ry, 0);
     cam.fov = fovBase; cam.updateProjectionMatrix();
     const left = Math.max(0, 3.5 - (now - yo.deadAt) / 1000);
-    $('#mCuenta').textContent = left > 0 ? `Volvés en ${Math.ceil(left)}…` : 'Volviendo…';
+    $('#mCuenta').textContent = C.S() && C.S().settings.mode === 'zombis' ? 'Volvés cuando empiece la próxima oleada 🧟' : left > 0 ? `Volvés en ${Math.ceil(left)}…` : 'Volviendo…';
     hud(dt);
   }
   // espectador: sigue a un jugador vivo, desde sus ojos
@@ -843,7 +969,8 @@
   function marcador() {
     const S = C.S(); if (!S) return;
     const st = S.settings, el = $('#tScore');
-    if (st.mode === 'equipos') el.innerHTML = `<span class="tr">🔴 ${S.score.r}</span> <small>/${st.goal}</small> <span class="ta">${S.score.a} 🔵</span>`;
+    if (st.mode === 'zombis') { const me = S.players.find(p => p.id === C.me()), o = yo.ola; el.innerHTML = (o ? `🧟 quedan <b>${o[1]}</b>` : '🧟 ya vienen...') + (me && !C.obs() ? ` · <b>vos ${me.k}</b>` : ''); }
+    else if (st.mode === 'equipos') el.innerHTML = `<span class="tr">🔴 ${S.score.r}</span> <small>/${st.goal}</small> <span class="ta">${S.score.a} 🔵</span>`;
     else {
       const L = S.players.slice().sort((a, b) => b.k - a.k), me = S.players.find(p => p.id === C.me());
       el.innerHTML = `🥇 ${esc(L[0] ? L[0].name : '')} ${L[0] ? L[0].k : 0}<small>/${st.goal}</small>` + (me && !C.obs() ? ` · <b>vos ${me.k}</b>` : '');
