@@ -1,0 +1,15 @@
+Modelos 3D de los pilotos de Carrera Guasu
+Todos bajados gratis de Poly Pizza (https://poly.pizza), licencia Creative Commons Atribución 3.0 (CC-BY 3.0):
+https://creativecommons.org/licenses/by/3.0/
+Cambios: se achicaron las texturas a 256 px y se acomodan/escalan en el juego.
+
+jakare.glb  - "Black caiman" por Poly by Google - https://poly.pizza/m/5etIv4omd7Z
+kapi.glb    - "Capybara" por Poly by Google     - https://poly.pizza/m/66d-mKAgF17
+tuka.glb    - "Toco Toucan" por Anonymous       - https://poly.pizza/m/fFVqukPnc62
+jagua.glb   - "Jaguar" por Poly by Google       - https://poly.pizza/m/4fb-oMr2uUF
+kure.glb    - "Pig" por Poly by Google          - https://poly.pizza/m/6XC3XssJIU_
+aguara.glb  - "Fox" por Poly by Google          - https://poly.pizza/m/10u8FYPC5Br
+kai.glb     - "Capuchin" por Poly by Google     - https://poly.pizza/m/29hG1_J1Uiq
+lobope.glb  - "River otter" por Poly by Google  - https://poly.pizza/m/dJW3JeUWXQ-
+
+GLTFLoader.js: three.js r128 (licencia MIT).

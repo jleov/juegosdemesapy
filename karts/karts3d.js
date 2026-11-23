@@ -103,7 +103,29 @@ function dibujarVehiculo(b, id, col){
   return R;
 }
 
-const K3 = {gRueda:null, mRueda:null, mLlanta:null, gSombra:null, mSombra:null};
+const K3 = {gRueda:null, mRueda:null, mLlanta:null, gSombra:null, mSombra:null, mod:{}, esperan:[]};
+/* modelos 3D de los animales (Poly Pizza, licencia CC-BY: los créditos están en "Cómo se juega" y en modelos/CREDITOS.txt).
+   Se cargan aparte: mientras no llegan (o si no cargan) se ve el muñeco hecho a mano de arriba.
+   H = alto máximo, L = largo máximo, y/z = dónde se para en el asiento */
+const MODELOS = {jakare:{H:1.1, L:3.3, rx:-.25, y:.95, z:-.4}, kapi:{H:1.7, L:2.0, rx:-.45, y:.55, z:-.35}, tuka:{H:1.9, L:2.8, y:.5, z:-.2}, jagua:{H:1.6, L:2.1, rx:-.5, y:.55, z:-.45},
+  kure:{H:1.35, L:1.7, rx:-.4, y:.8, z:-.55}, aguara:{H:1.75, L:2.0, rx:-.45, y:.7, z:-.35}, kai:{H:1.7, L:2.0, y:.5, z:-.3}, lobope:{H:1.6, L:2.0, rx:-.45, y:1.0, z:-.45}};
+const VMOD = 1;   // subir si se cambian los .glb
+function cargarModelos(){
+  if(K3.cargando || !THREE.GLTFLoader) return; K3.cargando=true; const L=new THREE.GLTFLoader();
+  for(const id in MODELOS) L.load('modelos/'+id+'.glb?v='+VMOD, g=>{
+    const o=g.scene, c=MODELOS[id], b=new THREE.Box3().setFromObject(o), s=b.getSize(new THREE.Vector3());
+    const e=Math.min((c.H||1.4)/s.y, (c.L||2.2)/Math.max(s.x,s.z)); o.scale.setScalar(e); o.position.set(-(b.min.x+s.x/2)*e, -b.min.y*e, -(b.min.z+s.z/2)*e);
+    o.traverse(m=>{ if(m.isMesh){ const v=m.material; if(v.map) v.map.encoding=THREE.LinearEncoding; m.material=new THREE.MeshLambertMaterial({map:v.map||null, color:v.map?'#ffffff':v.color}); } });
+    const w=new THREE.Group(); w.add(o); K3.mod[id]=w;
+    K3.esperan=K3.esperan.filter(v=>{ if(v.tirado) return false; if(piloto(v.ch).id!==id) return true; ponerModelo(v); return false; });
+  }, undefined, ()=>{});
+}
+function ponerModelo(v){
+  const id=piloto(v.ch).id, t=K3.mod[id]; if(!t || v.modelo) return; const c=MODELOS[id], m=t.clone(true), mats=[];
+  m.traverse(x=>{ if(x.isMesh){ x.material=x.material.clone(); mats.push(x.material); } });
+  m.position.set(0, c.y||.5, c.z||-.15); m.rotation.set(c.rx||0, c.ry||0, 0); v.pil.add(m); v.modelo=m; v.mMod=mats; v.pilMallas.forEach(x=>x.visible=false);
+  if(v.op<1) v.fantasma(v.op);
+}
 function crearKart3D(ch, color){
   const p=piloto(ch), g=new THREE.Group(), cuerpo=new THREE.Group(); g.add(cuerpo);
   const b=new Obra(), bp=new Obra(), bi=new Obra(), bd=new Obra(); const ruedasDef=dibujarVehiculo(b, p.id, color||p.color); dibujarPiloto(bp, p.id, {i:bi, d:bd});
@@ -127,8 +149,11 @@ function crearKart3D(ch, color){
   const mCh=new THREE.MeshBasicMaterial({color:'#5ad0ff'}); const chispas=[-.85,.85,-.7,.7].map((x,i)=>{ const m=new THREE.Mesh(K3.gChispa, mCh); m.position.set(x,.2,-1-(i>1?.3:0)); m.visible=false; cuerpo.add(m); return m; });
   const escudo=new THREE.Mesh(K3.gEscudo, K3.mEscudo); escudo.position.y=1; escudo.visible=false; g.add(escudo);
   const hielo=new THREE.Mesh(K3.gHielo, K3.mHielo); hielo.position.y=1.2; hielo.visible=false; g.add(hielo);
-  return {g, cuerpo, malla, pil, brazos, ruedas, sombra, llamas, chispas, mCh, escudo, hielo, cors, etiqueta:null, giro:0, extras:[],
-    tirar(){ mallas.forEach(m=>m.geometry.dispose()); mat.dispose(); mCh.dispose(); this.extras.forEach(m=>{ m.geometry.dispose(); if(m.material.map) m.material.map.dispose(); m.material.dispose(); }); if(this.etiqueta){ this.etiqueta.material.map.dispose(); this.etiqueta.material.dispose(); } }};
+  const v={g, cuerpo, malla, pil, brazos, ruedas, sombra, llamas, chispas, mCh, escudo, hielo, cors, etiqueta:null, giro:0, extras:[], ch, op:1, pilMallas:mallas.slice(1), mMod:[],
+    fantasma(op){ this.op=op; for(const m of [mat, ...this.mMod]){ m.transparent=op<1; m.opacity=op; } },
+    tirar(){ this.tirado=true; this.mMod.forEach(m=>m.dispose()); mallas.forEach(m=>m.geometry.dispose()); mat.dispose(); mCh.dispose(); this.extras.forEach(m=>{ m.geometry.dispose(); if(m.material.map) m.material.map.dispose(); m.material.dispose(); }); if(this.etiqueta){ this.etiqueta.material.map.dispose(); this.etiqueta.material.dispose(); } }};
+  cargarModelos(); if(K3.mod[p.id]) ponerModelo(v); else K3.esperan.push(v);
+  return v;
 }
 /* cartelito con el nombre (y la foto, si tiene) arriba del kart */
 function etiquetaKart(v, nombre, color, cara){

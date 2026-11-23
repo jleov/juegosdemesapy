@@ -15,7 +15,7 @@ const genCode = () => { const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; fo
 let myToken=load('kg_token'); if(!myToken){ myToken=Math.random().toString(36).slice(2)+Date.now().toString(36); store('kg_token', myToken); }
 const NET={mode:null, peer:null, code:null, conns:{}, hostConn:null, myPid:null, obs:null, welcomed:false};
 let CHAT=[], V=null, R=null;
-const VERSION = 20;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
+const VERSION = 21;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
 const me = () => NET.myPid || NET.obs;
 const VP = id => V && (V.players.find(p=>p.id===id) || (V.observers||[]).find(o=>o.id===id));
 const amHost = () => NET.mode==='local' || (V && V.hostPid===NET.myPid && NET.mode==='host');
@@ -414,7 +414,7 @@ function prepararCarrera(){
   if(fant) parrilla.push({pid:'fantasma', ch:miCh, color:'#ffffff', nombre:'Tu fantasma', fantasma:true, local:true});
   R=crearCarrera({pista:c.pista, vueltas:c.vueltas, ritmo:c.ritmo, nivel:c.nivel, objetos:c.objetos, parrilla, host:soyHost, miPid:yo, vidas:c.vidas, tiempo:c.tiempo});
   R.id=c.id; R.listo=soyHost;
-  R.karts.forEach(k=>{ const e=parrilla.find(x=>x.pid===k.pid); if(e.ausente){ k.ausente=true; k.humano=true; } if(k.fantasma){ k.datos=fant; const v=M3.kart(k); v.malla.material.transparent=true; v.malla.material.opacity=.38; v.sombra.visible=false; } });
+  R.karts.forEach(k=>{ const e=parrilla.find(x=>x.pid===k.pid); if(e.ausente){ k.ausente=true; k.humano=true; } if(k.fantasma){ k.datos=fant; const v=M3.kart(k); v.fantasma(.38); v.sombra.visible=false; } });
   if(S.crono){ const k=R.porPid[yo]; k.item='chipa3'; k.itemN=3; }
   R.pedir = d => { if(simulo()) hostPedido(R, d); else if(NET.hostConn && NET.hostConn.open) try{ NET.hostConn.send({t:'rq', d, id:R.id}); }catch(e){} };
   R.emitir = e => { const r=R; aplicarEvento(r, e); if(NET.mode==='host') difundir({t:'ev', e, id:r.id}); };
@@ -1073,6 +1073,7 @@ function showRules(){
   <h3>💬 Chat y voz</h3>
   <p>Escribí <b>@nombre</b> (o elegí a alguien en “Para”) para mandarle un <b>mensaje privado</b>. Con 🎤 hablan por voz y con 📷 ponés tu cara arriba de tu kart.</p>
   <p class="muted">🎶 ${MUSIC_CREDIT}</p>
+  <p class="muted">🐾 Modelos 3D de los animales, gratis con licencia <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC-BY 3.0</a>, bajados de <a href="https://poly.pizza" target="_blank" rel="noopener">Poly Pizza</a>: Black caiman, Capybara, Jaguar, Pig, Fox, Capuchin y River otter por <b>Poly by Google</b>; Toco Toucan por <b>Anonymous</b>. ¡Gracias!</p>
   <button class="btn wide" onclick="closeModal()">Entendido</button></div>`);
 }
 
