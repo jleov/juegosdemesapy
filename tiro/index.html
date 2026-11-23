@@ -171,6 +171,7 @@ body.tactil .pc-solo{display:none}
 .tb[data-b=aim]{right:126px;bottom:150px}.tb[data-b=jump]{right:30px;bottom:24px}.tb[data-b=crouch]{right:96px;bottom:24px}
 .tb[data-b=reload]{right:126px;bottom:84px}.tb[data-b=swap]{right:162px;bottom:24px}
 .tb[data-b=tabla]{right:14px;top:calc(max(8px,env(safe-area-inset-top)) + 52px);width:40px;height:40px;font-size:16px}
+.tb[data-b=luz]{right:106px;top:calc(max(8px,env(safe-area-inset-top)) + 52px);width:40px;height:40px;font-size:16px}
 .tb[data-b=chat]{right:60px;top:calc(max(8px,env(safe-area-inset-top)) + 52px);width:40px;height:40px;font-size:16px}
 body.tactil #feed{top:calc(max(8px,env(safe-area-inset-top)) + 100px)}
 body.tactil #abajo{left:12px;right:auto;bottom:auto;top:calc(max(8px,env(safe-area-inset-top)) + 54px);flex-direction:column;align-items:flex-start;gap:6px}
@@ -248,7 +249,7 @@ body.tactil #chatF{bottom:auto;top:30%}
         <form id="chatForm"><input id="chatIn" maxlength="120" placeholder="Escribí algo..." autocomplete="off"><button class="btn-p">➤</button></form></div>
       <div class="panel card ayuda">
         <b>Cómo se juega</b><br>
-        🖥️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · mouse apuntar · clic izquierdo tirar · clic derecho mira · <kbd>Espacio</kbd> saltar · <kbd>Shift</kbd> agacharse (corriendo, te deslizás) · <kbd>R</kbd> recargar · <kbd>Q</kbd>/<kbd>1</kbd>/<kbd>2</kbd> cambiar arma · <kbd>Tab</kbd> tabla · <kbd>Enter</kbd> chat · <kbd>Esc</kbd> ajustes<br>
+        🖥️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · mouse apuntar · clic izquierdo tirar · clic derecho mira · <kbd>Espacio</kbd> saltar · <kbd>Shift</kbd> agacharse (corriendo, te deslizás) · <kbd>R</kbd> recargar · <kbd>Q</kbd>/<kbd>1</kbd>/<kbd>2</kbd> cambiar arma · <kbd>Tab</kbd> tabla · <kbd>Enter</kbd> chat · <kbd>Esc</kbd> ajustes · <kbd>F</kbd> linterna (de noche, con zombis)<br>
         📱 palanca a la izquierda para caminar, arrastrá a la derecha para mirar, y botones para tirar, apuntar, saltar y agacharte.<br>
         🎯 A la cabeza hace el doble. La vida se recupera sola si no te pegan un rato.<br>
         <small>Personajes y armas en 3D: <a href="https://quaternius.com/packs/toonshootergamekit.html" target="_blank" rel="noopener" style="color:inherit">Toon Shooter Game Kit de Quaternius</a> (CC0, uso libre). Zombis: Zombie Apocalypse Kit de Quaternius vía <a href="https://poly.pizza/bundle/Post-Apocolypse-Pack-jg0We8Clu0" target="_blank" rel="noopener" style="color:inherit">Poly Pizza</a> (CC0 y CC-BY 3.0).</small>
@@ -281,7 +282,7 @@ body.tactil #chatF{bottom:auto;top:30%}
     <div id="palanca"><div id="bolita"></div></div>
     <div class="tb" data-b="fire">🔫</div><div class="tb" data-b="aim">🎯</div><div class="tb" data-b="jump">⬆️</div>
     <div class="tb" data-b="crouch">⬇️</div><div class="tb" data-b="reload">🔄</div><div class="tb" data-b="swap">🔁</div>
-    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div>
+    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div><div class="tb" data-b="luz">🔦</div>
   </div>
   <div id="topBtns">
     <button id="cfgBtn" title="Ajustes">⚙️</button>
@@ -311,9 +312,9 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div id="audios"></div>
 </div>
 
-<script src="mundo.js?v=11"></script>
-<script src="sala.js?v=11"></script>
-<script src="juego.js?v=11"></script>
+<script src="mundo.js?v=12"></script>
+<script src="sala.js?v=12"></script>
+<script src="juego.js?v=12"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);

@@ -17,6 +17,8 @@
   const CAMIS_TXT = ['#ff7a6e', '#7fa8ff', '#f1c40f', '#4cd47f', '#c18be0', '#ffa24d', '#3fd1b4', '#ff8fc4', '#ffffff', '#a9b8c9'];
   const CIELO = { mercado: ['#9fd3ff', '#8d8a84', 'baldosa'], puerto: ['#b9d3e8', '#5b5e63', 'asfalto'], chaco: ['#cfe2ef', '#b87444', 'tierra'] };
   const J = window.Juego = {};
+  const luz = {};   // luces de la escena (de día o de noche)
+  let noche = false, linternaOn = true;
   let C = null;                 // {send, S(), me(), obs(), toast}
   let ren, scene, cam, vmScene, vmCam, mapaId = null, mapGroup = null, activo = false, raf = 0, last = 0;
   const remotos = new Map();
@@ -35,11 +37,16 @@
     ren.autoClear = false;
     scene = new T.Scene();
     cam = new T.PerspectiveCamera(fovBase, 1, 0.05, 400); cam.rotation.order = 'YXZ';
-    scene.add(new T.HemisphereLight(0xe8f0ff, 0x6a5532, 0.8));
-    const sol = new T.DirectionalLight(0xfff4e0, 0.75); sol.position.set(30, 60, 18); scene.add(sol);
+    luz.cielo = new T.HemisphereLight(0xe8f0ff, 0x6a5532, 0.8); scene.add(luz.cielo);
+    luz.sol = new T.DirectionalLight(0xfff4e0, 0.75); luz.sol.position.set(30, 60, 18); scene.add(luz.sol);
+    // linterna del arma (solo de noche) y el fogonazo que ilumina al tirar
+    scene.add(cam);
+    luz.linterna = new T.SpotLight(0xfff3d6, 0, 38, 0.42, 0.45, 1.3); luz.linterna.position.set(0.2, -0.15, 0);
+    luz.linterna.target.position.set(0, -0.3, -10); cam.add(luz.linterna); cam.add(luz.linterna.target);
+    luz.destello = new T.PointLight(0xffc870, 0, 14, 2); luz.destello.position.set(0.2, -0.1, -0.6); cam.add(luz.destello);
     vmScene = new T.Scene(); vmCam = new T.PerspectiveCamera(62, 1, 0.01, 10);
-    vmScene.add(new T.HemisphereLight(0xffffff, 0x555555, 1.0));
-    const l2 = new T.DirectionalLight(0xffffff, 0.5); l2.position.set(1, 2, 1); vmScene.add(l2);
+    luz.vm1 = new T.HemisphereLight(0xffffff, 0x555555, 1.0); vmScene.add(luz.vm1);
+    luz.vm2 = new T.DirectionalLight(0xffffff, 0.5); luz.vm2.position.set(1, 2, 1); vmScene.add(luz.vm2);
     armarVM();
     if (modelosListos) { try { armasVM(); } catch (e) { console.warn('armas 3D', e); } }   // si los modelos cargaron antes que la pantalla 3D
     addEventListener('resize', medir); medir();
@@ -70,7 +77,7 @@
   }
   const TIPO = { 14: 'ladrillo', 1: 'ladrillo', 2: 'madera', 9: 'madera', 3: 'chapa', 4: 'chapa', 5: 'chapa', 6: 'chapa', 10: 'chapa' };
   const matCache = {};
-  function matCaja(c) { return matCache[c] || (matCache[c] = new T.MeshLambertMaterial({ color: W.PAL[c], map: tex(TIPO[c] || 'ruido') })); }
+  function matCaja(c) { return matCache[c] || (matCache[c] = new T.MeshPhongMaterial({ color: W.PAL[c], map: tex(TIPO[c] || 'ruido'), shininess: 6, specular: 0x111111 })); }
   function cajaGeo(w, h, d) {
     const g = new T.BoxGeometry(w, h, d), uv = g.attributes.uv;
     const esc2 = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
@@ -86,7 +93,7 @@
     mapGroup = new T.Group();
     scene.background = new T.Color(cfg[0]); scene.fog = new T.Fog(cfg[0], 45, 150);
     const ft = tex(cfg[2]).clone(); ft.needsUpdate = true; ft.repeat.set(M.S, M.S);
-    const piso = new T.Mesh(new T.PlaneGeometry(2 * M.S + 2, 2 * M.S + 2), new T.MeshLambertMaterial({ color: cfg[1], map: ft }));
+    const piso = new T.Mesh(new T.PlaneGeometry(2 * M.S + 2, 2 * M.S + 2), new T.MeshPhongMaterial({ color: cfg[1], map: ft, shininess: 4, specular: 0x0a0a0a }));
     piso.rotation.x = -Math.PI / 2; mapGroup.add(piso);
     // afuera: agua en el puerto, campo en las demás
     const afuera = new T.Mesh(new T.PlaneGeometry(600, 600), new T.MeshLambertMaterial({ color: id === 'puerto' ? '#3b6f8f' : id === 'chaco' ? '#9a7a3e' : '#6f8a52' }));
@@ -150,7 +157,8 @@
     arriba.add(torso, cabeza, pelo, ojo1, ojo2, brazos);
     g.add(pierna1, pierna2, arriba);
     const nom = cartel(p.name, modo === 'equipos' ? (p.team === 'r' ? '#ff8a80' : '#8ab4ff') : '#ffffff'); nom.position.y = 2.15; g.add(nom);
-    g.userData = { arriba, brazos, pierna1, pierna2, nom, cabeza, camisa, arma, armaMat: negro };
+    const haz = hazDeLuz(); g.add(haz);
+    g.userData = { arriba, brazos, pierna1, pierna2, nom, cabeza, camisa, arma, armaMat: negro, haz };
     scene.add(g);
     return g;
   }
@@ -232,7 +240,8 @@
     }
     if (acc.muere) { acc.muere.setLoop(T.LoopOnce, 1); acc.muere.clampWhenFinished = true; }
     const nom = cartel(p.name, modo === 'equipos' ? (p.team === 'r' ? '#ff8a80' : '#8ab4ff') : '#ffffff'); nom.position.y = 2.1; g.add(nom);
-    g.userData = { modelo: true, mixer, acc, armas, mats: [...mats.values()], nom, actual: null, armaVis: null };
+    const haz = hazDeLuz(); g.add(haz);
+    g.userData = { modelo: true, mixer, acc, armas, mats: [...mats.values()], nom, actual: null, armaVis: null, haz };
     scene.add(g);
     return g;
   }
@@ -546,15 +555,53 @@
   J.sfx = n => SFX[n] && SFX[n]();
 
   // ================= entrar / salir =================
+  // supervivencia zombi: de noche, solo se ve con la linterna del arma
+  function ambiente(S) {
+    if (!scene) return;
+    noche = S.settings.mode === 'zombis';
+    const cfg = CIELO[mapaId] || CIELO.mercado;
+    if (noche) {
+      scene.background = new T.Color('#04060c'); scene.fog = new T.Fog('#04060c', 4, 34);
+      luz.cielo.intensity = 0.07; luz.cielo.color.set('#6b7fb0'); luz.cielo.groundColor.set('#120d08');
+      luz.sol.intensity = 0.12; luz.sol.color.set('#7f93c8');
+      luz.vm1.intensity = 0.16; luz.vm2.intensity = 0.1;
+    } else {
+      scene.background = new T.Color(cfg[0]); scene.fog = new T.Fog(cfg[0], 45, 150);
+      luz.cielo.intensity = 0.8; luz.cielo.color.set(0xe8f0ff); luz.cielo.groundColor.set(0x6a5532);
+      luz.sol.intensity = 0.75; luz.sol.color.set(0xfff4e0);
+      luz.vm1.intensity = 1.0; luz.vm2.intensity = 0.5;
+    }
+    luz.linterna.intensity = noche && linternaOn ? 2.6 : 0;
+    for (const r of remotos.values()) if (r.g.userData.haz) r.g.userData.haz.visible = noche;
+  }
+  J.linterna = () => { linternaOn = !linternaOn; if (luz.linterna) luz.linterna.intensity = noche && linternaOn ? 2.6 : 0; return linternaOn; };
+  // haz de luz de los demás: un cono transparente que sale del arma (no ilumina, pero se ve)
+  let hazGeo = null, hazMat = null, brilloMat = null;
+  function hazDeLuz() {
+    if (!hazGeo) {
+      hazGeo = new T.ConeGeometry(2.2, 13, 18, 1, true); hazGeo.translate(0, -6.5, 0); hazGeo.rotateX(Math.PI / 2);
+      hazMat = new T.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.07, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false });
+      const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+      const gr = g.createRadialGradient(32, 32, 1, 32, 32, 30); gr.addColorStop(0, 'rgba(255,250,220,1)'); gr.addColorStop(0.3, 'rgba(255,230,160,.6)'); gr.addColorStop(1, 'rgba(255,200,100,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      brilloMat = new T.SpriteMaterial({ map: new T.CanvasTexture(c), blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false });
+    }
+    const h = new T.Group(); h.add(new T.Mesh(hazGeo, hazMat));
+    const b = new T.Sprite(brilloMat); b.scale.set(0.5, 0.5, 1); h.add(b);
+    h.position.set(0.15, 1.35, -0.35); h.visible = noche;
+    return h;
+  }
   J.entrar = S => {
     crear(); J.audio(); J.cargarModelos();
     cargarMapa(S.settings.map);
+    ambiente(S);
     J.estado(S);
     $('#juego').classList.remove('hidden');
     const obs = C.obs();
     if (!yo.s) yo.s = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, ground: true, crouch: false, slideT: 0 };
     $('#hud').classList.toggle('obs', obs);
     $('#tctl').classList.toggle('hidden', !tactil() || obs);
+    document.querySelectorAll('[data-b="luz"]').forEach(b => b.classList.toggle('hidden', S.settings.mode !== 'zombis'));
     if (!activo) { activo = true; last = performance.now(); raf = requestAnimationFrame(loop); }
     if (!obs && !tactil() && !yo.alive) { /* espera el spawn */ }
     pausa(!tactil() && !obs && document.pointerLockElement !== ren.domElement);
@@ -573,7 +620,8 @@
   J.estado = S => {
     if (S.settings.mode === 'zombis') J.cargarZombis();
     if (!scene) return;
-    if (S.settings.map !== mapaId) cargarMapa(S.settings.map);
+    if (S.settings.map !== mapaId) { cargarMapa(S.settings.map); ambiente(S); }
+    else if ((S.settings.mode === 'zombis') !== noche) ambiente(S);
     const ids = new Set();
     for (const p of S.players) { if (p.id === C.me()) { yo.prim = p.prim; continue; } ids.add(p.id); remoto(p); }
     for (const [id, r] of remotos) if (!ids.has(id)) { scene.remove(r.g); remotos.delete(id); }
@@ -717,6 +765,7 @@
       inp.keys.add(k);
       if (k === 'Space') { inp.jumpQ = true; e.preventDefault(); }
       if (k === 'KeyR') recargar();
+      if (k === 'KeyF' && noche) J.linterna();
       if (k === 'Digit1') ponerArma(yo.prim); if (k === 'Digit2') ponerArma('pistola'); if (k === 'KeyQ') cambiar();
     });
     addEventListener('keyup', e => { inp.keys.delete(e.code); if (e.code === 'Tab') { inp.tabla = false; tabla(); } });
@@ -758,6 +807,7 @@
           else if (b === 'swap') cambiar();
           else if (b === 'tabla') { inp.tabla = !inp.tabla; tabla(); }
           else if (b === 'chat') abrirChat();
+          else if (b === 'luz') { if (noche) J.linterna(); }
           continue;
         }
         if (C.obs()) { mira++; continue; }
@@ -839,7 +889,7 @@
     yo.kick = Math.min(0.5, yo.kick + w.kick * (apunta ? 0.6 : 1));
     yo.rx = Math.min(1.5, yo.rx + w.kick * (apunta ? 0.45 : 0.7)); yo.ry += (Math.random() - 0.5) * w.kick * 0.4;
     if (w.auto) yo.bloom = Math.min(0.05, yo.bloom + 0.004);
-    fogon.visible = true; fogon.t = 0.05;
+    fogon.visible = true; fogon.t = 0.05; if (luz.destello) luz.destello.intensity = noche ? 3 : 1.2;
     if (yo.ammo[yo.w] > 0) { if (yo.w === 'escopeta') chikChak(0.32); else if (yo.w === 'franco') cerrojo(0.42); }
     if (yo.ammo[yo.w] <= 0) setTimeout(recargar, 120);
     armaHUD();
@@ -884,6 +934,7 @@
       r.paso += Math.min(vel, 8) * dt * 1.6;
       if (u.modelo) {
         u.nom.position.y = r.crouch ? 1.6 : 2.1;
+        if (u.haz) { u.haz.rotation.x = cur.rx; u.haz.position.y = r.crouch ? 0.95 : 1.35; }
         animar(r, r.velS, dt);
         if (r.prot || r.eraProt) { r.eraProt = r.prot; const op = r.prot ? 0.45 + 0.25 * Math.sin(now / 80) : 1; for (const m of u.mats) { m.transparent = r.prot; m.opacity = op; } }
         if (r.fuego > 0) r.fuego -= dt;
@@ -893,6 +944,7 @@
       u.pierna1.scale.y = u.pierna2.scale.y = ag; u.pierna1.position.y = u.pierna2.position.y = 0.41 * ag; u.arriba.position.y = 0.82 * ag;
       u.nom.position.y = r.crouch ? 1.75 : 2.15;
       u.brazos.rotation.x = cur.rx;
+      if (u.haz) { u.haz.rotation.x = cur.rx; u.haz.position.y = r.crouch ? 0.95 : 1.35; }
       const sw = vel > 0.5 ? Math.sin(r.paso * 3) * 0.5 : 0;
       u.pierna1.rotation.x = sw; u.pierna2.rotation.x = -sw;
       if (r.prot || r.eraProt) { r.eraProt = r.prot; const op = r.prot ? 0.45 + 0.25 * Math.sin(now / 80) : 1; const vistos = new Set(); g.traverse(o => { if (o.material && o !== u.nom && !vistos.has(o.material)) { vistos.add(o.material); o.material.transparent = r.prot; o.material.opacity = op; } }); }
@@ -902,6 +954,7 @@
     if (obs) camObs(dt);
     efectosTick(dt);
     if (fogon.visible) { fogon.t -= dt; if (fogon.t <= 0) fogon.visible = false; }
+    if (luz.destello && luz.destello.intensity > 0) luz.destello.intensity = Math.max(0, luz.destello.intensity - dt * 50);
     // reloj del HUD
     if (C.S() && C.S().settings.mode === 'zombis') $('#tReloj').textContent = yo.ola ? (yo.ola[2] ? '⏸️ Descanso' : '🧟 Oleada ' + yo.ola[0]) : '🧟 Preparense';
     else if (yo.tl != null) { const ms = Math.max(0, yo.tl - (now - yo.tlAt)), s = Math.ceil(ms / 1000); $('#tReloj').textContent = `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`; }
