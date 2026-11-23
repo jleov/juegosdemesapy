@@ -253,7 +253,7 @@
       // arcos (solo los palos chocan)
       [-1, 1].forEach(sg => {
         const x = sg * 22.4;
-        o('arco', x + sg * 0.9, 0, { w: 7.3, h: 2.5, d: 2.2, q: sg > 0 ? 3 : 1 });
+        o('arco', x + sg * 0.9, 0, { w: 7.3, h: 2.5, d: 2.2, q: sg > 0 ? 1 : 3 });
         oculta(x, -3.6, 0.2, 0.2, 2.5); oculta(x, 3.6, 0.2, 0.2, 2.5); oculta(x, 0, 0.2, 7.4, 0.2, 2.4);
         oculta(x + sg * 1.9, 0, 0.2, 7.4, 2.5);   // la red de atrás
       });
