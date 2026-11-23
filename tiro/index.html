@@ -129,6 +129,8 @@ input:focus,select:focus{border-color:var(--azul2)}
 #flecha::before{content:"";position:absolute;left:-40px;top:-150px;width:80px;height:24px;border-radius:50% 50% 0 0;border-top:6px solid rgba(255,40,30,.9)}
 #mirilla{position:absolute;inset:0;background:radial-gradient(circle at center,transparent 0 min(36vh,36vw),#000 calc(min(36vh,36vw) + 2px))}
 #mirilla::before,#mirilla::after{content:"";position:absolute;background:#000}
+#nv{position:absolute;inset:0;background:repeating-linear-gradient(rgba(0,0,0,.18) 0 1px,transparent 1px 3px),radial-gradient(circle at center,rgba(80,255,120,.06),rgba(0,40,0,.35))}
+#nv span{position:absolute;top:calc(50% - min(36vh,36vw) + 14px);left:50%;transform:translateX(-50%);color:#9dff9d;font-size:12px;letter-spacing:2px;text-shadow:0 0 6px #3f3}
 #mirilla::before{left:50%;top:0;bottom:0;width:2px;margin-left:-1px}#mirilla::after{top:50%;left:0;right:0;height:2px;margin-top:-1px}
 #tabla{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(12,17,30,.9);border-radius:14px;padding:12px 16px;width:min(520px,92vw);max-height:80vh;overflow:auto;pointer-events:auto}
 #tabla h3{margin:6px 0}#tabla table{width:100%;border-collapse:collapse;font-size:14px}
@@ -265,6 +267,7 @@ body.tactil #chatF{bottom:auto;top:30%}
   <canvas id="cv3"></canvas>
   <div id="hud">
     <div id="dano"></div><div id="flecha"></div>
+    <div id="nv" class="hidden"><span>🌙 VISIÓN NOCTURNA · 🔥 CALOR</span></div>
     <div id="mirilla" class="hidden"></div>
     <div id="mira"><i></i><i></i><i></i><i></i><b></b></div>
     <div id="hitm"></div>
@@ -314,9 +317,9 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div id="audios"></div>
 </div>
 
-<script src="mundo.js?v=13"></script>
-<script src="sala.js?v=13"></script>
-<script src="juego.js?v=13"></script>
+<script src="mundo.js?v=14"></script>
+<script src="sala.js?v=14"></script>
+<script src="juego.js?v=14"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);

@@ -317,7 +317,7 @@
     g.userData.escala = ALTO_Z[k] / h;
     g.userData.suelo = -b.min.y;
   }
-  function zombiNuevo(tipo) {
+  function zombiNuevo(tipo, caliente) {
     const gl = GLBZ[tipo] || GLBZ.zombi;
     const g = new T.Group(); let u;
     if (gl) {
@@ -341,6 +341,7 @@
       const c2 = new T.Mesh(new T.BoxGeometry(0.4, 0.4, 0.4), mat); c2.position.y = alto * 0.85;
       const b1 = new T.Mesh(new T.BoxGeometry(0.15, 0.15, 0.6), mat); b1.position.set(0.2, alto * 0.65, -0.3); const b2 = b1.clone(); b2.position.x = -0.2;
       g.add(c1, c2, b1, b2); u = { modelo: false };
+      if (caliente) [mat, ropa].forEach(m => { m.emissive.set('#ff8a3a'); m.emissiveIntensity = 1.3; });
     }
     g.userData = u; scene.add(g);
     return g;
@@ -362,7 +363,7 @@
     for (const e of Z) {
       const [id, ti, x, y, zz, ry, estado, vel] = e; vistos.add(id);
       let z = zombis.get(id);
-      if (!z) { const tipo = TIPOS_Z[ti] || 'zombi'; z = { id, tipo, g: zombiNuevo(tipo), buf: [], estado: 0, vel: 0, velS: 0, cur: null, gruT: 2 + Math.random() * 5, muerto: 0 }; zombis.set(id, z); }
+      if (!z) { const tipo = TIPOS_Z[ti] || 'zombi'; z = { id, tipo, g: zombiNuevo(tipo, visionNoche), buf: [], estado: 0, vel: 0, velS: 0, cur: null, gruT: 2 + Math.random() * 5, muerto: 0 }; zombis.set(id, z); }
       if (estado === 2 && z.estado !== 2) z.muerto = 0.001;
       z.estado = estado; z.vel = vel;
       z.buf.push({ t: now, x, y, z: zz, ry, rx: 0 }); if (z.buf.length > 30) z.buf.shift();
@@ -728,6 +729,26 @@
     luz.linterna.intensity = noche && linternaOn ? 2.6 : 0;
     for (const r of remotos.values()) if (r.g.userData.haz) r.g.userData.haz.visible = noche;
   }
+  // mira nocturna del francotirador: imagen verde que ve lejos, y los zombis brillan por el calor
+  let visionNoche = false;
+  function visionNocturna(on) {
+    visionNoche = on;
+    $('#nv').classList.toggle('hidden', !on);
+    ren.domElement.style.filter = on ? 'grayscale(1) sepia(1) hue-rotate(70deg) saturate(3) brightness(0.95) contrast(1.6)' : '';
+    if (on) {
+      luz.cielo.intensity = 0.4; luz.cielo.color.set('#ffffff'); luz.cielo.groundColor.set('#333333'); luz.sol.intensity = 0.22;
+      for (const r of remotos.values()) if (r.g.userData.haz) r.g.userData.haz.visible = false;   // los haces de las linternas encandilan
+      scene.fog = new T.Fog('#04060c', 70, 260);
+    } else if (C && C.S()) ambiente(C.S());
+    calor(on);
+  }
+  // los zombis "calientes": brillan en naranja (en la imagen verde se ven casi blancos)
+  function calor(on) {
+    const vistos = new Set();
+    const pinta = m => { if (!m || vistos.has(m) || !m.emissive) return; vistos.add(m); m.emissive.set(on ? '#ffb070' : '#000000'); m.emissiveIntensity = on ? 2 : 1; };
+    for (const k in GLBZ) GLBZ[k].scene.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(pinta); });
+    for (const z of zombis.values()) z.g.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(pinta); });
+  }
   J.linterna = () => { linternaOn = !linternaOn; if (luz.linterna) luz.linterna.intensity = noche && linternaOn ? 2.6 : 0; return linternaOn; };
   // haz de luz de los demás: un cono transparente que sale del arma (no ilumina, pero se ve)
   let hazGeo = null, hazMat = null, brilloMat = null;
@@ -766,6 +787,7 @@
     for (const r of remotos.values()) scene.remove(r.g); remotos.clear();
     for (const z of zombis.values()) scene.remove(z.g); zombis.clear(); yo.ola = null;
     limpiarTiros();
+    if (visionNoche) visionNocturna(false);
     yo.alive = false; inp.fire = false; inp.aim = false;
     if (document.pointerLockElement) document.exitPointerLock();
     $('#juego').classList.add('hidden'); $('#muerte').classList.add('hidden'); $('#pausa').classList.add('hidden');
@@ -1125,6 +1147,9 @@
     ren.clear(); ren.render(scene, cam);
     if (!obs && yo.alive && !(yo.w === 'franco' && yo.aimK > 0.85)) { ren.clearDepth(); ren.render(vmScene, vmCam); }
     $('#mirilla').classList.toggle('hidden', !(yo.alive && !obs && yo.w === 'franco' && yo.aimK > 0.85));
+    // de noche, la mira del francotirador ve en la oscuridad y muestra el calor de los zombis
+    const nv = noche && yo.alive && !obs && yo.w === 'franco' && yo.aimK > 0.85;
+    if (nv !== visionNoche) visionNocturna(nv);
   }
   const fuegoMat = new T.MeshBasicMaterial({ color: '#ffd04a' });
 
