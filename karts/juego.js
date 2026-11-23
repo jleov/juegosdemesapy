@@ -15,12 +15,12 @@ const genCode = () => { const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; fo
 let myToken=load('kg_token'); if(!myToken){ myToken=Math.random().toString(36).slice(2)+Date.now().toString(36); store('kg_token', myToken); }
 const NET={mode:null, peer:null, code:null, conns:{}, hostConn:null, myPid:null, obs:null, welcomed:false};
 let CHAT=[], V=null, R=null;
-const VERSION = 22;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
+const VERSION = 23;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
 const me = () => NET.myPid || NET.obs;
 const VP = id => V && (V.players.find(p=>p.id===id) || (V.observers||[]).find(o=>o.id===id));
 const amHost = () => NET.mode==='local' || (V && V.hostPid===NET.myPid && NET.mode==='host');
 const simulo = () => NET.mode==='local' || NET.mode==='host';
-const CFG = Object.assign({calidad:'media', auto:null, tilt:false, vib:true}, load('kg_cfg')||{});
+const CFG = Object.assign({calidad:'media', auto:null, tilt:false, vib:true, joy:true}, load('kg_cfg')||{});
 const tactil = () => matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
 if(CFG.auto==null) CFG.auto=tactil();
 function guardarCfg(){ store('kg_cfg', CFG); }
@@ -62,7 +62,8 @@ function setCalidad(q){ CFG.calidad=q; guardarCfg(); M3.setCalidad(q); if(!R) vi
 function ajustesHTML(){
   return `<label>Calidad del 3D</label><select onchange="setCalidad(this.value)">${[['baja','Baja (celulares modestos)'],['media','Media'],['alta','Alta']].map(([v,t])=>`<option value="${v}" ${CFG.calidad===v?'selected':''}>${t}</option>`).join('')}</select>
     <label class="opt"><input type="checkbox" ${CFG.auto?'checked':''} onchange="CFG.auto=this.checked;guardarCfg();renderTouch()"><span><b>Acelerar solo</b><small>Sin botón GO: el kart acelera siempre; vos doblás, derrapás y frenás. Cómodo en el celular.</small></span></label>
-    <label class="opt"><input type="checkbox" ${CFG.tilt?'checked':''} onchange="setTilt(this.checked)"><span><b>Doblar inclinando el celular</b><small>Como un volante. Si no, se dobla con las flechas ◀ ▶.</small></span></label>
+    <label class="opt"><input type="checkbox" ${CFG.tilt?'checked':''} onchange="setTilt(this.checked)"><span><b>Doblar inclinando el celular</b><small>Como un volante. Si no, se dobla con el joystick o las flechas.</small></span></label>
+    <label class="opt"><input type="checkbox" ${CFG.joy?'checked':''} onchange="CFG.joy=this.checked;guardarCfg();renderTouch()"><span><b>Doblar con joystick</b><small>Arrastrás la perilla para el costado: cuanto más lejos, más dobla. Si lo apagás, vuelven las flechas ◀ ▶.</small></span></label>
     <label class="opt"><input type="checkbox" ${CFG.vib?'checked':''} onchange="CFG.vib=this.checked;guardarCfg()"><span><b>Vibración</b><small>En los golpes y turbos (si el celular lo permite).</small></span></label>`;
 }
 function ajustesModal(){ modal(`<h2>⚙️ Ajustes</h2><label style="margin-top:0">🏎️ Volante o mando</label><div id="padBox">${padHTML()}</div><button class="btn green wide" onclick="editarControles()">🎮 Acomodar controles del celular</button>${ajustesHTML()}<p class="muted">Teclado: flechas o WASD para manejar, <b>Espacio</b> salta y derrapa, <b>X</b> o <b>Enter</b> usa el objeto, <b>R</b> te vuelve a la pista. También funciona con mando.</p><button class="btn wide" onclick="closeModal()">Listo</button>`); }
@@ -452,7 +453,7 @@ function mandarRed(){
 }
 
 /* ---------- controles ---------- */
-const TECLAS={}, TOQUE={izq:0, der:0, gas:0, freno:0, derrape:0, usar:0}, TILT={v:0, ok:false};
+const TECLAS={}, TOQUE={izq:0, der:0, gas:0, freno:0, derrape:0, usar:0, joy:0}, TILT={v:0, ok:false};
 const enJuego = () => !!R && $('#game').classList.contains('on');
 addEventListener('keydown', e=>{
   if(/^(INPUT|TEXTAREA|SELECT)$/.test((e.target||{}).tagName||'')) return;
@@ -464,7 +465,7 @@ addEventListener('keydown', e=>{
   if(e.code==='KeyC') camSiguiente();
 });
 addEventListener('keyup', e=>{ TECLAS[e.code]=0; });
-addEventListener('blur', ()=>{ for(const k in TECLAS) TECLAS[k]=0; for(const k in TOQUE) TOQUE[k]=0; });
+addEventListener('blur', ()=>{ for(const k in TECLAS) TECLAS[k]=0; for(const k in TOQUE) TOQUE[k]=0; const p=$('#tJoy .perilla'); if(p) p.style.transform=''; });
 function ligarToques(){
   $$('[data-t]').forEach(b=>{
     const k=b.dataset.t, on=e=>{ if(ED.on) return; e.preventDefault(); TOQUE[k]=1; b.classList.add('ap'); try{ b.setPointerCapture(e.pointerId); }catch(x){} actx(); }, off=e=>{ TOQUE[k]=0; b.classList.remove('ap'); };
@@ -472,19 +473,32 @@ function ligarToques(){
     b.addEventListener('contextmenu', e=>e.preventDefault());
   });
 }
+/* joystick para doblar: la perilla sigue al dedo; cuanto más se corre al costado, más dobla (con una zona muerta en el medio) */
+function ligarJoystick(){
+  const b=$('#tJoy'), p=b.querySelector('.perilla'); let id=null;
+  const mover=e=>{ const r=b.getBoundingClientRect(), R2=r.width/2, max=R2*.62;
+    let dx=e.clientX-(r.left+R2), dy=e.clientY-(r.top+R2); const d=Math.hypot(dx,dy); if(d>max){ dx*=max/d; dy*=max/d; }
+    p.style.transform=`translate(${dx}px,${dy*.35}px)`;
+    const x=dx/max, z=.14; TOQUE.joy = Math.abs(x)<z ? 0 : Math.sign(x)*Math.min(1,(Math.abs(x)-z)/(1-z-.08)); };
+  const soltar=()=>{ id=null; TOQUE.joy=0; p.style.transform=''; b.classList.remove('ap'); };
+  b.addEventListener('pointerdown', e=>{ if(ED.on) return; e.preventDefault(); id=e.pointerId; b.classList.add('ap'); try{ b.setPointerCapture(id); }catch(x){} actx(); mover(e); });
+  b.addEventListener('pointermove', e=>{ if(ED.on || e.pointerId!==id) return; e.preventDefault(); mover(e); });
+  b.addEventListener('pointerup', soltar); b.addEventListener('pointercancel', soltar); b.addEventListener('lostpointercapture', soltar);
+  b.addEventListener('contextmenu', e=>e.preventDefault());
+}
 /* posiciones de los botones táctiles y de lo de arriba (mapa, caja del objeto, ↺):
    cada uno se puede mover y agrandar; se guarda en el aparato */
 const CTRL = Object.assign({}, load('kg_ctrl')||{});
 // [lado l/r, distancia a ese borde, distancia al borde de abajo (o de arriba si dice 't'), tamaño, 't']
 function ctrlDef(id){
   const bajo=innerHeight<430, ang=innerWidth<=520;
-  const D = {tIzq:['l',12,30,88], tDer:['l',110,30,88], tGas:['r',12,18,96], tDerr:['r',18,128,84], tObj:['r',122,110,70], tFreno:['r',122,18,64],
+  const D = {tIzq:['l',12,30,88], tDer:['l',110,30,88], tJoy:['l',14,22,bajo?132:150], tGas:['r',12,18,96], tDerr:['r',18,128,84], tObj:['r',122,110,70], tFreno:['r',122,18,64],
     mini:['r',8,56,bajo?100:ang?104:124,'t'], hObj:['l',8,56,72,'t'], btnReco:['r',8,bajo?166:ang?168:188,44,'t']};
   if(CFG.auto) Object.assign(D, {tDerr:['r',12,18,96], tObj:['r',122,98,72], tFreno:['r',122,14,64]});   // sin GO, el derrape va a la esquina
   return D[id];
 }
-const CTRL_IDS = ['tIzq','tDer','tGas','tDerr','tObj','tFreno','mini','hObj','btnReco'];
-const CTRL_NOM = {tIzq:'◀', tDer:'▶', tGas:'GO', tDerr:'derrape', tObj:'objeto', tFreno:'freno', mini:'el mapa', hObj:'la caja del objeto', btnReco:'↺'};
+const CTRL_IDS = ['tIzq','tDer','tJoy','tGas','tDerr','tObj','tFreno','mini','hObj','btnReco'];
+const CTRL_NOM = {tIzq:'◀', tDer:'▶', tJoy:'el joystick', tGas:'GO', tDerr:'derrape', tObj:'objeto', tFreno:'freno', mini:'el mapa', hObj:'la caja del objeto', btnReco:'↺'};
 const CTRL_FS = {tGas:.27, tFreno:.22, tObj:.44, hObj:.55, btnReco:.45, mini:.12};
 function aplicarCtrl(){
   for(const id of CTRL_IDS){
@@ -540,7 +554,9 @@ function renderTouch(){
   const t=tactil()||ED.on; $('#toques').classList.toggle('tactil', t);
   $('#tGas').style.display = CFG.auto ? 'none' : '';
   aplicarCtrl();
-  $('#tIzq').style.display = $('#tDer').style.display = CFG.tilt && TILT.ok ? 'none' : '';
+  const sinFlechas = CFG.tilt && TILT.ok;
+  $('#tIzq').style.display = $('#tDer').style.display = sinFlechas || CFG.joy ? 'none' : '';
+  $('#tJoy').style.display = sinFlechas || !CFG.joy ? 'none' : '';
   $('#ayudaTeclas').style.display = t ? 'none' : '';
 }
 function setTilt(on){
@@ -556,7 +572,7 @@ addEventListener('deviceorientation', e=>{
   TILT.v=Math.max(-1, Math.min(1, g/24));
 });
 function leerEntrada(){
-  const K=TECLAS; let dir=(K.ArrowRight||K.KeyD?1:0)-(K.ArrowLeft||K.KeyA?1:0)+TOQUE.der-TOQUE.izq;
+  const K=TECLAS; let dir=(K.ArrowRight||K.KeyD?1:0)-(K.ArrowLeft||K.KeyA?1:0)+TOQUE.der-TOQUE.izq+TOQUE.joy;
   let gas=K.ArrowUp||K.KeyW||TOQUE.gas?1:0, freno=K.ArrowDown||K.KeyS||TOQUE.freno?1:0, derrape=K.Space||K.ShiftLeft||K.ShiftRight||TOQUE.derrape?1:0, usar=K.KeyX||K.KeyE||K.Enter||K.ControlLeft||TOQUE.usar?1:0;
   if(CFG.tilt && TILT.ok && tactil() && Math.abs(TILT.v)>.06) dir+=TILT.v;
   if(CFG.auto && tactil() && !freno) gas=1;
@@ -1052,7 +1068,7 @@ function showRules(){
   modal(`<div class="rules"><h2>📜 Cómo se juega a Carrera Guasu</h2>
   <p>Carreras de karts por <b>12 ciudades del Paraguay</b>, con animales de acá al volante. Gana el que cruza primero la meta después de dar todas las vueltas. Hasta <b>8 karts</b>: los lugares libres los completan bots.</p>
   <h3>🎮 Manejar</h3>
-  <ul><li><b>Celular:</b> ◀ ▶ para doblar (o inclinando el celular, en ⚙️ Ajustes), <b>↯</b> para saltar y derrapar, <b>🎁</b> para usar el objeto y <b>freno</b>. El kart puede acelerar solo.</li>
+  <ul><li><b>Celular:</b> el <b>joystick</b> para doblar: arrastrás la perilla al costado y cuanto más lejos, más dobla (en ⚙️ Ajustes podés volver a las flechas ◀ ▶ o doblar inclinando el celular), <b>↯</b> para saltar y derrapar, <b>🎁</b> para usar el objeto y <b>freno</b>. El kart puede acelerar solo.</li>
   <li><b>PC:</b> flechas o WASD, <b>Espacio</b> derrapa, <b>X</b> o <b>Enter</b> usa el objeto, <b>R</b> te vuelve a la pista. También anda con mando.</li></ul>
   <h3>💨 Trucos para ir más rápido</h3>
   <ul><li><b>Largada turbo:</b> empezá a acelerar justo cuando la cuenta pasa del 2 al 1. Si aceleras con el 3 (o antes), el kart patina al largar.</li>
@@ -1077,6 +1093,6 @@ function showRules(){
   <button class="btn wide" onclick="closeModal()">Entendido</button></div>`);
 }
 
-renderPilotos(); ligarToques(); ctrlArrastre(); renderTouch(); renderVoice();
+renderPilotos(); ligarToques(); ligarJoystick(); ctrlArrastre(); renderTouch(); renderVoice();
 setTimeout(vitrina, 50);
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});

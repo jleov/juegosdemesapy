@@ -182,6 +182,10 @@ body.editando #editCtrl{display:block}
 #toques button small{position:absolute;bottom:-17px;left:0;right:0;font-size:10px;font-weight:800;text-shadow:0 1px 2px #000;letter-spacing:.5px}
 #tIzq,#tDer{width:88px;height:88px;bottom:calc(34px + env(safe-area-inset-bottom))}
 #tIzq{left:calc(12px + env(safe-area-inset-left))}#tDer{left:calc(110px + env(safe-area-inset-left))}
+#tJoy{width:150px;height:150px;left:calc(14px + env(safe-area-inset-left));bottom:calc(22px + env(safe-area-inset-bottom));background:radial-gradient(circle,rgba(10,14,40,.25),rgba(10,14,40,.5))!important;padding:0}
+#tJoy .riel{position:absolute;left:12%;right:12%;top:50%;height:12%;transform:translateY(-50%);border-radius:99px;background:rgba(255,255,255,.18);pointer-events:none}
+#tJoy .perilla{position:absolute;left:50%;top:50%;width:46%;height:46%;margin:-23% 0 0 -23%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#cfd6e6 55%,#8a94ad);border:3px solid rgba(255,255,255,.85);box-shadow:0 3px 10px rgba(0,0,0,.45);pointer-events:none;transition:transform .12s}
+#tJoy.ap{transform:none}#tJoy.ap .perilla{transition:none;background:radial-gradient(circle at 35% 30%,#fff7d6,#f2c14e 60%,#b8860b)}
 #tDerr{width:92px;height:92px;right:calc(12px + env(safe-area-inset-right));bottom:calc(34px + env(safe-area-inset-bottom));font-size:36px}
 #tObj{width:70px;height:70px;right:calc(112px + env(safe-area-inset-right));bottom:calc(86px + env(safe-area-inset-bottom))}
 #tObj.lleno{border-color:var(--gold);box-shadow:0 0 14px var(--gold)}
@@ -401,6 +405,7 @@ body.editando #editCtrl{display:block}
 <div id="toques">
   <button id="tIzq" data-t="izq">◀</button>
   <button id="tDer" data-t="der">▶</button>
+  <button id="tJoy" aria-label="Joystick para doblar"><i class="riel"></i><b class="perilla"></b></button>
   <button id="tGas" data-t="gas">GO</button>
   <button id="tObj" data-t="usar">🎁<small>OBJETO</small></button>
   <button id="tFreno" data-t="freno">FRENO</button>
@@ -428,7 +433,7 @@ body.editando #editCtrl{display:block}
 <script src="karts3d.js?v=19"></script>
 <script src="carrera.js?v=19"></script>
 <script src="sala.js?v=13"></script>
-<script src="juego.js?v=21"></script>
+<script src="juego.js?v=22"></script>
 <script src="mando.js?v=3"></script>
 <script src="caras.js?v=12"></script>
 <script src="../dueno-link.js?v=2"></script>
