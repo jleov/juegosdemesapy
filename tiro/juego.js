@@ -1127,9 +1127,17 @@
   // ---------- celular: palanca a la izquierda, mirar arrastrando a la derecha ----------
   function tactilCtl() {
     const z = $('#tctl'), pal = $('#palanca'), bolita = $('#bolita');
-    let palId = null, p0 = null; const miradas = new Map();
-    const R = 55;
+    let palId = null, p0 = null, R = 55; const miradas = new Map();
+    const editando = () => document.body.classList.contains('editando');
+    // la palanca: fija en su lugar o aparece donde se apoya el dedo (se elige en "Acomodar controles")
+    const moverPal = (t) => {
+      let dx = t.clientX - p0.x, dy = t.clientY - p0.y; const L = Math.hypot(dx, dy);
+      if (L > R) { dx = dx / L * R; dy = dy / L * R; }
+      bolita.style.transform = `translate(${dx}px,${dy}px)`;
+      inp.mx = dx / R; inp.mz = dy / R;
+    };
     z.addEventListener('touchstart', e => {
+      if (editando()) { e.preventDefault(); return; }
       J.audio();
       for (const t of e.changedTouches) {
         const btn = t.target.closest && t.target.closest('[data-b]');
@@ -1148,21 +1156,21 @@
           continue;
         }
         if (C.obs()) { mira++; continue; }
-        if (t.clientX < innerWidth * 0.42 && palId == null) {
-          palId = t.identifier; p0 = { x: t.clientX, y: t.clientY };
-          pal.style.left = (t.clientX - R) + 'px'; pal.style.top = (t.clientY - R) + 'px'; pal.classList.add('on'); bolita.style.transform = '';
+        const rr = pal.getBoundingClientRect(), pr = rr.width / 2, pcx = rr.left + pr, pcy = rr.top + pr;
+        const fija = document.body.classList.contains('palfija');
+        if (palId == null && (fija ? Math.hypot(t.clientX - pcx, t.clientY - pcy) < pr * 1.4 : t.clientX < innerWidth * 0.42)) {
+          palId = t.identifier; R = pr; pal.classList.add('on'); bolita.style.transform = '';
+          if (fija) { p0 = { x: pcx, y: pcy }; moverPal(t); }
+          else { p0 = { x: t.clientX, y: t.clientY }; pal.style.left = (t.clientX - R) + 'px'; pal.style.top = (t.clientY - R) + 'px'; pal.style.right = pal.style.bottom = 'auto'; }
         } else miradas.set(t.identifier, { x: t.clientX, y: t.clientY });
       }
       e.preventDefault();
     }, { passive: false });
     z.addEventListener('touchmove', e => {
+      if (editando()) { e.preventDefault(); return; }
       for (const t of e.changedTouches) {
-        if (t.identifier === palId) {
-          let dx = t.clientX - p0.x, dy = t.clientY - p0.y; const L = Math.hypot(dx, dy);
-          if (L > R) { dx = dx / L * R; dy = dy / L * R; }
-          bolita.style.transform = `translate(${dx}px,${dy}px)`;
-          inp.mx = dx / R; inp.mz = dy / R;
-        } else if (miradas.has(t.identifier)) {
+        if (t.identifier === palId) moverPal(t);
+        else if (miradas.has(t.identifier)) {
           const m = miradas.get(t.identifier), dx = t.clientX - m.x, dy = t.clientY - m.y; m.x = t.clientX; m.y = t.clientY;
           const zz = 1 + (A[yo.w].zoom - 1) * yo.aimK, k = 0.0055 * tsens / zz;
           yo.ry -= dx * k; yo.rx = Math.max(-1.5, Math.min(1.5, yo.rx - dy * k));
@@ -1172,7 +1180,7 @@
     }, { passive: false });
     const fin = e => {
       for (const t of e.changedTouches) {
-        if (t.identifier === palId) { palId = null; inp.mx = inp.mz = 0; pal.classList.remove('on'); }
+        if (t.identifier === palId) { palId = null; inp.mx = inp.mz = 0; pal.classList.remove('on'); bolita.style.transform = ''; if (window.ctAplicar) window.ctAplicar(); }
         if (miradas.has(t.identifier)) miradas.delete(t.identifier);
         const btn = t.target.closest && t.target.closest('[data-b]');
         if (btn) { btn.classList.remove('on'); if (btn.dataset.b === 'fire') { inp.fire = false; yo.latch = false; } }

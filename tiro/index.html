@@ -41,7 +41,7 @@ button{cursor:pointer;border:0;border-radius:10px;padding:.6em 1em;background:va
 button:active{transform:scale(.96)}
 button:hover{filter:brightness(1.12)}
 button:disabled{opacity:.4;cursor:not-allowed}
-.btn-p{background:var(--azul2);color:#fff}.btn-r{background:var(--rojo);color:#fff}.btn-ok{background:var(--ok);color:#fff}
+.btn-p{background:var(--azul2);color:#fff}.btn-r{background:var(--rojo);color:#fff}.btn-ok{background:var(--ok);color:#fff}.btn-g{background:#5b6475;color:#fff}
 input,select{border:2px solid var(--line);border-radius:10px;padding:.6em .8em;background:#11182a;outline:none;width:100%}
 input:focus,select:focus{border-color:var(--azul2)}
 .hidden{display:none!important}
@@ -166,7 +166,33 @@ body.tactil .pc-solo{display:none}
 #tctl{position:absolute;inset:0;z-index:2;touch-action:none}
 #palanca{position:absolute;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.35);left:40px;bottom:60px;opacity:.5}
 #palanca.on{opacity:1}
-#bolita{position:absolute;left:30px;top:30px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.55)}
+#bolita{position:absolute;left:50%;top:50%;width:46%;height:46%;margin:-23% 0 0 -23%;border-radius:50%;background:rgba(255,255,255,.55)}
+/* celular de costado (como en Carrera Guasu) */
+#rotate{position:fixed;inset:0;z-index:95;background:#0a1220;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:20px;font-weight:800}
+#rotate .ph{font-size:70px;animation:rot 1.6s ease-in-out infinite}
+#rotate small{display:block;font-size:14px;font-weight:600;opacity:.8;margin-top:8px}
+@keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait) and (pointer:coarse){body.jugando #rotate,body.editando #rotate{display:flex}}
+body:not(.tactil) .tactil-solo{display:none!important}
+/* acomodar controles: se arrastran y se agrandan */
+#editCtrl{position:absolute;inset:0;z-index:5;display:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,transparent 1px 40px),repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 1px,transparent 1px 40px),rgba(5,10,25,.62)}
+body.editando #editCtrl{display:block}
+body.editando #tctl,body.editando #tctl.hidden{display:block!important;z-index:6;opacity:1!important}
+body.editando #tctl .tb.hidden{display:flex!important}
+body.editando #tctl .tb,body.editando #palanca{animation:menea 1.4s ease-in-out infinite;cursor:grab;opacity:1}
+body.editando #tctl .sel{border-color:#ffc83d!important;box-shadow:0 0 0 3px #ffc83d,0 0 18px #ffc83d}
+body.editando #pausa,body.editando #muerte{display:none!important}
+@keyframes menea{50%{rotate:-5deg}}
+#ePanel{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:min(420px,60vw);z-index:7;display:none;background:#f6f1e4;color:#222;border-radius:14px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.5);font-size:13px;text-align:left}
+body.editando #ePanel{display:block}
+#ePanel.abajo{top:auto;bottom:8px}
+#ePanel .muted2{display:block;color:#555;font-size:12px;margin:2px 0 6px}
+#ePanel .erow{display:flex;align-items:center;gap:8px;margin:4px 0}
+#ePanel .erow label{flex:0 0 44%;font-weight:700;font-size:12.5px}
+#ePanel .erow label.chk{flex:1;font-weight:600;display:flex;align-items:center;gap:6px;margin:0;text-align:left}#ePanel .erow label.chk input{width:auto;margin:0;flex:0 0 auto}
+#ePanel input[type=range]{flex:1}
+#ePanel .ebtns{display:flex;gap:6px;margin-top:6px}#ePanel .ebtns button{flex:1;padding:7px 4px;font-size:12.5px;border-radius:10px}
+@media (max-height:430px){#ePanel .muted2{display:none}#ePanel{padding:6px 10px}#ePanel .erow{margin:1px 0}}
 .tb{position:absolute;width:54px;height:54px;border-radius:50%;background:rgba(15,20,35,.55);border:2px solid rgba(255,255,255,.45);color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px}
 .tb.on{background:rgba(255,200,61,.7)}
 .tb[data-b=fire]{width:84px;height:84px;font-size:32px;right:28px;bottom:110px;background:rgba(213,43,30,.55)}
@@ -290,6 +316,15 @@ body.tactil #chatF{bottom:auto;top:30%}
     <div class="tb" data-b="crouch">⬇️</div><div class="tb" data-b="reload">🔄</div><div class="tb" data-b="swap">🔁</div>
     <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div><div class="tb" data-b="luz">🔦</div><div class="tb" data-b="granada">💣</div><div class="tb" data-b="molotov">🔥</div>
   </div>
+  <div id="editCtrl"></div>
+  <div id="ePanel">
+    <b>🎮 Acomodar controles</b>
+    <span class="muted2">Arrastrá cada botón y la palanca 🕹️ adonde te queden cómodos. Tocá uno para cambiarle el tamaño.</span>
+    <div class="erow"><label>Tamaño de <span id="eSel">—</span></label><input type="range" id="eTam" min="34" max="170" step="2"></div>
+    <div class="erow"><label>Transparencia</label><input type="range" id="eOp" min="25" max="100" step="5"></div>
+    <div class="erow"><label class="chk"><input type="checkbox" id="eFija"> Palanca fija en su lugar (si no, aparece donde apoyás el dedo a la izquierda)</label></div>
+    <div class="ebtns"><button id="ePan" class="btn-g">↕️ Panel</button><button id="eReset" class="btn-g">↩️ Como venía</button><button id="eListo" class="btn-p">✔️ Listo</button></div>
+  </div>
   <div id="topBtns">
     <button id="cfgBtn" title="Ajustes">⚙️</button>
     <button id="voiceBtn" title="Voz">🎙️</button>
@@ -311,16 +346,18 @@ body.tactil #chatF{bottom:auto;top:30%}
       <div class="ajuste"><span>Dedo</span><input type="range" id="sTsens" min="0.3" max="3" step="0.1"><span id="vTsens"></span></div>
       <div class="ajuste"><span>Visión</span><input type="range" id="sFov" min="60" max="100" step="1"><span id="vFov"></span></div>
       <label class="ajuste chk"><input type="checkbox" id="sAimTog"> <span>La mira queda puesta con un clic (no hay que mantener)</span></label>
+      <div class="row tactil-solo" style="margin-top:10px"><button class="btn-p" id="ctrlBtn" style="flex:1">🎮 Acomodar controles</button></div>
       <div class="row" style="margin-top:10px"><button class="btn-r" id="leaveBtnP" style="flex:1">🚪 Salir de la partida</button></div>
     </div>
   </div>
   <div id="fin" class="capa hidden"><div class="card" id="finBox"></div></div>
   <div id="audios"></div>
 </div>
+<div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br><span id="rotateTxt">para jugar</span><small id="rotateSub">La partida sigue: ¡apurate!</small></p></div>
 
-<script src="mundo.js?v=15"></script>
-<script src="sala.js?v=15"></script>
-<script src="juego.js?v=15"></script>
+<script src="mundo.js?v=16"></script>
+<script src="sala.js?v=16"></script>
+<script src="juego.js?v=16"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -530,6 +567,7 @@ function closeNet() {
 }
 window.leaveToMenu = () => goHome();
 function goHome(silent) {
+  document.body.classList.remove('jugando', 'editando'); salirHorizontal();
   leaveVoice(); closeNet(); Juego.salir();
   mode = null; S = null; myId = null; roomCode = null; token = null; amObs = false; localCode = null; startedAt = null;
   sess.set('tg_session', null);
@@ -561,11 +599,12 @@ function onMsg(m) {
 function show(id) { ['home', 'lobby'].forEach(s => $('#' + s).classList.toggle('hidden', s !== id)); }
 function setState(s) {
   S = s; myId = s.me;
-  if (s.phase === 'lobby') { startedAt = null; if (Juego.activo()) Juego.salir(); show('lobby'); renderLobby(); }
+  if (s.phase === 'lobby') { startedAt = null; if (Juego.activo()) { Juego.salir(); salirHorizontal(); } document.body.classList.remove('jugando'); show('lobby'); renderLobby(); }
   else {
     if (!startedAt) startedAt = Date.now();
     show('lobby');
-    if (!Juego.activo()) Juego.entrar(s); else Juego.estado(s);
+    if (!Juego.activo()) { Juego.entrar(s); horizontal(); } else Juego.estado(s);
+    document.body.classList.toggle('jugando', s.phase === 'play');
     renderFin();
   }
   syncVoicePeers();
@@ -620,7 +659,7 @@ function renderLobby() {
 const sendSettings = () => send({ t: 'settings', s: { mode: $('#sMode').value, map: $('#sMap').value, goal: +$('#sGoal').value, time: +$('#sTime').value, bots: $('#sBots').value, fa: $('#sFa').value === '1' } });
 ['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa'].forEach(q => $(q).onchange = sendSettings);
 $('#addBotBtn').onclick = () => send({ t: 'addBot' });
-$('#startBtn').onclick = () => { Juego.audio(); send({ t: 'start' }); };
+$('#startBtn').onclick = () => { Juego.audio(); horizontal(); send({ t: 'start' }); };
 $('#leaveBtnL').onclick = () => goHome();
 let leaveArm = 0;
 function salirJuego() {
@@ -630,6 +669,84 @@ function salirJuego() {
 }
 $('#leaveBtn').onclick = salirJuego; $('#leaveBtnP').onclick = salirJuego;
 $('#cfgBtn').onclick = () => { $('#pausa').classList.toggle('hidden'); if (document.pointerLockElement) document.exitPointerLock(); };
+// ---------- en el celular se juega de costado, con pantalla completa (como Carrera Guasu) ----------
+function horizontal() {
+  if (!tactil) return;
+  const d = document.documentElement, trabar = () => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} };
+  if (!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen({ navigationUI: 'hide' }).then(trabar).catch(trabar); else trabar();
+}
+function salirHorizontal() {
+  try { screen.orientation.unlock(); } catch (e) {}
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+}
+// si la partida arrancó sin tocar nada (la empezó otro), se pide con el primer toque
+document.addEventListener('pointerdown', () => { if (tactil && document.body.classList.contains('jugando') && !document.fullscreenElement) horizontal(); });
+
+// ---------- controles del celular: cada uno los acomoda a su manera (se guarda en el aparato) ----------
+// [lado l/r, distancia a ese borde, arriba t / abajo b, distancia, tamaño]
+const CT_DEF = { fire: ['r', 28, 'b', 110, 84], aim: ['r', 126, 'b', 150, 54], jump: ['r', 30, 'b', 24, 54], crouch: ['r', 96, 'b', 24, 54], reload: ['r', 126, 'b', 84, 54], swap: ['r', 162, 'b', 24, 54],
+  granada: ['r', 200, 'b', 110, 54], molotov: ['r', 200, 'b', 174, 54], tabla: ['r', 14, 't', 60, 40], chat: ['r', 60, 't', 60, 40], luz: ['r', 106, 't', 60, 40], palanca: ['l', 40, 'b', 60, 110] };
+const CT_NOM = { fire: '🔫 disparar', aim: '🎯 apuntar', jump: '⬆️ saltar', crouch: '⬇️ agacharse', reload: '🔄 recargar', swap: '🔁 cambiar arma', granada: '💣 granada', molotov: '🔥 molotov', tabla: '📋 tabla', chat: '💬 chat', luz: '🔦 linterna', palanca: '🕹️ la palanca' };
+let CT = {}; try { CT = JSON.parse(localStorage.getItem('tiro_ctrl') || '{}') || {}; } catch (e) {}
+const ctEl = id => id === 'palanca' ? $('#palanca') : document.querySelector('#tctl [data-b="' + id + '"]');
+function ctAplicar() {
+  for (const id in CT_DEF) {
+    const [lh, dx, lv, dy, sz] = CT[id] || CT_DEF[id], el = ctEl(id);
+    if (!el) continue;
+    el.style.left = lh === 'l' ? 'calc(' + dx + 'px + env(safe-area-inset-left))' : 'auto';
+    el.style.right = lh === 'r' ? 'calc(' + dx + 'px + env(safe-area-inset-right))' : 'auto';
+    el.style.top = lv === 't' ? 'calc(' + dy + 'px + env(safe-area-inset-top))' : 'auto';
+    el.style.bottom = lv === 'b' ? 'calc(' + dy + 'px + env(safe-area-inset-bottom))' : 'auto';
+    el.style.width = el.style.height = sz + 'px';
+    if (id !== 'palanca') el.style.fontSize = Math.round(sz * 0.4) + 'px';
+  }
+  $('#tctl').style.opacity = (CT._op || 100) / 100;
+  document.body.classList.toggle('palfija', !!CT._fija);
+}
+window.ctAplicar = ctAplicar;
+ctAplicar();
+const ED = { on: false, sel: null, drag: null };
+function ctElegir(id) {
+  ED.sel = id;
+  for (const k in CT_DEF) { const el = ctEl(k); if (el) el.classList.toggle('sel', k === id); }
+  $('#eSel').textContent = CT_NOM[id] || id; $('#eTam').value = (CT[id] || CT_DEF[id])[4];
+}
+function ctEditar() {
+  ED.on = true; document.body.classList.add('editando'); $('#pausa').classList.add('hidden');
+  $('#rotateTxt').textContent = 'para acomodar los controles'; $('#rotateSub').textContent = 'Se acomodan con el celular de costado, como se juega.';
+  horizontal();
+  $('#eOp').value = CT._op || 100; $('#eFija').checked = !!CT._fija; ctElegir('fire'); ctAplicar();
+}
+function ctListo() {
+  ED.on = false; ED.drag = null; document.body.classList.remove('editando');
+  for (const k in CT_DEF) { const el = ctEl(k); if (el) el.classList.remove('sel'); }
+  try { localStorage.setItem('tiro_ctrl', JSON.stringify(CT)); } catch (e) {}
+  $('#rotateTxt').textContent = 'para jugar'; $('#rotateSub').textContent = 'La partida sigue: ¡apurate!';
+  ctAplicar(); toast('🎮 Controles guardados en este celular');
+}
+$('#ctrlBtn').onclick = e => { e.stopPropagation(); ctEditar(); };
+$('#eListo').onclick = ctListo;
+$('#ePan').onclick = () => $('#ePanel').classList.toggle('abajo');
+$('#eReset').onclick = () => { for (const k of Object.keys(CT)) delete CT[k]; $('#eOp').value = 100; $('#eFija').checked = false; ctAplicar(); if (ED.sel) ctElegir(ED.sel); toast('Los controles volvieron a como venían'); };
+$('#eTam').oninput = e => { if (!ED.sel) return; const c = (CT[ED.sel] || CT_DEF[ED.sel]).slice(); c[4] = +e.target.value; CT[ED.sel] = c; ctAplicar(); };
+$('#eOp').oninput = e => { CT._op = +e.target.value; ctAplicar(); };
+$('#eFija').onchange = e => { CT._fija = e.target.checked; ctAplicar(); };
+for (const id in CT_DEF) {
+  const el = ctEl(id); if (!el) continue;
+  el.addEventListener('pointerdown', e => {
+    if (!ED.on) return; e.preventDefault(); e.stopPropagation(); ctElegir(id);
+    const r = el.getBoundingClientRect(); ED.drag = { id, ox: e.clientX - (r.left + r.width / 2), oy: e.clientY - (r.top + r.height / 2) };
+    try { el.setPointerCapture(e.pointerId); } catch (x) {}
+  }, true);
+  el.addEventListener('pointermove', e => {
+    if (!ED.on || !ED.drag || ED.drag.id !== id) return;
+    const W = innerWidth, H = innerHeight, sz = (CT[id] || CT_DEF[id])[4];
+    const cx = Math.max(sz / 2, Math.min(W - sz / 2, e.clientX - ED.drag.ox)), cy = Math.max(sz / 2, Math.min(H - sz / 2, e.clientY - ED.drag.oy));
+    CT[id] = [cx < W / 2 ? 'l' : 'r', Math.round(cx < W / 2 ? cx - sz / 2 : W - cx - sz / 2), cy < H / 2 ? 't' : 'b', Math.round(cy < H / 2 ? cy - sz / 2 : H - cy - sz / 2), sz];
+    ctAplicar();
+  });
+  const fin = () => { ED.drag = null; }; el.addEventListener('pointerup', fin); el.addEventListener('pointercancel', fin);
+}
 $('#pausa').addEventListener('click', e => { if (!e.target.closest('.no-lock') && tactil) $('#pausa').classList.add('hidden'); });
 $('#shareBtn').onclick = async () => {
   const url = location.origin + location.pathname + '#' + S.code;
