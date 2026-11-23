@@ -601,6 +601,7 @@
       case 'spawn': {
         if (m.id === me) {
           Object.assign(yo.s, { x: m.p[0], y: m.p[1], z: m.p[2], vx: 0, vy: 0, vz: 0, crouch: false, slideT: 0, ground: true });
+          yo.aparecio = { x: m.p[0], y: m.p[1], z: m.p[2] }; yo.bueno = null;
           yo.ry = m.ry; yo.rx = 0; yo.alive = true; yo.hp = 100; yo.reloadT = 0; yo.w = yo.prim; yo.kick = 0; yo.bloom = 0;
           yo.ammo = { [yo.prim]: A[yo.prim].mag, pistola: A.pistola.mag };
           $('#muerte').classList.add('hidden'); SFX.aparece(); armaHUD();
@@ -848,7 +849,7 @@
   function loop(t) {
     if (!activo) return;
     raf = requestAnimationFrame(loop);
-    const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    const dt = Math.max(0, Math.min(0.05, (t - last) / 1000)); last = Math.max(last, t);
     const now = performance.now(), obs = C.obs();
     if (!obs && yo.alive) jugar(dt, now);
     else if (!obs) camMuerto(dt, now);
@@ -926,8 +927,10 @@
     W.mover(W.mapa(mapaId), s, { mx, mz, jump: inp.jumpQ || K.has('Space'), crouch, aim }, dt);
     inp.jumpQ = false;
     // por las dudas: si la posición se rompe (NaN), vuelve a la última buena
-    if (!Number.isFinite(s.x + s.y + s.z + s.vx + s.vy + s.vz)) { const b = yo.bueno || { x: 0, y: 0, z: 0 }; Object.assign(s, { x: b.x, y: b.y, z: b.z, vx: 0, vy: 0, vz: 0, ground: true }); }
+    if (!Number.isFinite(s.x + s.y + s.z + s.vx + s.vy + s.vz)) { const b = yo.bueno || yo.aparecio || { x: 0, y: 0, z: 0 }; Object.assign(s, { x: b.x, y: b.y, z: b.z, vx: 0, vy: 0, vz: 0, ground: true }); }
     else yo.bueno = { x: s.x, y: s.y, z: s.z };
+    // y si quedó metido adentro de algo, se sale solo
+    W.liberar(W.mapa(mapaId), s);
     yo.eye += ((s.crouch ? 0.95 : 1.55) - yo.eye) * Math.min(1, dt * 14);
     yo.aimK += ((aim ? 1 : 0) - yo.aimK) * Math.min(1, dt * 14);
     yo.bloom = Math.max(0, yo.bloom - dt * 0.06);

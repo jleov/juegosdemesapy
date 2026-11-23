@@ -174,6 +174,7 @@
   // un paso de movimiento. s = {x,y,z,vx,vy,vz,ground,crouch,slideT,slideCd}
   // inp = {mx,mz (dirección en el mundo, largo ≤1), jump, crouch, aim}
   function mover(M, s, inp, dt) {
+    if (!(dt > 0)) return;
     // agacharse / pararse (solo si hay lugar arriba)
     const quiere = !!inp.crouch;
     if (quiere && !s.crouch) {
@@ -194,7 +195,7 @@
       const sp = s.crouch ? F.CROUCH : inp.aim ? F.AIM : F.SPEED;
       const tx = inp.mx * sp, tz = inp.mz * sp, a = (s.ground ? F.ACC : F.AIR) * dt;
       const dx = tx - s.vx, dz = tz - s.vz, d = Math.hypot(dx, dz);
-      if (d <= a) { s.vx = tx; s.vz = tz; } else { s.vx += dx / d * a; s.vz += dz / d * a; }
+      if (d <= a || d < 1e-6) { s.vx = tx; s.vz = tz; } else { s.vx += dx / d * a; s.vz += dz / d * a; }
     }
     if (inp.jump && s.ground) { s.vy = F.JUMP; s.ground = false; if (s.slideT > 0) { s.slideT = 0; } }
     // horizontal, un eje a la vez, subiendo escalones
@@ -221,6 +222,22 @@
       s.ground = false;
     }
     if (s.y < -5) s.y = 0;
+  }
+
+  // si quedó metido adentro de una caja, lo saca al lugar libre más cerca (o arriba de la caja)
+  function liberar(M, s) {
+    const h = s.crouch ? F.HC : F.H;
+    const b = choca(M, s.x, s.y, s.z, h);
+    if (!b) return false;
+    for (let r = 0.25; r <= 4; r += 0.25) {
+      for (let a = 0; a < 16; a++) {
+        const x = s.x + Math.cos(a / 16 * Math.PI * 2) * r, z = s.z + Math.sin(a / 16 * Math.PI * 2) * r;
+        const y = piso(M, x, z, s.y + F.STEP);
+        if (!choca(M, x, y, z, h)) { s.x = x; s.y = y; s.z = z; s.vx = s.vz = s.vy = 0; return true; }
+      }
+    }
+    if (!choca(M, s.x, b[4], s.z, h)) { s.y = b[4]; s.vy = 0; return true; }
+    return false;
   }
 
   // ---------- rayos ----------
@@ -363,5 +380,5 @@
     return [0, 0, 0];
   }
 
-  G.TiroMundo = { F, PAL, ARMAS, ARMA_IDS, MAPAS, MAPA_IDS, mapa, choca, piso, mover, rayMundo, rayCuerpos, dir, desvio, seVe, rumbo, puntoLibre, cabeza };
+  G.TiroMundo = { F, PAL, ARMAS, ARMA_IDS, MAPAS, MAPA_IDS, mapa, choca, piso, mover, liberar, rayMundo, rayCuerpos, dir, desvio, seVe, rumbo, puntoLibre, cabeza };
 })(typeof window !== 'undefined' ? window : globalThis);

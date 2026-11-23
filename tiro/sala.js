@@ -357,6 +357,7 @@
       }
       const s = z.s, ox = s.x, oz = s.z;
       W.mover(M, s, { mx, mz, jump: false, crouch: false, aim: false }, dt);
+      W.liberar(M, s);
       if (z.estado === 0 && Math.hypot(s.x - ox, s.z - oz) < dt * 0.3) { if ((z.quieto += dt) > 0.7) { z.quieto = 0; z.paso = null; z.pathT = 0; if (s.ground) s.vy = F.JUMP * 0.8; } } else z.quieto = 0;
       z.x = s.x; z.y = s.y; z.z = s.z;
     }
@@ -442,6 +443,7 @@
       const L = Math.hypot(mx, mz); if (L > 1) { mx /= L; mz /= L; }
       const s = b.s, ox = s.x, oz = s.z;
       W.mover(M, s, { mx, mz, jump, crouch: false, aim }, dt);
+      W.liberar(M, s);
       if (L > 0.3 && Math.hypot(s.x - ox, s.z - oz) < dt * 0.6) { if ((b.stuck += dt) > 0.4) { b.stuck = 0; b.strafe *= -1; b.goal = null; if (s.ground) s.vy = F.JUMP; } } else b.stuck = 0;
       p.x = s.x; p.y = s.y; p.z = s.z; p.crouch = s.crouch;
     }
