@@ -7,14 +7,14 @@
 
 /* ---------- pilotos: animales del Paraguay, cada uno con su vehículo ---------- */
 const PILOTOS = [
-  {id:'jakare',  n:'Jakare',   esp:'el yacaré',        e:'🐊', veh:'Motocarro',          color:'#3f9a45', vel:4, ace:2, man:2, peso:5},
-  {id:'kapi',    n:'Kapi',     esp:'el carpincho',     e:'🦫', veh:'Carrito chipero',    color:'#b07a3a', vel:3, ace:3, man:4, peso:3},
-  {id:'tuka',    n:'Tukã',     esp:'el tucán',         e:'🦜', veh:'Kart pico largo',    color:'#ff9a1e', vel:2, ace:5, man:4, peso:1},
+  {id:'jakare',  n:'Jakare',   esp:'el yacaré',        e:'🐊', veh:'Camioneta', color:'#3f9a45', vel:4, ace:2, man:2, peso:5},
+  {id:'kapi',    n:'Kapi',     esp:'el carpincho',     e:'🦫', veh:'Carrito con toldo',  color:'#b07a3a', vel:3, ace:3, man:4, peso:3},
+  {id:'tuka',    n:'Tukã',     esp:'el tucán',         e:'🦜', veh:'Descapotable',       color:'#ff9a1e', vel:2, ace:5, man:4, peso:1},
   {id:'jagua',   n:'Jaguarete',esp:'el jaguareté',     e:'🐆', veh:'Kart de carrera',    color:'#f2b01e', vel:5, ace:2, man:1, peso:4},
   {id:'kure',    n:'Kure',     esp:'el chanchito',     e:'🐷', veh:'Tractorcito',        color:'#f28aa8', vel:3, ace:2, man:3, peso:5},
-  {id:'aguara',  n:'Aguara',   esp:'el aguará guazú',  e:'🦊', veh:'Arenero patas largas',color:'#d8582a', vel:4, ace:3, man:4, peso:2},
-  {id:'kai',     n:'Ka’i',     esp:'el monito',        e:'🐒', veh:'Karrito de madera',  color:'#8a5a34', vel:4, ace:4, man:5, peso:1},
-  {id:'lobope',  n:'Lobope',   esp:'la nutria gigante',e:'🦦', veh:'Lancha con ruedas',  color:'#3b8fd0', vel:4, ace:4, man:3, peso:3},
+  {id:'aguara',  n:'Aguara',   esp:'el aguará guazú',  e:'🦊', veh:'Jeep arenero',color:'#d8582a', vel:4, ace:3, man:4, peso:2},
+  {id:'kai',     n:'Ka’i',     esp:'el monito',        e:'🐒', veh:'Carrito de tirar',   color:'#8a5a34', vel:4, ace:4, man:5, peso:1},
+  {id:'lobope',  n:'Lobope',   esp:'la nutria gigante',e:'🦦', veh:'Bote con ruedas',    color:'#3b8fd0', vel:4, ace:4, man:3, peso:3},
 ];
 const COLORES = ['#d52b1e','#1d6fe0','#f2c14e','#2fae5a','#ff7a1e','#c452d8','#19c2c2','#f4f1e8'];
 const piloto = i => PILOTOS[((i|0)%PILOTOS.length+PILOTOS.length)%PILOTOS.length];
@@ -103,27 +103,41 @@ function dibujarVehiculo(b, id, col){
   return R;
 }
 
-const K3 = {gRueda:null, mRueda:null, mLlanta:null, gSombra:null, mSombra:null, mod:{}, esperan:[]};
-/* modelos 3D de los animales (Poly Pizza, licencia CC-BY: los créditos están en "Cómo se juega" y en modelos/CREDITOS.txt).
-   Se cargan aparte: mientras no llegan (o si no cargan) se ve el muñeco hecho a mano de arriba.
-   H = alto máximo, L = largo máximo, y/z = dónde se para en el asiento */
-const MODELOS = {jakare:{H:1.1, L:3.3, rx:-.25, y:.95, z:-.4}, kapi:{H:1.7, L:2.0, rx:-.45, y:.55, z:-.35}, tuka:{H:1.9, L:2.8, y:.5, z:-.2}, jagua:{H:1.6, L:2.1, rx:-.5, y:.55, z:-.45},
-  kure:{H:1.35, L:1.7, rx:-.4, y:.8, z:-.55}, aguara:{H:1.75, L:2.0, rx:-.45, y:.7, z:-.35}, kai:{H:1.7, L:2.0, y:.5, z:-.3}, lobope:{H:1.6, L:2.0, rx:-.45, y:1.0, z:-.45}};
+const K3 = {gRueda:null, mRueda:null, mLlanta:null, gSombra:null, mSombra:null, mod:{}, veh:{}, esperan:[]};
+/* modelos 3D de los animales y de sus vehículos (Poly Pizza, licencia CC-BY: los créditos están en "Cómo se juega",
+   modelos/CREDITOS.txt y vehiculos/CREDITOS.txt). Se cargan aparte: mientras no llegan (o si no cargan) se ve lo hecho a mano de arriba.
+   Animales: H = alto máximo, L = largo máximo, y/z = dónde se sienta, rx = cuánto se echa para atrás.
+   Vehículos: L = largo, ry = para dónde mira el modelo, quitar = piezas que sobran, pinta = piezas que toman el color del kart,
+   ruedas = dejar nuestras ruedas (el modelo no trae). */
+const MODELOS = {jakare:{H:1.0, L:2.4, rx:-.15, y:.95, z:-.7}, kapi:{H:1.45, L:1.7, rx:-.45, y:.55, z:-.05}, tuka:{H:1.5, L:2.0, y:.35, z:-.25}, jagua:{H:1.4, L:1.8, rx:-.5, y:.25, z:-.35},
+  kure:{H:1.35, L:1.7, rx:-.4, y:.85, z:-.7}, aguara:{H:1.5, L:1.8, rx:-.45, y:.6, z:-.25}, kai:{H:1.7, L:2.0, y:.5, z:-.3}, lobope:{H:1.6, L:2.0, rx:-.45, y:1.0, z:-.45}};
+const VEHICULOS = {jakare:{L:3.1, ry:Math.PI, pinta:['M_0042_Sienna']}, kapi:{L:2.9, H:2.3, ry:Math.PI}, tuka:{L:2.8}, jagua:{L:2.7, ry:Math.PI/2, pinta:['01___Default']},
+  kure:{L:2.8}, aguara:{L:2.7, quitar:1, pinta:['mat13']}, kai:{L:2.6, ry:Math.PI/2}, lobope:{L:2.7, y:.3, ruedas:1}};
 const VMOD = 1;   // subir si se cambian los .glb
+function normalizar(o, c, H, L){
+  // quitar = sacar la base plana donde viene apoyado el modelo (la pieza más ancha y finita)
+  if(c.quitar){ o.updateMatrixWorld(true); const B=new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()), fuera=[]; o.traverse(m=>{ if(m.isMesh){ const t=new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3()); if(t.y<B.y*.15 && t.x>B.x*.8 && t.z>B.z*.8) fuera.push(m); } }); fuera.forEach(m=>m.parent.remove(m)); }
+  o.traverse(m=>{ if(m.isMesh){ const lista=Array.isArray(m.material)?m.material:[m.material];
+    const nuevos=lista.map(v=>{ if(v.map) v.map.encoding=THREE.LinearEncoding; const n=new THREE.MeshLambertMaterial({map:v.map||null, color:v.map?'#ffffff':v.color, vertexColors:!!m.geometry.attributes.color, side:v.side}); n.name=v.name; return n; });
+    m.material=Array.isArray(m.material)?nuevos:nuevos[0]; } });
+  const r=new THREE.Group(); r.rotation.y=c.ry||0; r.add(o); const w=new THREE.Group(); w.add(r); w.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(w), s=b.getSize(new THREE.Vector3()), e=Math.min((c.H||H)/s.y, (c.L||L)/Math.max(s.x,s.z));
+  w.scale.setScalar(e); const z=new THREE.Group(); z.add(w); w.position.set(-(b.min.x+s.x/2)*e, -b.min.y*e, -(b.min.z+s.z/2)*e); return z;
+}
 function cargarModelos(){
   if(K3.cargando || !THREE.GLTFLoader) return; K3.cargando=true; const L=new THREE.GLTFLoader();
-  for(const id in MODELOS) L.load('modelos/'+id+'.glb?v='+VMOD, g=>{
-    const o=g.scene, c=MODELOS[id], b=new THREE.Box3().setFromObject(o), s=b.getSize(new THREE.Vector3());
-    const e=Math.min((c.H||1.4)/s.y, (c.L||2.2)/Math.max(s.x,s.z)); o.scale.setScalar(e); o.position.set(-(b.min.x+s.x/2)*e, -b.min.y*e, -(b.min.z+s.z/2)*e);
-    o.traverse(m=>{ if(m.isMesh){ const v=m.material; if(v.map) v.map.encoding=THREE.LinearEncoding; m.material=new THREE.MeshLambertMaterial({map:v.map||null, color:v.map?'#ffffff':v.color}); } });
-    const w=new THREE.Group(); w.add(o); K3.mod[id]=w;
-    K3.esperan=K3.esperan.filter(v=>{ if(v.tirado) return false; if(piloto(v.ch).id!==id) return true; ponerModelo(v); return false; });
-  }, undefined, ()=>{});
+  const listo=()=>{ K3.esperan=K3.esperan.filter(v=>{ if(v.tirado) return false; ponerModelo(v); return !(v.modelo && v.vehM); }); };
+  for(const id in MODELOS) L.load('modelos/'+id+'.glb?v='+VMOD, g=>{ K3.mod[id]=normalizar(g.scene, MODELOS[id], 1.4, 2.2); listo(); }, undefined, ()=>{});
+  for(const id in VEHICULOS) L.load('vehiculos/'+id+'.glb?v='+VMOD, g=>{ K3.veh[id]=normalizar(g.scene, VEHICULOS[id], 2.2, 2.7); listo(); }, undefined, ()=>{});
 }
+function copiar(t, mats){ const m=t.clone(true); m.traverse(x=>{ if(x.isMesh){ x.material=Array.isArray(x.material)?x.material.map(y=>y.clone()):x.material.clone(); [].concat(x.material).forEach(y=>mats.push(y)); } }); return m; }
 function ponerModelo(v){
-  const id=piloto(v.ch).id, t=K3.mod[id]; if(!t || v.modelo) return; const c=MODELOS[id], m=t.clone(true), mats=[];
-  m.traverse(x=>{ if(x.isMesh){ x.material=x.material.clone(); mats.push(x.material); } });
-  m.position.set(0, c.y||.5, c.z||-.15); m.rotation.set(c.rx||0, c.ry||0, 0); v.pil.add(m); v.modelo=m; v.mMod=mats; v.pilMallas.forEach(x=>x.visible=false);
+  const id=piloto(v.ch).id;
+  if(!v.modelo && K3.mod[id]){ const c=MODELOS[id], m=copiar(K3.mod[id], v.mMod);
+    m.position.set(0, c.y||.5, c.z||-.15); m.rotation.set(c.rx||0, 0, 0); v.pil.add(m); v.modelo=m; v.pilMallas.forEach(x=>x.visible=false); }
+  if(!v.vehM && K3.veh[id]){ const c=VEHICULOS[id], ant=v.mMod.length, m=copiar(K3.veh[id], v.mMod);
+    if(c.pinta) v.mMod.slice(ant).forEach(x=>{ if(c.pinta.includes(x.name)){ x.color.set(v.color); x.map=null; } });
+    m.position.y=c.y||0; v.cuerpo.add(m); v.vehM=m; v.malla.visible=false; if(!c.ruedas) v.ruedas.forEach(r=>{ if(r) r.visible=false; }); }
   if(v.op<1) v.fantasma(v.op);
 }
 function crearKart3D(ch, color){
@@ -149,10 +163,10 @@ function crearKart3D(ch, color){
   const mCh=new THREE.MeshBasicMaterial({color:'#5ad0ff'}); const chispas=[-.85,.85,-.7,.7].map((x,i)=>{ const m=new THREE.Mesh(K3.gChispa, mCh); m.position.set(x,.2,-1-(i>1?.3:0)); m.visible=false; cuerpo.add(m); return m; });
   const escudo=new THREE.Mesh(K3.gEscudo, K3.mEscudo); escudo.position.y=1; escudo.visible=false; g.add(escudo);
   const hielo=new THREE.Mesh(K3.gHielo, K3.mHielo); hielo.position.y=1.2; hielo.visible=false; g.add(hielo);
-  const v={g, cuerpo, malla, pil, brazos, ruedas, sombra, llamas, chispas, mCh, escudo, hielo, cors, etiqueta:null, giro:0, extras:[], ch, op:1, pilMallas:mallas.slice(1), mMod:[],
+  const v={g, cuerpo, malla, pil, brazos, ruedas, sombra, llamas, chispas, mCh, escudo, hielo, cors, etiqueta:null, giro:0, extras:[], ch, color:color||p.color, op:1, pilMallas:mallas.slice(1), mMod:[],
     fantasma(op){ this.op=op; for(const m of [mat, ...this.mMod]){ m.transparent=op<1; m.opacity=op; } },
     tirar(){ this.tirado=true; this.mMod.forEach(m=>m.dispose()); mallas.forEach(m=>m.geometry.dispose()); mat.dispose(); mCh.dispose(); this.extras.forEach(m=>{ m.geometry.dispose(); if(m.material.map) m.material.map.dispose(); m.material.dispose(); }); if(this.etiqueta){ this.etiqueta.material.map.dispose(); this.etiqueta.material.dispose(); } }};
-  cargarModelos(); if(K3.mod[p.id]) ponerModelo(v); else K3.esperan.push(v);
+  cargarModelos(); ponerModelo(v); if(!(v.modelo && v.vehM)) K3.esperan.push(v);
   return v;
 }
 /* cartelito con el nombre (y la foto, si tiene) arriba del kart */

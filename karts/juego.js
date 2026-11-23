@@ -15,7 +15,7 @@ const genCode = () => { const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; fo
 let myToken=load('kg_token'); if(!myToken){ myToken=Math.random().toString(36).slice(2)+Date.now().toString(36); store('kg_token', myToken); }
 const NET={mode:null, peer:null, code:null, conns:{}, hostConn:null, myPid:null, obs:null, welcomed:false};
 let CHAT=[], V=null, R=null;
-const VERSION = 21;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
+const VERSION = 22;   // subir con cada cambio: los aparatos viejos se actualizan solos al entrar a una sala
 const me = () => NET.myPid || NET.obs;
 const VP = id => V && (V.players.find(p=>p.id===id) || (V.observers||[]).find(o=>o.id===id));
 const amHost = () => NET.mode==='local' || (V && V.hostPid===NET.myPid && NET.mode==='host');
@@ -1073,7 +1073,7 @@ function showRules(){
   <h3>💬 Chat y voz</h3>
   <p>Escribí <b>@nombre</b> (o elegí a alguien en “Para”) para mandarle un <b>mensaje privado</b>. Con 🎤 hablan por voz y con 📷 ponés tu cara arriba de tu kart.</p>
   <p class="muted">🎶 ${MUSIC_CREDIT}</p>
-  <p class="muted">🐾 Modelos 3D de los animales, gratis con licencia <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC-BY 3.0</a>, bajados de <a href="https://poly.pizza" target="_blank" rel="noopener">Poly Pizza</a>: Black caiman, Capybara, Jaguar, Pig, Fox, Capuchin y River otter por <b>Poly by Google</b>; Toco Toucan por <b>Anonymous</b>. ¡Gracias!</p>
+  <p class="muted">🐾 Modelos 3D de los animales, gratis con licencia <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC-BY 3.0</a>, bajados de <a href="https://poly.pizza" target="_blank" rel="noopener">Poly Pizza</a>: Black caiman, Capybara, Jaguar, Pig, Fox, Capuchin y River otter por <b>Poly by Google</b>; Toco Toucan por <b>Anonymous</b>. Vehículos: Go kart, Tractor y Wagon por <b>Poly by Google</b>; Toyota Hilux 97 por <b>Muhammad Reyhan</b>; Golf cart por <b>Michael Ruddy</b>; Jeep por <b>Alex Safayan</b>; Convertible por <b>Poly by Google</b>; Boat (minimalist) por <b>Sébastien Tricheux</b>. ¡Gracias!</p>
   <button class="btn wide" onclick="closeModal()">Entendido</button></div>`);
 }
 

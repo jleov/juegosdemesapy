@@ -1,0 +1,13 @@
+Vehículos 3D de Carrera Guasu
+Todos bajados gratis de Poly Pizza (https://poly.pizza), licencia Creative Commons Atribución 3.0 (CC-BY 3.0):
+https://creativecommons.org/licenses/by/3.0/
+Cambios: se sacaron bases, se achicaron texturas, se pintan con el color del kart y se acomodan/escalan en el juego.
+
+jakare.glb  - "Toyota Hilux 97" por Muhammad Reyhan - https://poly.pizza/m/8-0nFArehjd
+kapi.glb    - "Golf cart" por Michael Ruddy         - https://poly.pizza/m/0ZN5hIrQCUh
+tuka.glb    - "Convertible" por Poly by Google      - https://poly.pizza/m/4P4buLkUIjH
+jagua.glb   - "Go kart" por Poly by Google          - https://poly.pizza/m/3hkutVs0AAV
+kure.glb    - "Tractor" por Poly by Google          - https://poly.pizza/m/5TGoA5N14c5
+aguara.glb  - "Jeep" por Alex Safayan               - https://poly.pizza/m/4gOfX6DR4yG
+kai.glb     - "Wagon" por Poly by Google            - https://poly.pizza/m/136bU5GesHs
+lobope.glb  - "Boat (minimalist)" por Sébastien Tricheux - https://poly.pizza/m/0IoH9zbsv0D
