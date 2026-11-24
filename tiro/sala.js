@@ -62,7 +62,7 @@
       const now = Date.now();
       return {
         t: 'state', me: id, code: this.code, phase: this.phase, hostId: this.hostId, settings: this.settings,
-        players: this.list().map(p => ({ id: p.id, name: p.name, avatar: p.avatar, bot: !!p.bot, team: p.team, col: p.col, k: p.k, d: p.d, connected: !!p.bot || p.connected, voice: !!p.voice, prim: p.prim, skin: p.skin, gr: p.granadas | 0, mo: p.molotov | 0, ru: p.ruidos | 0 })),
+        players: this.list().map(p => ({ id: p.id, name: p.name, avatar: p.avatar, bot: !!p.bot, team: p.team, col: p.col, k: p.k, d: p.d, connected: !!p.bot || p.connected, voice: !!p.voice, prim: p.prim, skin: p.skin, gr: p.granadas | 0, mo: p.molotov | 0, ru: p.ruidos | 0, bq: p.botiq | 0, lim: !!p.res })),
         remaining: this.phase === 'play' ? Math.max(0, this.endAt - now) : 0, ola: this.ola ? { n: this.ola.n, quedan: this.ola.quedan + this.zVivos() } : null, score: this.score, ranking: this.ranking, winner: this.winner,
         maps: W.MAPA_IDS.map(k => [k, W.mapa(k).n]),
         camp: this.camp ? { n: this.camp.nivel, ab: (this.M.abiertas || []).slice() } : null,
@@ -135,6 +135,7 @@
       if ([3, 5, 8, 10, 15].includes(+s.time)) st.time = +s.time;
       if (SKILL[s.bots]) st.bots = s.bots;
       if (typeof s.fa === 'boolean') st.fa = s.fa;
+      if (['facil', 'normal', 'dificil'].includes(s.dif)) st.dif = s.dif;
       if (Number.isInteger(+s.nivel) && +s.nivel >= 0 && +s.nivel < 10) st.nivel = +s.nivel;
       this.broadcastState();
     }
@@ -144,7 +145,7 @@
       p.team = team; this.broadcastState();
     }
     setPrim(pid, w) {
-      const p = this.players.get(pid); if (!p || !A[w] || w === 'pistola') return;
+      const p = this.players.get(pid); if (!p || !A[w] || w === 'pistola' || w === 'cuchillo') return;
       p.prim = w; this.broadcastState();
     }
 
@@ -209,16 +210,17 @@
       p.hp = 100; p.alive = true; p.prot = Date.now() + 1800; p.lastHurt = 0; p.w = p.prim;
       p.granadas = 2; p.molotov = 1;   // para la supervivencia zombi
       p.ruidos = this.camp && this.camp.nivel >= 4 ? 2 : 0; p.usando = false;
+      if (this.camp) this.campKit(p); else { p.res = null; p.botiq = 0; }
       if (p.bot) { p.bot.s = { x: p.x, y: p.y, z: p.z, vx: 0, vy: 0, vz: 0, ground: true, crouch: false, slideT: 0 }; p.bot.ammo = A[p.w].mag; p.bot.relT = 0; p.bot.tgt = null; p.bot.goal = null; }
       if (!sinAviso) this.spawnMsg(p);
     }
-    spawnMsg(p) { this.all({ t: 'spawn', id: p.id, p: [r2(p.x), r2(p.y), r2(p.z)], ry: r2(p.ry), w: p.w }); }
+    spawnMsg(p) { this.all({ t: 'spawn', id: p.id, p: [r2(p.x), r2(p.y), r2(p.z)], ry: r2(p.ry), w: p.w, res: p.res || null }); }
 
     // ---------- tiros ----------
     fire(pid, m) {
       const p = this.players.get(pid);
       if (!p || !p.alive || this.phase !== 'play') return;
-      const w = A[m.w]; if (!w || (m.w !== p.prim && m.w !== 'pistola')) return;
+      const w = A[m.w]; if (!w || (m.w !== p.prim && m.w !== 'pistola' && !(m.w === 'cuchillo' && this.camp))) return;
       const now = Date.now();
       if (now - (p.lastFire[m.w] || 0) < w.cad * 0.6) return;
       p.lastFire[m.w] = now; p.w = m.w; p.prot = 0;
@@ -230,7 +232,7 @@
         if (!t || t === p || !t.alive) continue;
         if (!t.zombi && this.companero(p, t) && !this.settings.fa) continue;   // sin fuego amigo, entre compañeros no se lastiman
         const dist = Math.hypot(t.x - p.x, t.y - p.y, t.z - p.z);
-        if (dist > w.range + 6) continue;
+        if (dist > w.range + (w.melee ? 1.2 : 6)) continue;
         const d = dano.get(t) || { v: 0, head: false };
         d.v += this.calc(w, !!h[1], dist); d.head = d.head || !!h[1]; dano.set(t, d);
       }
@@ -306,7 +308,7 @@
       if (this.phase !== 'play') return;
       for (const p of this.players.values()) {
         if (!p.alive) { if (now >= p.respawnAt) this.respawn(p); continue; }
-        if (p.hp < 100 && now - p.lastHurt > 4500) p.hp = Math.min(100, p.hp + 22 * dt);
+        if (p.hp < 100 && now - p.lastHurt > 4500 && !(p.res && this.camp)) p.hp = Math.min(100, p.hp + 22 * dt);
         if (p.bot) this.botTick(p, dt, now);
       }
       if (this.ola) { this.olaTick(dt, now); for (const z of this.zombis.values()) this.zombiTick(z, dt, now); this.proyTick(dt, now); this.areasTick(dt, now); if (this.phase !== 'play') return; }
@@ -538,6 +540,7 @@
     matarZombi(z, a, w, head) {
       if (z.tipo === 'explosivo' && !z.exploto && this.camp) { this.zExplota(z); if (a && !a.zombi && !a.merc) { a.k++; a.streak++; } this.all({ t: 'kill', a: a ? a.id : null, v: z.id, w, h: !!head, s: a ? a.streak : 0 }); return; }
       z.alive = false; z.deadAt = Date.now(); z.estado = 2;
+      if (this.camp) this.campDrop(z);
       if (a && !a.zombi && !a.merc) { a.k++; a.streak++; }
       this.all({ t: 'kill', a: a ? a.id : null, v: z.id, w, h: !!head, s: a && a.streak ? a.streak : 0, msg: a && RACHA[a.streak] ? RACHA[a.streak] : null, vn: z.tipo === 'teju' ? 'Teju Jagua' : undefined });
       this.broadcastState();
@@ -653,6 +656,8 @@
         case 'prim': return this.setPrim(pid, m.w);
         case 'lanza': return this.tirar(p, m);
         case 'usar': p.usando = !!m.on; return;
+        case 'recarga': return this.camp && this.recargo(p, m);
+        case 'curar': return this.camp && this.curar(p);
         case 'skin': if (SKINS.includes(m.skin)) { p.skin = m.skin; this.broadcastState(); } return;
         case 'start': return this.start(pid);
         case 'lobby': return this.toLobby(pid);

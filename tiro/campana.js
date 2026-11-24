@@ -408,9 +408,10 @@
       const N = NIVELES[nivel];
       this.settings.map = N.mapa; W.reiniciarMapa(N.mapa);
       this.zombis.clear(); this.mercs = new Map(); this.proy = []; this.areas = []; this.ola = null;
-      this.camp = { nivel, fase: -1, estado: 'juego', gracia: Date.now() + 7000, zT: 2, refT: 0, ruido: 0, puntos: [], camion: null, puerta: null, jefe: null, hasta: 0, prog: 0, refN: 0 };
+      this.camp = { items: new Map(), iVer: 0, nivel, fase: -1, estado: 'juego', gracia: Date.now() + 7000, zT: 2, refT: 0, ruido: 0, puntos: [], camion: null, puerta: null, jefe: null, hasta: 0, prog: 0, refN: 0 };
       this.all({ t: 'cnivel', n: nivel });
       for (const p of this.players.values()) this.respawn(p, true);
+      this.campItems();
       this.campFase(0);
       this.broadcastState();
       for (const p of this.players.values()) this.spawnMsg(p);
@@ -496,6 +497,7 @@
       }
       for (const z of this.zombis.values()) this.zombiTick(z, dt, now);
       for (const m of this.mercs.values()) this.mercTick(m, dt, now);
+      this.itemsTick();
       this.proyTick(dt, now); this.areasTick(dt, now);
       if (this.phase !== 'play' || c.estado !== 'juego') return;
       if (c.camion) this.camionTick(dt, now);
@@ -771,6 +773,7 @@
     P.matarMerc = function (m, a, w, head) {
       if (!m.alive) return;
       m.alive = false; m.deadAt = Date.now(); m.estado = 2;
+      this.campDrop(m);
       if (a && !a.zombi && !a.merc && a.k != null) { a.k++; a.streak++; }
       this.all({ t: 'kill', a: a ? a.id : null, v: m.id, w: w === 'hack' ? 'hack' : w, h: !!head, s: a && a.streak ? a.streak : 0, vn: MT[m.tipo].n });
       if (m.tipo === 'comandante') this.sys('🎖️ ¡Cayó el comandante!');
@@ -891,6 +894,84 @@
       const c = this.camp; if (c && c.camion && Math.hypot(c.camion.x - x, c.camion.z - z) < r + 1.5) c.camion.hp -= max;
     };
 
+    // ---------- dificultad: mochila, botiquines y cosas tiradas en el suelo ----------
+    // fácil: como siempre (balas sin fin y la vida se cura sola)
+    // normal: balas contadas (hasta 3 cargadores de cada arma), granadas y molotov hasta 3, botiquines hasta 2;
+    //         la vida no se cura sola: hay que encontrar botiquines
+    // difícil: igual, pero con muy pocas cosas en el suelo; sin balas queda el cuchillo
+    const KIT = { normal: { prim: 1, pis: 1, gr: 1, mo: 0, bq: 1 }, dificil: { prim: 0, pis: 0, gr: 0, mo: 0, bq: 0 } };
+    const CANT = { normal: { balas: 13, botiquin: 5, granada: 4, molotov: 3 }, dificil: { balas: 6, botiquin: 2, granada: 1, molotov: 1 } };
+    const TIPOS_I = ['balas', 'botiquin', 'granada', 'molotov'];
+    P.difCamp = function () { return this.camp && this.settings.dif && this.settings.dif !== 'facil' ? this.settings.dif : null; };
+    P.campKit = function (p) {
+      const d = this.difCamp(); if (!d || p.bot) { p.res = null; p.botiq = 0; return; }
+      const k = KIT[d];
+      p.res = { [p.prim]: A[p.prim].mag * k.prim, pistola: A.pistola.mag * k.pis };
+      p.granadas = k.gr; p.molotov = k.mo; p.botiq = k.bq;
+    };
+    P.campItems = function () {
+      const c = this.camp, d = this.difCamp(), M = this.M; c.items = new Map(); c.iVer = (c.iVer || 0) + 1;
+      if (!d) return;
+      const N = NIVELES[c.nivel], cps = N.fases.map(f => f.cp);
+      for (const tipo of TIPOS_I) {
+        for (let i = 0; i < CANT[d][tipo]; i++) {
+          let p;
+          // la mitad cerca de los puntos de control (para poder seguir), el resto repartido
+          if (i % 2 === 0) { const cp = cps[(i / 2) % cps.length | 0]; const q = this.libreCerca(cp[0] + (Math.random() - 0.5) * 10, cp[1] + (Math.random() - 0.5) * 10); p = [q[0], 0, q[1]]; }
+          else p = W.puntoLibre(M);
+          this.nuevoItem(tipo, p[0], p[2]);
+        }
+      }
+    };
+    P.nuevoItem = function (tipo, x, z) {
+      const c = this.camp; if (!c.items) c.items = new Map();
+      const id = 'i' + (++this.pc); c.items.set(id, { id, tipo, x, y: W.piso(this.M, x, z, 1.5), z }); c.iVer = (c.iVer || 0) + 1;
+    };
+    // lo que dejan los enemigos al caer
+    P.campDrop = function (e) {
+      const d = this.difCamp(); if (!d) return;
+      const r = Math.random(), dif = d === 'dificil';
+      if (e.merc) {
+        if (e.tipo === 'torreta') return;
+        if (e.tipo === 'comandante') { this.nuevoItem('botiquin', e.x + 0.6, e.z); this.nuevoItem('balas', e.x - 0.6, e.z); return; }
+        if (r < (dif ? 0.35 : 0.6)) this.nuevoItem('balas', e.x, e.z);
+        else if (r < (dif ? 0.4 : 0.7)) this.nuevoItem(Math.random() < 0.5 ? 'granada' : 'botiquin', e.x, e.z);
+      } else if (e.tipo !== 'teju' && e.tipo !== 'explosivo') {
+        if (r < (dif ? 0.03 : 0.06)) this.nuevoItem('balas', e.x, e.z);
+        else if (r < (dif ? 0.04 : 0.085)) this.nuevoItem('botiquin', e.x, e.z);
+      }
+    };
+    P.itemsTick = function () {
+      const c = this.camp; if (!c.items || !c.items.size) return;
+      for (const p of this.players.values()) {
+        if (!p.alive || p.bot || !p.res) continue;
+        for (const it of c.items.values()) {
+          if (Math.hypot(it.x - p.x, it.z - p.z) > 1.4 || Math.abs(it.y - p.y) > 1.6) continue;
+          let ok = false;
+          if (it.tipo === 'balas') {
+            for (const w of [p.prim, 'pistola']) { const cap = A[w].mag * 3, v = p.res[w] | 0; if (v < cap) { p.res[w] = Math.min(cap, v + A[w].mag); ok = true; } }
+          } else if (it.tipo === 'botiquin') { if ((p.botiq | 0) < 2) { p.botiq = (p.botiq | 0) + 1; ok = true; } }
+          else if (it.tipo === 'granada') { if ((p.granadas | 0) < 3) { p.granadas++; ok = true; } }
+          else if (it.tipo === 'molotov') { if ((p.molotov | 0) < 3) { p.molotov++; ok = true; } }
+          if (!ok) continue;
+          c.items.delete(it.id); c.iVer++;
+          this.to(p.id, { t: 'item', tipo: it.tipo, res: p.res });
+          this.broadcastState();
+          break;
+        }
+      }
+    };
+    P.recargo = function (p, m) {
+      if (!p.res || !A[m.w] || m.w === 'cuchillo') return;
+      p.res[m.w] = Math.max(0, (p.res[m.w] | 0) - Math.max(0, Math.min(A[m.w].mag, m.n | 0)));
+    };
+    P.curar = function (p) {
+      if (!p.alive || !p.res || (p.botiq | 0) <= 0 || p.hp >= 100) return;
+      p.botiq--; p.hp = Math.min(100, p.hp + 60);
+      this.to(p.id, { t: 'curado', hp: Math.round(p.hp) });
+      this.broadcastState();
+    };
+
     // ---------- adónde van los bots compañeros ----------
     P.campMeta = function (p) {
       const c = this.camp, f = c.f; if (!f) return [p.x, p.z];
@@ -925,10 +1006,11 @@
         C: [c.nivel, c.fase, r2(c.prog || 0), c.puntos.map(p => p.ok && (f.tipo !== 'jefe' || now - p.ok < 8000) ? -1 : now < p.cd ? -2 : r2(p.prog / (f.tipo === 'escoltar' ? 3 : f.seg || 1))), f.seg ? Math.max(0, Math.ceil(f.seg - c.t)) : 0, c.estado === 'juego' ? 0 : c.estado === 'falla' ? 1 : c.estado === 'fin' ? 2 : 3,
           c.puerta ? Math.max(0, Math.round(c.puerta.hp / c.puerta.max * 100)) : -1, c.jefe ? Math.max(0, Math.round(c.jefe.hp / c.jefe.max * 100)) : -1, c.jefe && now < c.jefe.expHasta ? Math.ceil((c.jefe.expHasta - now) / 1000) : 0],
       };
+      if (c.items && (c.iEnv !== c.iVer || now - (c.iT || 0) > 2000)) { c.iEnv = c.iVer; c.iT = now; o.I = [...c.items.values()].map(it => [it.id, TIPOS_I.indexOf(it.tipo), r2(it.x), r2(it.y), r2(it.z)]); }
       if (c.camion) o.K = [r2(c.camion.x), r2(c.camion.z), r2(c.camion.ry), Math.max(0, Math.round(c.camion.hp / c.camion.max * 100)), c.camion.parado ? 1 : 0];
       return o;
     };
   }
 
-  G.TiroCampana = { NIVELES, MT, TIPOS_M, instalar };
+  G.TiroCampana = { NIVELES, MT, TIPOS_M, TIPOS_I: ['balas', 'botiquin', 'granada', 'molotov'], instalar };
 })(typeof window !== 'undefined' ? window : globalThis);

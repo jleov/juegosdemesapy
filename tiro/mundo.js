@@ -19,9 +19,10 @@
     escopeta: { n: 'Escopeta',      ico: '💥', dmg: 14, head: 1.5, cad: 750,  mag: 6,  rec: 2300, hip: 0.055, aim: 0.04,  auto: false, pel: 9, range: 34,  zoom: 1.2,  kick: 0.06 },
     franco:   { n: 'Francotirador', ico: '🎯', dmg: 85, head: 2,   cad: 1150, mag: 5,  rec: 2600, hip: 0.09,  aim: 0,     auto: false, pel: 1, range: 260, zoom: 4,    kick: 0.08 },
     subfusil: { n: 'Subfusil',      ico: '⚡', dmg: 14, head: 1.8, cad: 62,   mag: 24, rec: 1500, hip: 0.028, aim: 0.013, auto: true,  pel: 1, range: 70,  zoom: 1.25, kick: 0.007 },
+    cuchillo: { n: 'Cuchillo',      ico: '🔪', dmg: 50, head: 1.6, cad: 520,  mag: 1,  rec: 0,    hip: 0,     aim: 0,     auto: false, pel: 1, range: 2.4, zoom: 1,    kick: 0.5, melee: true },
     pistola:  { n: 'Pistola',       ico: '🔫', dmg: 26, head: 2,   cad: 230,  mag: 12, rec: 1300, hip: 0.012, aim: 0.005, auto: false, pel: 1, range: 90,  zoom: 1.3,  kick: 0.025 },
   };
-  const ARMA_IDS = ['fusil', 'escopeta', 'franco', 'pistola', 'subfusil'];
+  const ARMA_IDS = ['fusil', 'escopeta', 'franco', 'pistola', 'subfusil', 'cuchillo'];
 
   // ---------- objetos 3D de los mapas (modelos/props/*.glb) ----------
   // n: medida original del modelo (para mantener la forma), c: color si no carga,

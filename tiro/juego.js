@@ -365,7 +365,7 @@
     hazmat:    { base: 'hazmat' },
   };
   const MAIN = { soldado: 'Character_Main', enemigo: 'Enemy_Red', hazmat: 'Hazmat_Main' };
-  const ARMA_NODO = { fusil: 'AK', subfusil: 'SMG', escopeta: 'Shotgun', franco: 'Sniper', pistola: 'Pistol' };
+  const ARMA_NODO = { fusil: 'AK', subfusil: 'SMG', escopeta: 'Shotgun', franco: 'Sniper', pistola: 'Pistol', cuchillo: 'Knife_1' };
   const NODOS_ARMA = ['AK', 'SMG', 'Shotgun', 'Sniper', 'Sniper_2', 'Pistol', 'Revolver', 'Revolver_Small', 'GrenadeLauncher', 'ShortCannon', 'RocketLauncher', 'Shovel', 'Knife_1', 'Knife_2'];
   const GLB = {}; let modelosListos = false, cargando = null;
   J.cargarModelos = () => {
@@ -445,7 +445,7 @@
     u.mixer.update(dt);
   }
   // armas 3D en primera persona: se sacan del soldado en pose de disparo para que apunten hacia adelante
-  const LARGO = { fusil: 0.78, subfusil: 0.5, escopeta: 0.85, franco: 1.0, pistola: 0.3 };
+  const LARGO = { fusil: 0.78, subfusil: 0.5, escopeta: 0.85, franco: 1.0, pistola: 0.3, cuchillo: 0.34 };
   function armasVM() {
     const gl = GLB.soldado, m = T.SkeletonUtils.clone(gl.scene), mix = new T.AnimationMixer(m);
     const c = gl.animations.find(a => /(^|\|)Idle_Shoot$/.test(a.name));
@@ -754,6 +754,8 @@
     document.querySelectorAll('[data-b="granada"],[data-b="molotov"]').forEach(b => b.classList.toggle('hidden', !z));
     document.querySelectorAll('[data-b="ruido"]').forEach(b => b.classList.toggle('hidden', !ru));
     document.querySelectorAll('[data-b="usar"]').forEach(b => b.classList.toggle('hidden', !N));
+    document.querySelectorAll('[data-b="curar"]').forEach(b => b.classList.toggle('hidden', !(me && me.lim)));
+    if (z && me && me.lim) el.textContent += `   💊 ${me.bq | 0}`;
   }
   function limpiarTiros() {
     for (const p of proys.values()) scene.remove(p.g); proys.clear();
@@ -775,6 +777,7 @@
     g = new T.Group(); box(g, 0.06, 0.08, 0.6, 0, 0, -0.18, met); box(g, 0.03, 0.03, 0.4, 0, 0.01, -0.65, met2); box(g, 0.05, 0.05, 0.28, 0, 0.08, -0.15, met2); box(g, 0.07, 0.1, 0.22, 0, -0.02, 0.22, mad); mano(g); VM.franco = g;
     g = new T.Group(); box(g, 0.05, 0.06, 0.2, 0, 0.02, -0.12, met); box(g, 0.045, 0.12, 0.06, 0, -0.06, -0.04, met2); mano(g); VM.pistola = g;
     g = new T.Group(); box(g, 0.065, 0.1, 0.32, 0, 0, -0.08, met); box(g, 0.03, 0.03, 0.12, 0, 0.02, -0.3, met2); box(g, 0.04, 0.2, 0.05, 0, -0.14, -0.12, met2); box(g, 0.04, 0.1, 0.05, 0, -0.08, 0.03, met2); box(g, 0.03, 0.03, 0.2, 0, 0.01, 0.17, met2); box(g, 0.015, 0.035, 0.015, 0, 0.065, -0.2, met2); mano(g); VM.subfusil = g;
+    g = new T.Group(); box(g, 0.025, 0.05, 0.22, 0, 0.01, -0.2, met2); box(g, 0.035, 0.06, 0.13, 0, -0.01, -0.02, mad); mano(g); VM.cuchillo = g;
     for (const k in VM) { VM[k].visible = false; vmGrupo.add(VM[k]); }
     const fc = document.createElement('canvas'); fc.width = fc.height = 64; const fg = fc.getContext('2d');
     const gr = fg.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,220,1)'); gr.addColorStop(0.3, 'rgba(255,200,60,.9)'); gr.addColorStop(1, 'rgba(255,120,0,0)');
@@ -782,7 +785,7 @@
     fogon = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(fc), blending: T.AdditiveBlending, depthTest: false, transparent: true }));
     fogon.scale.set(0.22, 0.22, 1); fogon.visible = false; vmGrupo.add(fogon);
   }
-  const PUNTA = { fusil: -0.62, escopeta: -0.5, franco: -0.88, pistola: -0.24, subfusil: -0.37 };
+  const PUNTA = { fusil: -0.62, escopeta: -0.5, franco: -0.88, pistola: -0.24, subfusil: -0.37, cuchillo: -0.3 };
 
   // ================= rastros de bala y polvito =================
   const efectos = [];
@@ -881,6 +884,7 @@
     try {
       const t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
       src.buffer = ruido();
+      if (w === 'cuchillo') { raspa(0, 0.12, 4000, 1500, 0.18 * vol); return; }
       const cfg = { fusil: [1400, 0.12], escopeta: [700, 0.28], franco: [900, 0.45], pistola: [2000, 0.1], subfusil: [2400, 0.07] }[w] || [1200, 0.15];
       f.type = 'lowpass'; f.frequency.setValueAtTime(cfg[0] * 2, t); f.frequency.exponentialRampToValueAtTime(cfg[0] / 3, t + cfg[1]);
       g.gain.setValueAtTime(0.5 * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + cfg[1]);
@@ -1073,6 +1077,7 @@
           yo.aparecio = { x: m.p[0], y: m.p[1], z: m.p[2] }; yo.bueno = null;
           yo.ry = m.ry; yo.rx = 0; yo.alive = true; yo.hp = 100; yo.reloadT = 0; yo.w = yo.prim; yo.kick = 0; yo.bloom = 0;
           yo.ammo = { [yo.prim]: A[yo.prim].mag, pistola: A.pistola.mag };
+          yo.res = m.res ? Object.assign({}, m.res) : null;
           $('#muerte').classList.add('hidden'); SFX.aparece(); armaHUD();
           // si no volvió a agarrar el mouse mientras estaba muerto, se le pide un clic
           if (!tactil() && !C.obs() && document.pointerLockElement !== ren.domElement && !chatAbierto()) pausa(true);
@@ -1089,6 +1094,8 @@
         break;
       }
       case 'kill': feedKill(m); break;
+      case 'item': { if (m.res) yo.res = Object.assign({}, m.res); const t = { balas: ['📦 +1 cargador', 'para cada arma'], botiquin: ['💊 Botiquín guardado', 'Usalo con H (o 💊)'], granada: ['💣 +1 granada', ''], molotov: ['🔥 +1 molotov', ''] }[m.tipo] || ['+1', '']; aviso(t[0], t[1]); metal(0, 0.08, 1800, 900, 0.15, 3); tono(880, 0.05, 0.08, 'triangle', 0.08); armaHUD(); break; }
+      case 'curado': yo.hp = m.hp; aviso('💊 +60 de vida', ''); tono(660, 0, 0.12, 'sine', 0.1); tono(990, 0.1, 0.2, 'sine', 0.1); break;
       case 'cnivel': case 'cfase': case 'cfin': case 'cfalla': case 'cpunto': case 'abrir': case 'jefe': case 'final': J.campMsg(m); break;
       case 'ola': if (m.n) { aviso('🧟 ¡Oleada ' + m.n + '!', 'Vienen zombis...'); SFX.aparece(); } else if (m.fin) aviso('✅ ¡Pasaron la oleada ' + m.fin + '!', 'Respiren: la próxima en 8 segundos'); break;
       case 'boom': boom(m); break;
@@ -1195,6 +1202,7 @@
       if (k === 'KeyF' && noche) J.linterna();
       if (k === 'KeyG') lanzar('granada');
       if (k === 'KeyB') lanzar('ruido');
+      if (k === 'KeyH') J.curar();
       if (k === 'KeyE') usar(true);
       if (k === 'KeyV') lanzar('molotov');
       if (k === 'Digit1') ponerArma(yo.prim); if (k === 'Digit2') ponerArma('pistola'); if (k === 'KeyQ') cambiar();
@@ -1249,6 +1257,7 @@
           else if (b === 'luz') { if (noche) J.linterna(); }
           else if (b === 'granada' || b === 'molotov' || b === 'ruido') lanzar(b);
           else if (b === 'usar') usar(true);
+          else if (b === 'curar') J.curar();
           continue;
         }
         if (C.obs()) { mira++; continue; }
@@ -1289,14 +1298,15 @@
 
   // ================= armas =================
   function ponerArma(w) {
-    if (!yo.alive || yo.w === w || (w !== yo.prim && w !== 'pistola')) return;
+    if (!yo.alive || yo.w === w || (w !== yo.prim && w !== 'pistola' && !(w === 'cuchillo' && esCamp()))) return;
     yo.w = w; yo.reloadT = 0; yo.nextFire = Math.max(yo.nextFire, performance.now() + 280); yo.cambioT = 0.28;
     if (yo.ammo[w] == null) yo.ammo[w] = A[w].mag;
     armaHUD();
   }
-  function cambiar() { ponerArma(yo.w === 'pistola' ? yo.prim : 'pistola'); }
+  function cambiar() { if (esCamp()) ponerArma(yo.w === yo.prim ? 'pistola' : yo.w === 'pistola' ? 'cuchillo' : yo.prim); else ponerArma(yo.w === 'pistola' ? yo.prim : 'pistola'); }
   function recargar() {
-    const w = A[yo.w]; if (!yo.alive || yo.reloadT > 0 || yo.ammo[yo.w] >= w.mag) return;
+    const w = A[yo.w]; if (!yo.alive || yo.reloadT > 0 || w.melee || yo.ammo[yo.w] >= w.mag) return;
+    if (yo.res && (yo.res[yo.w] | 0) <= 0) { SFX.vacio(); if (!yo.avisoBal || performance.now() - yo.avisoBal > 3000) { yo.avisoBal = performance.now(); aviso('🎒 Sin cargadores de ' + w.n, 'Buscá cajas de balas en el suelo'); } return; }
     yo.reloadT = yo.reloadOf = w.rec / 1000;
     const r = RECARGA[yo.w]; if (r) r(w.mag - (yo.ammo[yo.w] | 0)); else SFX.recarga();
   }
@@ -1304,8 +1314,12 @@
     const w = A[yo.w];
     if (yo.reloadT > 0 || now < yo.nextFire) return;
     if (!w.auto && yo.latch) return;
-    if ((yo.ammo[yo.w] | 0) <= 0) { SFX.vacio(); yo.latch = true; recargar(); return; }
-    yo.latch = true; yo.nextFire = now + w.cad; yo.ammo[yo.w]--;
+    if (!w.melee && (yo.ammo[yo.w] | 0) <= 0) {
+      SFX.vacio(); yo.latch = true;
+      if (yo.res && (yo.res[yo.w] | 0) <= 0) { const otra = yo.w === yo.prim ? 'pistola' : yo.prim; if ((yo.ammo[otra] | 0) > 0 || (yo.res[otra] | 0) > 0) ponerArma(otra); else { ponerArma('cuchillo'); aviso('🔪 ¡Sin balas!', 'A cuchillo hasta encontrar munición'); } return; }
+      recargar(); return;
+    }
+    yo.latch = true; yo.nextFire = now + w.cad; if (!w.melee) yo.ammo[yo.w]--;
     const s = yo.s, mov = Math.hypot(s.vx, s.vz) > 1, apunta = yo.aimK > 0.8;
     let sp = (apunta ? w.aim : w.hip) * (mov ? 1.5 : 1) * (s.ground ? 1 : 2.2) + yo.bloom;
     if (s.crouch && s.slideT <= 0) sp *= 0.75;
@@ -1325,16 +1339,16 @@
       if (h) { hits.push([h.id, h.head ? 1 : 0]); polvo(e, h.id[0] === 'z' && zombis.get(h.id) && zombis.get(h.id).tipo === 'teju' && !(campC && campC[8] > 0) ? '#cfd6dc' : '#c0392b'); } else if (t < w.range) polvo(e, '#cfc6b0');
       // el rastro sale un poco abajo a la derecha (del caño)
       const right = [Math.cos(yo.ry), 0, -Math.sin(yo.ry)], k = apunta ? 0 : 0.18;
-      trazo([o[0] + right[0] * k + d0[0] * 0.6, o[1] - (apunta ? 0.06 : 0.14) + d0[1] * 0.6, o[2] + right[2] * k + d0[2] * 0.6], e);
+      if (!w.melee) trazo([o[0] + right[0] * k + d0[0] * 0.6, o[1] - (apunta ? 0.06 : 0.14) + d0[1] * 0.6, o[2] + right[2] * k + d0[2] * 0.6], e);
     }
     C.send({ t: 'fire', w: yo.w, o: o.map(v => Math.round(v * 100) / 100), e: ends, hits });
     tiroSnd(yo.w, 0.8);
     yo.kick = Math.min(0.5, yo.kick + w.kick * (apunta ? 0.6 : 1));
-    yo.rx = Math.min(1.5, yo.rx + w.kick * (apunta ? 0.45 : 0.7)); yo.ry += (Math.random() - 0.5) * w.kick * 0.4;
+    if (!w.melee) { yo.rx = Math.min(1.5, yo.rx + w.kick * (apunta ? 0.45 : 0.7)); yo.ry += (Math.random() - 0.5) * w.kick * 0.4; }
     if (w.auto) yo.bloom = Math.min(0.05, yo.bloom + 0.004);
-    fogon.visible = true; fogon.t = 0.05; if (luz.destello) luz.destello.intensity = noche ? 3 : 1.2;
+    if (!w.melee) fogon.visible = true; fogon.t = 0.05; if (luz.destello && !w.melee) luz.destello.intensity = noche ? 3 : 1.2;
     if (yo.ammo[yo.w] > 0) { if (yo.w === 'escopeta') chikChak(0.32); else if (yo.w === 'franco') cerrojo(0.42); }
-    if (yo.ammo[yo.w] <= 0) setTimeout(recargar, 120);
+    if (yo.ammo[yo.w] <= 0 && !w.melee) setTimeout(recargar, 120);
     armaHUD();
   }
 
@@ -1448,7 +1462,7 @@
     yo.aimK += ((aim ? 1 : 0) - yo.aimK) * Math.min(1, dt * 14);
     yo.bloom = Math.max(0, yo.bloom - dt * 0.06);
     // armas
-    if (yo.reloadT > 0) { yo.reloadT -= dt; if (yo.reloadT <= 0) { yo.ammo[yo.w] = w.mag; armaHUD(); } }
+    if (yo.reloadT > 0) { yo.reloadT -= dt; if (yo.reloadT <= 0) { if (yo.res) { const n = Math.min(w.mag - (yo.ammo[yo.w] | 0), yo.res[yo.w] | 0); yo.ammo[yo.w] = (yo.ammo[yo.w] | 0) + n; yo.res[yo.w] = (yo.res[yo.w] | 0) - n; C.send({ t: 'recarga', w: yo.w, n }); } else yo.ammo[yo.w] = w.mag; armaHUD(); } }
     if (yo.cambioT > 0) yo.cambioT -= dt;
     if (inp.fire) disparar(now);
     // avisar a la sala 20 veces por segundo
@@ -1509,7 +1523,7 @@
   function armaHUD() {
     const w = A[yo.w];
     $('#aNom').textContent = `${w.ico} ${w.n}`;
-    $('#aBal').innerHTML = `<b>${yo.ammo[yo.w] ?? w.mag}</b> / ${w.mag}`;
+    $('#aBal').innerHTML = w.melee ? '<b>∞</b>' : `<b>${yo.ammo[yo.w] ?? w.mag}</b> / ${yo.res ? (yo.res[yo.w] | 0) + ' 🎒' : w.mag}`;
   }
   function hud(dt) {
     const v = Math.max(0, Math.round(yo.hp));
@@ -1725,6 +1739,29 @@
   }
   function usar(on) { if (on === usarOn) return; usarOn = on; C.send({ t: 'usar', on }); }
   J.usar = usar;
+  J.curar = () => { const S = C.S(), me = S && S.players.find(p => p.id === C.me()); if (!me || !me.lim || !yo.alive) return; if ((me.bq | 0) <= 0) { aviso('💊 No tenés botiquines', 'Buscalos en el suelo'); return; } if (yo.hp >= 100) { aviso('💊 Tenés la vida llena', ''); return; } C.send({ t: 'curar' }); };
+  // ---------- cosas tiradas en el suelo (dificultad normal y difícil) ----------
+  const items = new Map(); let itemGeo = null;
+  function itemNuevo(tipo) {
+    if (!itemGeo) {
+      const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+      g.fillStyle = '#f4f4f4'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#d62828'; g.fillRect(24, 10, 16, 44); g.fillRect(10, 24, 44, 16);
+      itemGeo = { cruz: new T.MeshPhongMaterial({ map: new T.CanvasTexture(c) }), caja: new T.MeshPhongMaterial({ color: '#4a5a2a' }), fr: new T.MeshPhongMaterial({ color: '#e0b020' }) };
+    }
+    const g = new T.Group();
+    if (tipo === 'balas') { const b = new T.Mesh(new T.BoxGeometry(0.55, 0.3, 0.32), itemGeo.caja); b.position.y = 0.15; g.add(b); const f = new T.Mesh(new T.BoxGeometry(0.56, 0.06, 0.33), itemGeo.fr); f.position.y = 0.2; g.add(f); }
+    else if (tipo === 'botiquin') { const b = new T.Mesh(new T.BoxGeometry(0.5, 0.32, 0.36), itemGeo.cruz); b.position.y = 0.16; g.add(b); }
+    else { const p = proyNuevo(tipo); scene.remove(p); p.scale.setScalar(1.6); p.position.y = 0.2; g.add(p); }
+    const brillo2 = new T.Sprite(new T.SpriteMaterial({ map: brillo(tipo === 'botiquin' ? '#ff6a6a' : tipo === 'balas' ? '#ffe070' : '#ffb040'), blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 }));
+    brillo2.scale.set(1.3, 1.3, 1); brillo2.position.y = 0.25; g.add(brillo2);
+    scene.add(g); return g;
+  }
+  function itemsSnap(L) {
+    const vistos = new Set(), TI = CAMP().TIPOS_I;
+    for (const [id, ti, x, y, z] of L) { vistos.add(id); if (!items.has(id)) { const g = itemNuevo(TI[ti]); g.position.set(x, y, z); items.set(id, { g, y }); } }
+    for (const [id, it] of items) if (!vistos.has(id)) { scene.remove(it.g); items.delete(id); }
+  }
+  function itemsTick() { const t = performance.now() / 1000; for (const it of items.values()) { it.g.rotation.y = t * 1.5; it.g.position.y = it.y + 0.08 + Math.sin(t * 2.5) * 0.06; } }
   // ---------- sonidos de la campaña ----------
   function rugido(vol) {
     if (!soundOn || !actx) return;
@@ -1837,7 +1874,7 @@
   }
   function campLimpiar() {
     for (const r of mercs.values()) { scene.remove(r.g); if (r.laser) scene.remove(r.laser); } mercs.clear();
-    if (camion) { scene.remove(camion.g); camion = null; } campC = null; campK = null; abriendo.length = 0;
+    if (camion) { scene.remove(camion.g); camion = null; } for (const it of items.values()) scene.remove(it.g); items.clear(); campC = null; campK = null; abriendo.length = 0;
     if (cine) { cine = null; document.body.classList.remove('cine'); $('#cine').classList.add('hidden'); }
     $('#obj').classList.add('hidden'); $('#jefeBar').classList.add('hidden'); $('#usar').classList.add('hidden'); $('#marcas').innerHTML = '';
     usar(false);
@@ -1873,7 +1910,7 @@
       case 'final': J.final(); break;
     }
   };
-  J.campSnap = m => { if (m.M) mercsSnap(m.M); else if (mercs.size) mercsSnap([]); if (m.C) { campC = m.C; campHUD(); } campK = m.K || null; };
+  J.campSnap = m => { if (m.I) itemsSnap(m.I); if (m.M) mercsSnap(m.M); else if (mercs.size) mercsSnap([]); if (m.C) { campC = m.C; campHUD(); } campK = m.K || null; };
   J.campAbiertas = S => {
     if (!S.camp || !S.camp.ab || !mapaId) return;
     const M = W.mapa(mapaId);
@@ -1881,7 +1918,7 @@
   };
   function campTick(dt, rt) {
     if (mercs.size) mercsTick(dt, rt);
-    camionTick(dt); abriendoTick(dt);
+    camionTick(dt); abriendoTick(dt); if (items.size) itemsTick();
     if (esCamp()) { marcasTick(); usarTick(); ambienteTick(dt); }
   }
 

@@ -135,7 +135,7 @@ input:focus,select:focus{border-color:var(--azul2)}
 #usar div{height:6px;border-radius:3px;background:rgba(255,255,255,.2);margin-top:5px;overflow:hidden}#usar i{display:block;height:100%;width:0;background:#2ecc71}
 #hitm.bl{filter:grayscale(1) brightness(2)}
 .tb[data-b=usar]{right:236px;bottom:24px;width:60px;height:60px;font-size:26px}.tb[data-b=usar].lista{background:rgba(46,204,113,.65);box-shadow:0 0 14px #2ecc71}
-.tb[data-b=ruido]{right:200px;bottom:238px}
+.tb[data-b=ruido]{right:200px;bottom:238px}.tb[data-b=curar]{left:24px;top:calc(max(8px,env(safe-area-inset-top)) + 150px);width:48px;height:48px}
 #brief .card{max-width:600px;width:100%;text-align:left;max-height:88vh;overflow:auto}
 #brief .nv{font-size:12px;letter-spacing:3px;color:#ffc83d;font-weight:800}#brief h2{margin:2px 0 2px;font-size:1.6em}
 #brief .lugar{color:var(--mut);margin-bottom:8px}#brief p{line-height:1.45;margin:6px 0}#brief .enem{background:#2a1418;border-radius:8px;padding:6px 10px;margin:8px 0;font-weight:700}
@@ -293,6 +293,7 @@ body.tactil #chatF{bottom:auto;top:30%}
         <div class="sets">
           <label>Modo<select id="sMode"><option value="ffa">🎯 Todos contra todos</option><option value="equipos">🔴🔵 Albirroja contra Azules</option><option value="zombis">🧟 Supervivencia zombi</option><option value="campana">🎖️ Campaña: Operación Yvy (4 jugadores)</option></select></label>
           <label id="lNivel" class="hidden">Nivel<select id="sNivel"></select></label>
+          <label id="lDif" class="hidden">Dificultad<select id="sDif"><option value="facil">🙂 Fácil (balas sin fin, la vida se cura sola)</option><option value="normal">😐 Normal (mochila, balas y botiquines en el suelo)</option><option value="dificil">😈 Difícil (casi nada en el suelo, a cuchillo)</option></select></label>
           <label>Mapa<select id="sMap"></select></label>
           <label id="lGoal">Gana con<select id="sGoal"></select></label>
           <label id="lTime">Tiempo<select id="sTime"></select></label>
@@ -347,7 +348,7 @@ body.tactil #chatF{bottom:auto;top:30%}
     <div id="palanca"><div id="bolita"></div></div>
     <div class="tb" data-b="fire">🔫</div><div class="tb" data-b="aim">🎯</div><div class="tb" data-b="jump">⬆️</div>
     <div class="tb" data-b="crouch">⬇️</div><div class="tb" data-b="reload">🔄</div><div class="tb" data-b="swap">🔁</div>
-    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div><div class="tb" data-b="luz">🔦</div><div class="tb" data-b="granada">💣</div><div class="tb" data-b="molotov">🔥</div><div class="tb hidden" data-b="ruido">📢</div><div class="tb hidden" data-b="usar">✋</div>
+    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div><div class="tb" data-b="luz">🔦</div><div class="tb" data-b="granada">💣</div><div class="tb" data-b="molotov">🔥</div><div class="tb hidden" data-b="ruido">📢</div><div class="tb hidden" data-b="usar">✋</div><div class="tb hidden" data-b="curar">💊</div>
   </div>
   <div id="editCtrl"></div>
   <div id="ePanel">
@@ -391,10 +392,10 @@ body.tactil #chatF{bottom:auto;top:30%}
 </div>
 <div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br><span id="rotateTxt">para jugar</span><small id="rotateSub">La partida sigue: ¡apurate!</small></p></div>
 
-<script src="mundo.js?v=19"></script>
-<script src="campana.js?v=19"></script>
-<script src="sala.js?v=19"></script>
-<script src="juego.js?v=19"></script>
+<script src="mundo.js?v=20"></script>
+<script src="campana.js?v=20"></script>
+<script src="sala.js?v=20"></script>
+<script src="juego.js?v=20"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -627,7 +628,7 @@ function onMsg(m) {
       break;
     case 'state': setState(m); break;
     case 'chat': addMsg(m); if (Juego.activo()) Juego.chat(m); break;
-    case 'snap': case 'spawn': case 'fx': case 'kill': case 'hurt': case 'hitm': case 'ola': case 'muerde': case 'boom': case 'area': case 'escupe': case 'tira': case 'cnivel': case 'cfase': case 'cfin': case 'cfalla': case 'cpunto': case 'abrir': case 'jefe': case 'final': if (Juego.activo()) Juego.msg(m); break;
+    case 'snap': case 'spawn': case 'fx': case 'kill': case 'hurt': case 'hitm': case 'ola': case 'muerde': case 'boom': case 'area': case 'escupe': case 'tira': case 'cnivel': case 'cfase': case 'cfin': case 'cfalla': case 'cpunto': case 'abrir': case 'jefe': case 'final': case 'item': case 'curado': if (Juego.activo()) Juego.msg(m); break;
     case 'sfx': Juego.sfx(m.name); break;
     case 'rtc': onRtc(m.from, m.data); break;
     case 'err': toast(m.msg); if (m.expired) { sess.set('tg_session', null); goHome(true); } break;
@@ -686,7 +687,7 @@ function renderLobby() {
   $('#sBots').value = st.bots;
   const zomb = st.mode === 'zombis';
   const camp = st.mode === 'campana';
-  $('#lGoal').classList.toggle('hidden', zomb || camp); $('#lTime').classList.toggle('hidden', zomb || camp); $('#lNivel').classList.toggle('hidden', !camp);
+  $('#lGoal').classList.toggle('hidden', zomb || camp); $('#lTime').classList.toggle('hidden', zomb || camp); $('#lNivel').classList.toggle('hidden', !camp); $('#lDif').classList.toggle('hidden', !camp); $('#sDif').value = st.dif || 'facil';
   if (camp && window.TiroCampana) {
     const NV = TiroCampana.NIVELES;
     fillSelect($('#sNivel'), NV.map((n, i) => [i, n.id + '. ' + n.n + ' — ' + n.lugar]), st.nivel || 0);
@@ -697,14 +698,14 @@ function renderLobby() {
   } else if ($('#campInfo')) $('#campInfo').classList.add('hidden');
   $('#sFa').value = st.fa ? '1' : '0'; $('#lFa').classList.toggle('hidden', st.mode === 'ffa');
   $('#startBtn').textContent = camp ? '🎖️ ¡Arranca la Operación Yvy!' : zomb ? '🧟 ¡Que vengan los zombis!' : '🔫 ¡Empezar!';
-  ['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa', '#sNivel', '#addBotBtn', '#startBtn'].forEach(q => $(q).disabled = !host);
+  ['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa', '#sNivel', '#sDif', '#addBotBtn', '#startBtn'].forEach(q => $(q).disabled = !host);
   $('#sMap').closest('label').classList.toggle('hidden', camp);
   $('#hostOnly').textContent = host ? '' : '(la elige el anfitrión)';
   $('#waitNote').textContent = zomb && !amObs ? '🧟 Todos juntos (y los bots de compañeros) contra oleadas de zombis cada vez más fuertes. Si caés, volvés en la próxima oleada.' : amObs ? '👀 Estás mirando la sala: no jugás, pero ves todo.' : host ? (s.players.length < 2 ? 'Esperando jugadores... o agregá bots 🤖' : '') : 'Esperando que el anfitrión empiece...';
   $('#armasL').parentNode.classList.toggle('hidden', amObs);
 }
-const sendSettings = () => send({ t: 'settings', s: { mode: $('#sMode').value, map: $('#sMap').value, goal: +$('#sGoal').value, time: +$('#sTime').value, bots: $('#sBots').value, fa: $('#sFa').value === '1', nivel: +($('#sNivel').value || 0) } });
-['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa', '#sNivel'].forEach(q => $(q).onchange = sendSettings);
+const sendSettings = () => send({ t: 'settings', s: { mode: $('#sMode').value, map: $('#sMap').value, goal: +$('#sGoal').value, time: +$('#sTime').value, bots: $('#sBots').value, fa: $('#sFa').value === '1', nivel: +($('#sNivel').value || 0), dif: $('#sDif').value } });
+['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa', '#sNivel', '#sDif'].forEach(q => $(q).onchange = sendSettings);
 $('#addBotBtn').onclick = () => send({ t: 'addBot' });
 $('#startBtn').onclick = () => { Juego.audio(); horizontal(); send({ t: 'start' }); };
 $('#leaveBtnL').onclick = () => goHome();
@@ -732,8 +733,8 @@ document.addEventListener('pointerdown', () => { if (tactil && document.body.cla
 // ---------- controles del celular: cada uno los acomoda a su manera (se guarda en el aparato) ----------
 // [lado l/r, distancia a ese borde, arriba t / abajo b, distancia, tamaño]
 const CT_DEF = { fire: ['r', 28, 'b', 110, 84], aim: ['r', 126, 'b', 150, 54], jump: ['r', 30, 'b', 24, 54], crouch: ['r', 96, 'b', 24, 54], reload: ['r', 126, 'b', 84, 54], swap: ['r', 162, 'b', 24, 54],
-  granada: ['r', 200, 'b', 110, 54], molotov: ['r', 200, 'b', 174, 54], ruido: ['r', 200, 'b', 238, 54], usar: ['r', 236, 'b', 24, 60], tabla: ['r', 14, 't', 60, 40], chat: ['r', 60, 't', 60, 40], luz: ['r', 106, 't', 60, 40], palanca: ['l', 40, 'b', 60, 110] };
-const CT_NOM = { fire: '🔫 disparar', aim: '🎯 apuntar', jump: '⬆️ saltar', crouch: '⬇️ agacharse', reload: '🔄 recargar', swap: '🔁 cambiar arma', granada: '💣 granada', molotov: '🔥 molotov', ruido: '📢 granada de ruido', usar: '✋ usar / activar', tabla: '📋 tabla', chat: '💬 chat', luz: '🔦 linterna', palanca: '🕹️ la palanca' };
+  granada: ['r', 200, 'b', 110, 54], molotov: ['r', 200, 'b', 174, 54], ruido: ['r', 200, 'b', 238, 54], usar: ['r', 236, 'b', 24, 60], curar: ['l', 24, 't', 150, 48], tabla: ['r', 14, 't', 60, 40], chat: ['r', 60, 't', 60, 40], luz: ['r', 106, 't', 60, 40], palanca: ['l', 40, 'b', 60, 110] };
+const CT_NOM = { fire: '🔫 disparar', aim: '🎯 apuntar', jump: '⬆️ saltar', crouch: '⬇️ agacharse', reload: '🔄 recargar', swap: '🔁 cambiar arma', granada: '💣 granada', molotov: '🔥 molotov', ruido: '📢 granada de ruido', usar: '✋ usar / activar', curar: '💊 botiquín', tabla: '📋 tabla', chat: '💬 chat', luz: '🔦 linterna', palanca: '🕹️ la palanca' };
 let CT = {}; try { CT = JSON.parse(localStorage.getItem('tiro_ctrl') || '{}') || {}; } catch (e) {}
 const ctEl = id => id === 'palanca' ? $('#palanca') : document.querySelector('#tctl [data-b="' + id + '"]');
 function ctAplicar() {
