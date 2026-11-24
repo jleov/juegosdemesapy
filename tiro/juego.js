@@ -1021,7 +1021,7 @@
     if (!yo.s) yo.s = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, ground: true, crouch: false, slideT: 0 };
     $('#hud').classList.toggle('obs', obs);
     $('#tctl').classList.toggle('hidden', !tactil() || obs);
-    if (S.settings.mode === 'campana') ['torreta', 'escudo', 'blindado', 'palmera'].forEach(cargarProp);
+    if (S.settings.mode === 'campana') ['torreta', 'escudo', 'blindado', 'palmera', 'helicoptero', 'jeep', 'locomotora', 'colectivo', 'camion_militar', 'humvee'].forEach(cargarProp);
     if (S.settings.mode === 'campana' && S.camp && !activo) setTimeout(() => briefing(S.camp.n), 300);
     if (!activo) { activo = true; last = performance.now(); raf = requestAnimationFrame(loop); }
     if (!obs && !tactil() && !yo.alive) { /* espera el spawn */ }
@@ -1952,6 +1952,7 @@
     SFX.fin();
   };
   function cineTick(dt) {
+    if (cine.escape) return escapeTick(dt);
     cine.t += dt;
     const a = -0.9 + cine.t * 0.045, R = 6.5 - Math.min(2, cine.t * 0.06);
     cam.position.set(Math.sin(a) * R, 1.7 + Math.sin(cine.t * 0.2) * 0.15, Math.cos(a) * R - 3); cam.lookAt(0, 1.1, -3);
@@ -1960,10 +1961,92 @@
     if (cine.guampa) cine.guampa.position.y = 1.15 + Math.sin(cine.t * 1.3) * 0.05;
     ren.clear(); ren.render(cine.sc, cam);
   }
+  // ---------- al terminar cada nivel: el escuadrón se escapa del lugar ----------
+  // vehículo de cada nivel: [modelo, cómo se va, medidas]
+  const ESCAPE = {
+    1: ['helicoptero', 'sube', { w: 9, h: 3.2, d: 10 }, 'El helicóptero de rescate los saca del Mercado 4...'],
+    2: ['jeep', 'auto', { h: 2.3 }, 'Se escapan por la Costanera en un jeep abandonado...'],
+    3: ['locomotora', 'auto', { w: 10.4, h: 2.7, d: 2.4 }, 'Suben al tren de carga y dejan Areguá entre la neblina...'],
+    4: ['colectivo', 'auto', { w: 2.9, h: 3.1, d: 9.5 }, 'Evacúan a la gente de la Basílica en un colectivo...'],
+    5: ['camion_militar', 'auto', { h: 2.8 }, 'Se llevan las muestras en el camión de la corporación...'],
+    6: ['jeep', 'auto', { h: 2.3 }, 'Salen de la represa a oscuras, en un jeep de mantenimiento...'],
+    7: ['humvee', 'auto', { h: 2 }, 'Encuentran un vehículo enemigo y dejan atrás la selva...'],
+    8: ['humvee', 'auto', { h: 2 }, 'Con los datos, se van de las ruinas rumbo al Chaco...'],
+    9: ['blindado', 'auto', { h: 2.9 }, 'El camión blindado llega a la entrada del búnker...'],
+  };
+  J.finNivel = n => {
+    const c = CAMP(), N = c.NIVELES[n], S = C.S(), V = ESCAPE[N && N.id];
+    if (!N || !V || !scene || !mapaId) return finNivel(n);
+    if (cine) campLimpiar();
+    const f = N.fases[N.fases.length - 1], ex = (f.zona ? [f.zona[0], f.zona[1]] : f.cp).slice();
+    if (N.id === 9 && campK) { ex[0] = campK[0]; ex[1] = campK[1]; }
+    let dx = ex[0], dz = ex[1]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+    if (N.id === 3) { dx = 1; dz = 0; } if (N.id === 9) { dx = 0; dz = -1; }
+    const grupo = new T.Group(); scene.add(grupo);
+    // el vehículo, mirando hacia donde se va
+    const veh = new T.Group(), gl = GLBP[V[0]];
+    if (gl) {
+      const m = gl.scene.clone(true), cj = gl.caja, sz = cj.getSize(new T.Vector3()), ce = cj.getCenter(new T.Vector3());
+      const sp = V[2], P = W.PROPS[V[0]], k = sp.h / sz.y;
+      const sx = sp.w ? sp.w / sz.x : k, sz2 = sp.d ? sp.d / sz.z : k;
+      const hold = new T.Group(); hold.add(m); hold.scale.set(sx, k, sz2); hold.position.set(-ce.x * sx, -cj.min.y * k, -ce.z * sz2);
+      const largoX = sz.x * sx > sz.z * sz2;
+      const piv = new T.Group(); piv.add(hold); piv.rotation.y = largoX ? Math.atan2(-dz, dx) : Math.atan2(dx, dz); veh.add(piv);
+    } else { const b = new T.Mesh(cajaGeo(2.6, 2.4, 5), matCaja(13)); b.position.y = 1.2; b.rotation.y = Math.atan2(dx, dz); veh.add(b); }
+    veh.position.set(ex[0], 0, ex[1]); grupo.add(veh);
+    if (N.id === 1) veh.position.y = 0.2;
+    // el escuadrón camina hasta el vehículo y sube
+    const gente = S.players.filter(p => !p.bot).concat(S.players.filter(p => p.bot)).slice(0, 4), rs = [];
+    gente.forEach((p, i) => {
+      const g = muneco(p, 'campana'); scene.remove(g); grupo.add(g);
+      const lado = (i - 1.5) * 1.3, px = ex[0] - dx * 9 - dz * lado, pz = ex[1] - dz * 9 + dx * lado;
+      g.position.set(px, W.piso(W.mapa(mapaId), px, pz, 1), pz); g.rotation.y = Math.atan2(-dx, -dz) + Math.PI;
+      if (g.userData.nom) g.userData.nom.visible = false; if (g.userData.haz) g.userData.haz.visible = noche;
+      rs.push({ g, w: 0, alive: true, crouch: false, tiroT: 0, velS: 3, desde: g.position.clone() });
+    });
+    for (const r of remotos.values()) r.g.visible = false;
+    // cámara: de costado, un poco arriba
+    const cx = ex[0] - dx * 12 + dz * 10, cz = ex[1] - dz * 12 - dx * 10;
+    cine = { escape: true, t: 0, t0: performance.now(), grupo, veh, rs, dir: [dx, dz], tipo: V[1], cam: [cx, 5, cz], N };
+    document.body.classList.add('cine');
+    const el = $('#cine'); el.innerHTML = '<p class="tit" style="animation-delay:.6s">✅ ¡Nivel ' + N.id + ' completado!</p><p style="animation-delay:2.2s">' + esc(V[3]) + '</p><p style="animation-delay:4.4s">' + esc(N.fin) + '</p>';
+    el.classList.remove('hidden'); el.style.background = '';
+    if (document.pointerLockElement) document.exitPointerLock();
+    SFX.fin();
+  };
+  function escapeTick(dt0) {
+    // con el reloj de verdad (en un celular lento la escena no se atrasa)
+    const c = cine, nt = (performance.now() - c.t0) / 1000, dt = Math.min(0.2, Math.max(0, nt - c.t)); c.t = nt;
+    const [dx, dz] = c.dir, veh = c.veh;
+    // 0 a 3 s: caminan hasta el vehículo; después suben (desaparecen)
+    c.rs.forEach((r, i) => {
+      const k = Math.min(1, c.t / 2.6);
+      r.g.position.x = r.desde.x + (veh.position.x - dx * 2.5 - r.desde.x) * k; r.g.position.z = r.desde.z + (veh.position.z - dz * 2.5 - r.desde.z) * k;
+      r.g.visible = c.t < 2.8 + i * 0.12;
+      if (r.g.userData.modelo) animar(r, k < 1 ? 3.5 : 0, dt);
+    });
+    // después el vehículo se va
+    const v = Math.max(0, c.t - 3.2);
+    if (c.tipo === 'sube') {
+      veh.position.y = 0.2 + v * v * 0.9; veh.position.x += dx * v * dt * 3; veh.position.z += dz * v * dt * 3; veh.rotation.x = -Math.min(0.25, v * 0.08);
+      if (v > 0 && Math.random() < dt * 9) tono(70, 0, 0.08, 'sawtooth', 0.05);
+    } else {
+      const vel = Math.min(14, v * 4); veh.position.x += dx * vel * dt; veh.position.z += dz * vel * dt;
+      if (v > 0 && !c.motor) { c.motor = true; raspa(0, 5, 160, 420, 0.25); }
+    }
+    // la cámara sigue al vehículo
+    cam.position.set(c.cam[0], c.cam[1] + Math.min(4, v * 0.4), c.cam[2]);
+    cam.lookAt(veh.position.x, veh.position.y + 1.5, veh.position.z);
+    cam.fov = fovBase; cam.updateProjectionMatrix();
+    // al final, la pantalla se pone negra
+    if (c.t > 8.5) $('#cine').style.background = 'rgba(0,0,0,' + Math.min(1, (c.t - 8.5) / 1.5) + ')';
+    if (zombis.size) zombisTick(dt, performance.now() - 110);
+    ren.clear(); ren.render(scene, cam);
+  }
   function campLimpiar() {
     for (const r of mercs.values()) { scene.remove(r.g); if (r.laser) scene.remove(r.laser); } mercs.clear();
     if (camion) { scene.remove(camion.g); camion = null; } for (const it of items.values()) scene.remove(it.g); items.clear(); campC = null; campK = null; abriendo.length = 0;
-    if (cine) { cine = null; document.body.classList.remove('cine'); $('#cine').classList.add('hidden'); }
+    if (cine) { if (cine.grupo) scene.remove(cine.grupo); cine = null; document.body.classList.remove('cine'); $('#cine').classList.add('hidden'); $('#cine').style.background = ''; }
     $('#obj').classList.add('hidden'); $('#jefeBar').classList.add('hidden'); $('#usar').classList.add('hidden'); $('#marcas').innerHTML = '';
     usar(false);
   }
@@ -1974,7 +2057,7 @@
         const N = c.NIVELES[m.n]; if (!N) break;
         W.reiniciarMapa(N.mapa); mapaId = null;
         campLimpiar(); briefing(m.n);
-        ['torreta', 'escudo', 'blindado', 'palmera'].forEach(cargarProp);
+        ['torreta', 'escudo', 'blindado', 'palmera', 'helicoptero', 'jeep', 'locomotora', 'colectivo', 'camion_militar', 'humvee'].forEach(cargarProp);
         break;
       }
       case 'cfase': {
@@ -1984,7 +2067,7 @@
         if (f.tipo === 'jefe') rugido(1);
         break;
       }
-      case 'cfin': finNivel(m.n); break;
+      case 'cfin': J.finNivel(m.n); break;
       case 'cfalla': aviso('💀 ' + m.motivo, 'Reintentan desde el último punto de control...'); SFX.muero(); break;
       case 'cpunto': SFX.baja(); if (!m.jefe) aviso('✅ ¡Listo!', 'Sigan con el objetivo'); break;
       case 'abrir': { const M = W.mapa(mapaId); W.abrir(M, m.id); abrirVisual(m.id); break; }

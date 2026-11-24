@@ -462,7 +462,9 @@
       // nivel terminado
       for (const z of this.zombis.values()) if (z.alive && z.tipo === 'teju') z.alive = false;
       if (c.nivel + 1 < NIVELES.length) {
-        c.estado = 'fin'; c.espera = Date.now() + 10000;
+        c.estado = 'fin'; c.espera = Date.now() + 11000;
+        this.zombis.clear(); this.mercs.clear(); this.proy = []; this.areas = []; if (c.items) { c.items.clear(); c.iVer++; } c.vuelven = [];
+        for (const p of this.players.values()) { p.hp = 100; p.prot = Date.now() + 12000; }
         this.all({ t: 'cfin', n: c.nivel });
         this.sys(`✅ ¡Nivel ${N.id} completado! ${N.fin}`);
       } else {
