@@ -120,6 +120,34 @@ input:focus,select:focus{border-color:var(--azul2)}
 .armahud{text-align:right}#aNom{font-size:14px;color:#ddd}#aBal{font-size:20px}#aBal b{font-size:32px}
 #aTira{font-size:15px;margin-bottom:2px}
 #aRec{display:none;width:120px;height:6px;background:rgba(0,0,0,.5);border-radius:4px;overflow:hidden;margin:4px 0 0 auto}#aRec div{height:100%;background:#ffc83d;width:0}
+/* campaña */
+#obj{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 54px);left:50%;transform:translateX(-50%);width:min(560px,70vw);background:rgba(8,12,24,.66);border:1px solid rgba(255,200,61,.35);border-radius:12px;padding:6px 10px;text-align:center;font-size:13.5px;line-height:1.3;pointer-events:none}
+#obj small{display:block;font-size:11px;opacity:.75}#obj b{color:#ffc83d}
+#obj .objbar{height:5px;border-radius:3px;background:rgba(255,255,255,.15);margin-top:4px;overflow:hidden}#objB{display:block;height:100%;background:#ffc83d;transition:width .3s}
+#jefeBar{position:absolute;bottom:92px;left:50%;transform:translateX(-50%);width:min(520px,72vw);text-align:center;pointer-events:none}
+#jefeBar b{font-size:15px;text-shadow:0 1px 3px #000}#jefeBar div{height:12px;border:2px solid #222;border-radius:6px;background:rgba(0,0,0,.5);overflow:hidden;margin:3px 0}
+#jefeBar i{display:block;height:100%;background:linear-gradient(#9a6a4a,#5a3a22);transition:width .3s}#jefeBar.exp i{background:linear-gradient(#bff,#3ad)}
+#jefeBar span{font-size:12.5px;text-shadow:0 1px 3px #000}#jefeBar.exp span{color:#9ff;font-weight:800}
+#marcas{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.marca{position:absolute;left:0;top:0;margin:-18px 0 0 -18px;font-size:22px;text-align:center;filter:drop-shadow(0 1px 2px #000);white-space:nowrap}
+.marca small{display:block;font-size:11px;font-weight:700;color:#ffe9a8;text-shadow:0 1px 2px #000;margin-top:-2px}
+#usar{position:absolute;top:60%;left:50%;transform:translateX(-50%);background:rgba(8,12,24,.75);border-radius:10px;padding:6px 12px;text-align:center;font-size:14px;pointer-events:none}
+#usar div{height:6px;border-radius:3px;background:rgba(255,255,255,.2);margin-top:5px;overflow:hidden}#usar i{display:block;height:100%;width:0;background:#2ecc71}
+#hitm.bl{filter:grayscale(1) brightness(2)}
+.tb[data-b=usar]{right:236px;bottom:24px;width:60px;height:60px;font-size:26px}.tb[data-b=usar].lista{background:rgba(46,204,113,.65);box-shadow:0 0 14px #2ecc71}
+.tb[data-b=ruido]{right:200px;bottom:238px}
+#brief .card{max-width:600px;width:100%;text-align:left;max-height:88vh;overflow:auto}
+#brief .nv{font-size:12px;letter-spacing:3px;color:#ffc83d;font-weight:800}#brief h2{margin:2px 0 2px;font-size:1.6em}
+#brief .lugar{color:var(--mut);margin-bottom:8px}#brief p{line-height:1.45;margin:6px 0}#brief .enem{background:#2a1418;border-radius:8px;padding:6px 10px;margin:8px 0;font-weight:700}
+#brief ol{margin:6px 0 12px 18px;padding:0;line-height:1.5}#brief .jugar{display:block;margin:0 auto}
+#cfin .card{max-width:520px;text-align:center}#cfin .sig{color:#ffc83d}
+body.cine #hud,body.cine #tctl,body.cine #obj,body.cine #marcas,body.cine #jefeBar,body.cine #usar,body.cine #muerte{display:none!important}
+#cine{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:0 20px 8vh;pointer-events:none;background:linear-gradient(transparent 55%,rgba(0,0,0,.55))}
+#cine p{margin:4px 0;font-size:clamp(15px,2.4vw,21px);text-align:center;text-shadow:0 2px 6px #000;opacity:0;animation:cineTxt 1.4s ease forwards}
+#cine p.tit{font-size:clamp(24px,4.4vw,40px);font-weight:900;color:#ffd24a}
+@keyframes cineTxt{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+#campInfo{background:#16182a;border:1px solid rgba(255,200,61,.3);border-radius:10px;padding:8px 10px;margin-top:8px;font-size:13px;line-height:1.4}
+#campInfo b{color:#ffc83d}
 #aviso{position:absolute;top:30%;left:0;right:0;text-align:center;font-size:clamp(16px,3.4vw,24px);opacity:0}
 #aviso .racha{font-size:1.4em;color:#ffc83d}
 #aviso.ver{animation:aviso 2.2s ease-out forwards}
@@ -263,7 +291,8 @@ body.tactil #chatF{bottom:auto;top:30%}
       <div class="panel card">
         <h3>Partida <small id="hostOnly" style="color:var(--mut);font-weight:600"></small></h3>
         <div class="sets">
-          <label>Modo<select id="sMode"><option value="ffa">🎯 Todos contra todos</option><option value="equipos">🔴🔵 Albirroja contra Azules</option><option value="zombis">🧟 Supervivencia zombi</option></select></label>
+          <label>Modo<select id="sMode"><option value="ffa">🎯 Todos contra todos</option><option value="equipos">🔴🔵 Albirroja contra Azules</option><option value="zombis">🧟 Supervivencia zombi</option><option value="campana">🎖️ Campaña: Operación Yvy (4 jugadores)</option></select></label>
+          <label id="lNivel" class="hidden">Nivel<select id="sNivel"></select></label>
           <label>Mapa<select id="sMap"></select></label>
           <label id="lGoal">Gana con<select id="sGoal"></select></label>
           <label id="lTime">Tiempo<select id="sTime"></select></label>
@@ -283,7 +312,7 @@ body.tactil #chatF{bottom:auto;top:30%}
         🖥️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · mouse apuntar · clic izquierdo tirar · clic derecho mira · <kbd>Espacio</kbd> saltar · <kbd>Shift</kbd> agacharse (corriendo, te deslizás) · <kbd>R</kbd> recargar · <kbd>Q</kbd>/<kbd>1</kbd>/<kbd>2</kbd> cambiar arma · <kbd>Tab</kbd> tabla · <kbd>Enter</kbd> chat · <kbd>Esc</kbd> ajustes · <kbd>F</kbd> linterna, <kbd>G</kbd> granada y <kbd>V</kbd> molotov (con zombis)<br>
         📱 palanca a la izquierda para caminar, arrastrá a la derecha para mirar, y botones para tirar, apuntar, saltar y agacharte.<br>
         🎯 A la cabeza hace el doble. La vida se recupera sola si no te pegan un rato.<br>
-        <small>Personajes y armas en 3D: <a href="https://quaternius.com/packs/toonshootergamekit.html" target="_blank" rel="noopener" style="color:inherit">Toon Shooter Game Kit de Quaternius</a> (CC0, uso libre). Zombis: Zombie Apocalypse Kit de Quaternius vía <a href="https://poly.pizza/bundle/Post-Apocolypse-Pack-jg0We8Clu0" target="_blank" rel="noopener" style="color:inherit">Poly Pizza</a> (CC0 y CC-BY 3.0). Objetos del laberinto y el estadio vía <a href="https://poly.pizza" target="_blank" rel="noopener" style="color:inherit">Poly Pizza</a>: Quaternius, Isa y Kay (CC0); arco, colectivo, portón y pelota de Poly by Google, lapacho de konta, ángel y torres de luz de Zsky, cantina de sirkitree y barreras de J-Toastie (CC-BY 3.0).</small>
+        <small>Personajes y armas en 3D: <a href="https://quaternius.com/packs/toonshootergamekit.html" target="_blank" rel="noopener" style="color:inherit">Toon Shooter Game Kit de Quaternius</a> (CC0, uso libre). Zombis: Zombie Apocalypse Kit de Quaternius vía <a href="https://poly.pizza/bundle/Post-Apocolypse-Pack-jg0We8Clu0" target="_blank" rel="noopener" style="color:inherit">Poly Pizza</a> (CC0 y CC-BY 3.0). Objetos del laberinto y el estadio vía <a href="https://poly.pizza" target="_blank" rel="noopener" style="color:inherit">Poly Pizza</a>: Quaternius, Isa y Kay (CC0); arco, colectivo, portón y pelota de Poly by Google, lapacho de konta, ángel y torres de luz de Zsky, cantina de sirkitree y barreras de J-Toastie (CC-BY 3.0). Campaña Operación Yvy: modelos de Quaternius, Kenney y Kay (CC0, el jefe Teju Jagua es el Dragon Evolved de Quaternius) y de sirkitree, J-Toastie, Poly by Google, Zsky, S, Paul, Bruno, KolosStudios, Nicholas, Alex, madtrollstudio, Jeremy y Jason (CC-BY 3.0), vía Poly Pizza.</small>
       </div>
     </div>
   </div>
@@ -301,6 +330,9 @@ body.tactil #chatF{bottom:auto;top:30%}
     <div id="arriba"><div id="tReloj">0:00</div><div id="tScore"></div></div>
     <div id="feed"></div>
     <div id="aviso"></div>
+    <div id="obj" class="hidden"><div id="objT"></div><div class="objbar"><i id="objB"></i></div></div>
+    <div id="jefeBar" class="hidden"><b>🐉 Proyecto Teju Jagua</b><div><i></i></div><span></span></div>
+    <div id="usar" class="hidden"><span></span><div><i></i></div></div>
     <div id="clog"></div>
     <div id="abajo">
       <div class="vida"><div class="num">❤️ <span id="vNum">100</span></div><div class="vbar"><div id="vBar"></div></div></div>
@@ -310,11 +342,12 @@ body.tactil #chatF{bottom:auto;top:30%}
     <div id="tabla" class="hidden"></div>
   </div>
   <form id="chatF"><input id="cin" maxlength="120" placeholder="Escribí y Enter..." autocomplete="off"><button class="btn-p">➤</button></form>
+  <div id="marcas"></div>
   <div id="tctl" class="hidden">
     <div id="palanca"><div id="bolita"></div></div>
     <div class="tb" data-b="fire">🔫</div><div class="tb" data-b="aim">🎯</div><div class="tb" data-b="jump">⬆️</div>
     <div class="tb" data-b="crouch">⬇️</div><div class="tb" data-b="reload">🔄</div><div class="tb" data-b="swap">🔁</div>
-    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div><div class="tb" data-b="luz">🔦</div><div class="tb" data-b="granada">💣</div><div class="tb" data-b="molotov">🔥</div>
+    <div class="tb" data-b="tabla">📋</div><div class="tb" data-b="chat">💬</div><div class="tb" data-b="luz">🔦</div><div class="tb" data-b="granada">💣</div><div class="tb" data-b="molotov">🔥</div><div class="tb hidden" data-b="ruido">📢</div><div class="tb hidden" data-b="usar">✋</div>
   </div>
   <div id="editCtrl"></div>
   <div id="ePanel">
@@ -350,14 +383,18 @@ body.tactil #chatF{bottom:auto;top:30%}
       <div class="row" style="margin-top:10px"><button class="btn-r" id="leaveBtnP" style="flex:1">🚪 Salir de la partida</button></div>
     </div>
   </div>
+  <div id="brief" class="capa hidden"><div class="card no-lock" id="briefBox"></div></div>
+  <div id="cfin" class="capa hidden"></div>
+  <div id="cine" class="hidden"></div>
   <div id="fin" class="capa hidden"><div class="card" id="finBox"></div></div>
   <div id="audios"></div>
 </div>
 <div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br><span id="rotateTxt">para jugar</span><small id="rotateSub">La partida sigue: ¡apurate!</small></p></div>
 
-<script src="mundo.js?v=18"></script>
-<script src="sala.js?v=18"></script>
-<script src="juego.js?v=18"></script>
+<script src="mundo.js?v=19"></script>
+<script src="campana.js?v=19"></script>
+<script src="sala.js?v=19"></script>
+<script src="juego.js?v=19"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -590,7 +627,7 @@ function onMsg(m) {
       break;
     case 'state': setState(m); break;
     case 'chat': addMsg(m); if (Juego.activo()) Juego.chat(m); break;
-    case 'snap': case 'spawn': case 'fx': case 'kill': case 'hurt': case 'hitm': case 'ola': case 'muerde': case 'boom': case 'area': case 'escupe': case 'tira': if (Juego.activo()) Juego.msg(m); break;
+    case 'snap': case 'spawn': case 'fx': case 'kill': case 'hurt': case 'hitm': case 'ola': case 'muerde': case 'boom': case 'area': case 'escupe': case 'tira': case 'cnivel': case 'cfase': case 'cfin': case 'cfalla': case 'cpunto': case 'abrir': case 'jefe': case 'final': if (Juego.activo()) Juego.msg(m); break;
     case 'sfx': Juego.sfx(m.name); break;
     case 'rtc': onRtc(m.from, m.data); break;
     case 'err': toast(m.msg); if (m.expired) { sess.set('tg_session', null); goHome(true); } break;
@@ -648,16 +685,26 @@ function renderLobby() {
   fillSelect($('#sTime'), [3, 5, 8, 10, 15].map(n => [n, n + ' minutos']), st.time);
   $('#sBots').value = st.bots;
   const zomb = st.mode === 'zombis';
-  $('#lGoal').classList.toggle('hidden', zomb); $('#lTime').classList.toggle('hidden', zomb);
+  const camp = st.mode === 'campana';
+  $('#lGoal').classList.toggle('hidden', zomb || camp); $('#lTime').classList.toggle('hidden', zomb || camp); $('#lNivel').classList.toggle('hidden', !camp);
+  if (camp && window.TiroCampana) {
+    const NV = TiroCampana.NIVELES;
+    fillSelect($('#sNivel'), NV.map((n, i) => [i, n.id + '. ' + n.n + ' — ' + n.lugar]), st.nivel || 0);
+    const N = NV[st.nivel || 0];
+    let ci = $('#campInfo'); if (!ci) { ci = document.createElement('div'); ci.id = 'campInfo'; $('#waitNote').before(ci); }
+    ci.innerHTML = '<b>Operación Yvy</b> · Una corporación extranjera perforó el Acuífero Guaraní y liberó un patógeno ancestral. Ustedes son un escuadrón táctico paraguayo: rastreen el brote, frenen a los mercenarios y sobrevivan a las hordas. Si son menos de 4, se completa con bots compañeros.<br><b>Nivel ' + N.id + ': ' + esc(N.n) + '</b> · ' + esc(N.lugar) + ' · ' + esc(N.enemigos);
+    ci.classList.remove('hidden');
+  } else if ($('#campInfo')) $('#campInfo').classList.add('hidden');
   $('#sFa').value = st.fa ? '1' : '0'; $('#lFa').classList.toggle('hidden', st.mode === 'ffa');
-  $('#startBtn').textContent = zomb ? '🧟 ¡Que vengan los zombis!' : '🔫 ¡Empezar!';
-  ['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa', '#addBotBtn', '#startBtn'].forEach(q => $(q).disabled = !host);
+  $('#startBtn').textContent = camp ? '🎖️ ¡Arranca la Operación Yvy!' : zomb ? '🧟 ¡Que vengan los zombis!' : '🔫 ¡Empezar!';
+  ['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa', '#sNivel', '#addBotBtn', '#startBtn'].forEach(q => $(q).disabled = !host);
+  $('#sMap').closest('label').classList.toggle('hidden', camp);
   $('#hostOnly').textContent = host ? '' : '(la elige el anfitrión)';
   $('#waitNote').textContent = zomb && !amObs ? '🧟 Todos juntos (y los bots de compañeros) contra oleadas de zombis cada vez más fuertes. Si caés, volvés en la próxima oleada.' : amObs ? '👀 Estás mirando la sala: no jugás, pero ves todo.' : host ? (s.players.length < 2 ? 'Esperando jugadores... o agregá bots 🤖' : '') : 'Esperando que el anfitrión empiece...';
   $('#armasL').parentNode.classList.toggle('hidden', amObs);
 }
-const sendSettings = () => send({ t: 'settings', s: { mode: $('#sMode').value, map: $('#sMap').value, goal: +$('#sGoal').value, time: +$('#sTime').value, bots: $('#sBots').value, fa: $('#sFa').value === '1' } });
-['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa'].forEach(q => $(q).onchange = sendSettings);
+const sendSettings = () => send({ t: 'settings', s: { mode: $('#sMode').value, map: $('#sMap').value, goal: +$('#sGoal').value, time: +$('#sTime').value, bots: $('#sBots').value, fa: $('#sFa').value === '1', nivel: +($('#sNivel').value || 0) } });
+['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa', '#sNivel'].forEach(q => $(q).onchange = sendSettings);
 $('#addBotBtn').onclick = () => send({ t: 'addBot' });
 $('#startBtn').onclick = () => { Juego.audio(); horizontal(); send({ t: 'start' }); };
 $('#leaveBtnL').onclick = () => goHome();
@@ -685,8 +732,8 @@ document.addEventListener('pointerdown', () => { if (tactil && document.body.cla
 // ---------- controles del celular: cada uno los acomoda a su manera (se guarda en el aparato) ----------
 // [lado l/r, distancia a ese borde, arriba t / abajo b, distancia, tamaño]
 const CT_DEF = { fire: ['r', 28, 'b', 110, 84], aim: ['r', 126, 'b', 150, 54], jump: ['r', 30, 'b', 24, 54], crouch: ['r', 96, 'b', 24, 54], reload: ['r', 126, 'b', 84, 54], swap: ['r', 162, 'b', 24, 54],
-  granada: ['r', 200, 'b', 110, 54], molotov: ['r', 200, 'b', 174, 54], tabla: ['r', 14, 't', 60, 40], chat: ['r', 60, 't', 60, 40], luz: ['r', 106, 't', 60, 40], palanca: ['l', 40, 'b', 60, 110] };
-const CT_NOM = { fire: '🔫 disparar', aim: '🎯 apuntar', jump: '⬆️ saltar', crouch: '⬇️ agacharse', reload: '🔄 recargar', swap: '🔁 cambiar arma', granada: '💣 granada', molotov: '🔥 molotov', tabla: '📋 tabla', chat: '💬 chat', luz: '🔦 linterna', palanca: '🕹️ la palanca' };
+  granada: ['r', 200, 'b', 110, 54], molotov: ['r', 200, 'b', 174, 54], ruido: ['r', 200, 'b', 238, 54], usar: ['r', 236, 'b', 24, 60], tabla: ['r', 14, 't', 60, 40], chat: ['r', 60, 't', 60, 40], luz: ['r', 106, 't', 60, 40], palanca: ['l', 40, 'b', 60, 110] };
+const CT_NOM = { fire: '🔫 disparar', aim: '🎯 apuntar', jump: '⬆️ saltar', crouch: '⬇️ agacharse', reload: '🔄 recargar', swap: '🔁 cambiar arma', granada: '💣 granada', molotov: '🔥 molotov', ruido: '📢 granada de ruido', usar: '✋ usar / activar', tabla: '📋 tabla', chat: '💬 chat', luz: '🔦 linterna', palanca: '🕹️ la palanca' };
 let CT = {}; try { CT = JSON.parse(localStorage.getItem('tiro_ctrl') || '{}') || {}; } catch (e) {}
 const ctEl = id => id === 'palanca' ? $('#palanca') : document.querySelector('#tctl [data-b="' + id + '"]');
 function ctAplicar() {
@@ -765,6 +812,7 @@ function renderFin() {
   let tit = '🏆 ¡Fin de la partida!';
   const zomb = s.settings.mode === 'zombis';
   if (zomb) tit = `🧟 Llegaron hasta la oleada ${s.ola ? s.ola.n : 0}`;
+  else if (s.settings.mode === 'campana') tit = '🧉 ¡Operación Yvy cumplida!';
   else if (eq) tit = s.winner === 'empate' ? '🤝 ¡Empate!' : s.winner === 'r' ? '🔴 ¡Ganó la Albirroja!' : '🔵 ¡Ganaron los Azules!';
   else { const w = s.ranking[0]; if (w) tit = w.id === myId ? '🏆 ¡Ganaste vos!' : `🏆 Ganó ${esc(w.avatar)} ${esc(w.name)}`; }
   $('#finBox').innerHTML = `<h2>${tit}</h2>${eq ? `<div style="font-size:1.3em;margin-bottom:6px"><span class="tr">🔴 ${s.score.r}</span> — <span class="ta">${s.score.a} 🔵</span></div>` : ''}

@@ -54,6 +54,57 @@
     basurero:    { n: [1.22, 1.85, 1.22], c: 0, col: [0.8, 1, 0.8] },
     pelota:      { n: [1, 1, 1], c: 7, solido: false },
     publi:       { n: [1, 1, 1], c: 7, archivo: false },   // cartel de publicidad con letras
+    // ---- campaña "Operación Yvy" (Poly Pizza: Quaternius, Kenney, Kay CC0; los demás CC-BY) ----
+    puesto_feria:   { n: [0.95, 1.05, 1.19], c: 2 },
+    feria:          { n: [1.9, 0.55, 1.87], c: 4 },
+    ropa:           { n: [1.54, 0.47, 0.92], c: 3 },
+    televisor:      { n: [0.41, 0.27, 0.27], c: 11 },
+    estante:        { n: [3.38, 4.44, 0.76], c: 8 },
+    auto_rojo:      { n: [1.07, 0.58, 1.87], c: 4 },
+    patrullera:     { n: [1.78, 1.24, 3.73], c: 11 },
+    auto_azul:      { n: [45.5, 32.33, 89.11], c: 3 },
+    palmera:        { n: [2.86, 2.69, 2.75], c: 13, col: [0.12, 1, 0.12] },
+    helicoptero:    { n: [41.34, 11.41, 45.2], c: 13, col: [0.35, 0.8, 0.8] },
+    sombrilla:      { n: [0.57, 0.67, 0.51], c: 4, col: [0.1, 1, 0.1] },
+    vagon:          { n: [10.25, 2.62, 2.1], c: 13 },
+    locomotora:     { n: [10.35, 2.68, 2.15], c: 13 },
+    generador:      { n: [2.09, 1.31, 1.01], c: 5 },
+    ceramica:       { n: [11.49, 7.44, 8.96], c: 9 },
+    basilica:       { n: [13.44, 16.79, 17.34], c: 7, col: [0.92, 1, 0.92] },
+    velas:          { n: [0.88, 0.61, 0.84], c: 5, solido: false },
+    campana:        { n: [0.63, 0.73, 0.63], c: 5, solido: false },
+    edificio:       { n: [2.04, 1.68, 1.24], c: 7 },
+    edificio_alto:  { n: [0.97, 1.68, 0.84], c: 0 },
+    galeria:        { n: [2.01, 2.35, 2], c: 1 },
+    camion:         { n: [2.71, 2.88, 5.26], c: 6 },
+    semirremolque:  { n: [1.68, 2.42, 6.68], c: 7 },
+    cisterna:       { n: [10.89, 4.74, 4.42], c: 4 },
+    caneria:        { n: [1, 0.96, 4.27], c: 0 },
+    tablero:        { n: [1.46, 1.68, 1.72], c: 11, col: [0.8, 1, 0.6] },
+    tanque_agua:    { n: [1.62, 3.52, 2.35], c: 0, col: [0.7, 1, 0.6] },
+    arbol_selva:    { n: [4.31, 7.26, 4.58], c: 2, col: [0.12, 1, 0.12] },
+    helecho:        { n: [9.05, 2.69, 8.49], c: 6, solido: false },
+    roca:           { n: [0.62, 0.57, 0.7], c: 14, col: [0.85, 1, 0.85] },
+    tronco:         { n: [4.64, 1.09, 4.57], c: 2, col: [0.55, 1, 0.55] },
+    arco_piedra:    { n: [4.1, 4.01, 0.99], c: 1, solido: false },
+    parabolica:     { n: [0.7, 0.62, 0.7], c: 7 },
+    antena:         { n: [0.62, 0.73, 0.66], c: 8, col: [0.3, 1, 0.3] },
+    terminal:       { n: [604.61, 283.62, 547.24], c: 11 },
+    bidon:          { n: [1.01, 1.39, 1.01], c: 5 },
+    blindado:       { n: [2.98, 2.9, 5.59], c: 13 },
+    camion_militar: { n: [2.64, 2.75, 5.85], c: 12 },
+    humvee:         { n: [4.68, 2, 2.7], c: 12 },
+    jeep:           { n: [2.04, 2.33, 4.56], c: 13 },
+    servidor:       { n: [3.38, 5.15, 1.72], c: 11 },
+    torreta:        { n: [1.16, 0.59, 1.16], c: 8 },
+    valvula:        { n: [0.32, 0.46, 0.2], c: 4 },
+    escudo:         { n: [2.01, 2.56, 0.6], c: 8, solido: false },
+    neones:         { n: [5.11, 3.5, 1.77], c: 10, solido: false },
+    arbusto:        { n: [2.07, 1.19, 2.07], c: 6, solido: false },
+    arbustos:       { n: [6.57, 1.47, 1.78], c: 6, solido: false },
+    puente_soga:    { n: [5948944.75, 560992.94, 1123419], c: 2, solido: false },
+    luz_roja:       { n: [0.3, 0.3, 0.3], c: 4, solido: false, archivo: false, brillo: [0, 0.5, 0], color: '#ff3a20' },
+    luz_azul:       { n: [0.3, 0.3, 0.3], c: 3, solido: false, archivo: false, brillo: [0, 0.5, 0], color: '#5ad0ff' },
   };
 
   // ---------- mapas ----------
@@ -65,11 +116,11 @@
       op = op || {}; const P = PROPS[t], q = (op.q | 0) & 3, y = op.y || 0;
       const k = op.h ? op.h / P.n[1] : op.w ? op.w / P.n[0] : op.d ? op.d / P.n[2] : 1;
       const w = op.w || P.n[0] * k, h = op.h || P.n[1] * k, d = op.d || P.n[2] * k;
-      props.push({ t, x, y, z, w, h, d, q, txt: op.txt || null });
+      props.push({ t, x, y, z, w, h, d, q, txt: op.txt || null, est: op.est || null, puerta: op.puerta || null, abre: op.abre || null, humo: !!op.humo });
       if (P.solido === false) return;
       const col = P.col || [1, 1, 1]; let cw = w * col[0], cd = d * col[2]; const ch = h * col[1];
       if (q % 2) { const t2 = cw; cw = cd; cd = t2; }
-      B.push([x - cw / 2, y, z - cd / 2, x + cw / 2, y + ch, z + cd / 2, P.c, 1]);
+      B.push(op.puerta ? [x - cw / 2, y, z - cd / 2, x + cw / 2, y + ch, z + cd / 2, P.c, 1, op.puerta] : [x - cw / 2, y, z - cd / 2, x + cw / 2, y + ch, z + cd / 2, P.c, 1]);
     };
     // choque sin dibujo (los palos del arco, por ejemplo)
     const oculta = (cx, cz, w, d, h, y) => { y = y || 0; B.push([cx - w / 2, y, cz - d / 2, cx + w / 2, y + h, cz + d / 2, 7, 1]); };
@@ -84,8 +135,10 @@
     };
     // paredes de afuera
     const pc = pared == null ? 8 : pared;
-    b(0, -S - 0.5, 2 * S + 2, 1, 7, pc); b(0, S + 0.5, 2 * S + 2, 1, 7, pc);
-    b(-S - 0.5, 0, 1, 2 * S + 2, 7, pc); b(S + 0.5, 0, 1, 2 * S + 2, 7, pc);
+    // pared -1: paredes invisibles (en la costa o el puente se ve el agua)
+    const bp = pc < 0 ? (cx, cz, w, d) => B.push([cx - w / 2, 0, cz - d / 2, cx + w / 2, 7, cz + d / 2, 8, 1]) : (cx, cz, w, d) => b(cx, cz, w, d, 7, pc);
+    bp(0, -S - 0.5, 2 * S + 2, 1); bp(0, S + 0.5, 2 * S + 2, 1);
+    bp(-S - 0.5, 0, 1, 2 * S + 2); bp(S + 0.5, 0, 1, 2 * S + 2);
     extra(b, escalera, o, oculta);
     return { id, n, S, boxes: B, props };
   }
@@ -420,13 +473,14 @@
   }
   // cuerpos: lista de {id,x,y,z,crouch}
   // alto: los zombis tienen su propio alto (el que se arrastra es bajito)
-  function cabeza(p) { const h = p.alto || (p.crouch ? F.HC : F.H); return [p.x, p.y + h - 0.22, p.z]; }
+  function cabeza(p) { const h = p.alto || (p.crouch ? F.HC : F.H); return [p.x, p.y + h - (p.cabR || 0.26) * 0.85, p.z]; }
   function rayCuerpos(list, o, d, max) {
     let best = null;
     for (const p of list) {
       const h = p.alto || (p.crouch ? F.HC : F.H);
-      let t = raySphere(o, d, cabeza(p), 0.26, max), head = true;
-      const tb = rayCaja(o, d, [p.x - 0.34, p.y, p.z - 0.34, p.x + 0.34, p.y + h - 0.44, p.z + 0.34], max);
+      const an = p.ancho || 0.34;
+      let t = raySphere(o, d, cabeza(p), p.cabR || 0.26, max), head = true;
+      const tb = rayCaja(o, d, [p.x - an, p.y, p.z - an, p.x + an, p.y + h - (p.cabR || 0.26) * 1.7, p.z + an], max);
       if (tb >= 0 && (t < 0 || tb < t - 0.05)) { t = tb; head = false; }
       if (t >= 0 && (!best || t < best.t)) best = { id: p.id, t, head };
     }
@@ -531,5 +585,14 @@
     return [0, 0, 0];
   }
 
-  G.TiroMundo = { F, PAL, PROPS, ARMAS, ARMA_IDS, MAPAS, MAPA_IDS, mapa, choca, piso, mover, liberar, rayMundo, rayCuerpos, dir, desvio, seVe, rumbo, puntoLibre, cabeza };
+  function abrir(M, id) {
+    if (!M.abiertas) M.abiertas = [];
+    if (M.abiertas.includes(id)) return false;
+    M.abiertas.push(id);
+    M.boxes = M.boxes.filter(b => b[8] !== id);
+    M.nav = navGrid(M);
+    return true;
+  }
+  function reiniciarMapa(id) { delete cacheM[id]; }
+  G.TiroMundo = { armar, abrir, reiniciarMapa, F, PAL, PROPS, ARMAS, ARMA_IDS, MAPAS, MAPA_IDS, mapa, choca, piso, mover, liberar, rayMundo, rayCuerpos, dir, desvio, seVe, rumbo, puntoLibre, cabeza };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -72,6 +72,7 @@
     else if (tipo === 'chapa') { for (let x = 0; x < 128; x += 10) { g.fillStyle = '#ffffff'; g.fillRect(x, 0, 4, 128); g.fillStyle = '#b4b4b4'; g.fillRect(x + 6, 0, 2, 128); } ruido(14); }
     else if (tipo === 'baldosa') { g.fillStyle = '#d8d8d8'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#a8a8a8'; g.fillRect(0, 0, 128, 3); g.fillRect(0, 0, 3, 128); g.fillRect(0, 63, 128, 3); g.fillRect(63, 0, 3, 128); ruido(26); }
     else if (tipo === 'asfalto') { ruido(40); g.fillStyle = 'rgba(255,220,0,.7)'; g.fillRect(0, 60, 128, 6); }
+    else if (tipo === 'agua') { g.fillStyle = '#d0d0d0'; g.fillRect(0, 0, 128, 128); for (let i = 0; i < 60; i++) { g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(Math.random() * 128, Math.random() * 128, 6 + Math.random() * 14, 1.5); } ruido(10); }
     else if (tipo === 'cesped') { ruido(40); for (let i = 0; i < 500; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(80,80,80,.22)' : 'rgba(255,255,255,.2)'; g.fillRect(Math.random() * 128, Math.random() * 128, 1, 2 + Math.random() * 4); } }
     else if (tipo === 'tierra') { ruido(55); for (let i = 0; i < 60; i++) { g.fillStyle = 'rgba(90,60,20,.18)'; g.beginPath(); g.arc(Math.random() * 128, Math.random() * 128, 2 + Math.random() * 6, 0, 7); g.fill(); } }
     else ruido(28);
@@ -92,15 +93,24 @@
   function cargarMapa(id) {
     if (mapaId === id && mapGroup) return;
     if (mapGroup) { scene.remove(mapGroup); mapGroup.traverse(o => o.geometry && o.geometry.dispose()); }
-    mapaId = id; const M = W.mapa(id), cfg = CIELO[id] || CIELO.mercado;
+    mapaId = id; const M = W.mapa(id), cfg = CIELO[id] || M.cielo || CIELO.mercado;
+    puertasB = {};
+    // reflectores de algunos mapas (la fachada de la Basílica)
+    for (const [x, y, z, col, it, dist] of (M.luces || [])) { const l = new T.PointLight(col, it, dist, 1.5); l.position.set(x, y, z); mapGroup.add(l); }
     mapGroup = new T.Group();
     scene.background = new T.Color(cfg[0]); scene.fog = new T.Fog(cfg[0], 45, 150);
     let ft; if (cfg[2] === 'estadio') ft = pisoEstadio(M); else { ft = tex(cfg[2]).clone(); ft.needsUpdate = true; ft.repeat.set(M.S, M.S); }
     const piso = new T.Mesh(new T.PlaneGeometry(2 * M.S + 2, 2 * M.S + 2), new T.MeshPhongMaterial({ color: cfg[1], map: ft, shininess: 4, specular: 0x0a0a0a }));
     piso.rotation.x = -Math.PI / 2; mapGroup.add(piso);
     // afuera: agua en el puerto, campo en las demás
-    const afuera = new T.Mesh(new T.PlaneGeometry(600, 600), new T.MeshLambertMaterial({ color: { puerto: '#3b6f8f', chaco: '#9a7a3e', laberinto: '#4f7a3a', estadio: '#55585e' }[id] || '#6f8a52' }));
+    const afuera = new T.Mesh(new T.PlaneGeometry(600, 600), new T.MeshLambertMaterial({ color: { puerto: '#3b6f8f', chaco: '#9a7a3e', laberinto: '#4f7a3a', estadio: '#55585e' }[id] || (M.cielo && M.cielo[3]) || '#6f8a52' }));
     afuera.rotation.x = -Math.PI / 2; afuera.position.y = -0.05; mapGroup.add(afuera);
+    // partes del piso pintadas (asfalto, arena, agua...)
+    for (const [x0, z0, x1, z1, col, tx] of (M.suelos || [])) {
+      const t2 = tex(tx || 'ruido').clone(); t2.needsUpdate = true; t2.repeat.set((x1 - x0) / 2, (z1 - z0) / 2);
+      const pl = new T.Mesh(new T.PlaneGeometry(x1 - x0, z1 - z0), new T.MeshPhongMaterial({ color: col, map: t2, shininess: tx === 'agua' ? 60 : 4, specular: tx === 'agua' ? 0x335566 : 0x0a0a0a }));
+      pl.rotation.x = -Math.PI / 2; pl.position.set((x0 + x1) / 2, 0.012, (z0 + z1) / 2); mapGroup.add(pl);
+    }
     for (const b of M.boxes) {
       if (b[7]) continue;
       const w = b[3] - b[0], h = b[4] - b[1], d = b[5] - b[2];
@@ -109,7 +119,8 @@
     }
     // árboles y cerros de lejos para que no se vea vacío
     const tronco = new T.MeshLambertMaterial({ color: '#6b4a2b' }), copa = new T.MeshLambertMaterial({ color: id === 'chaco' ? '#7d8f3a' : '#3f7d3a' });
-    for (let i = 0; i < 40; i++) {
+    const adentro = id === 'c_bunker' || id === 'c_itaipu';
+    for (let i = 0; i < (adentro ? 0 : 40); i++) {
       const a = i / 40 * Math.PI * 2 + Math.random() * 0.1, r = M.S + 10 + Math.random() * 30;
       const x = Math.cos(a) * r, z = Math.sin(a) * r, h = 4 + Math.random() * 6;
       const t1 = new T.Mesh(new T.BoxGeometry(0.6, h, 0.6), tronco); t1.position.set(x, h / 2, z); mapGroup.add(t1);
@@ -140,7 +151,7 @@
     columna: c => c.lerp(new T.Color('#b9b2a5'), 0.7),
     fuente: c => c.lerp(new T.Color('#d8d2c4'), 0.3),
   };
-  let propsGroup = null, lamparas = [];
+  let propsGroup = null, lamparas = [], humeantes = [];
   function cargarProp(t) {
     if (cargaP[t]) return cargaP[t];
     if (!T.GLTFLoader || W.PROPS[t].archivo === false) { GLBP[t] = null; return cargaP[t] = Promise.resolve(null); }
@@ -152,7 +163,9 @@
     }, null, () => { GLBP[t] = null; res(null); }));
   }
   let lampMat = null;
-  function brilloLampara() {
+  const lampCol = {};
+  function brilloLampara(col) {
+    if (col) { if (!lampCol[col]) lampCol[col] = new T.SpriteMaterial({ map: brillo(col), blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false }); return new T.Sprite(lampCol[col]); }
     if (!lampMat) {
       const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
       const gr = g.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,250,225,1)'); gr.addColorStop(0.25, 'rgba(255,220,140,.55)'); gr.addColorStop(1, 'rgba(255,190,90,0)');
@@ -163,11 +176,23 @@
   }
   function ponerProps(M) {
     if (propsGroup) { mapGroup.remove(propsGroup); propsGroup.traverse(o => { if (o.geometry && o.userData.propio) o.geometry.dispose(); }); }
-    propsGroup = new T.Group(); lamparas = [];
+    propsGroup = new T.Group(); lamparas = []; humeantes = []; puertasP = {};
     const sueltos = new T.Group();
     for (const p of M.props) {
       const P = W.PROPS[p.t], piv = new T.Group();
       piv.rotation.y = p.q * Math.PI / 2; piv.position.set(p.x, p.y, p.z);
+      if (P.brillo) {
+        const b = brilloLampara(P.color), k = p.t === 'torre_luz' ? 7 : P.color ? 1 : 1.3;
+        b.scale.set(k, k, 1); b.position.set(P.brillo[0] * p.w, P.brillo[1] * p.h, P.brillo[2] * p.d); b.visible = noche || !!P.color;
+        const bp = new T.Group(); bp.rotation.y = p.q * Math.PI / 2; bp.position.set(p.x, p.y, p.z); bp.add(b); propsGroup.add(bp); lamparas.push(b); b.userData.siempre = !!P.color;
+      }
+      if (p.humo) humeantes.push([p.x, p.y + p.h * 0.7, p.z]);
+      let dest = sueltos;
+      if (p.puerta) {
+        piv.userData.abre = p.abre; dest = propsGroup;
+        if ((M.abiertas || []).includes(p.puerta)) { if (p.abre && p.abre[1] < -1) continue; if (p.abre) { piv.position.x += p.abre[0]; piv.position.y += p.abre[1]; piv.position.z += p.abre[2]; } }
+        else (puertasP[p.puerta] = puertasP[p.puerta] || []).push(piv);
+      }
       if (p.t === 'publi') { piv.add(cartelPubli(p)); propsGroup.add(piv); continue; }
       const g = GLBP[p.t];
       if (!g) {
@@ -181,8 +206,8 @@
       const sx = p.w / sz.x, sy = p.h / sz.y, sz2 = p.d / sz.z;
       const hold = new T.Group(); hold.add(g.scene.clone(true));
       hold.scale.set(sx, sy, sz2); hold.position.set(-ce.x * sx, -c.min.y * sy, -ce.z * sz2);
-      piv.add(hold); sueltos.add(piv);
-      if (P.brillo) {
+      piv.add(hold); dest.add(piv);
+      if (false) {
         const b = brilloLampara(), k = p.t === 'torre_luz' ? 7 : 1.3;
         b.scale.set(k, k, 1); b.position.set(P.brillo[0] * p.w, P.brillo[1] * p.h, P.brillo[2] * p.d); b.visible = noche;
         const bp = new T.Group(); bp.rotation.y = p.q * Math.PI / 2; bp.position.set(p.x, p.y, p.z); bp.add(b); propsGroup.add(bp); lamparas.push(b);
@@ -242,7 +267,8 @@
       const fondo = ['#c8241a', '#1d4fd8', '#f4f4f4'][n % 3], letra = n % 3 === 2 ? '#c8241a' : '#ffffff';
       g.fillStyle = fondo; g.fillRect(0, 0, 512, 96);
       g.fillStyle = letra; g.font = 'bold 54px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(p.txt, 256, 50, 490);
+      if (p.est === 'letras') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, 512, 96); const cs = ['#e63946', '#f4a261', '#2a9d8f', '#1d4fd8', '#9b5de5', '#f15bb5', '#00a86b']; let x = 22; g.font = 'bold 66px Arial, sans-serif'; g.textAlign = 'left'; for (let i = 0; i < p.txt.length; i++) { const ch = p.txt[i]; g.fillStyle = ch === '♥' ? '#d62828' : cs[i % cs.length]; g.fillText(ch, x, 52); x += g.measureText(ch).width + 2; } }
+      else g.fillText(p.txt, 256, 50, 490);
       publiCache[p.txt] = new T.MeshPhongMaterial({ map: new T.CanvasTexture(c), shininess: 20 });
     }
     const lado = matCaja(8), mats = [lado, lado, lado, lado, publiCache[p.txt], publiCache[p.txt]];
@@ -447,9 +473,10 @@
   // ================= zombis (modo supervivencia) =================
   // Modelos del "Zombie Apocalypse Kit" de Quaternius (Poly Pizza): zombi común (CC0), gordo,
   // de brazo grande y el que se arrastra (CC-BY 3.0, con crédito en la ayuda).
-  const TIPOS_Z = ['zombi', 'gordo', 'brazo', 'medio'];
-  const ARCH_Z = { zombi: 'modelos/zombi.glb', gordo: 'modelos/zombi_gordo.glb', brazo: 'modelos/zombi_brazo.glb', medio: 'modelos/zombi_medio.glb' };
-  const ALTO_Z = { zombi: 1.8, gordo: 1.85, brazo: 2.05, medio: 0.75 };
+  const TIPOS_Z = ['zombi', 'gordo', 'brazo', 'medio', 'explosivo', 'teju'];
+  // el jefe final: "Dragon Evolved" de Quaternius (CC0), con armadura
+  const ARCH_Z = { zombi: 'modelos/zombi.glb', gordo: 'modelos/zombi_gordo.glb', brazo: 'modelos/zombi_brazo.glb', medio: 'modelos/zombi_medio.glb', teju: 'modelos/jefe/teju_jagua.glb' };
+  const ALTO_Z = { zombi: 1.8, gordo: 1.85, brazo: 2.05, medio: 0.75, explosivo: 1.8, teju: 4.4 };
   const GLBZ = {}; let cargandoZ = null;
   const zombis = new Map();
   J.cargarZombis = () => {
@@ -479,12 +506,19 @@
       g.add(dentro);
       const mixer = new T.AnimationMixer(m), clip = re => gl.animations.find(a => re.test(a.name));
       const acc = {};
-      const pide = { quieto: [/(^|\|)(Zombie)?Idle$/], camina: [/(^|\|)Walk$/, /(^|\|)Crawl$/], corre: [/(^|\|)Run_Arms$/, /(^|\|)Run$/, /(^|\|)Crawl$/],
-        ataca: [/(^|\|)Punch$/, /(^|\|)Idle_Attack$/, /(^|\|)Run_Attack$/, /(^|\|)Attack$/, /(^|\|)Crawl$/], muere: [/(^|\|)Death$/] };
+      const pide = { quieto: [/(^|\|)(Zombie)?Idle$/, /(^|\|)Flying_Idle$/], camina: [/(^|\|)Walk$/, /(^|\|)Crawl$/, /(^|\|)Flying_Idle$/], corre: [/(^|\|)Run_Arms$/, /(^|\|)Run$/, /(^|\|)Crawl$/, /(^|\|)Fast_Flying$/],
+        ataca: [/(^|\|)Headbutt$/, /(^|\|)Punch$/, /(^|\|)Idle_Attack$/, /(^|\|)Run_Attack$/, /(^|\|)Attack$/, /(^|\|)Crawl$/], muere: [/(^|\|)Death$/], aturdido: [/(^|\|)HitReact$/] };
       if (tipo === 'medio') { pide.camina = [/(^|\|)Crawl$/]; pide.corre = [/(^|\|)Crawl$/]; pide.ataca = [/(^|\|)Crawl$/]; }
       for (const k in pide) { for (const re of pide[k]) { const c = clip(re); if (c) { acc[k] = mixer.clipAction(c); break; } } }
       if (acc.muere) { acc.muere.setLoop(T.LoopOnce, 1); acc.muere.clampWhenFinished = true; }
       u = { modelo: true, mixer, acc, actual: null };
+      // el explosivo es verde y brilla; el jefe es oscuro y acorazado
+      if (tipo === 'explosivo' || tipo === 'teju') {
+        const mats = [];
+        m.traverse(o => { if (o.isMesh) { o.material = [].concat(o.material).map(x => { const c = x.clone(); mats.push(c); return c; }); if (o.material.length === 1) o.material = o.material[0]; } });
+        for (const c of mats) { if (tipo === 'explosivo') { c.color.lerp(new T.Color('#7cff3a'), 0.55); if (c.emissive) { c.emissive.set('#2f8a00'); c.emissiveIntensity = 0.7; } } else c.color.lerp(new T.Color('#3a4434'), 0.55); }
+        u.mats = mats;
+      }
     } else {
       // sin modelos: un muñeco verde de cajas
       const mat = new T.MeshLambertMaterial({ color: '#5f8a3a' }), ropa = new T.MeshLambertMaterial({ color: '#4a3b2a' });
@@ -500,7 +534,7 @@
   function animarZ(z, dt) {
     const u = z.g.userData;
     if (!u.modelo) { if (z.estado === 2) z.g.rotation.x = -Math.min(1.5, (z.muerto || 0) * 4); return; }
-    const q = z.estado === 2 ? 'muere' : z.estado === 1 || z.estado === 3 ? 'ataca' : z.vel > 3 ? 'corre' : z.velS > 0.3 ? 'camina' : 'quieto';
+    const q = z.estado === 2 ? 'muere' : z.estado === 4 && u.acc.aturdido ? 'aturdido' : z.estado === 1 || z.estado === 3 ? 'ataca' : z.estado === 5 || z.vel > 3 ? 'corre' : z.velS > 0.3 ? 'camina' : 'quieto';
     if (q !== u.actual) {
       const antes = u.acc[u.actual], luego = u.acc[q] || u.acc.camina;
       if (luego && luego !== antes) { luego.reset(); luego.play(); if (antes) antes.crossFadeTo(luego, q === 'muere' ? 0.1 : 0.25, false); }
@@ -539,6 +573,7 @@
       z.g.visible = z.estado !== 2 || z.muerto < 2.4;
       z.g.position.set(cur.x, cur.y, cur.z); z.g.rotation.y = cur.ry;
       animarZ(z, dt);
+      if (z.tipo === 'teju' && z.g.userData.mats) { const ex = campC && campC[8] > 0, k = ex ? 0.6 + Math.sin(performance.now() / 120) * 0.4 : 0; for (const c of z.g.userData.mats) if (c.emissive) { c.emissive.set(ex ? '#7fd8ff' : '#000000'); c.emissiveIntensity = k; } }
       // gruñidos de vez en cuando (más seguido si está cerca)
       if (z.estado !== 2 && (z.gruT -= dt) <= 0) { z.gruT = 3 + Math.random() * 6; gruDe(z.cur, z.tipo); }
     }
@@ -563,7 +598,7 @@
   const esZombi = id => typeof id === 'string' && zombis.has(id);
 
   // ================= granadas, molotov y ácido =================
-  const PROY = ['granada', 'molotov', 'acido'];
+  const PROY = ['granada', 'molotov', 'acido', 'ruido', 'humo'];
   const proys = new Map(), areas = [], humos = [];
   let geoG = null;
   function proyNuevo(tipo) {
@@ -573,6 +608,9 @@
     else if (tipo === 'molotov') {
       const b = new T.Mesh(geoG.botella, new T.MeshPhongMaterial({ color: '#6b3d12', transparent: true, opacity: 0.85 })); g.add(b);
       const llama = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ffb040'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); llama.scale.set(0.35, 0.35, 1); llama.position.y = 0.2; g.add(llama);
+    } else if (tipo === 'ruido' || tipo === 'humo') {
+      const b = new T.Mesh(geoG.botella, new T.MeshPhongMaterial({ color: tipo === 'ruido' ? '#b0281a' : '#8a8f96' })); g.add(b);
+      if (tipo === 'ruido') { const l = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ff3a20'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); l.scale.set(0.4, 0.4, 1); g.add(l); }
     } else {
       const a = new T.Sprite(new T.SpriteMaterial({ map: brillo('#7dff3a'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); a.scale.set(0.7, 0.7, 1); g.add(a);
       const c = new T.Mesh(geoG.esfera, new T.MeshBasicMaterial({ color: '#8cff2a' })); c.scale.setScalar(0.14); g.add(c);
@@ -613,9 +651,12 @@
         if (c.isSprite) {
           const u = c.userData;
           if (a.tipo === 'fuego') { u.f += dt * (2 + u.v); const s = (0.9 + Math.sin(u.f * 5) * 0.25) * u.s * fin; c.scale.set(s, s * 1.5, 1); c.position.y = u.y + s * 0.5; }
+          else if (a.tipo === 'humo') { u.f += dt; const s = Math.min(u.s, 1 + u.f * 3) * (0.9 + Math.sin(u.f + u.v * 6) * 0.08); c.scale.set(s, s, 1); c.position.y = u.y + u.f * 0.08; c.material.opacity = 0.9 * fin; }
+          else if (a.tipo === 'ruido') { c.material.opacity = (Math.sin(a.t * 14) > 0 ? 1 : 0.1) * fin; }
           else { u.f += dt * u.v; c.position.y = 0.05 + (u.f % 1) * 0.5; c.material.opacity = (1 - (u.f % 1)) * 0.8 * fin; }
         } else if (c.material) c.material.opacity = (a.tipo === 'fuego' ? 0.35 : 0.55) * fin;
       });
+      if (a.tipo === 'ruido' && ((a.beepT = (a.beepT || 0) - dt) <= 0)) { a.beepT = 0.45; tono(1600, 0, 0.08, 'square', 0.06 * aDistancia(a) + 0.01); }
       if (a.tipo === 'fuego') { const d = cam ? Math.hypot(a.x - cam.position.x, a.z - cam.position.z) : 0; if (d < fd) { fd = d; fuegoCerca = a; } if ((a.crepT -= dt) <= 0) { a.crepT = 0.12 + Math.random() * 0.25; crepita(a); } }
     }
     if (luz.fuego) {
@@ -632,7 +673,12 @@
   function area(m) {
     const g = new T.Group(); g.position.set(m.x, m.y + 0.03, m.z);
     const a = { tipo: m.tipo, x: m.x, y: m.y, z: m.z, dur: (m.dur || 6000) / 1000, t: 0, g, crepT: 0 };
-    if (m.tipo === 'fuego') {
+    if (m.tipo === 'humo') {
+      for (let i = 0; i < 22; i++) { const an = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 3.6; const sp = new T.Sprite(new T.SpriteMaterial({ map: brillo('#9aa0a6'), transparent: true, depthWrite: false, opacity: 0.9 })); sp.material.color.set(noche ? '#3a3d40' : '#b8bcc0'); sp.position.set(Math.cos(an) * r, 0.6 + Math.random() * 2.2, Math.sin(an) * r); sp.userData = { f: 0, v: Math.random(), s: 3.2 + Math.random() * 2.2, y: sp.position.y }; g.add(sp); }
+      raspa(0, 1.5, 3000, 800, 0.2);
+    } else if (m.tipo === 'ruido') {
+      const l = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ff3a20'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); l.scale.set(1.6, 1.6, 1); l.position.y = 0.3; g.add(l);
+    } else if (m.tipo === 'fuego') {
       const disco = new T.Mesh(new T.CircleGeometry(m.r, 24), new T.MeshBasicMaterial({ color: '#ff5a10', transparent: true, opacity: 0.35, blending: T.AdditiveBlending, depthWrite: false }));
       disco.rotation.x = -Math.PI / 2; g.add(disco);
       for (let i = 0; i < 16; i++) {
@@ -656,7 +702,7 @@
   function boom(m) {
     const d = cam ? Math.hypot(m.x - cam.position.x, m.y - cam.position.y, m.z - cam.position.z) : 30;
     if (luz.boom) { luz.boom.position.set(m.x, m.y + 1.5, m.z); luz.boom.intensity = noche ? 9 : 5; }
-    const bola = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ff9a2a'), blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 1 }));
+    const bola = new T.Sprite(new T.SpriteMaterial({ map: brillo(m.verde ? '#7dff3a' : '#ff9a2a'), blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 1 }));
     bola.position.set(m.x, m.y + 0.6, m.z); scene.add(bola); humos.push({ o: bola, t: 0, max: 0.45, s0: 1, s1: 9, op: 1, sube: 0 });
     for (let i = 0; i < 9; i++) {
       const h = new T.Mesh(polvoGeo, new T.MeshBasicMaterial({ color: '#3a3a3a', transparent: true }));
@@ -694,18 +740,20 @@
   }
   // tirar (G granada, V molotov)
   function lanzar(tipo) {
-    const S = C.S(); if (!S || S.settings.mode !== 'zombis' || !yo.alive) return;
-    const me = S.players.find(p => p.id === C.me()); if (!me || (tipo === 'granada' ? me.gr : me.mo) <= 0) return;
+    const S = C.S(); if (!S || (S.settings.mode !== 'zombis' && S.settings.mode !== 'campana') || !yo.alive) return;
+    const me = S.players.find(p => p.id === C.me()); if (!me || (tipo === 'granada' ? me.gr : tipo === 'ruido' ? me.ru : me.mo) <= 0) return;
     C.send({ t: 'lanza', tipo, d: W.dir(yo.ry, yo.rx).map(v => Math.round(v * 1000) / 1000) });
     yo.cambioT = 0.35; raspa(0, 0.2, 400, 1600, 0.25);
   }
   J.lanzar = lanzar;
   function tiraHUD() {
     const S = C.S(), el = $('#aTira'); if (!S || !el) return;
-    const z = S.settings.mode === 'zombis', me = S.players.find(p => p.id === C.me());
+    const z = S.settings.mode === 'zombis' || S.settings.mode === 'campana', me = S.players.find(p => p.id === C.me()), N = nivelDe(S), ru = !!(N && N.id >= 5);
     el.classList.toggle('hidden', !z || C.obs());
-    if (z && me) el.textContent = `💣 ${me.gr | 0}   🔥 ${me.mo | 0}`;
+    if (z && me) el.textContent = `💣 ${me.gr | 0}   🔥 ${me.mo | 0}` + (ru ? `   📢 ${me.ru | 0}` : '');
     document.querySelectorAll('[data-b="granada"],[data-b="molotov"]').forEach(b => b.classList.toggle('hidden', !z));
+    document.querySelectorAll('[data-b="ruido"]').forEach(b => b.classList.toggle('hidden', !ru));
+    document.querySelectorAll('[data-b="usar"]').forEach(b => b.classList.toggle('hidden', !N));
   }
   function limpiarTiros() {
     for (const p of proys.values()) scene.remove(p.g); proys.clear();
@@ -790,7 +838,7 @@
   // pasos de otro jugador: más fuerte cuanto más cerca, y del lado donde está
   // deslizarse: nubecitas de polvo en los pies y un roce largo
   let polvoTex = null;
-  function polvo(x, y, z) {
+  function polvoPies(x, y, z) {
     if (!polvoTex) {
       const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
       const gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,.4)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
@@ -897,22 +945,27 @@
   // supervivencia zombi: de noche, solo se ve con la linterna del arma
   function ambiente(S) {
     if (!scene) return;
-    noche = S.settings.mode === 'zombis';
-    const cfg = CIELO[mapaId] || CIELO.mercado;
+    const NV = nivelDe(S);
+    noche = S.settings.mode === 'zombis' || !!(NV && NV.noche);
+    const cfg = CIELO[mapaId] || (mapaId && W.mapa(mapaId).cielo) || CIELO.mercado;
     if (noche) {
       scene.background = new T.Color('#04060c'); scene.fog = new T.Fog('#04060c', 4, 34);
       luz.cielo.intensity = 0.07; luz.cielo.color.set('#6b7fb0'); luz.cielo.groundColor.set('#120d08');
       luz.sol.intensity = 0.12; luz.sol.color.set('#7f93c8');
       luz.vm1.intensity = 0.16; luz.vm2.intensity = 0.1;
+      if (NV && NV.niebla) { scene.background = new T.Color(NV.niebla[0]); scene.fog = new T.Fog(NV.niebla[0], NV.niebla[1], NV.niebla[2]); }
+      if (NV && NV.luna) { luz.cielo.intensity = NV.luna; luz.cielo.color.set(NV.id === 10 ? '#4aa0c8' : '#8a9ad0'); }
     } else {
       scene.background = new T.Color(cfg[0]); scene.fog = new T.Fog(cfg[0], 45, 150);
       luz.cielo.intensity = 0.8; luz.cielo.color.set(0xe8f0ff); luz.cielo.groundColor.set(0x6a5532);
       luz.sol.intensity = 0.75; luz.sol.color.set(0xfff4e0);
       luz.vm1.intensity = 1.0; luz.vm2.intensity = 0.5;
+      if (NV && NV.niebla) { scene.background = new T.Color(NV.niebla[0]); scene.fog = new T.Fog(NV.niebla[0], NV.niebla[1], NV.niebla[2]); luz.sol.color.set('#ffcf8a'); }
+      else if (NV && NV.id === 2) { luz.sol.color.set('#ffd0a0'); }
     }
     luz.linterna.intensity = noche && linternaOn ? 2.6 : 0;
     for (const r of remotos.values()) if (r.g.userData.haz) r.g.userData.haz.visible = noche;
-    for (const b of lamparas) b.visible = noche;
+    for (const b of lamparas) b.visible = noche || b.userData.siempre;
   }
   // mira nocturna del francotirador: imagen verde que ve lejos, y los zombis brillan por el calor
   let visionNoche = false;
@@ -961,7 +1014,8 @@
     if (!yo.s) yo.s = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, ground: true, crouch: false, slideT: 0 };
     $('#hud').classList.toggle('obs', obs);
     $('#tctl').classList.toggle('hidden', !tactil() || obs);
-    document.querySelectorAll('[data-b="luz"]').forEach(b => b.classList.toggle('hidden', S.settings.mode !== 'zombis'));
+    if (S.settings.mode === 'campana') ['torreta', 'escudo', 'blindado', 'palmera'].forEach(cargarProp);
+    if (S.settings.mode === 'campana' && S.camp && !activo) setTimeout(() => briefing(S.camp.n), 300);
     if (!activo) { activo = true; last = performance.now(); raf = requestAnimationFrame(loop); }
     if (!obs && !tactil() && !yo.alive) { /* espera el spawn */ }
     pausa(!tactil() && !obs && document.pointerLockElement !== ren.domElement);
@@ -971,7 +1025,7 @@
     activo = false; cancelAnimationFrame(raf);
     for (const r of remotos.values()) scene.remove(r.g); remotos.clear();
     for (const z of zombis.values()) scene.remove(z.g); zombis.clear(); yo.ola = null;
-    limpiarTiros();
+    limpiarTiros(); campLimpiar();
     if (visionNoche) visionNocturna(false);
     yo.alive = false; inp.fire = false; inp.aim = false;
     if (document.pointerLockElement) document.exitPointerLock();
@@ -980,10 +1034,13 @@
   };
   J.activo = () => activo;
   J.estado = S => {
-    if (S.settings.mode === 'zombis') J.cargarZombis();
+    if (S.settings.mode === 'zombis' || S.settings.mode === 'campana') J.cargarZombis();
     if (!scene) return;
+    const NV = nivelDe(S), quiereNoche = S.settings.mode === 'zombis' || !!(NV && NV.noche);
     if (S.settings.map !== mapaId) { cargarMapa(S.settings.map); ambiente(S); }
-    else if ((S.settings.mode === 'zombis') !== noche) ambiente(S);
+    else if (quiereNoche !== noche || (NV && NV.niebla)) ambiente(S);
+    J.campAbiertas(S);
+    document.querySelectorAll('[data-b="luz"]').forEach(b => b.classList.toggle('hidden', !quiereNoche));
     const ids = new Set();
     for (const p of S.players) { if (p.id === C.me()) { yo.prim = p.prim; continue; } ids.add(p.id); remoto(p); }
     for (const [id, r] of remotos) if (!ids.has(id)) { scene.remove(r.g); remotos.delete(id); }
@@ -1007,6 +1064,7 @@
         yo.tl = m.tl; yo.tlAt = performance.now();
         if (m.Z) { zombisSnap(m.Z); yo.ola = m.ol; marcador(); } else if (zombis.size) zombisSnap([]);
         if (m.G) proysSnap(m.G); else if (proys.size) proysSnap([]);
+        if (m.C || mercs.size || campK) J.campSnap(m);
         break;
       }
       case 'spawn': {
@@ -1022,7 +1080,7 @@
         break;
       }
       case 'fx': {
-        const r = remotos.get(m.id); if (!r) break;
+        const r = remotos.get(m.id) || mercs.get(m.id); if (!r) break;
         const o = m.o;
         for (const e of m.e) { trazo(o, e); polvo(e, '#cfc6b0'); }
         const d = Math.hypot(o[0] - (yo.s ? yo.s.x : 0), o[2] - (yo.s ? yo.s.z : 0));
@@ -1031,6 +1089,7 @@
         break;
       }
       case 'kill': feedKill(m); break;
+      case 'cnivel': case 'cfase': case 'cfin': case 'cfalla': case 'cpunto': case 'abrir': case 'jefe': case 'final': J.campMsg(m); break;
       case 'ola': if (m.n) { aviso('🧟 ¡Oleada ' + m.n + '!', 'Vienen zombis...'); SFX.aparece(); } else if (m.fin) aviso('✅ ¡Pasaron la oleada ' + m.fin + '!', 'Respiren: la próxima en 8 segundos'); break;
       case 'boom': boom(m); break;
       case 'area': area(m); break;
@@ -1047,26 +1106,27 @@
         break;
       }
       case 'hitm': {
-        const h = $('#hitm'); h.className = m.kill ? 'kill' : m.head ? 'head' : ''; h.style.opacity = 1; clearTimeout(h._t); h._t = setTimeout(() => h.style.opacity = 0, 160);
+        const h = $('#hitm'); h.className = m.kill ? 'kill' : m.bl ? 'bl' : m.head ? 'head' : '';
+        if (m.bl && !m.kill) { metal(0, 0.06, 3000, 1800, 0.12, 6); break; } h.style.opacity = 1; clearTimeout(h._t); h._t = setTimeout(() => h.style.opacity = 0, 160);
         (m.head ? SFX.head : SFX.hit)();
         break;
       }
     }
   };
-  function nombre(id) { if (esZombi(id) || /^z\d+$/.test(id || '')) return '🧟 Zombi'; const p = (C.S().players || []).find(x => x.id === id); return p ? p.name : '¿?'; }
+  function nombre(id, vn) { if (vn) return (id && id[0] === 'm' ? '🪖 ' : '🐉 ') + vn; const mr = mercs.get(id); if (mr) return '🪖 ' + CAMP().MT[mr.tipo].n; const zz = zombis.get(id); if (zz && zz.tipo === 'teju') return '🐉 Teju Jagua'; if (zz && zz.tipo === 'explosivo') return '💥 Zombi explosivo'; if (esZombi(id) || /^z\d+$/.test(id || '')) return '🧟 Zombi'; const p = (C.S().players || []).find(x => x.id === id); return p ? p.name : '¿?'; }
   function colorDe(id) {
-    const S = C.S(), p = S.players.find(x => x.id === id); if (!p) return /^z\d+$/.test(id || '') ? '#9ccc65' : '#fff';
+    const S = C.S(), p = S.players.find(x => x.id === id); if (!p) return /^z\d+$/.test(id || '') ? '#9ccc65' : /^m\d+$/.test(id || '') ? '#ff8a80' : '#fff';
     return S.settings.mode === 'equipos' ? (p.team === 'r' ? '#ff8a80' : '#8ab4ff') : CAMIS_TXT[p.col % CAMIS_TXT.length];
   }
   function feedKill(m) {
-    const me = C.me(), w = { zombi: { ico: '🧟' }, granada: { ico: '💣' }, molotov: { ico: '🔥' }, acido: { ico: '🧪' } }[m.w] || A[m.w] || A.fusil;
+    const me = C.me(), w = { zombi: { ico: '🧟' }, granada: { ico: '💣' }, molotov: { ico: '🔥' }, acido: { ico: '🧪' }, hack: { ico: '✋🔧' }, explosivo: { ico: '💥' }, derrumbe: { ico: '🪨' } }[m.w] || A[m.w] || A.fusil;
     const d = document.createElement('div'); d.className = 'fk' + (m.a === me || m.v === me ? ' mio' : '');
-    d.innerHTML = m.a && m.a !== m.v ? `<b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> <span>${w.ico}${m.h ? '🎯' : ''}</span> <b style="color:${colorDe(m.v)}">${esc(nombre(m.v))}</b>` : `💀 <b>${esc(nombre(m.v))}</b>`;
+    d.innerHTML = m.a && m.a !== m.v ? `<b style="color:${colorDe(m.a)}">${esc(nombre(m.a, m.an))}</b> <span>${w.ico}${m.h ? '🎯' : ''}</span> <b style="color:${colorDe(m.v)}">${esc(nombre(m.v, m.vn))}</b>` : `💀 <b>${esc(nombre(m.v))}</b>`;
     const f = $('#feed'); f.prepend(d); while (f.children.length > 5) f.lastChild.remove();
     setTimeout(() => d.remove(), 6000);
     if (m.v === me) morir(m);
     if (m.a === me && m.v !== me) {
-      SFX.baja(); aviso(`${m.h ? '🎯 ¡A la cabeza! ' : ''}Bajaste a ${nombre(m.v)}`, m.msg);
+      SFX.baja(); aviso(`${m.h ? '🎯 ¡A la cabeza! ' : ''}${m.w === 'hack' ? 'Desactivaste' : 'Bajaste a'} ${nombre(m.v, m.vn)}`, m.msg);
     }
     const r = remotos.get(m.v); if (r) { r.alive = false; r.caida = 0.001; }
   }
@@ -1080,7 +1140,7 @@
     if (estaba) SFX.muero();
     if (m && m.a && m.a !== C.me()) yo.killer = m.a; else if (m) yo.killer = null;
     const w = m && A[m.w];
-    $('#mTxt').innerHTML = m && m.w === 'acido' ? 'Te derritió el ácido de un zombi 🧪' : m && m.w === 'zombi' ? 'Te agarró un zombi 🧟' : m && m.a && m.a !== m.v ? `Te bajó <b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> con ${w ? w.ico + ' ' + w.n : 'un tiro'}${m.h ? ' <b>¡a la cabeza!</b> 🎯' : ''}` : 'Caíste 💀';
+    $('#mTxt').innerHTML = m && m.w === 'explosivo' ? 'Te voló un zombi explosivo 💥' : m && m.w === 'derrumbe' ? 'Te agarró el derrumbe del búnker 🪨' : m && m.a && /^m\d+$/.test(m.a) ? `Te bajó un ${esc(nombre(m.a, m.an))}${m.h ? ' <b>¡a la cabeza!</b> 🎯' : ''}` : m && m.w === 'acido' ? 'Te derritió el ácido de un zombi 🧪' : m && m.w === 'zombi' ? 'Te agarró un zombi 🧟' : m && m.a && m.a !== m.v ? `Te bajó <b style="color:${colorDe(m.a)}">${esc(nombre(m.a))}</b> con ${w ? w.ico + ' ' + w.n : 'un tiro'}${m.h ? ' <b>¡a la cabeza!</b> 🎯' : ''}` : 'Caíste 💀';
     $('#muerte').classList.remove('hidden');
     // en la PC se suelta el mouse para poder tocar el arma de la próxima vida
     if (document.pointerLockElement) document.exitPointerLock();
@@ -1134,10 +1194,12 @@
       if (k === 'KeyR') recargar();
       if (k === 'KeyF' && noche) J.linterna();
       if (k === 'KeyG') lanzar('granada');
+      if (k === 'KeyB') lanzar('ruido');
+      if (k === 'KeyE') usar(true);
       if (k === 'KeyV') lanzar('molotov');
       if (k === 'Digit1') ponerArma(yo.prim); if (k === 'Digit2') ponerArma('pistola'); if (k === 'KeyQ') cambiar();
     });
-    addEventListener('keyup', e => { inp.keys.delete(e.code); if (e.code === 'Tab') { inp.tabla = false; tabla(); } });
+    addEventListener('keyup', e => { inp.keys.delete(e.code); if (e.code === 'KeyE') usar(false); if (e.code === 'Tab') { inp.tabla = false; tabla(); } });
     addEventListener('blur', () => { inp.keys.clear(); inp.fire = false; });
     $('#chatF').addEventListener('submit', e => { e.preventDefault(); const v = $('#cin').value.trim(); if (v) C.send({ t: 'chat', text: v }); $('#cin').value = ''; $('#cin').blur(); $('#chatF').classList.remove('abierto'); bloquear(); });
     $('#cin').addEventListener('blur', () => setTimeout(() => $('#chatF').classList.remove('abierto'), 100));
@@ -1185,7 +1247,8 @@
           else if (b === 'tabla') { inp.tabla = !inp.tabla; tabla(); }
           else if (b === 'chat') abrirChat();
           else if (b === 'luz') { if (noche) J.linterna(); }
-          else if (b === 'granada' || b === 'molotov') lanzar(b);
+          else if (b === 'granada' || b === 'molotov' || b === 'ruido') lanzar(b);
+          else if (b === 'usar') usar(true);
           continue;
         }
         if (C.obs()) { mira++; continue; }
@@ -1216,7 +1279,7 @@
         if (t.identifier === palId) { palId = null; inp.mx = inp.mz = 0; pal.classList.remove('on'); bolita.style.transform = ''; if (window.ctAplicar) window.ctAplicar(); }
         if (miradas.has(t.identifier)) miradas.delete(t.identifier);
         const btn = t.target.closest && t.target.closest('[data-b]');
-        if (btn) { btn.classList.remove('on'); if (btn.dataset.b === 'fire') { inp.fire = false; yo.latch = false; } }
+        if (btn) { btn.classList.remove('on'); if (btn.dataset.b === 'fire') { inp.fire = false; yo.latch = false; } if (btn.dataset.b === 'usar') usar(false); }
       }
       z.querySelectorAll('[data-b="aim"]').forEach(b => b.classList.toggle('on', inp.aim));
       z.querySelectorAll('[data-b="crouch"]').forEach(b => b.classList.toggle('on', inp.crouchT));
@@ -1249,16 +1312,17 @@
     const o = [s.x, s.y + yo.eye, s.z], d0 = W.dir(yo.ry, yo.rx);
     const S = C.S(), eq = S.settings.mode === 'equipos', miEq = (S.players.find(p => p.id === C.me()) || {}).team;
     const cuerpos = [];
-    const zomb = S.settings.mode === 'zombis';
+    const zomb = S.settings.mode === 'zombis' || S.settings.mode === 'campana';
     const fa = !!S.settings.fa;   // fuego amigo: también se le puede pegar a los compañeros
     if (!zomb || fa) for (const [id, r] of remotos) if (r.alive && r.cur && (fa || !(eq && r.team === miEq))) cuerpos.push({ id, x: r.cur.x, y: r.cur.y, z: r.cur.z, crouch: r.crouch });
-    for (const [id, z] of zombis) if (z.estado !== 2 && z.cur) cuerpos.push({ id, x: z.cur.x, y: z.cur.y, z: z.cur.z, alto: ALTO_Z[z.tipo] || 1.75 });
+    for (const [id, z] of zombis) if (z.estado !== 2 && z.cur) cuerpos.push(z.tipo === 'teju' ? { id, x: z.cur.x, y: z.cur.y, z: z.cur.z, alto: 4.4, ancho: 1.25, cabR: 0.8 } : { id, x: z.cur.x, y: z.cur.y, z: z.cur.z, alto: ALTO_Z[z.tipo] || 1.75 });
+    for (const [id, r] of mercs) if (r.alive && r.cur) cuerpos.push(r.tipo === 'torreta' ? { id, x: r.cur.x, y: r.cur.y, z: r.cur.z, alto: 1.15, ancho: 0.6, cabR: 0.32 } : { id, x: r.cur.x, y: r.cur.y, z: r.cur.z, crouch: r.crouch });
     const M = W.mapa(mapaId), hits = [], ends = [];
     for (let i = 0; i < w.pel; i++) {
       const d = W.desvio(d0, sp), tw = W.rayMundo(M, o, d, w.range), h = W.rayCuerpos(cuerpos, o, d, tw), t = h ? h.t : tw;
       const e = [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t];
       ends.push(e.map(v => Math.round(v * 100) / 100));
-      if (h) { hits.push([h.id, h.head ? 1 : 0]); polvo(e, '#c0392b'); } else if (t < w.range) polvo(e, '#cfc6b0');
+      if (h) { hits.push([h.id, h.head ? 1 : 0]); polvo(e, h.id[0] === 'z' && zombis.get(h.id) && zombis.get(h.id).tipo === 'teju' && !(campC && campC[8] > 0) ? '#cfd6dc' : '#c0392b'); } else if (t < w.range) polvo(e, '#cfc6b0');
       // el rastro sale un poco abajo a la derecha (del caño)
       const right = [Math.cos(yo.ry), 0, -Math.sin(yo.ry)], k = apunta ? 0 : 0.18;
       trazo([o[0] + right[0] * k + d0[0] * 0.6, o[1] - (apunta ? 0.06 : 0.14) + d0[1] * 0.6, o[2] + right[2] * k + d0[2] * 0.6], e);
@@ -1280,6 +1344,7 @@
     raf = requestAnimationFrame(loop);
     const dt = Math.max(0, Math.min(0.05, (t - last) / 1000)); last = Math.max(last, t);
     const now = performance.now(), obs = C.obs();
+    if (cine) { cineTick(dt); return; }
     if (!obs && yo.alive) jugar(dt, now);
     else if (!obs) camMuerto(dt, now);
     // otros jugadores (con 110 ms de atraso para que se vean suaves)
@@ -1314,7 +1379,7 @@
       if (desl && !r.desl) deslizDe(cur);
       r.desl = desl;
       r.deslK = (r.deslK || 0) + ((desl ? 1 : 0) - (r.deslK || 0)) * Math.min(1, dt * 12);
-      if (desl) { r.polvoT = (r.polvoT || 0) - dt; if (r.polvoT <= 0) { r.polvoT = 0.035; polvo(cur.x, cur.y, cur.z); } }
+      if (desl) { r.polvoT = (r.polvoT || 0) - dt; if (r.polvoT <= 0) { r.polvoT = 0.035; polvoPies(cur.x, cur.y, cur.z); } }
       g.position.set(cur.x, cur.y, cur.z); g.rotation.order = 'YXZ'; g.rotation.set(r.deslK * 0.75, cur.ry, 0);
       r.paso += Math.min(vel, 8) * dt * 1.6;
       if (u.modelo) {
@@ -1336,13 +1401,17 @@
       if (r.fuego > 0) { r.fuego -= dt; u.arma.material = r.fuego > 0 ? fuegoMat : u.armaMat; }
     }
     if (zombis.size) zombisTick(dt, rt);
+    campTick(dt, rt);
+    for (const h of humeantes) if (Math.random() < dt * 4) humoNegro(h[0], h[1], h[2]);
     if (proys.size || areas.length || humos.length || (luz.boom && luz.boom.intensity > 0)) proysTick(dt);
     if (obs) camObs(dt);
     efectosTick(dt);
     if (fogon.visible) { fogon.t -= dt; if (fogon.t <= 0) fogon.visible = false; }
     if (luz.destello && luz.destello.intensity > 0) luz.destello.intensity = Math.max(0, luz.destello.intensity - dt * 50);
     // reloj del HUD
-    if (C.S() && C.S().settings.mode === 'zombis') $('#tReloj').textContent = yo.ola ? (yo.ola[2] ? '⏸️ Descanso' : '🧟 Oleada ' + yo.ola[0]) : '🧟 Preparense';
+    const NVL = nivelDe(C.S());
+    if (NVL) { const f = faseAct(); $('#tReloj').textContent = f && (f.tipo === 'aguantar' || f.tipo === 'escapar') ? '⏱️ ' + campC[4] + ' s' : '🎖️ Nivel ' + NVL.id; }
+    else if (C.S() && C.S().settings.mode === 'zombis') $('#tReloj').textContent = yo.ola ? (yo.ola[2] ? '⏸️ Descanso' : '🧟 Oleada ' + yo.ola[0]) : '🧟 Preparense';
     else if (yo.tl != null) { const ms = Math.max(0, yo.tl - (now - yo.tlAt)), s = Math.ceil(ms / 1000); $('#tReloj').textContent = `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`; }
     ren.clear(); ren.render(scene, cam);
     if (!obs && yo.alive && !(yo.w === 'franco' && yo.aimK > 0.85)) { ren.clearDepth(); ren.render(vmScene, vmCam); }
@@ -1418,7 +1487,7 @@
     } else cam.rotation.set(-0.5 * k, yo.ry, 0);
     cam.fov = fovBase; cam.updateProjectionMatrix();
     const left = Math.max(0, 3.5 - (now - yo.deadAt) / 1000);
-    $('#mCuenta').textContent = C.S() && C.S().settings.mode === 'zombis' ? 'Volvés cuando empiece la próxima oleada 🧟' : left > 0 ? `Volvés en ${Math.ceil(left)}…` : 'Volviendo…';
+    $('#mCuenta').textContent = esCamp() ? (Math.max(0, 15 - (now - yo.deadAt) / 1000) > 0 ? `Volvés en ${Math.ceil(15 - (now - yo.deadAt) / 1000)} s al lado de un compañero 🎖️` : 'Volviendo…') : C.S() && C.S().settings.mode === 'zombis' ? 'Volvés cuando empiece la próxima oleada 🧟' : left > 0 ? `Volvés en ${Math.ceil(left)}…` : 'Volviendo…';
     hud(dt);
   }
   // espectador: sigue a un jugador vivo, desde sus ojos
@@ -1455,7 +1524,8 @@
   function marcador() {
     const S = C.S(); if (!S) return;
     const st = S.settings, el = $('#tScore');
-    if (st.mode === 'zombis') { const me = S.players.find(p => p.id === C.me()), o = yo.ola; el.innerHTML = (o ? `🧟 quedan <b>${o[1]}</b>` : '🧟 ya vienen...') + (me && !C.obs() ? ` · <b>vos ${me.k}</b>` : ''); }
+    if (st.mode === 'campana') { const me = S.players.find(p => p.id === C.me()), N = nivelDe(S); el.innerHTML = N ? `🎖️ Nivel <b>${N.id}</b>/10 · ${campC ? campC[1] + 1 : 1}/${N.fases.length}` + (me && !C.obs() ? ` · <b>vos ${me.k}</b>` : '') : '🎖️ Operación Yvy'; }
+    else if (st.mode === 'zombis') { const me = S.players.find(p => p.id === C.me()), o = yo.ola; el.innerHTML = (o ? `🧟 quedan <b>${o[1]}</b>` : '🧟 ya vienen...') + (me && !C.obs() ? ` · <b>vos ${me.k}</b>` : ''); }
     else if (st.mode === 'equipos') el.innerHTML = `<span class="tr">🔴 ${S.score.r}</span> <small>/${st.goal}</small> <span class="ta">${S.score.a} 🔵</span>`;
     else {
       const L = S.players.slice().sort((a, b) => b.k - a.k), me = S.players.find(p => p.id === C.me());
@@ -1479,7 +1549,343 @@
     const b = $('#clog'); b.appendChild(d); while (b.children.length > 7) b.firstChild.remove();
     setTimeout(() => d.classList.add('viejo'), 9000);
   };
-  J._dbg = { yo, inp, remotos, VM };   // para probar desde la consola
+  // ================= CAMPAÑA "OPERACIÓN YVY" =================
+  const CAMP = () => window.TiroCampana;
+  const mercs = new Map(); let camion = null, campC = null, campK = null, abriendo = [], cine = null, ambT = 6, derrumbeT = 3, usarOn = false;
+  let puertasB = {}, puertasP = {};
+  const ICO_P = { generador: '⚡', tablero: '⚡', terminal: '💻', camion: '🧪', helicoptero: '📡', valvula: '❄️', bloqueo: '🚧' };
+  const VERBO = { generador: 'arrancar el generador', tablero: 'cortar el tablero', terminal: 'hackear la terminal', camion: 'sacar las muestras', helicoptero: 'recuperar las coordenadas', valvula: 'abrir la válvula de agua helada', bloqueo: 'despejar el bloqueo', torreta: 'desactivar la torreta' };
+  function nivelDe(S) {
+    const c = CAMP(); if (!c || !S || S.settings.mode !== 'campana') return null;
+    return c.NIVELES[S.camp ? S.camp.n : (S.settings.nivel || 0)] || null;
+  }
+  J.nivelDe = nivelDe;
+  const esCamp = () => { const S = C.S(); return !!(S && S.settings.mode === 'campana'); };
+  const faseAct = () => { const N = nivelDe(C.S()); return N && campC ? N.fases[campC[1]] : null; };
+  function puntosDe(f) { return !f ? [] : f.paradas ? f.paradas.map(p => [p.punto[0], p.punto[1], 'bloqueo']) : (f.puntos || []); }
+
+  // ---------- mercenarios ----------
+  function mercsSnap(L) {
+    const now = performance.now(), vistos = new Set(), TM = CAMP().TIPOS_M;
+    for (const e of L) {
+      const [id, ti, x, y, z, ry, estado, cr, rx, hp, hack] = e; vistos.add(id);
+      let r = mercs.get(id);
+      if (!r) r = mercNuevo(id, TM[ti] || 'merc');
+      const vivo = estado !== 2;
+      if (!vivo && r.alive) r.caida = 0.001;
+      r.alive = vivo; r.estado = estado; r.crouch = !!cr; r.hp = hp; r.hack = hack;
+      r.buf.push({ t: now, x, y, z, ry, rx }); if (r.buf.length > 30) r.buf.shift();
+    }
+    for (const [id, r] of mercs) if (!vistos.has(id)) { scene.remove(r.g); if (r.laser) scene.remove(r.laser); mercs.delete(id); }
+  }
+  function mercNuevo(id, tipo) {
+    const T2 = CAMP().MT[tipo];
+    let g;
+    if (tipo === 'torreta') {
+      g = new T.Group(); const gl = GLBP.torreta;
+      if (gl) { const m = gl.scene.clone(true), c = gl.caja, sz = c.getSize(new T.Vector3()), k = 1.3 / Math.max(sz.x, sz.z); m.scale.setScalar(k); m.position.y = -c.min.y * k; g.add(m); }
+      else { const b = new T.Mesh(new T.BoxGeometry(0.9, 0.6, 0.9), matCaja(8)); b.position.y = 0.3; g.add(b); }
+      const cano = new T.Mesh(new T.BoxGeometry(0.12, 0.12, 0.9), new T.MeshLambertMaterial({ color: '#222' })); cano.position.set(0, 0.62, -0.55); g.add(cano);
+      const nom = cartel('🔧 Torreta', '#ff9a8a'); nom.position.y = 1.7; g.add(nom);
+      g.userData = { modelo: false, torreta: true, nom };
+      scene.add(g);
+    } else {
+      g = muneco({ id, name: T2.n, skin: 'enemigo', team: 'r', col: 3 }, 'campana');
+      const u = g.userData; if (u.nom) { g.remove(u.nom); u.nom = cartel(T2.n, tipo === 'comandante' ? '#ffd24a' : '#ff8a80'); u.nom.position.y = 2.15; g.add(u.nom); }
+      if (tipo === 'comandante') { g.scale.setScalar(1.15); (u.mats || []).forEach(m => m.color && m.color.multiplyScalar(0.55)); }
+      if (tipo === 'escudo') {
+        let e; const gl = GLBP.escudo;
+        if (gl) { e = gl.scene.clone(true); const c = gl.caja, sz = c.getSize(new T.Vector3()); e.scale.set(0.9 / sz.x, 1.3 / sz.y, 0.18 / sz.z); e.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.set('#3a3f47'); } }); }
+        else e = new T.Mesh(new T.BoxGeometry(0.9, 1.3, 0.08), new T.MeshPhongMaterial({ color: '#3a3f47', shininess: 40 }));
+        const h = new T.Group(); h.add(e); e.position.set(0, 0, 0); h.position.set(0.05, 0.75, -0.55); g.add(h); u.escudo = h;
+      }
+    }
+    const r = { id, tipo, g, buf: [], alive: true, crouch: false, w: Math.max(0, W.ARMA_IDS.indexOf(T2.w)), tiroT: 0, cur: null, velS: 0, caida: 0, paso: 0, estado: 0 };
+    if (tipo === 'franco') {
+      const geo = new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -1)]);
+      r.laser = new T.Line(geo, new T.LineBasicMaterial({ color: '#ff2a1a', transparent: true, opacity: 0.85, fog: false }));
+      r.laser.visible = false; scene.add(r.laser);
+    }
+    mercs.set(id, r); return r;
+  }
+  function mercsTick(dt, rt) {
+    const M = W.mapa(mapaId);
+    for (const r of mercs.values()) {
+      if (!r.buf.length) continue;
+      const cur = interp(r.buf, rt), last = r.buf[r.buf.length - 1]; cur.rx = last.rx || 0;
+      const v = r.cur ? Math.hypot(cur.x - r.cur.x, cur.z - r.cur.z) / Math.max(dt, 0.001) : 0;
+      r.velS = r.velS * 0.85 + Math.min(v, 10) * 0.15; r.cur = cur;
+      const g = r.g, u = g.userData;
+      if (!r.alive) { r.caida += dt; g.visible = r.caida < 3; if (r.laser) r.laser.visible = false; if (u.modelo) animar(r, 0, dt); else if (!u.torreta) g.rotation.x = -Math.min(1.5, r.caida * 4); continue; }
+      g.visible = true;
+      g.position.set(cur.x, cur.y, cur.z); g.rotation.y = cur.ry;
+      if (u.torreta) { if (r.hack > 0) g.rotation.z = Math.sin(performance.now() / 40) * 0.04; continue; }
+      if (u.haz) { u.haz.rotation.x = cur.rx; u.haz.position.y = r.crouch ? 0.95 : 1.35; u.haz.visible = noche; }
+      if (u.modelo) animar(r, r.velS, dt); else if (u.brazos) u.brazos.rotation.x = cur.rx;
+      if (r.fuego > 0) r.fuego -= dt;
+      r.paso += Math.min(r.velS, 8) * dt * 1.6;
+      const st = Math.floor(r.paso * 3 / Math.PI); if (st !== r.st) { r.st = st; if (r.velS > 2.2 && !r.crouch) pasoDe(cur, r.velS); }
+      // el láser rojo del francotirador cuando apunta (aviso para cubrirse)
+      if (r.laser) {
+        r.laser.visible = r.estado === 1;
+        if (r.laser.visible) {
+          const o = [cur.x, cur.y + 1.5, cur.z], d = W.dir(cur.ry, cur.rx), L = W.rayMundo(M, o, d, 140);
+          r.laser.position.set(o[0], o[1], o[2]); r.laser.lookAt(o[0] - d[0], o[1] - d[1], o[2] - d[2]); r.laser.scale.set(1, 1, L);
+        }
+      }
+    }
+  }
+  // ---------- el camión blindado ----------
+  function camionTick(dt) {
+    if (!campK) { if (camion) { scene.remove(camion.g); camion = null; } return; }
+    if (!camion) {
+      const g = new T.Group(), gl = GLBP.blindado;
+      if (gl) { const m = gl.scene.clone(true), c = gl.caja, sz = c.getSize(new T.Vector3()), ce = c.getCenter(new T.Vector3()); const k = 6 / sz.z; m.scale.setScalar(k); m.position.set(-ce.x * k, -c.min.y * k, -ce.z * k); g.add(m); }
+      else { const b = new T.Mesh(cajaGeo(2.8, 2.6, 6), matCaja(13)); b.position.y = 1.3; g.add(b); }
+      g.position.set(campK[0], 0, campK[1]); scene.add(g); camion = { g, humoT: 0 };
+    }
+    const g = camion.g, k = Math.min(1, dt * 6);
+    g.position.x += (campK[0] - g.position.x) * k; g.position.z += (campK[1] - g.position.z) * k;
+    let dr = campK[2] - g.rotation.y; while (dr > Math.PI) dr -= 2 * Math.PI; while (dr < -Math.PI) dr += 2 * Math.PI; g.rotation.y += dr * k;
+    if (campK[3] < 45 && (camion.humoT -= dt) <= 0) { camion.humoT = 0.2; humoNegro(g.position.x, 2.6, g.position.z); }
+  }
+  function humoNegro(x, y, z) {
+    const h = new T.Sprite(new T.SpriteMaterial({ map: brillo('#555555'), transparent: true, depthWrite: false, opacity: 0.6 }));
+    h.material.color.set('#222'); h.position.set(x + (Math.random() - 0.5) * 0.6, y, z + (Math.random() - 0.5) * 0.6); scene.add(h);
+    humos.push({ o: h, t: 0, max: 2.5, s0: 1, s1: 3, op: 0.55, sube: 1.4 });
+  }
+  // ---------- puertas que se abren (vagón, bloqueos, compuerta) ----------
+  function abrirVisual(id, ya) {
+    const L = (puertasB[id] || []).concat(puertasP[id] || []); delete puertasB[id]; delete puertasP[id];
+    for (const o of L) {
+      const a = o.userData.abre || [0, -3.5, 0];
+      if (ya) { o.position.x += a[0]; o.position.y += a[1]; o.position.z += a[2]; if (a[1] < -1) o.visible = false; }
+      else abriendo.push({ o, a, t: 0, desde: o.position.clone() });
+    }
+    if (!ya && L.length) { raspa(0, 2.2, 150, 500, 0.35); metal(0.1, 1.8, 90, 60, 0.25, 3); }
+  }
+  function abriendoTick(dt) {
+    for (let i = abriendo.length - 1; i >= 0; i--) {
+      const b = abriendo[i]; b.t = Math.min(1, b.t + dt / 3.5); const e = b.t * b.t * (3 - 2 * b.t);
+      b.o.position.set(b.desde.x + b.a[0] * e, b.desde.y + b.a[1] * e, b.desde.z + b.a[2] * e);
+      if (b.t >= 1) { if (b.a[1] < -1) b.o.visible = false; abriendo.splice(i, 1); }
+    }
+  }
+  // ---------- cartel del objetivo, marcas en el mundo y el ✋ ----------
+  function campHUD() {
+    const S = C.S(), N = nivelDe(S), el = $('#obj');
+    if (!N || !campC || cine) { el.classList.add('hidden'); $('#jefeBar').classList.add('hidden'); return; }
+    const f = N.fases[campC[1]]; if (!f) return;
+    el.classList.remove('hidden');
+    let extra = '';
+    if (f.tipo === 'aguantar' || f.tipo === 'escapar') extra += ` ⏱️ ${campC[4]} s`;
+    if (f.tipo === 'activar') extra += ` · ${campC[3].filter(v => v === -1).length}/${campC[3].length}`;
+    if (f.tipo === 'matar') extra += ` · ${Math.round(campC[2] * 100)}%`;
+    if (campC[6] >= 0) extra += ` · ⛪ ${campC[6]}%`;
+    if (campK && (f.tipo === 'escoltar' || f.defiende)) extra += ` · 🚚 ${campK[3]}%` + (campK[4] && f.tipo === 'escoltar' ? ' ⏸️' : '');
+    const html = `<small>Nivel ${N.id}/10 · ${esc(N.n)} · ${esc(N.lugar)}</small>🎯 ${esc(f.txt)}<b>${extra}</b>`;
+    if (el._h !== html) { el._h = html; $('#objT').innerHTML = html; }
+    $('#objB').style.width = Math.round(Math.min(1, Math.max(0, campC[2])) * 100) + '%';
+    const j = $('#jefeBar'); j.classList.toggle('hidden', campC[7] < 0);
+    if (campC[7] >= 0) { j.querySelector('i').style.width = campC[7] + '%'; j.querySelector('span').textContent = campC[8] > 0 ? `❄️⚡ ¡AL DESCUBIERTO! Tírenle a la cabeza · ${campC[8]} s` : '🛡️ Blindado: activen DOS consolas a la vez (✋)'; j.classList.toggle('exp', campC[8] > 0); }
+  }
+  function marcasTick() {
+    const f = faseAct(), cont = $('#marcas'), L = [];
+    if (f && campC[5] === 0 && !cine) {
+      if (f.zona) L.push([f.zona[0], 1.6, f.zona[1], f.tipo === 'escapar' ? '🛗' : f.tipo === 'aguantar' ? '🛡️' : '🏁', '']);
+      puntosDe(f).forEach(([x, z, t], i) => { const v = campC[3][i]; if (v === -1 || v === -2 || v == null) return; L.push([x, 1.4, z, ICO_P[t] || '✋', v > 0 ? Math.round(v * 100) + '%' : '']); });
+      if (f.puerta) L.push([f.puerta[0], 3, f.puerta[1], '⛪', campC[6] + '%']);
+      if (campK && (f.tipo === 'escoltar' || f.defiende)) L.push([campK[0], 3.4, campK[1], '🚚', campK[3] + '%']);
+      if (f.tipo === 'matar') for (const r of mercs.values()) if (r.alive && r.tipo === 'torreta' && r.cur) L.push([r.cur.x, r.cur.y + 1.5, r.cur.z, '🔧', '']);
+    }
+    while (cont.children.length < L.length) { const d = document.createElement('div'); d.className = 'marca'; cont.appendChild(d); }
+    const W2 = innerWidth, H2 = innerHeight, v = new T.Vector3();
+    [...cont.children].forEach((d, i) => {
+      const m = L[i]; if (!m) { d.style.display = 'none'; return; }
+      v.set(m[0], m[1], m[2]).project(cam);
+      let x = (v.x * 0.5 + 0.5) * W2, y = (-v.y * 0.5 + 0.5) * H2;
+      if (v.z > 1) { x = W2 - x; y = H2 - 60; }
+      x = Math.max(26, Math.min(W2 - 26, x)); y = Math.max(70, Math.min(H2 - 50, y));
+      const dist = Math.round(Math.hypot(m[0] - cam.position.x, m[2] - cam.position.z));
+      d.style.display = ''; d.style.transform = `translate(${x}px,${y}px)`;
+      const html = `${m[3]}<small>${m[4] ? m[4] + ' · ' : ''}${dist} m</small>`; if (d._h !== html) { d._h = html; d.innerHTML = html; }
+    });
+  }
+  function usarTick() {
+    const f = faseAct(); let txt = '', prog = 0;
+    if (f && campC[5] === 0 && yo.alive && yo.s && !C.obs()) {
+      const s = yo.s;
+      puntosDe(f).forEach(([x, z, t], i) => { const v = campC[3][i]; if (v === -1 || v === -2) return; if (Math.hypot(x - s.x, z - s.z) < 2.6) { txt = VERBO[t]; prog = Math.max(0, v); } });
+      if (f.tipo === 'matar') for (const r of mercs.values()) if (r.alive && r.tipo === 'torreta' && r.cur && Math.hypot(r.cur.x - s.x, r.cur.z - s.z) < 2.4) { txt = VERBO.torreta; prog = r.hack || 0; }
+    }
+    const el = $('#usar');
+    el.classList.toggle('hidden', !txt);
+    if (txt) { const t2 = (tactil() ? 'Mantené ✋ para ' : 'Mantené E para ') + txt; if (el._t !== t2) { el._t = t2; el.querySelector('span').textContent = t2; } el.querySelector('i').style.width = Math.round(Math.min(1, prog) * 100) + '%'; }
+    document.querySelectorAll('[data-b="usar"]').forEach(b => b.classList.toggle('lista', !!txt));
+  }
+  function usar(on) { if (on === usarOn) return; usarOn = on; C.send({ t: 'usar', on }); }
+  J.usar = usar;
+  // ---------- sonidos de la campaña ----------
+  function rugido(vol) {
+    if (!soundOn || !actx) return;
+    try {
+      const t = actx.currentTime, o = actx.createOscillator(), f = actx.createBiquadFilter(), g = actx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(38, t + 1.6);
+      const lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = 18; lg.gain.value = 14; lfo.connect(lg); lg.connect(o.frequency);
+      f.type = 'lowpass'; f.frequency.value = 700; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5 * vol, t + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
+      o.connect(f); f.connect(g); g.connect(actx.destination); o.start(t); lfo.start(t); o.stop(t + 1.8); lfo.stop(t + 1.8);
+      raspa(0, 1.2, 300, 120, 0.25 * vol);
+    } catch (e) { }
+  }
+  function silbido() {   // el silbido del Pombero, de lejos y de algún costado
+    if (!soundOn || !actx) return;
+    try {
+      const t = actx.currentTime, pan = actx.createStereoPanner ? actx.createStereoPanner() : null;
+      for (let i = 0; i < 2; i++) {
+        const o = actx.createOscillator(), g = actx.createGain(), t0 = t + i * 0.42;
+        o.type = 'sine'; o.frequency.setValueAtTime(1900 + i * 300, t0); o.frequency.linearRampToValueAtTime(2500 + i * 200, t0 + 0.25);
+        g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.05, t0 + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+        o.connect(g); if (pan) { g.connect(pan); } else g.connect(actx.destination); o.start(t0); o.stop(t0 + 0.35);
+      }
+      if (pan) { pan.pan.value = Math.random() < 0.5 ? -0.85 : 0.85; pan.connect(actx.destination); }
+    } catch (e) { }
+  }
+  function grillo() {
+    if (!soundOn || !actx) return;
+    try {
+      const t = actx.currentTime;
+      for (let i = 0; i < 4; i++) { const o = actx.createOscillator(), g = actx.createGain(), t0 = t + i * 0.09; o.frequency.value = 4200 + Math.random() * 300; g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.012, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06); o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + 0.07); }
+    } catch (e) { }
+  }
+  function ambienteTick(dt) {
+    const N = nivelDe(C.S()); if (!N || cine) return;
+    ambT -= dt;
+    if (ambT <= 0) {
+      ambT = 4 + Math.random() * 8;
+      if (N.selva) (Math.random() < 0.45 ? silbido : grillo)();
+      else if (N.noche && N.id !== 10 && N.id !== 6) grillo();
+    }
+    // autodestrucción del búnker: temblores y piedras que caen
+    const f = faseAct();
+    if (f && f.tipo === 'escapar' && campC[5] === 0) {
+      derrumbeT -= dt;
+      if (derrumbeT <= 0) {
+        derrumbeT = 2 + Math.random() * 3; yo.temblor = Math.max(yo.temblor || 0, 0.18); boomSnd(0.25);
+        if (yo.s) for (let i = 0; i < 6; i++) { const h = new T.Mesh(polvoGeo, new T.MeshBasicMaterial({ color: '#6a6258', transparent: true })); h.position.set(yo.s.x + (Math.random() - 0.5) * 12, 7 + Math.random() * 3, yo.s.z + (Math.random() - 0.5) * 12); scene.add(h); humos.push({ o: h, t: 0, max: 1.4, s0: 2, s1: 3, op: 0.9, sube: -6 }); }
+      }
+    }
+  }
+  // ---------- pantallas de la historia ----------
+  function briefing(n) {
+    const N = CAMP().NIVELES[n]; if (!N) return;
+    $('#briefBox').innerHTML = `<div class="nv">NIVEL ${N.id} DE 10</div><h2>${esc(N.n)}</h2><div class="lugar">📍 ${esc(N.lugar)}</div><p>${esc(N.historia)}</p><div class="enem">${esc(N.enemigos)}</div><ol>${N.fases.map(f => `<li>${esc(f.txt)}</li>`).join('')}</ol><button class="btn-ok jugar" id="briefOk">¡Vamos! 💪</button>`;
+    $('#brief').classList.remove('hidden');
+    $('#briefOk').onclick = e => { e.stopPropagation(); $('#brief').classList.add('hidden'); bloquear(); };
+    clearTimeout(briefing._t); briefing._t = setTimeout(() => $('#brief').classList.add('hidden'), 16000);
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+  function finNivel(n) {
+    const c = CAMP(), N = c.NIVELES[n], sig = c.NIVELES[n + 1];
+    const el = $('#cfin');
+    el.innerHTML = `<div class="card"><h2>✅ ¡Nivel ${N.id} completado!</h2><p>${esc(N.fin)}</p>${sig ? `<p class="sig">Siguiente: <b>Nivel ${sig.id} · ${esc(sig.n)}</b> — ${esc(sig.lugar)}</p>` : ''}</div>`;
+    el.classList.remove('hidden'); clearTimeout(finNivel._t); finNivel._t = setTimeout(() => el.classList.add('hidden'), 9500);
+    SFX.fin();
+  }
+  // ---------- final: amanecer en el Chaco con tereré ----------
+  J.final = () => {
+    const S = C.S(); if (!S || !scene) return;
+    const sc = new T.Scene(); cine = { t: 0, sc, rs: [] };
+    sc.background = new T.Color('#f0a25c'); sc.fog = new T.Fog('#f0a25c', 18, 80);
+    sc.add(new T.HemisphereLight(0xffe0bc, 0x7a4a2a, 1.05)); const sol = new T.DirectionalLight(0xffc27a, 0.95); sol.position.set(-20, 8, -40); sc.add(sol);
+    const ft = tex('tierra').clone(); ft.needsUpdate = true; ft.repeat.set(40, 40);
+    const piso = new T.Mesh(new T.PlaneGeometry(200, 200), new T.MeshLambertMaterial({ color: '#b8784a', map: ft })); piso.rotation.x = -Math.PI / 2; sc.add(piso);
+    const ruta = new T.Mesh(new T.PlaneGeometry(6, 200), new T.MeshLambertMaterial({ color: '#4a4a4a' })); ruta.rotation.x = -Math.PI / 2; ruta.position.set(-7, 0.02, 0); sc.add(ruta);
+    const s2 = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ffd890'), blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false })); s2.scale.set(26, 26, 1); s2.position.set(-30, 3, -70); sc.add(s2);
+    if (GLBP.palmera) for (let i = 0; i < 14; i++) { const p = GLBP.palmera.scene.clone(true), a = i / 14 * 6.28, r = 14 + (i % 3) * 7; p.scale.setScalar(2 + (i % 2)); p.position.set(Math.cos(a) * r, 0, Math.sin(a) * r - 6); sc.add(p); }
+    // la escotilla del búnker por donde salieron
+    const esco = new T.Mesh(new T.BoxGeometry(2.6, 0.5, 2.6), matCaja(8)); esco.position.set(3.5, 0.25, -3); sc.add(esco);
+    // los 4 del escuadrón
+    const gente = S.players.filter(p => !p.bot).concat(S.players.filter(p => p.bot)).slice(0, 4);
+    gente.forEach((p, i) => {
+      const g = muneco(p, 'campana'); sc.add(g);
+      const a = (i - (gente.length - 1) / 2) * 0.55; g.position.set(Math.sin(a) * 3, 0, Math.cos(a) * 3 - 3); g.rotation.y = a + Math.PI;
+      if (g.userData.haz) g.userData.haz.visible = false; if (g.userData.nom) g.userData.nom.visible = false;
+      cine.rs.push({ g, w: 0, alive: true, crouch: false, tiroT: 0, velS: 0 });
+    });
+    // el tereré: termo abollado y guampa con bombilla
+    const termo = new T.Mesh(new T.CylinderGeometry(0.09, 0.1, 0.42, 10), new T.MeshPhongMaterial({ color: '#c9cdd2', shininess: 60 })); termo.rotation.z = 0.12;
+    const guampa = new T.Mesh(new T.CylinderGeometry(0.07, 0.055, 0.14, 10), new T.MeshPhongMaterial({ color: '#7a4a24' }));
+    const bombilla = new T.Mesh(new T.CylinderGeometry(0.006, 0.006, 0.2, 5), new T.MeshPhongMaterial({ color: '#d8d8d8', shininess: 80 })); bombilla.position.set(0.02, 0.12, 0); bombilla.rotation.z = -0.25; guampa.add(bombilla);
+    const r0 = cine.rs[0];
+    if (r0) { termo.position.set(r0.g.position.x + 0.45, 0.21, r0.g.position.z + 0.3); guampa.position.set(r0.g.position.x + 0.25, 1.15, r0.g.position.z + 0.35); }
+    sc.add(termo, guampa); cine.guampa = guampa;
+    document.body.classList.add('cine');
+    const textos = ['🧉 Operación Yvy — Cumplida', 'Amanece en el Chaco. Los cuatro salen a la superficie, agotados y llenos de polvo.', 'El acuífero está a salvo: el agua de todos queda limpia.', 'Uno saca una guampa y un termo abollado...', '...y ceban el primer tereré de la victoria. 🧉', 'Gracias por jugar · Tiro Guasu · juegospy.com'];
+    const el = $('#cine'); el.innerHTML = textos.map((t, i) => `<p style="animation-delay:${1 + i * 4}s"${i === 0 ? ' class="tit"' : ''}>${esc(t)}</p>`).join('');
+    el.classList.remove('hidden');
+    if (document.pointerLockElement) document.exitPointerLock();
+    SFX.fin();
+  };
+  function cineTick(dt) {
+    cine.t += dt;
+    const a = -0.9 + cine.t * 0.045, R = 6.5 - Math.min(2, cine.t * 0.06);
+    cam.position.set(Math.sin(a) * R, 1.7 + Math.sin(cine.t * 0.2) * 0.15, Math.cos(a) * R - 3); cam.lookAt(0, 1.1, -3);
+    cam.fov = fovBase; cam.updateProjectionMatrix();
+    for (const r of cine.rs) if (r.g.userData.modelo) animar(r, 0, dt);
+    if (cine.guampa) cine.guampa.position.y = 1.15 + Math.sin(cine.t * 1.3) * 0.05;
+    ren.clear(); ren.render(cine.sc, cam);
+  }
+  function campLimpiar() {
+    for (const r of mercs.values()) { scene.remove(r.g); if (r.laser) scene.remove(r.laser); } mercs.clear();
+    if (camion) { scene.remove(camion.g); camion = null; } campC = null; campK = null; abriendo.length = 0;
+    if (cine) { cine = null; document.body.classList.remove('cine'); $('#cine').classList.add('hidden'); }
+    $('#obj').classList.add('hidden'); $('#jefeBar').classList.add('hidden'); $('#usar').classList.add('hidden'); $('#marcas').innerHTML = '';
+    usar(false);
+  }
+  J.campMsg = m => {
+    const c = CAMP(); if (!c) return;
+    switch (m.t) {
+      case 'cnivel': {
+        const N = c.NIVELES[m.n]; if (!N) break;
+        W.reiniciarMapa(N.mapa); mapaId = null;
+        campLimpiar(); briefing(m.n);
+        ['torreta', 'escudo', 'blindado', 'palmera'].forEach(cargarProp);
+        break;
+      }
+      case 'cfase': {
+        const f = c.NIVELES[m.n].fases[m.f]; if (!f) break;
+        if (m.f > 0) { aviso('🎯 Nuevo objetivo', f.txt); SFX.aparece(); }
+        if (f.aviso) setTimeout(() => aviso('⚠️ ' + f.aviso, f.txt), m.f > 0 ? 2200 : 0);
+        if (f.tipo === 'jefe') rugido(1);
+        break;
+      }
+      case 'cfin': finNivel(m.n); break;
+      case 'cfalla': aviso('💀 ' + m.motivo, 'Reintentan desde el último punto de control...'); SFX.muero(); break;
+      case 'cpunto': SFX.baja(); if (!m.jefe) aviso('✅ ¡Listo!', 'Sigan con el objetivo'); break;
+      case 'abrir': { const M = W.mapa(mapaId); W.abrir(M, m.id); abrirVisual(m.id); break; }
+      case 'jefe': {
+        const j = [...zombis.values()].find(z => z.tipo === 'teju');
+        if (m.ev === 'expuesto') { aviso('❄️⚡ ¡Teju Jagua al descubierto!', '¡Tírenle a la cabeza ahora!'); metal(0, 1.2, 2400, 300, 0.3, 4); if (j && j.cur) for (let i = 0; i < 16; i++) { const h = new T.Sprite(new T.SpriteMaterial({ map: brillo(m.tipo === 'valvula' ? '#bfefff' : '#9ad0ff'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); h.position.set(j.cur.x + (Math.random() - 0.5) * 3, 1 + Math.random() * 3.5, j.cur.z + (Math.random() - 0.5) * 3); scene.add(h); humos.push({ o: h, t: 0, max: 1.5 + Math.random(), s0: 0.6, s1: 2, op: 0.9, sube: 0.6 }); } }
+        else if (m.ev === 'golpe') { boomSnd(0.45); if (yo.s && Math.hypot(m.x - yo.s.x, m.z - yo.s.z) < 12) yo.temblor = Math.max(yo.temblor || 0, 0.3); }
+        else rugido(m.ev === 'carga' ? 0.7 : 1);
+        break;
+      }
+      case 'final': J.final(); break;
+    }
+  };
+  J.campSnap = m => { if (m.M) mercsSnap(m.M); else if (mercs.size) mercsSnap([]); if (m.C) { campC = m.C; campHUD(); } campK = m.K || null; };
+  J.campAbiertas = S => {
+    if (!S.camp || !S.camp.ab || !mapaId) return;
+    const M = W.mapa(mapaId);
+    for (const id of S.camp.ab) if (W.abrir(M, id) || puertasB[id] || puertasP[id]) abrirVisual(id, true);
+  };
+  function campTick(dt, rt) {
+    if (mercs.size) mercsTick(dt, rt);
+    camionTick(dt); abriendoTick(dt);
+    if (esCamp()) { marcasTick(); usarTick(); ambienteTick(dt); }
+  }
+
+  J._dbg = { yo, inp, remotos, VM, mercs };   // para probar desde la consola
   J.vivo = () => yo.alive;
   J.prim = () => yo.prim;
   J.setPrim = w => { if (A[w]) yo.prim = w; };
