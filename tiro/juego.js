@@ -604,7 +604,9 @@
   function proyNuevo(tipo) {
     if (!geoG) geoG = { esfera: new T.SphereGeometry(1, 10, 8), botella: new T.CylinderGeometry(0.05, 0.07, 0.28, 8) };
     const g = new T.Group();
-    if (tipo === 'granada') { g.add(new T.Mesh(geoG.esfera, new T.MeshPhongMaterial({ color: '#3d4a2a' }))); g.children[0].scale.setScalar(0.1); }
+    const glp = (tipo === 'granada' || tipo === 'molotov') && GLBP['item_' + tipo];
+    if (glp) { const m = glp.scene.clone(true), c = glp.caja, sz = c.getSize(new T.Vector3()), ce = c.getCenter(new T.Vector3()), k = (tipo === 'granada' ? 0.2 : 0.34) / sz.y; m.scale.setScalar(k); m.position.set(-ce.x * k, -ce.y * k, -ce.z * k); g.add(m); if (tipo === 'molotov') { const llama = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ffb040'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); llama.scale.set(0.35, 0.35, 1); llama.position.y = 0.2; g.add(llama); } }
+    else if (tipo === 'granada') { g.add(new T.Mesh(geoG.esfera, new T.MeshPhongMaterial({ color: '#3d4a2a' }))); g.children[0].scale.setScalar(0.1); }
     else if (tipo === 'molotov') {
       const b = new T.Mesh(geoG.botella, new T.MeshPhongMaterial({ color: '#6b3d12', transparent: true, opacity: 0.85 })); g.add(b);
       const llama = new T.Sprite(new T.SpriteMaterial({ map: brillo('#ffb040'), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); llama.scale.set(0.35, 0.35, 1); llama.position.y = 0.2; g.add(llama);
@@ -1038,7 +1040,7 @@
   };
   J.activo = () => activo;
   J.estado = S => {
-    if (S.settings.mode === 'zombis' || S.settings.mode === 'campana') J.cargarZombis();
+    if (S.settings.mode === 'zombis' || S.settings.mode === 'campana') { J.cargarZombis(); cargarItems(); }
     if (!scene) return;
     const NV = nivelDe(S), quiereNoche = S.settings.mode === 'zombis' || !!(NV && NV.noche);
     if (S.settings.map !== mapaId) { cargarMapa(S.settings.map); ambiente(S); }
@@ -1742,14 +1744,24 @@
   J.curar = () => { const S = C.S(), me = S && S.players.find(p => p.id === C.me()); if (!me || !me.lim || !yo.alive) return; if ((me.bq | 0) <= 0) { aviso('💊 No tenés botiquines', 'Buscalos en el suelo'); return; } if (yo.hp >= 100) { aviso('💊 Tenés la vida llena', ''); return; } C.send({ t: 'curar' }); };
   // ---------- cosas tiradas en el suelo (dificultad normal y difícil) ----------
   const items = new Map(); let itemGeo = null;
+  const ALTO_I = { balas: 0.5, botiquin: 0.42, granada: 0.3, molotov: 0.45 };
+  const ITEMS_GLB = ['item_balas', 'item_botiquin', 'item_granada', 'item_molotov'];
+  // cuando terminan de bajar los modelos, se cambian las cosas del suelo
+  function cargarItems() { Promise.all(ITEMS_GLB.map(cargarProp)).then(() => { for (const it of items.values()) { const p = it.g.position.clone(); scene.remove(it.g); it.g = itemNuevo(it.tipo); it.g.position.copy(p); } }); }
+  J.cargarItems = cargarItems;
   function itemNuevo(tipo) {
     if (!itemGeo) {
       const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
       g.fillStyle = '#f4f4f4'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#d62828'; g.fillRect(24, 10, 16, 44); g.fillRect(10, 24, 44, 16);
       itemGeo = { cruz: new T.MeshPhongMaterial({ map: new T.CanvasTexture(c) }), caja: new T.MeshPhongMaterial({ color: '#4a5a2a' }), fr: new T.MeshPhongMaterial({ color: '#e0b020' }) };
     }
-    const g = new T.Group();
-    if (tipo === 'balas') { const b = new T.Mesh(new T.BoxGeometry(0.55, 0.3, 0.32), itemGeo.caja); b.position.y = 0.15; g.add(b); const f = new T.Mesh(new T.BoxGeometry(0.56, 0.06, 0.33), itemGeo.fr); f.position.y = 0.2; g.add(f); }
+    const g = new T.Group(), gl = GLBP['item_' + tipo];
+    if (gl) {
+      // modelos bajados: caja de balas (Zsky), botiquín (Quaternius), granada y molotov (CreativeTrio)
+      const m = gl.scene.clone(true), c = gl.caja, sz = c.getSize(new T.Vector3()), ce = c.getCenter(new T.Vector3()), k = ALTO_I[tipo] / sz.y;
+      m.scale.setScalar(k); m.position.set(-ce.x * k, -c.min.y * k, -ce.z * k); g.add(m);
+    }
+    else if (tipo === 'balas') { const b = new T.Mesh(new T.BoxGeometry(0.55, 0.3, 0.32), itemGeo.caja); b.position.y = 0.15; g.add(b); const f = new T.Mesh(new T.BoxGeometry(0.56, 0.06, 0.33), itemGeo.fr); f.position.y = 0.2; g.add(f); }
     else if (tipo === 'botiquin') { const b = new T.Mesh(new T.BoxGeometry(0.5, 0.32, 0.36), itemGeo.cruz); b.position.y = 0.16; g.add(b); }
     else { const p = proyNuevo(tipo); scene.remove(p); p.scale.setScalar(1.6); p.position.y = 0.2; g.add(p); }
     const brillo2 = new T.Sprite(new T.SpriteMaterial({ map: brillo(tipo === 'botiquin' ? '#ff6a6a' : tipo === 'balas' ? '#ffe070' : '#ffb040'), blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 }));
@@ -1758,7 +1770,7 @@
   }
   function itemsSnap(L) {
     const vistos = new Set(), TI = CAMP().TIPOS_I;
-    for (const [id, ti, x, y, z] of L) { vistos.add(id); if (!items.has(id)) { const g = itemNuevo(TI[ti]); g.position.set(x, y, z); items.set(id, { g, y }); } }
+    for (const [id, ti, x, y, z] of L) { vistos.add(id); if (!items.has(id)) { const g = itemNuevo(TI[ti]); g.position.set(x, y, z); items.set(id, { g, y, tipo: TI[ti] }); } }
     for (const [id, it] of items) if (!vistos.has(id)) { scene.remove(it.g); items.delete(id); }
   }
   function itemsTick() { const t = performance.now() / 1000; for (const it of items.values()) { it.g.rotation.y = t * 1.5; it.g.position.y = it.y + 0.08 + Math.sin(t * 2.5) * 0.06; } }

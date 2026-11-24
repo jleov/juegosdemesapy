@@ -104,6 +104,10 @@
     arbusto:        { n: [2.07, 1.19, 2.07], c: 6, solido: false },
     arbustos:       { n: [6.57, 1.47, 1.78], c: 6, solido: false },
     puente_soga:    { n: [5948944.75, 560992.94, 1123419], c: 2, solido: false },
+    item_balas:     { n: [0.628, 2.322, 2.309], c: 13, solido: false },
+    item_botiquin:  { n: [1.563, 1.359, 0.733], c: 4, solido: false },
+    item_granada:   { n: [0.128, 0.213, 0.109], c: 13, solido: false },
+    item_molotov:   { n: [0.12, 0.348, 0.1], c: 6, solido: false },
     luz_roja:       { n: [0.3, 0.3, 0.3], c: 4, solido: false, archivo: false, brillo: [0, 0.5, 0], color: '#ff3a20' },
     luz_azul:       { n: [0.3, 0.3, 0.3], c: 3, solido: false, archivo: false, brillo: [0, 0.5, 0], color: '#5ad0ff' },
   };
