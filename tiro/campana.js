@@ -910,7 +910,7 @@
       p.granadas = k.gr; p.molotov = k.mo; p.botiq = k.bq;
     };
     P.campItems = function () {
-      const c = this.camp, d = this.difCamp(), M = this.M; c.items = new Map(); c.iVer = (c.iVer || 0) + 1;
+      const c = this.camp, d = this.difCamp(), M = this.M; c.items = new Map(); c.vuelven = []; c.iVer = (c.iVer || 0) + 1;
       if (!d) return;
       const N = NIVELES[c.nivel], cps = N.fases.map(f => f.cp);
       for (const tipo of TIPOS_I) {
@@ -919,13 +919,13 @@
           // la mitad cerca de los puntos de control (para poder seguir), el resto repartido
           if (i % 2 === 0) { const cp = cps[(i / 2) % cps.length | 0]; const q = this.libreCerca(cp[0] + (Math.random() - 0.5) * 10, cp[1] + (Math.random() - 0.5) * 10); p = [q[0], 0, q[1]]; }
           else p = W.puntoLibre(M);
-          this.nuevoItem(tipo, p[0], p[2]);
+          this.nuevoItem(tipo, p[0], p[2], true);
         }
       }
     };
-    P.nuevoItem = function (tipo, x, z) {
+    P.nuevoItem = function (tipo, x, z, fijo) {
       const c = this.camp; if (!c.items) c.items = new Map();
-      const id = 'i' + (++this.pc); c.items.set(id, { id, tipo, x, y: W.piso(this.M, x, z, 1.5), z }); c.iVer = (c.iVer || 0) + 1;
+      const id = 'i' + (++this.pc); c.items.set(id, { id, tipo, x, y: W.piso(this.M, x, z, 1.5), z, fijo: !!fijo }); c.iVer = (c.iVer || 0) + 1;
     };
     // lo que dejan los enemigos al caer
     P.campDrop = function (e) {
@@ -942,7 +942,9 @@
       }
     };
     P.itemsTick = function () {
-      const c = this.camp; if (!c.items || !c.items.size) return;
+      const c = this.camp;
+      if (c.vuelven && c.vuelven.length) { const now = Date.now(); c.vuelven = c.vuelven.filter(v => { if (now < v.at) return true; this.nuevoItem(v.tipo, v.x, v.z, true); return false; }); }
+      if (!c.items || !c.items.size) return;
       for (const p of this.players.values()) {
         if (!p.alive || p.bot || !p.res) continue;
         for (const it of c.items.values()) {
@@ -955,6 +957,7 @@
           else if (it.tipo === 'molotov') { if ((p.molotov | 0) < 3) { p.molotov++; ok = true; } }
           if (!ok) continue;
           c.items.delete(it.id); c.iVer++;
+          if (it.fijo && it.tipo === 'balas' && this.difCamp() === 'normal') (c.vuelven = c.vuelven || []).push({ tipo: 'balas', x: it.x, z: it.z, at: Date.now() + 120000 });
           this.to(p.id, { t: 'item', tipo: it.tipo, res: p.res });
           this.broadcastState();
           break;

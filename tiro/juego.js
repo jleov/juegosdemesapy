@@ -453,6 +453,7 @@
     m.updateMatrixWorld(true);
     const giro = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI);
     for (const w in ARMA_NODO) {
+      if (w === 'cuchillo') continue;
       const src = m.getObjectByName(ARMA_NODO[w]); if (!src || !VM[w]) continue;
       const q = new T.Quaternion(), ws = new T.Vector3();
       src.getWorldQuaternion(q); src.getWorldScale(ws);
@@ -1041,6 +1042,7 @@
   J.activo = () => activo;
   J.estado = S => {
     if (S.settings.mode === 'zombis' || S.settings.mode === 'campana') { J.cargarZombis(); cargarItems(); }
+    if (S.settings.mode === 'campana' && !cuchilloVM.hecho) { cuchilloVM.hecho = true; cuchilloVM(); }
     if (!scene) return;
     const NV = nivelDe(S), quiereNoche = S.settings.mode === 'zombis' || !!(NV && NV.noche);
     if (S.settings.map !== mapaId) { cargarMapa(S.settings.map); ambiente(S); }
@@ -1145,7 +1147,7 @@
   }
   function morir(m) {
     if (!yo.alive && !m) return;
-    const estaba = yo.alive; yo.alive = false; yo.deadAt = performance.now(); inp.fire = false;
+    const estaba = yo.alive; yo.alive = false; yo.deadAt = performance.now(); inp.fire = false; yo.curando = null; yo.tajo = null;
     if (estaba) SFX.muero();
     if (m && m.a && m.a !== C.me()) yo.killer = m.a; else if (m) yo.killer = null;
     const w = m && A[m.w];
@@ -1345,7 +1347,7 @@
     }
     C.send({ t: 'fire', w: yo.w, o: o.map(v => Math.round(v * 100) / 100), e: ends, hits });
     tiroSnd(yo.w, 0.8);
-    yo.kick = Math.min(0.5, yo.kick + w.kick * (apunta ? 0.6 : 1));
+    if (w.melee) { yo.tajo = { t: 0, lado: yo.tajo && yo.tajo.lado > 0 ? -1 : 1 }; } else yo.kick = Math.min(0.5, yo.kick + w.kick * (apunta ? 0.6 : 1));
     if (!w.melee) { yo.rx = Math.min(1.5, yo.rx + w.kick * (apunta ? 0.45 : 0.7)); yo.ry += (Math.random() - 0.5) * w.kick * 0.4; }
     if (w.auto) yo.bloom = Math.min(0.05, yo.bloom + 0.004);
     if (!w.melee) fogon.visible = true; fogon.t = 0.05; if (luz.destello && !w.melee) luz.destello.intensity = noche ? 3 : 1.2;
@@ -1466,7 +1468,8 @@
     // armas
     if (yo.reloadT > 0) { yo.reloadT -= dt; if (yo.reloadT <= 0) { if (yo.res) { const n = Math.min(w.mag - (yo.ammo[yo.w] | 0), yo.res[yo.w] | 0); yo.ammo[yo.w] = (yo.ammo[yo.w] | 0) + n; yo.res[yo.w] = (yo.res[yo.w] | 0) - n; C.send({ t: 'recarga', w: yo.w, n }); } else yo.ammo[yo.w] = w.mag; armaHUD(); } }
     if (yo.cambioT > 0) yo.cambioT -= dt;
-    if (inp.fire) disparar(now);
+    if (yo.curando) curaTick(dt);
+    else if (inp.fire) disparar(now);
     // avisar a la sala 20 veces por segundo
     yo.mvT -= dt;
     if (yo.mvT <= 0) { yo.mvT = 0.05; C.send({ t: 'mv', p: [s.x, s.y, s.z].map(v => Math.round(v * 100) / 100), ry: Math.round(yo.ry * 100) / 100, rx: Math.round(yo.rx * 100) / 100, c: s.crouch, w: yo.w }); }
@@ -1482,12 +1485,26 @@
     // mis propios pasos, más bajitos
     const mp = Math.floor(yo.bob / Math.PI);
     if (mp !== yo.mp) { yo.mp = mp; if (v > 2.2 && s.ground && !s.crouch) pasoSnd(0.16 * Math.min(1, v / 6), 0); }
-    for (const k in VM) VM[k].visible = k === yo.w;
+    for (const k in VM) VM[k].visible = k === yo.w && !yo.curando;
     const bx = Math.sin(yo.bob) * 0.012 * (1 - yo.aimK), by = Math.abs(Math.cos(yo.bob)) * 0.012 * (1 - yo.aimK);
     const hip = [0.16, -0.16, -0.4], ads = [0, yo.w === 'pistola' ? -0.115 : -0.105, -0.34];
     const r = yo.reloadT > 0 ? Math.sin(Math.min(1, 1 - yo.reloadT / yo.reloadOf) * Math.PI) : 0, cb = Math.max(0, yo.cambioT || 0) / 0.28;
     vmGrupo.position.set(hip[0] + (ads[0] - hip[0]) * yo.aimK + bx, hip[1] + (ads[1] - hip[1]) * yo.aimK + by - r * 0.12 - cb * 0.25, hip[2] + (ads[2] - hip[2]) * yo.aimK + yo.kick * 0.25);
     vmGrupo.rotation.set(yo.kick * 0.9 + r * 0.6, 0, r * 0.4);
+    // cuchillo: quieto se lleva abajo a la derecha; al atacar hace un tajo de lado a lado
+    if (yo.w === 'cuchillo') {
+      vmGrupo.position.set(0.2 + bx, -0.24 + by, -0.38); vmGrupo.rotation.set(0.75, 0.2, -0.3);
+      if (yo.tajo) {
+        yo.tajo.t += dt; const p = Math.min(1, yo.tajo.t / 0.3), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2, L = yo.tajo.lado;
+        const ida = Math.sin(p * Math.PI);
+        vmGrupo.position.set(0.06 + L * (0.22 - e * 0.44), -0.2 - e * 0.08 + ida * 0.04, -0.44 - ida * 0.12);
+        vmGrupo.rotation.set(0.8 - e * 0.6, L * (0.3 - e * 0.6), L * (-1.1 + e * 2));
+        if (yo.tajo.t >= 0.42) yo.tajo = null;
+      }
+    }
+    // curándose: el arma baja y aparece la venda, la pastilla o el inyectable
+    if (yo.curando) curaVM(dt);
+    else if (vmCura) vmCura.visible = false;
     fogon.position.set(0, 0.03, PUNTA[yo.w]);
     hud(dt);
   }
@@ -1728,6 +1745,7 @@
     });
   }
   function usarTick() {
+    if (yo.curando) return;   // mientras se cura, el cartel muestra la curación
     const f = faseAct(); let txt = '', prog = 0;
     if (f && campC[5] === 0 && yo.alive && yo.s && !C.obs()) {
       const s = yo.s;
@@ -1741,7 +1759,56 @@
   }
   function usar(on) { if (on === usarOn) return; usarOn = on; C.send({ t: 'usar', on }); }
   J.usar = usar;
-  J.curar = () => { const S = C.S(), me = S && S.players.find(p => p.id === C.me()); if (!me || !me.lim || !yo.alive) return; if ((me.bq | 0) <= 0) { aviso('💊 No tenés botiquines', 'Buscalos en el suelo'); return; } if (yo.hp >= 100) { aviso('💊 Tenés la vida llena', ''); return; } C.send({ t: 'curar' }); };
+  J.curar = () => {
+    const S = C.S(), me = S && S.players.find(p => p.id === C.me()); if (!me || !me.lim || !yo.alive || yo.curando) return;
+    if ((me.bq | 0) <= 0) { aviso('💊 No tenés botiquines', 'Buscalos en el suelo'); return; }
+    if (yo.hp >= 100) { aviso('💊 Tenés la vida llena', ''); return; }
+    const tipo = ['venda', 'pastilla', 'inyectable'][(Math.random() * 3) | 0];
+    yo.curando = { t: 0, tipo }; yo.reloadT = 0; inp.fire = false;
+    ['cura_venda', 'cura_pastilla', 'cura_inyectable'].forEach(cargarProp);
+    if (tipo === 'venda') raspa(0, 1.6, 2500, 900, 0.22); else if (tipo === 'pastilla') { for (let i = 0; i < 5; i++) metal(0.1 + i * 0.09, 0.05, 2600, 2000, 0.08, 6); } else { metal(0.2, 0.06, 3000, 2600, 0.12, 5); raspa(0.9, 0.7, 6000, 3000, 0.08); }
+  };
+  // ---------- curarse (2 segundos) ----------
+  let vmCura = null;
+  const CURA_TXT = { venda: '🩹 Vendándote...', pastilla: '💊 Tomando la pastilla...', inyectable: '💉 Poniéndote el inyectable...' };
+  function curaTick(dt) {
+    const c = yo.curando; c.t += dt;
+    const el = $('#usar'); el.classList.remove('hidden'); el.querySelector('span').textContent = CURA_TXT[c.tipo]; el.querySelector('i').style.width = Math.min(100, c.t / 2 * 100) + '%';
+    if (c.t >= 2) { yo.curando = null; C.send({ t: 'curar' }); el.classList.add('hidden'); }
+  }
+  function curaVM(dt) {
+    const c = yo.curando, gl = GLBP['cura_' + c.tipo];
+    if (!vmCura) { vmCura = new T.Group(); vmScene.add(vmCura); }
+    if (vmCura.userData.tipo !== c.tipo) {
+      vmCura.children.slice().forEach(ch => vmCura.remove(ch));
+      if (gl) {
+        const m = gl.scene.clone(true), cj = gl.caja, sz = cj.getSize(new T.Vector3()), ce = cj.getCenter(new T.Vector3());
+        const largo = { venda: 0.3, pastilla: 0.12, inyectable: 0.2 }[c.tipo], k = largo / Math.max(sz.x, sz.y, sz.z);
+        m.scale.setScalar(k); m.position.set(-ce.x * k, -ce.y * k, -ce.z * k);
+        const h = new T.Group(); h.add(m); if (c.tipo === 'venda') h.rotation.x = Math.PI / 2; vmCura.add(h);
+      } else { const b = new T.Mesh(new T.BoxGeometry(0.06, 0.1, 0.06), new T.MeshLambertMaterial({ color: '#eee' })); vmCura.add(b); }
+      const mano = new T.Mesh(new T.BoxGeometry(0.08, 0.08, 0.2), new T.MeshLambertMaterial({ color: '#c99a73' })); mano.position.set(0.03, -0.06, 0.12); vmCura.add(mano);
+      vmCura.userData.tipo = c.tipo;
+    }
+    vmCura.visible = true;
+    const p = Math.min(1, c.t / 2), sube = Math.min(1, c.t / 0.35), baja = c.t > 1.7 ? (c.t - 1.7) / 0.3 : 0, en = sube * (1 - baja);
+    if (c.tipo === 'pastilla') {
+      // se lleva el frasco a la boca y se inclina
+      vmCura.position.set(0.12 - en * 0.1, -0.32 + en * 0.2, -0.32);
+      vmCura.rotation.set(en * 0.4 + Math.max(0, Math.sin((p - 0.3) * Math.PI * 1.6)) * 0.9, 0, en * 0.5);
+    } else if (c.tipo === 'inyectable') {
+      // abajo a la izquierda, se clava en el brazo y se aprieta
+      const pica = c.t > 0.5 && c.t < 1.5 ? Math.min(1, (c.t - 0.5) / 0.2) : c.t >= 1.5 ? 1 - Math.min(1, (c.t - 1.5) / 0.2) : 0;
+      vmCura.position.set(-0.08 - pica * 0.05, -0.3 + en * 0.1, -0.34 + pica * 0.06);
+      vmCura.rotation.set(0.3, 0.8, 1.2 + pica * 0.3);
+    } else {
+      // la venda da vueltas alrededor del brazo
+      const a = c.t * 7;
+      vmCura.position.set(0.02 + Math.cos(a) * 0.05 * en, -0.3 + en * 0.08 + Math.sin(a) * 0.04 * en, -0.34);
+      vmCura.rotation.set(0.6, a * 0.3, Math.sin(a) * 0.4);
+    }
+    vmGrupo.position.y -= 0.4 * en;
+  }
   // ---------- cosas tiradas en el suelo (dificultad normal y difícil) ----------
   const items = new Map(); let itemGeo = null;
   const ALTO_I = { balas: 0.5, botiquin: 0.42, granada: 0.3, molotov: 0.45 };
@@ -1749,6 +1816,15 @@
   // cuando terminan de bajar los modelos, se cambian las cosas del suelo
   function cargarItems() { Promise.all(ITEMS_GLB.map(cargarProp)).then(() => { for (const it of items.values()) { const p = it.g.position.clone(); scene.remove(it.g); it.g = itemNuevo(it.tipo); it.g.position.copy(p); } }); }
   J.cargarItems = cargarItems;
+  function cuchilloVM() {
+    cargarProp('arma_cuchillo').then(gl => {
+      if (!gl || !VM.cuchillo) return;
+      const g = VM.cuchillo; g.children.filter(ch => !ch.userData.mano).forEach(ch => g.remove(ch));
+      const m = gl.scene.clone(true), cj = gl.caja, sz = cj.getSize(new T.Vector3()), ce = cj.getCenter(new T.Vector3()), k = 0.3 / sz.y;
+      m.scale.setScalar(k); m.position.set(-ce.x * k, -cj.min.y * k, -ce.z * k);
+      const h = new T.Group(); h.add(m); h.rotation.x = -Math.PI / 2 + 0.25; h.position.set(0.01, -0.03, 0.05); g.add(h);
+    });
+  }
   function itemNuevo(tipo) {
     if (!itemGeo) {
       const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
