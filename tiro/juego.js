@@ -40,6 +40,27 @@
   const quiereAA = () => graf === 'ultra' || ((graf === 'alto' || graf === 'auto') && !tactil());
   let escala = 1, fogVisto = 0, fpsN = 0, fpsT = 0, fpsVal = 60, autoSum = 0, autoN = 0, lastDraw = 0;
   const efx = n => { const k = gq().efx; return k >= 1 ? n : Math.max(1, Math.round(n * k)); };
+  // ¿el navegador usa la placa de video? si no, el 3D lo hace el procesador y anda lento
+  function sinPlaca() {
+    try {
+      const c = document.createElement('canvas');
+      const gl = c.getContext('webgl', { failIfMajorPerformanceCaveat: true });
+      if (!gl) return !!document.createElement('canvas').getContext('webgl');
+      const inf = gl.getExtension('WEBGL_debug_renderer_info');
+      const r = inf ? String(gl.getParameter(inf.UNMASKED_RENDERER_WEBGL)) : '';
+      const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+      return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(r);
+    } catch (e) { return false; }
+  }
+  function avisoPlaca() {
+    if (avisoPlaca.r == null) avisoPlaca.r = sinPlaca();
+    if (!avisoPlaca.r) return;
+    const nav = navigator.brave ? 'brave' : /Edg\//.test(navigator.userAgent) ? 'edge' : /OPR\//.test(navigator.userAgent) ? 'opera' : 'chrome';
+    const dir = nav === 'edge' ? 'edge://settings/system' : nav === 'opera' ? 'opera://settings/system' : nav + '://settings/system';
+    const el = $('#gpuAviso'); el.classList.remove('hidden');
+    el.innerHTML = '⚠️ <b>Tu navegador no está usando la placa de video</b>, por eso el juego anda lento aunque bajes los gráficos.<br>Para arreglarlo: escribí <code>' + dir + '</code> en la barra de direcciones, prendé <b>“Usar aceleración de gráficos cuando esté disponible”</b> y tocá <b>Reiniciar</b>.';
+    if (!avisoPlaca.dicho) { avisoPlaca.dicho = true; setTimeout(() => aviso('⚠️ Tu navegador no usa la placa de video', 'Abrí ⚙️ Ajustes para ver cómo arreglarlo'), 1500); }
+  }
   function aplicarGraf() {
     if (!ren) return;
     const q = gq(); escala = q.pr(); ren.setPixelRatio(escala); medir();
@@ -1067,7 +1088,7 @@
     return h;
   }
   J.entrar = S => {
-    crear(); J.audio(); J.cargarModelos();
+    crear(); J.audio(); J.cargarModelos(); avisoPlaca();
     cargarMapa(S.settings.map);
     ambiente(S);
     J.estado(S);
