@@ -88,7 +88,12 @@ input[type=text]:focus,select:focus{border-color:var(--accent)}
 .row2 .btn{white-space:nowrap}
 #roomCode{margin-top:8px;width:100%;background:var(--bg);border:1px dashed var(--accent);border-radius:8px;padding:6px 8px;text-align:left;font-size:13px}
 #roomCode b{letter-spacing:.15em;font-size:15px}
-.memvol{padding:0 8px 6px 48px;font-size:12px;color:var(--muted)}
+.memvol{padding:0 8px 6px 48px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.volctl{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.volctl input{flex:1;min-width:60px;accent-color:var(--accent)}
+.volctl small{min-width:38px;text-align:right;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.volctl small.hot{color:#f0b232;font-weight:700}
+.tools .vol .volctl input{width:110px;flex:none}
 #invite{margin:8px;display:flex;gap:6px}
 #invite button{flex:1}
 
@@ -349,6 +354,6 @@ body.tv,body.tv #main{background:#000}
 <script src="vendor/peerjs.min.js"></script>
 <script src="../ice.js"></script>
 <script src="../inicio.js"></script>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=20261128"></script>
 </body>
 </html>

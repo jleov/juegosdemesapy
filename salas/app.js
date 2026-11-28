@@ -407,11 +407,38 @@ function setDeaf(v) {
   broadcast({ t: 'state', muted: S.muted, deaf: S.deaf });
   renderBar(); renderMembers();
 }
+// volumen de 0 a 200 % (como Discord): hasta 100 lo hace el reproductor; más arriba el sonido pasa por
+// un amplificador del AudioContext y el reproductor queda mudo (sigue conectado para que Chrome reciba el sonido)
+const VOL_MAX = 200;
 function applyVolume(r) {
   if (!r.el) return;
-  r.el.muted = S.deaf || (TV && r.kind === 'mic' && !tvVoices.on);
-  const v = r.kind === 'mic' ? (cfg.vols[r.peerName || ''] ?? 100) : (r.vol ?? 100);
-  r.el.volume = Math.max(0, Math.min(1, v / 100));
+  const off = S.deaf || (TV && r.kind === 'mic' && !tvVoices.on);
+  const v = Math.max(0, Math.min(VOL_MAX, r.kind === 'mic' ? (cfg.vols[r.peerName || ''] ?? 100) : (r.vol ?? 100)));
+  if (v > 100 && !r.boost && A.ctx && r.stream.getAudioTracks().length) {
+    try {
+      const gain = A.ctx.createGain(); gain.gain.value = 0;
+      A.ctx.createMediaStreamSource(r.stream).connect(gain).connect(A.ctx.destination);
+      r.boost = gain;
+      if (A.ctx.setSinkId && cfg.out && !TV) A.ctx.setSinkId(cfg.out).catch(() => {});
+      if (A.ctx.state === 'suspended') A.ctx.resume().catch(() => {});
+    } catch (e) {}
+  }
+  const boosted = v > 100 && !!r.boost;
+  r.el.muted = off || boosted;
+  r.el.volume = boosted ? 1 : v / 100;
+  if (r.boost) r.boost.gain.setTargetAtTime(boosted && !off ? v / 100 : 0, A.ctx.currentTime, 0.02);
+}
+// la etiqueta «150 %» al lado de cada barrita de volumen; doble clic vuelve a 100 %
+function volInput(value, label, onChange) {
+  const w = document.createElement('span'); w.className = 'volctl';
+  w.innerHTML = `<input type="range" min="0" max="${VOL_MAX}" step="5" value="${value}" aria-label="${esc(label)}"><small>${value}%</small>`;
+  const inp = w.querySelector('input'), pct = w.querySelector('small');
+  const set = v => { inp.value = v; pct.textContent = v + '%'; pct.classList.toggle('hot', v > 100); onChange(v); };
+  pct.classList.toggle('hot', value > 100);
+  inp.oninput = () => set(+inp.value);
+  inp.ondblclick = () => set(100);
+  inp.title = 'Doble clic: volver a 100 %';
+  return w;
 }
 
 /* =====================================================================
@@ -730,6 +757,7 @@ function removeRemote(key, quiet) {
   S.remote.delete(key);
   try { r.call && r.call.close(); } catch (e) {}
   if (r.el) { r.el.pause(); r.el.srcObject = null; }
+  if (r.boost) { try { r.boost.disconnect(); } catch (e) {} r.boost = null; }
   if (S.focus === key) S.focus = '';
   subLines.delete(key);
   if (!quiet) { renderTiles(); renderMembers(); }
@@ -1061,11 +1089,14 @@ function renderMembers() {
       ${m.live ? '<span class="live">EN VIVO</span>' : ''}
       <span class="ic">${m.muted ? ICON.micOff : ''}${m.deaf ? ICON.headOff : ''}</span>
     </div>
-    ${!m.me && !m.wait ? `<div class="memvol">${ICON.vol} <input type="range" min="0" max="100" value="${cfg.vols[m.name] ?? 100}" data-vol="${esc(m.name)}" aria-label="Volumen de ${esc(m.name)}"></div>` : ''}
+    ${!m.me && !m.wait ? `<div class="memvol" data-vol="${esc(m.name)}">${ICON.vol}</div>` : ''}
   `).join('');
-  box.querySelectorAll('input[data-vol]').forEach(inp => inp.oninput = () => {
-    cfg.vols[inp.dataset.vol] = +inp.value; saveCfg();
-    S.remote.forEach(r => { if (r.kind === 'mic') applyVolume(r); });
+  box.querySelectorAll('.memvol[data-vol]').forEach(d => {
+    const name = d.dataset.vol;
+    d.appendChild(volInput(cfg.vols[name] ?? 100, 'Volumen de ' + name, v => {
+      cfg.vols[name] = v; saveCfg();
+      S.remote.forEach(r => { if (r.kind === 'mic') applyVolume(r); });
+    }));
   });
   $('#netState').title = S.reg ? 'Tenés la lista de la sala' : '';
   paintStats();
@@ -1110,8 +1141,8 @@ function screenTile(key, stream, title, mine, ls, r) {
   const btn = (html, tip, fn, on) => { const b = document.createElement('button'); b.innerHTML = html; b.title = tip; if (on) b.classList.add('on'); b.onclick = e => { e.stopPropagation(); fn(); }; tools.appendChild(b); return b; };
   if (r && r.hasAudio) {
     const w = document.createElement('div'); w.className = 'vol';
-    w.innerHTML = ICON.vol + `<input type="range" min="0" max="100" value="${r.vol}" aria-label="Volumen de la pantalla">`;
-    w.querySelector('input').oninput = e => { r.vol = +e.target.value; applyVolume(r); };
+    w.innerHTML = ICON.vol;
+    w.appendChild(volInput(r.vol, 'Volumen de la pantalla', v => { r.vol = v; applyVolume(r); }));
     w.onclick = e => e.stopPropagation();
     tools.appendChild(w);
   }
