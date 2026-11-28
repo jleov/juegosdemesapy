@@ -2075,6 +2075,55 @@
     return [R[0][0], R[0][1], 0, 1];
   }
   const largoRuta = R => { let L = 0; for (let i = 0; i < R.length - 1; i++) L += Math.hypot(R[i + 1][0] - R[i][0], R[i + 1][1] - R[i][1]); return L; };
+  // el helicóptero viene en una sola pieza: se separan los triángulos de arriba (las aspas) para hacerlos girar
+  function separarRotor(piv) {
+    piv.updateMatrixWorld(true);
+    const box = new T.Box3().setFromObject(piv), alto = box.max.y - box.min.y, corte = box.max.y - alto * 0.12;
+    const inv = new T.Matrix4().copy(piv.matrixWorld).invert(), va = new T.Vector3(), vb = new T.Vector3(), vc = new T.Vector3();
+    const rot = {};   // material -> posiciones de las aspas (en coordenadas de piv)
+    const mallas = []; piv.traverse(o => { if (o.isMesh) mallas.push(o); });
+    for (const o of mallas) {
+      let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      const pos = g.attributes.position, mats = [].concat(o.material), n = pos.count / 3;
+      const grupos = g.groups.length ? g.groups : [{ start: 0, count: pos.count, materialIndex: 0 }];
+      const queda = new Uint8Array(n).fill(1);
+      for (const gr of grupos) for (let t = gr.start / 3; t < (gr.start + gr.count) / 3; t++) {
+        va.fromBufferAttribute(pos, t * 3).applyMatrix4(o.matrixWorld); vb.fromBufferAttribute(pos, t * 3 + 1).applyMatrix4(o.matrixWorld); vc.fromBufferAttribute(pos, t * 3 + 2).applyMatrix4(o.matrixWorld);
+        if (va.y > corte && vb.y > corte && vc.y > corte) {
+          queda[t] = 0; const m = mats[gr.materialIndex] || mats[0], k = m.uuid;
+          if (!rot[k]) rot[k] = { m, p: [] };
+          for (const v of [va, vb, vc]) { v.applyMatrix4(inv); rot[k].p.push(v.x, v.y, v.z); }
+        }
+      }
+      if (queda.every(x => x)) continue;
+      // lo que queda del helicóptero, sin las aspas
+      const ng = new T.BufferGeometry();
+      for (const nom in g.attributes) {
+        const at = g.attributes[nom], sz = at.itemSize, out = [];
+        for (let t = 0; t < n; t++) if (queda[t]) for (let j = 0; j < 3; j++) for (let c = 0; c < sz; c++) out.push(at.array[(t * 3 + j) * sz + c]);
+        ng.setAttribute(nom, new T.Float32BufferAttribute(out, sz));
+      }
+      let base = 0;
+      for (const gr of grupos) { let c = 0; for (let t = gr.start / 3; t < (gr.start + gr.count) / 3; t++) if (queda[t]) c += 3; if (c) ng.addGroup(base, c, gr.materialIndex); base += c; }
+      o.geometry = ng;
+    }
+    const ks = Object.keys(rot); if (!ks.length) return null;
+    // las aspas giran alrededor de su centro
+    let sx = 0, sz = 0, sy = 0, cnt = 0;
+    for (const k of ks) for (let i = 0; i < rot[k].p.length; i += 3) { sx += rot[k].p[i]; sy += rot[k].p[i + 1]; sz += rot[k].p[i + 2]; cnt++; }
+    const cx = sx / cnt, cy = sy / cnt, cz = sz / cnt, rotor = new T.Group(); rotor.position.set(cx, cy, cz);
+    for (const k of ks) {
+      const p = rot[k].p; for (let i = 0; i < p.length; i += 3) { p[i] -= cx; p[i + 1] -= cy; p[i + 2] -= cz; }
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(p, 3)); geo.computeVertexNormals();
+      const m = rot[k].m.clone(); m.side = T.DoubleSide; rotor.add(new T.Mesh(geo, m));
+    }
+    // un disco borroso que aparece cuando giran rápido
+    let R = 0; for (const k of ks) { const p = rot[k].p; for (let i = 0; i < p.length; i += 3) R = Math.max(R, Math.hypot(p[i], p[i + 2])); }
+    const disco = new T.Mesh(new T.CircleGeometry(R, 32), new T.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0, depthWrite: false, side: T.DoubleSide }));
+    disco.rotation.x = -Math.PI / 2; rotor.add(disco); rotor.userData.disco = disco;
+    piv.add(rotor);
+    return rotor;
+  }
   J.finNivel = n => {
     const c = CAMP(), N = c.NIVELES[n], S = C.S(), E = N && N.esc, V = E && VEHI[E.v];
     if (!E || !V || !scene || !mapaId) return finNivel(n);
@@ -2087,6 +2136,7 @@
       const k = V.h / sz.y, sx = V.w ? V.w / sz.x : k, sz2 = V.d ? V.d / sz.z : k;
       const hold = new T.Group(); hold.add(m); hold.scale.set(sx, k, sz2); hold.position.set(-ce.x * sx, -cj.min.y * k, -ce.z * sz2);
       const piv = new T.Group(); piv.add(hold); piv.rotation.y = V.frente; veh.add(piv);
+      if (V.sube) { try { veh.userData.rotor = separarRotor(piv); } catch (e) { console.warn('rotor', e); } }
     } else { const b = new T.Mesh(cajaGeo(2.6, 2.4, 5), matCaja(13)); b.position.y = 1.2; veh.add(b); }
     const p0 = enRuta(E.ruta, 0);
     veh.position.set(p0[0], V.sube ? 0.2 : 0, p0[1]); veh.rotation.y = Math.atan2(p0[2], p0[3]); grupo.add(veh);
@@ -2104,13 +2154,14 @@
       rs.push({ g, w: 0, alive: true, crouch: false, tiroT: 0, velS: 3, desde: g.position.clone(), hasta: [puerta[0] - az * lado * 0.4, puerta[1] + ax * lado * 0.4] });
     });
     for (const r of remotos.values()) r.g.visible = false;
-    cine = { escape: true, t: 0, t0: performance.now(), grupo, veh, rs, E, V, L: largoRuta(E.ruta), d: 0, y0: veh.position.y, N };
+    cine = { escape: true, t: 0, t0: performance.now(), grupo, veh, rs, E, V, L: largoRuta(E.ruta), d: 0, y0: veh.position.y, N, rotor: veh.userData.rotor || null };
     document.body.classList.add('cine');
     const el = $('#cine'); el.innerHTML = '<p class="tit" style="animation-delay:.6s">✅ ¡Nivel ' + N.id + ' completado!</p><p style="animation-delay:2.2s">' + esc(E.txt) + '</p><p style="animation-delay:4.4s">' + esc(N.fin) + '</p>';
     el.classList.remove('hidden'); el.style.background = '';
     if (document.pointerLockElement) document.exitPointerLock();
     SFX.fin();
   };
+  J._cine = () => cine;
   function escapeTick() {
     // con el reloj de verdad (en un celular lento la escena no se atrasa)
     const c = cine, nt = (performance.now() - c.t0) / 1000, dt = Math.min(0.2, Math.max(0, nt - c.t)); c.t = nt;
@@ -2132,6 +2183,11 @@
     });
     // después el vehículo arranca despacio y sigue el recorrido (al final del camino se queda quieto)
     const v = Math.max(0, c.t - 3.2);
+    // las aspas: arrancan despacio y antes de despegar ya giran a full
+    if (c.rotor) {
+      const vel = 4 + Math.min(1, c.t / 3) * 34; c.rotor.rotation.y += vel * dt;
+      const d = c.rotor.userData.disco; if (d) d.material.opacity = Math.min(0.35, Math.max(0, (vel - 15) / 50));
+    }
     if (c.V.sube) {
       // el helicóptero sube derecho y después avanza
       const p = enRuta(E.ruta, Math.min(c.L, v * v * 0.35));

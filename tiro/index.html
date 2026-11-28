@@ -150,6 +150,9 @@ body.cine #pausa,body.cine #brief,body.cine #hud,body.cine #tctl,body.cine #obj,
 @keyframes cineTxt{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 #campInfo{background:#16182a;border:1px solid rgba(255,200,61,.3);border-radius:10px;padding:8px 10px;margin-top:8px;font-size:13px;line-height:1.4}
 #campInfo b{color:#ffc83d}
+#seguir{background:rgba(61,214,140,.1);border:1px solid rgba(61,214,140,.45);border-radius:12px;padding:10px 12px;margin:4px 0 12px;font-size:14px;line-height:1.4}
+#seguir .row{margin-top:8px;gap:8px}#seguir button{flex:1}
+#recInfo{background:#1a1a14;border:1px solid rgba(255,200,61,.35);border-radius:10px;padding:7px 10px;margin-top:8px;font-size:13px;line-height:1.45}
 #aviso{position:absolute;top:30%;left:0;right:0;text-align:center;font-size:clamp(16px,3.4vw,24px);opacity:0}
 #aviso .racha{font-size:1.4em;color:#ffc83d}
 #aviso.ver{animation:aviso 2.2s ease-out forwards}
@@ -254,6 +257,7 @@ body.tactil #chatF{bottom:auto;top:30%}
   <div class="home-box card">
     <h1 class="logo"><span class="a">Tiro</span> <span class="b">Guasu</span></h1>
     <p class="sub">🔫 Tiros en 3D por el Mercado 4, el Puerto y el Chaco</p>
+    <div id="seguir" class="hidden"></div>
     <label class="lbl" for="nameIn">Tu nombre</label>
     <input id="nameIn" maxlength="16" placeholder="Ej: Kalé" autocomplete="nickname">
     <span class="lbl">Tu cara</span>
@@ -405,10 +409,10 @@ body.tactil #chatF{bottom:auto;top:30%}
 </div>
 <div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br><span id="rotateTxt">para jugar</span><small id="rotateSub">La partida sigue: ¡apurate!</small></p></div>
 
-<script src="mundo.js?v=27"></script>
-<script src="campana.js?v=27"></script>
-<script src="sala.js?v=27"></script>
-<script src="juego.js?v=27"></script>
+<script src="mundo.js?v=28"></script>
+<script src="campana.js?v=28"></script>
+<script src="sala.js?v=28"></script>
+<script src="juego.js?v=28"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
@@ -488,7 +492,65 @@ $('#watchBtn').onclick = () => {
 };
 $('#codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('#joinBtn').click(); });
 $('#practiceBtn').onclick = () => { Juego.audio(); startLocal(); };
-function savedToken(code) { const s = sess.get('tg_session'); return s && s.code === code ? s.token : null; }
+function savedToken(code) {
+  const s = sess.get('tg_session'); if (s && s.code === code) return s.token;
+  const t = store.get('tg_tok', null); return t && t.code === code && Date.now() - t.at < 3 * 3600e3 ? t.token : null;
+}
+// ---------- seguir una partida que se cortó (el anfitrión) ----------
+const GUARDA_MS = 3 * 3600e3;
+function guardada() { const g = store.get('tg_partida', null); return g && g.at && Date.now() - g.at < GUARDA_MS && g.players ? g : null; }
+setInterval(() => {
+  if (!localRoom || localRoom.dead || !S) return;
+  if (localRoom.phase === 'over') { store.set('tg_partida', null); return; }
+  if (localRoom.phase !== 'play') return;
+  try { const g = localRoom.guardar(); g.local = mode === 'local'; store.set('tg_partida', g); } catch (e) {}
+}, 3000);
+function hace(ms) { const m = Math.round(ms / 60000); return m < 1 ? 'recién' : m === 1 ? 'hace 1 minuto' : m < 60 ? 'hace ' + m + ' minutos' : 'hace ' + Math.round(m / 60) + ' h'; }
+function descPartida(g) {
+  const st = g.settings, NV = window.TiroCampana ? TiroCampana.NIVELES : [];
+  const mo = st.mode === 'campana' ? '🎖️ Campaña · Nivel ' + ((g.nivel | 0) + 1) + (NV[g.nivel | 0] ? ' (' + NV[g.nivel | 0].n + ')' : '') + ' · ' + ({ facil: 'Fácil', normal: 'Normal', dificil: 'Difícil' }[st.dif || 'facil'])
+    : st.mode === 'zombis' ? '🧟 Supervivencia · oleada ' + (g.ola || 1) : st.mode === 'equipos' ? '🔫 Por equipos' : '🔫 Todos contra todos';
+  const yo = g.players.find(p => p.host) || g.players[0];
+  return mo + (yo ? ' · vos con ' + yo.k + ' bajas' : '') + ' · ' + (g.local ? 'práctica' : 'sala ' + g.code) + ' · ' + hace(Date.now() - g.at);
+}
+function mostrarSeguir() {
+  const g = guardada(), el = $('#seguir');
+  if (!g) { el.classList.add('hidden'); return; }
+  el.innerHTML = '<b>🔁 Tenés una partida sin terminar</b><br><span class="muted2">' + esc(descPartida(g)) + '</span>' + (g.local ? '' : '<br><span class="muted2">Los demás vuelven a entrar solos (si siguen con el juego abierto).</span>') + '<div class="row"><button class="btn-ok" id="seguirSi">▶️ Seguir la partida</button><button id="seguirNo">🗑️ Descartar</button></div>';
+  el.classList.remove('hidden');
+  $('#seguirSi').onclick = () => { Juego.audio(); el.classList.add('hidden'); if (g.local) startLocal(g); else createRoom(0, g); };
+  $('#seguirNo').onclick = () => { store.set('tg_partida', null); el.classList.add('hidden'); };
+}
+setTimeout(mostrarSeguir, 350);
+// ---------- récords (en este aparato) ----------
+function mmss(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+const DIFN = { facil: 'Fácil', normal: 'Normal', dificil: 'Difícil' };
+function guardarRecord(r) {
+  const R = store.get('tg_records', {}) || {}, room = localRoom; let msg = '';
+  if (r.mode === 'campana') {
+    const k = 'camp_' + r.dif, a = R[k] || {};
+    msg = '🏁 Terminaron la campaña en ' + DIFN[r.dif] + ': ⏱️ ' + mmss(r.ms) + ' · 💀 ' + r.bajas + ' bajas.';
+    if (r.completa) {
+      const nT = !a.ms || r.ms < a.ms, nB = !a.bajas || r.bajas > a.bajas;
+      if (nT) a.ms = r.ms; if (nB) a.bajas = r.bajas; a.veces = (a.veces || 0) + 1; R[k] = a;
+      if (nT || nB) msg += ' 🏆 ¡Nuevo récord' + (nT ? ' de tiempo' : '') + (nT && nB ? ' y' : '') + (nB ? ' de bajas' : '') + '!';
+    } else msg += ' (Para el récord hay que jugarla entera desde el nivel 1.)';
+  } else if (r.mode === 'zombis') {
+    const k = 'zomb_' + r.map, a = R[k] || {};
+    if (!a.ola || r.ola > a.ola) { const habia = a.ola; a.ola = r.ola; a.bajas = r.bajas; R[k] = a; if (habia) msg = '🏆 ¡Nuevo récord en este mapa: ' + r.ola + ' oleadas!'; }
+  }
+  store.set('tg_records', R);
+  if (msg && room && !room.dead) room.sys(msg);
+}
+function textoRecords(st) {
+  const R = store.get('tg_records', {}) || {};
+  if (st.mode === 'campana') {
+    const L = ['facil', 'normal', 'dificil'].map(d => R['camp_' + d] ? DIFN[d] + ': ⏱️ ' + mmss(R['camp_' + d].ms) + ' · 💀 ' + R['camp_' + d].bajas : null).filter(Boolean);
+    return '🏆 <b>Tus récords de la campaña</b> (completa, desde el nivel 1): ' + (L.length ? L.join(' &nbsp;|&nbsp; ') : 'todavía ninguno. ¡A hacer el primero!');
+  }
+  if (st.mode === 'zombis') { const a = R['zomb_' + st.map]; return '🏆 <b>Tu récord en este mapa</b>: ' + (a ? a.ola + ' oleadas superadas · 💀 ' + a.bajas + ' bajas' : 'todavía ninguno.'); }
+  return '';
+}
 
 setTimeout(() => {
   if (urlCode && isOwner) { joinRoom(urlCode, { t: 'watch', name: 'Dueño', owner: true }); return; }
@@ -497,24 +559,25 @@ setTimeout(() => {
 }, 300);
 
 // ---------- anfitrión ----------
-function createRoom(tries) {
+function createRoom(tries, g) {
   closeNet(); mode = 'online'; Juego.cargarModelos();
-  const code = genCode(), p = newPeer(PREF + code); peer = p;
+  const code = g && tries < 4 ? g.code : genCode(), p = newPeer(PREF + code); peer = p;
   banner('Abriendo la sala...');
   p.on('open', () => {
     if (p !== peer) return;
     hideBanner(); roomCode = code;
-    localRoom = new R.Room(code, { send: hostSend, onEmpty() {} });
+    localRoom = new R.Room(code, { send: hostSend, onEmpty() {}, record: guardarRecord });
     hookObservers(localRoom);
-    const me = localRoom.addPlayer({ name: myName(), avatar, skin });
-    myId = me.id; token = me.token; localRoom.setPrim(myId, prim);
+    const me = (g && localRoom.restaurar(g)) || localRoom.addPlayer({ name: myName(), avatar, skin });
+    myId = me.id; token = me.token; if (!g) localRoom.setPrim(myId, prim);
     history.replaceState(null, '', location.pathname + '#' + code);
     localRoom.broadcastState();
   });
   p.on('connection', c => hostAccept(c));
   p.on('error', e => {
     if (p !== peer) return;
-    if (e && e.type === 'unavailable-id' && tries < 5) { try { p.destroy(); } catch (x) {} createRoom(tries + 1); return; }
+    // el código viejo puede tardar unos segundos en liberarse: se reintenta y si no, se usa uno nuevo
+    if (e && e.type === 'unavailable-id' && tries < 7) { try { p.destroy(); } catch (x) {} if (g && tries < 4) { banner('Recuperando la sala ' + g.code + '...'); setTimeout(() => createRoom(tries + 1, g), 2500); } else createRoom(tries + 1, g); return; }
     if (!localRoom) { hideBanner(); toast('No se pudo abrir la sala. Revisá la conexión y probá de nuevo.'); goHome(true); }
   });
   p.on('disconnected', () => { if (!p.destroyed) setTimeout(() => { try { p.reconnect(); } catch (e) {} }, 1500); });
@@ -589,19 +652,20 @@ function connectHost() {
 }
 function lost() {
   if (mode !== 'online' || !roomCode || localRoom) return;
-  if (reconnectTries++ > 6) { banner('Se perdió la conexión con la sala'); setTimeout(() => goHome(true), 1800); return; }
-  banner('Reconectando...');
+  if (reconnectTries++ > 40) { banner('Se perdió la conexión con la sala'); setTimeout(() => goHome(true), 1800); return; }
+  banner(reconnectTries > 3 ? '⏳ Se cortó la sala. Esperando que el anfitrión vuelva a entrar...' : 'Reconectando...');
   if (token) firstMsg = { t: 'join', name: myName(), avatar, token };
-  setTimeout(() => { if (mode === 'online' && roomCode && !hostConn) connectHost(); }, 1200 + reconnectTries * 500);
+  setTimeout(() => { if (mode === 'online' && roomCode && !hostConn) connectHost(); }, Math.min(4000, 1200 + reconnectTries * 500));
 }
 
 // ---------- práctica y salida ----------
-function startLocal() {
+function startLocal(g) {
   Juego.cargarModelos(); closeNet(); mode = 'local'; amObs = false;
-  localRoom = new R.Room('PRÁCTICA', { send: (pid, msg) => { if (pid === myId) setTimeout(() => onMsg(msg), 0); }, onEmpty() {} });
-  const p = localRoom.addPlayer({ name: myName(), avatar, skin });
-  myId = p.id; roomCode = null; localRoom.setPrim(myId, prim);
-  for (let i = 0; i < 5; i++) localRoom.addBot(myId);
+  localRoom = new R.Room('PRÁCTICA', { send: (pid, msg) => { if (pid === myId) setTimeout(() => onMsg(msg), 0); }, onEmpty() {}, record: guardarRecord });
+  const p = (g && localRoom.restaurar(g)) || localRoom.addPlayer({ name: myName(), avatar, skin });
+  myId = p.id; roomCode = null;
+  if (!g) { localRoom.setPrim(myId, prim); for (let i = 0; i < 5; i++) localRoom.addBot(myId); }
+  else localRoom.broadcastState();
 }
 function closeNet() {
   if (localRoom) {
@@ -624,7 +688,7 @@ function goHome(silent) {
   sess.set('tg_session', null);
   history.replaceState(null, '', location.pathname);
   $('#msgs').innerHTML = '';
-  show('home'); hideBanner();
+  show('home'); hideBanner(); mostrarSeguir();
 }
 function send(m) {
   if (localRoom) { localRoom.handle(myId, m); return; }
@@ -636,7 +700,7 @@ function onMsg(m) {
   switch (m.t) {
     case 'welcome':
       myId = m.id; roomCode = m.code; amObs = !!m.obs;
-      if (!m.obs) { token = m.token; sess.set('tg_session', { code: m.code, token: m.token }); send({ t: 'prim', w: prim }); send({ t: 'skin', skin }); }
+      if (!m.obs) { token = m.token; sess.set('tg_session', { code: m.code, token: m.token }); store.set('tg_tok', { code: m.code, token: m.token, at: Date.now() }); send({ t: 'prim', w: prim }); send({ t: 'skin', skin }); }
       history.replaceState(null, '', location.pathname + '#' + m.code);
       break;
     case 'state': setState(m); break;
@@ -709,6 +773,7 @@ function renderLobby() {
     ci.innerHTML = '<b>Operación Yvy</b> · Una corporación extranjera perforó el Acuífero Guaraní y liberó un patógeno ancestral. Ustedes son un escuadrón táctico paraguayo: rastreen el brote, frenen a los mercenarios y sobrevivan a las hordas. Si son menos de 4, se completa con bots compañeros.<br><b>Nivel ' + N.id + ': ' + esc(N.n) + '</b> · ' + esc(N.lugar) + ' · ' + esc(N.enemigos);
     ci.classList.remove('hidden');
   } else if ($('#campInfo')) $('#campInfo').classList.add('hidden');
+  { let ri = $('#recInfo'); if (!ri) { ri = document.createElement('div'); ri.id = 'recInfo'; $('#waitNote').before(ri); } const t = host ? textoRecords(st) : ''; ri.innerHTML = t; ri.classList.toggle('hidden', !t); }
   $('#sFa').value = st.fa ? '1' : '0'; $('#lFa').classList.toggle('hidden', st.mode === 'ffa');
   $('#startBtn').textContent = camp ? '🎖️ ¡Arranca la Operación Yvy!' : zomb ? '🧟 ¡Que vengan los zombis!' : '🔫 ¡Empezar!';
   ['#sMode', '#sMap', '#sGoal', '#sTime', '#sBots', '#sFa', '#sNivel', '#sDif', '#addBotBtn', '#startBtn'].forEach(q => $(q).disabled = !host);

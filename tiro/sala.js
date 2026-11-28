@@ -47,6 +47,7 @@
       this.dead = false; this.last = Date.now(); this.snapAcc = 0;
       this.zombis = new Map(); this.ola = null; this.zc = 0;
       this.proy = []; this.areas = []; this.pc = 0;
+      this.idos = new Map(); this.reg = null;   // los que se fueron en medio de la partida (por si vuelven) y el registro para los récords
       this.timer = setInterval(() => this.tick(), 33);
     }
     destroy() { this.dead = true; clearInterval(this.timer); }
@@ -104,7 +105,14 @@
     }
     removeBot(pid, id) { if (pid !== this.hostId) return; const p = this.players.get(id); if (p && p.bot) this.removePlayer(id); }
     reconnect(token) {
-      const p = [...this.players.values()].find(x => !x.bot && x.token === token);
+      let p = [...this.players.values()].find(x => !x.bot && x.token === token);
+      if (!p && this.idos.has(token) && this.players.size < this.settings.max) {
+        p = this.idos.get(token); this.idos.delete(token);
+        this.players.set(p.id, p); this.order.push(p.id); p.connected = true;
+        this.sys(`🔁 ${p.avatar} ${p.name} volvió a la partida (con sus ${p.k} bajas)`);
+        if (this.phase === 'play') { p.alive = false; this.respawn(p); }
+        this.broadcastState(); return p;
+      }
       if (!p) return null;
       p.connected = true; this.broadcastState(); return p;
     }
@@ -114,11 +122,46 @@
       this.to(id, this.stateFor(id));
       if (this.phase === 'play' && p.alive) this.to(id, { t: 'spawn', id, p: [r2(p.x), r2(p.y), r2(p.z)], ry: r2(p.ry), w: p.w });
     }
+    guardar() {
+      const now = Date.now(), fp = p => ({ token: p.token || null, name: p.name, avatar: p.avatar, skin: p.skin, prim: p.prim, bot: !!p.bot, team: p.team, k: p.k | 0, d: p.d | 0 });
+      return {
+        code: this.code, at: now, settings: Object.assign({}, this.settings), phase: this.phase,
+        players: this.list().map(p => Object.assign(fp(p), { host: p.id === this.hostId })), idos: [...this.idos.values()].map(fp),
+        score: Object.assign({}, this.score), resta: this.phase === 'play' ? Math.max(0, this.endAt - now) : 0,
+        ola: this.ola ? this.ola.n : 0, nivel: this.camp ? this.camp.nivel : null,
+        reg: this.reg ? { mode: this.reg.mode, lleva: now - this.reg.t0, desde: this.reg.desde, dif: this.reg.dif, map: this.reg.map } : null,
+      };
+    }
+    restaurar(g) {
+      Object.assign(this.settings, g.settings);
+      const crear = q => this.nuevo({ token: q.token || genId() + genId(), name: q.name, avatar: q.avatar, skin: SKINS.includes(q.skin) ? q.skin : 'soldado', prim: A[q.prim] ? q.prim : 'fusil', w: A[q.prim] ? q.prim : 'fusil', bot: false, connected: false, team: q.team === 'a' ? 'a' : 'r' });
+      let host = null;
+      for (const q of g.players) {
+        if (q.bot) { this.addBot(null); const b = this.players.get(this.order[this.order.length - 1]); if (b) Object.assign(b, { name: q.name, prim: A[q.prim] ? q.prim : b.prim, w: A[q.prim] ? q.prim : b.prim, team: q.team === 'a' ? 'a' : 'r' }); continue; }
+        const p = crear(q); this.players.set(p.id, p); this.order.push(p.id);
+        if (q.host && !host) { host = p; p.connected = true; this.hostId = p.id; }
+      }
+      if (!host) { host = this.players.get(this.order.find(id => !this.players.get(id).bot)); if (host) { host.connected = true; this.hostId = host.id; } }
+      for (const q of g.idos || []) { const p = crear(q); p.k = q.k; p.d = q.d; this.idos.set(p.token, p); }
+      if (g.phase === 'play' && host) {
+        if (this.settings.mode === 'campana' && g.nivel != null) this.settings.nivel = g.nivel;
+        this.phase = 'lobby'; this.start(host.id);
+        const L = this.list();
+        g.players.forEach((q, i) => { const p = L[i]; if (p) { p.k = q.k; p.d = q.d; } });
+        if (this.settings.mode === 'zombis' && this.ola && g.ola > 1) this.ola.n = g.ola - 1;
+        if (this.settings.mode === 'ffa' || this.settings.mode === 'equipos') { this.endAt = Date.now() + Math.max(30000, g.resta); this.score = g.score || this.score; }
+        if (g.reg && this.reg) { this.reg.t0 = Date.now() - g.reg.lleva; this.reg.desde = g.reg.desde; }
+        this.sys('🔁 El anfitrión volvió: siguen desde donde estaban' + (this.settings.mode === 'campana' ? ' (desde el principio del nivel ' + ((g.nivel | 0) + 1) + ')' : '') + '. Los demás vuelven a entrar solos.');
+      }
+      this.broadcastState();
+      return host;
+    }
     disconnect(id) { const p = this.players.get(id); if (!p) return; p.connected = false; p.voice = false; this.broadcastState(); }
     removePlayer(id) {
       const p = this.players.get(id); if (!p) return;
       this.players.delete(id); this.order = this.order.filter(x => x !== id);
-      if (!p.bot) this.sys(`${p.avatar} ${p.name} se fue`);
+      if (!p.bot && this.phase === 'play' && p.token) this.idos.set(p.token, p);
+      if (!p.bot) this.sys(`${p.avatar} ${p.name} se fue` + (this.phase === 'play' ? ' (si vuelve a entrar, sigue con lo que tenía)' : ''));
       if (!this.humans().length) { this.destroy(); this.io.onEmpty && this.io.onEmpty(this.code); return; }
       if (this.hostId === id) { this.hostId = this.humans()[0].id; const h = this.players.get(this.hostId); this.sys(`👑 Ahora ${h.name} es el anfitrión`); }
       this.broadcastState();
@@ -160,7 +203,8 @@
       this.score = { r: 0, a: 0 }; this.ranking = null; this.winner = null;
       for (const p of this.players.values()) { p.k = 0; p.d = 0; p.streak = 0; this.respawn(p, true); }
       this.phase = 'play'; this.endAt = Date.now() + this.settings.time * 60000;
-      this.zombis.clear(); this.ola = null; this.proy = []; this.areas = [];
+      this.zombis.clear(); this.ola = null; this.proy = []; this.areas = []; this.idos.clear();
+      this.reg = { mode: this.settings.mode, t0: Date.now(), desde: this.settings.mode === 'campana' ? (this.settings.nivel || 0) : 0, dif: this.settings.dif || 'facil', map: this.settings.map };
       if (this.settings.mode === 'campana') { this.endAt = Date.now() + 24 * 3600e3; this.phase = 'play'; this.campStart(this.settings.nivel || 0); this.sys('🎖️ Campaña "Operación Yvy": todos juntos contra la corporación y los infectados. Si caen, vuelven en 15 segundos al lado de un compañero.'); return; }
       if (this.settings.mode === 'zombis') { this.endAt = Date.now() + 24 * 3600e3; this.ola = { n: 0, quedan: 0, spawnT: 0, pausaHasta: Date.now() + 4000 }; }
       this.broadcastState();
@@ -352,6 +396,7 @@
       if (o.quedan === 0 && vivos === 0) {
         o.pausaHasta = now + 8000;
         this.all({ t: 'ola', fin: o.n });
+        if (this.io.record && this.reg) this.io.record({ mode: 'zombis', map: this.settings.map, ola: o.n, bajas: this.list().reduce((s, p) => s + (p.k | 0), 0) });
         this.sys(`✅ ¡Pasaron la oleada ${o.n}! La próxima en 8 segundos (los caídos vuelven).`);
         this.broadcastState();
       }

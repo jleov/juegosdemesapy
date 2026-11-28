@@ -483,6 +483,7 @@
         c.estado = 'final'; c.espera = Date.now() + 32000;
         this.zombis.clear(); this.mercs.clear();
         this.all({ t: 'final' });
+        if (this.io.record && this.reg) this.io.record({ mode: 'campana', dif: this.reg.dif, ms: Date.now() - this.reg.t0, completa: this.reg.desde === 0, bajas: this.list().reduce((s, p) => s + (p.k | 0), 0) });
         this.sys('🧉 ¡Operación Yvy cumplida! El acuífero está a salvo.');
       }
     };
