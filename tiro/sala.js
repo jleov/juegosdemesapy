@@ -14,6 +14,7 @@
   };
   const COLS = 10;
   const SKINS = ['soldado', 'albirrojo', 'enemigo', 'hazmat'];   // personajes 3D (juego.js)   // cantidad de colores de camiseta (todos contra todos)
+  const CAIDO_MS = 30000, LEVANTA_S = 4;   // caído: 30 s para que lo levanten; levantar lleva 4 s
   const genId = () => Math.random().toString(36).slice(2, 10);
   const clean = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
   const r2 = v => Math.round(v * 100) / 100;
@@ -251,6 +252,7 @@
         const ry = a / 16 * Math.PI * 2, d = W.rayMundo(M, [p.x, 1.55, p.z], W.dir(ry, 0), 60) + Math.random() * 3;
         if (d > lejos) { lejos = d; p.ry = ry; }
       }
+      p.caido = null; p.sangro = false;
       p.hp = 100; p.alive = true; p.prot = Date.now() + 1800; p.lastHurt = 0; p.w = p.prim;
       p.granadas = 2; p.molotov = 1;   // para la supervivencia zombi
       p.ruidos = this.camp && this.camp.nivel >= 4 ? 2 : 0; p.usando = false;
@@ -327,6 +329,8 @@
       if (kill) this.die(t, a, w, head);
     }
     die(t, a, w, head) {
+      if ((this.settings.mode === 'zombis' || this.camp) && !t.caido && !t.sangro && this.players.has(t.id)) return this.caer(t, a);
+      t.sangro = false; t.caido = null;
       t.alive = false; t.hp = 0; t.d++; t.streak = 0; t.respawnAt = Date.now() + 3500;
       const zomb = this.settings.mode === 'zombis';
       if (zomb) t.respawnAt = Infinity;   // en supervivencia se vuelve en la próxima oleada
@@ -345,13 +349,55 @@
       if (this.settings.mode === 'equipos' ? (this.score.r >= goal || this.score.a >= goal) : (a && a.k >= goal)) this.finish('goal');
     }
 
+    // ---------- caído: tirado en el piso, un compañero lo puede levantar ----------
+    caer(t, a) {
+      const now = Date.now();
+      t.alive = false; t.hp = 0; t.streak = 0; t.usando = false; t.respawnAt = Infinity;
+      t.caido = { hasta: now + CAIDO_MS, prog: 0 };
+      const amigo = a && a !== t && this.companero(a, t);
+      this.sys(amigo ? `🔥 Fuego amigo: ${a.name} dejó caído a ${t.name}` : `💔 ${t.name} está caído: ¡levántenlo! (mantener E o ✋ a su lado)`);
+      this.all({ t: 'caido', id: t.id });
+      this.broadcastState();
+      if (this.camp) { this.campRevisarCaidos(); return; }
+      if (this.settings.mode === 'zombis' && ![...this.players.values()].some(p => p.alive)) { this.sys(`💀 Cayeron todos en la oleada ${this.ola ? this.ola.n : 0}.`); this.finish('caidos'); }
+    }
+    caidoTick(p, dt, now) {
+      const c = p.caido; let quien = null;
+      for (const q of this.players.values()) {
+        if (q === p || !q.alive || Math.hypot(q.x - p.x, q.z - p.z) > 2.2 || Math.abs(q.y - p.y) > 1.6) continue;
+        if (q.bot ? q.bot.levanta === p.id : q.usando) { quien = q; break; }
+      }
+      if (quien) {
+        c.hasta += dt * 1000;   // mientras lo levantan, no se desangra
+        if (!c.por) this.to(p.id, { t: 'chat', kind: 'system', text: `🙌 ${quien.name} te está levantando...` });
+        c.por = quien.id; c.prog += dt;
+        if (c.prog >= LEVANTA_S) this.levantar(p, quien);
+        return;
+      }
+      c.por = null; c.prog = Math.max(0, c.prog - dt * 0.8);
+      if (now >= c.hasta) { p.caido = null; p.sangro = true; p.alive = true; this.die(p, null, 'zombi', false); }
+    }
+    levantar(p, q) {
+      const now = Date.now();
+      p.caido = null; p.alive = true; p.hp = 35; p.prot = now + 1500; p.lastHurt = now; p.usando = false;
+      if (p.bot) { Object.assign(p.bot.s, { x: p.x, y: p.y, z: p.z, vx: 0, vy: 0, vz: 0 }); p.bot.tgt = null; p.bot.goal = null; }
+      this.all({ t: 'levanta', id: p.id, por: q.id, hp: p.hp });
+      this.sys(`🙌 ${q.name} levantó a ${p.name}`);
+      this.broadcastState();
+    }
+    caidoCerca(p, R) {
+      let best = null, bd = R;
+      for (const q of this.players.values()) if (q !== p && q.caido) { const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < bd) { bd = d; best = q; } }
+      return best;
+    }
+
     // ---------- reloj ----------
     tick() {
       if (this.dead) return;
       const now = Date.now(), dt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
       if (this.phase !== 'play') return;
       for (const p of this.players.values()) {
-        if (!p.alive) { if (now >= p.respawnAt) this.respawn(p); continue; }
+        if (!p.alive) { if (p.caido) this.caidoTick(p, dt, now); else if (now >= p.respawnAt) this.respawn(p); continue; }
         if (p.hp < 100 && now - p.lastHurt > 4500 && !(p.res && this.camp)) p.hp = Math.min(100, p.hp + 22 * dt);
         if (p.bot) this.botTick(p, dt, now);
       }
@@ -361,7 +407,7 @@
       this.snapAcc += dt;
       if (this.snapAcc >= 0.05) {
         this.snapAcc = 0;
-        const P = this.list().map(p => [p.id, r2(p.x), r2(p.y), r2(p.z), r2(p.ry), r2(p.rx), Math.ceil(p.hp), p.alive ? 1 : 0, W.ARMA_IDS.indexOf(p.w), p.crouch ? 1 : 0, now < p.prot ? 1 : 0]);
+        const P = this.list().map(p => [p.id, r2(p.x), r2(p.y), r2(p.z), r2(p.ry), r2(p.rx), Math.ceil(p.hp), p.alive ? 1 : 0, W.ARMA_IDS.indexOf(p.w), p.crouch ? 1 : 0, now < p.prot ? 1 : 0, p.caido ? Math.max(1, Math.ceil((p.caido.hasta - now) / 1000)) : 0, p.caido ? r2(Math.min(1, p.caido.prog / LEVANTA_S)) : 0]);
         const m = { t: 'snap', P, tl: Math.max(0, this.endAt - now) };
         if (this.ola) {
           m.Z = [...this.zombis.values()].map(z => [z.id, TIPOS_Z.indexOf(z.tipo), r2(z.x), r2(z.y), r2(z.z), r2(z.ry), z.alive ? z.estado : 2, r2(z.vel)]);
@@ -652,6 +698,15 @@
         }
         const r = W.rumbo(M, p.x, p.z, b.goal[0], b.goal[1]);
         if (r) { const dx = r[0] - p.x, dz = r[1] - p.z, L = Math.hypot(dx, dz) || 1; mx = dx / L; mz = dz / L; quiereRy = Math.atan2(-mx, -mz); }
+      }
+      b.levanta = null;
+      if (this.ola || this.camp) {
+        const cai = this.caidoCerca(p, 90);
+        if (cai && (!b.tgt || Math.hypot(b.tgt.x - p.x, b.tgt.z - p.z) > 6)) {
+          const d = Math.hypot(cai.x - p.x, cai.z - p.z);
+          if (d > 1.3) { const r = W.rumbo(M, p.x, p.z, cai.x, cai.z); if (r) { const dx = r[0] - p.x, dz = r[1] - p.z, L = Math.hypot(dx, dz) || 1; mx = dx / L; mz = dz / L; if (!b.tgt) quiereRy = Math.atan2(-mx, -mz); } }
+          else { mx = 0; mz = 0; b.levanta = cai.id; if (!b.tgt) { quiereRy = Math.atan2(-(cai.x - p.x), -(cai.z - p.z)); quiereRx = -0.7; } }
+        }
       }
       // girar de a poco
       let dRy = quiereRy - p.ry; while (dRy > Math.PI) dRy -= 2 * Math.PI; while (dRy < -Math.PI) dRy += 2 * Math.PI;

@@ -831,7 +831,7 @@
     if (z && me) el.textContent = `💣 ${me.gr | 0}   🔥 ${me.mo | 0}` + (ru ? `   📢 ${me.ru | 0}` : '');
     document.querySelectorAll('[data-b="granada"],[data-b="molotov"]').forEach(b => b.classList.toggle('hidden', !z));
     document.querySelectorAll('[data-b="ruido"]').forEach(b => b.classList.toggle('hidden', !ru));
-    document.querySelectorAll('[data-b="usar"]').forEach(b => b.classList.toggle('hidden', !N));
+    document.querySelectorAll('[data-b="usar"]').forEach(b => b.classList.toggle('hidden', !z));
     document.querySelectorAll('[data-b="curar"]').forEach(b => b.classList.toggle('hidden', !(me && me.lim)));
     if (z && me && me.lim) el.textContent += `   💊 ${me.bq | 0}`;
   }
@@ -1138,9 +1138,17 @@
       case 'snap': {
         const now = performance.now();
         for (const e of m.P) {
-          const [id, x, y, z, ry, rx, hp, alive, w, c, prot] = e;
-          if (id === me) { yo.hp = hp; if (!alive && yo.alive) morir(null); continue; }
+          const [id, x, y, z, ry, rx, hp, alive, w, c, prot, cai, cprog] = e;
+          if (id === me) {
+            yo.hp = hp;
+            if (cai) { yo.caidoS = cai; yo.caidoP = cprog || 0; if (!yo.caido) caer(); }
+            else if (yo.caido && alive) levantado();
+            else if (!alive && yo.alive) morir(null);
+            continue;
+          }
           const r = remotos.get(id); if (!r) continue;
+          r.caido = cai || 0; r.cprog = cprog || 0;
+          if (cai && r.alive) { r.alive = false; r.caida = 0.001; }
           if (alive && !r.alive) { r.buf = []; r.caida = 0; }
           r.alive = !!alive; r.hp = hp; r.w = w; r.crouch = !!c; r.prot = !!prot;
           if (alive) { r.buf.push({ t: now, x, y, z, ry, rx }); if (r.buf.length > 30) r.buf.shift(); }
@@ -1158,7 +1166,7 @@
           yo.ry = m.ry; yo.rx = 0; yo.alive = true; yo.hp = 100; yo.reloadT = 0; yo.w = yo.prim; yo.kick = 0; yo.bloom = 0;
           yo.ammo = { [yo.prim]: A[yo.prim].mag, pistola: A.pistola.mag };
           yo.res = m.res ? Object.assign({}, m.res) : null;
-          $('#muerte').classList.add('hidden'); SFX.aparece(); armaHUD();
+          $('#muerte').classList.add('hidden'); yo.caido = null; $('#caido').classList.add('hidden'); SFX.aparece(); armaHUD();
           // si no volvió a agarrar el mouse mientras estaba muerto, se le pide un clic
           if (!tactil() && !C.obs() && document.pointerLockElement !== ren.domElement && !chatAbierto()) pausa(true);
         } else { const r = remotos.get(m.id); if (r) { r.buf = [{ t: performance.now(), x: m.p[0], y: m.p[1], z: m.p[2], ry: m.ry, rx: 0 }]; r.alive = true; r.caida = 0; } }
@@ -1223,7 +1231,8 @@
   }
   function morir(m) {
     if (!yo.alive && !m) return;
-    const estaba = yo.alive; yo.alive = false; yo.deadAt = performance.now(); inp.fire = false; yo.curando = null; yo.tajo = null;
+    const estaba = yo.alive || !!yo.caido; if (yo.caido) { yo.caido = null; $('#caido').classList.add('hidden'); }
+    yo.alive = false; yo.deadAt = performance.now(); inp.fire = false; yo.curando = null; yo.tajo = null;
     if (estaba) SFX.muero();
     if (m && m.a && m.a !== C.me()) yo.killer = m.a; else if (m) yo.killer = null;
     const w = m && A[m.w];
@@ -1457,6 +1466,7 @@
       if (!r.alive) {
         if (r.caida > 0 && r.cur) {
           r.caida += dt; g.visible = r.caida < (u.modelo ? 2 : 1.4); g.position.y = r.cur.y;
+          if (r.caido) g.visible = true;   // caído: queda tirado hasta que lo levantan
           if (u.modelo) animar(r, 0, dt); else g.rotation.x = -Math.min(1.5, r.caida * 4);
         }
         else g.visible = false;
@@ -1593,8 +1603,30 @@
     fogon.position.set(0, 0.03, PUNTA[yo.w]);
     hud(dt);
   }
+  // ---------- caído ----------
+  function caer() {
+    yo.caido = { t0: performance.now() }; yo.alive = false; yo.deadAt = performance.now(); inp.fire = false; yo.curando = null; yo.tajo = null; usar(false);
+    SFX.muero(); $('#caido').classList.remove('hidden'); $('#muerte').classList.add('hidden');
+  }
+  function levantado() {
+    yo.caido = null; yo.alive = true; $('#caido').classList.add('hidden');
+    if (yo.s) { yo.s.vx = yo.s.vy = yo.s.vz = 0; }
+    SFX.aparece(); aviso('🙌 ¡Te levantaron!', 'Volvés con poca vida: cubrite'); armaHUD();
+    if (!tactil() && !C.obs() && document.pointerLockElement !== ren.domElement && !chatAbierto()) pausa(true);
+  }
+  function camCaido(dt, now) {
+    const s = yo.s, t = (now - yo.caido.t0) / 1000, k = Math.min(1, t / 0.6);
+    cam.position.set(s.x, s.y + 1.55 - k * 1.25, s.z);
+    cam.rotation.set(-0.12 * k + Math.sin(t * 1.3) * 0.03, yo.ry + Math.sin(t * 0.7) * 0.05, 0.42 * k);
+    cam.fov = fovBase; cam.updateProjectionMatrix();
+    $('#cTxt').textContent = (yo.caidoP > 0 ? 'No te muevas...' : 'Tus compañeros te pueden levantar') + ' · te quedan ' + (yo.caidoS || 0) + ' s';
+    $('#caido .cbar i').style.width = Math.round((yo.caidoP || 0) * 100) + '%';
+    $('#cLev').textContent = yo.caidoP > 0 ? '🙌 Te están levantando...' : '';
+    hud(dt);
+  }
   function camMuerto(dt, now) {
     if (!yo.s) return;
+    if (yo.caido) return camCaido(dt, now);
     const r = yo.killer && remotos.get(yo.killer), s = yo.s;
     const k = Math.min(1, (now - yo.deadAt) / 1200);
     cam.position.set(s.x, s.y + 1.55 + k * 2.5, s.z);
@@ -1818,6 +1850,7 @@
   }
   function marcasTick() {
     const f = faseAct(), cont = $('#marcas'), L = [];
+    if (!cine) for (const r of remotos.values()) if (r.caido && r.cur) L.push([r.cur.x, r.cur.y + 1.1, r.cur.z, '💔', (r.cprog > 0 ? '🙌 ' + Math.round(r.cprog * 100) + '% · ' : '') + r.caido + ' s']);
     if (f && campC[5] === 0 && !cine) {
       if (f.zona) L.push([f.zona[0], 1.6, f.zona[1], f.tipo === 'escapar' ? '🛗' : f.tipo === 'aguantar' ? '🛡️' : '🏁', '']);
       puntosDe(f).forEach(([x, z, t], i) => { const v = campC[3][i]; if (v === -1 || v === -2 || v == null) return; L.push([x, 1.4, z, ICO_P[t] || '✋', v > 0 ? Math.round(v * 100) + '%' : '']); });
@@ -1840,8 +1873,10 @@
   }
   function usarTick() {
     if (yo.curando) return;   // mientras se cura, el cartel muestra la curación
-    const f = faseAct(); let txt = '', prog = 0;
-    if (f && campC[5] === 0 && yo.alive && yo.s && !C.obs()) {
+    const f = faseAct(); let txt = '', prog = 0, cerca = null;
+    if (yo.alive && yo.s && !C.obs()) for (const r of remotos.values()) if (r.caido && r.cur && Math.hypot(r.cur.x - yo.s.x, r.cur.z - yo.s.z) < 2.2) cerca = r;
+    if (cerca) { txt = 'levantar a ' + (cerca.name || 'tu compañero'); prog = cerca.cprog; }
+    else if (f && campC[5] === 0 && yo.alive && yo.s && !C.obs()) {
       const s = yo.s;
       puntosDe(f).forEach(([x, z, t], i) => { const v = campC[3][i]; if (v === -1 || v === -2) return; if (Math.hypot(x - s.x, z - s.z) < 2.6) { txt = VERBO[t]; prog = Math.max(0, v); } });
       if (f.tipo === 'matar') for (const r of mercs.values()) if (r.alive && r.tipo === 'torreta' && r.cur && Math.hypot(r.cur.x - s.x, r.cur.z - s.z) < 2.4) { txt = VERBO.torreta; prog = r.hack || 0; }
@@ -2260,6 +2295,7 @@
     if (mercs.size) mercsTick(dt, rt);
     camionTick(dt); abriendoTick(dt); if (items.size) itemsTick();
     if (esCamp()) { marcasTick(); usarTick(); ambienteTick(dt); }
+    else if (C.S() && C.S().settings.mode === 'zombis') { marcasTick(); usarTick(); }
   }
 
   J._dbg = { yo, inp, remotos, VM, mercs };   // para probar desde la consola

@@ -181,6 +181,11 @@ body.cine #pausa,body.cine #brief,body.cine #hud,body.cine #tctl,body.cine #obj,
 /* pantallas encima del juego */
 .capa{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:rgba(6,10,20,.72);text-align:center;padding:20px;z-index:4}
 #muerte{background:linear-gradient(rgba(90,0,0,.35),rgba(6,10,20,.55));pointer-events:auto}
+#caido{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:22vh;text-align:center;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 35%,rgba(150,0,0,.55) 100%);animation:latido 1.1s ease-in-out infinite;text-shadow:0 2px 6px #000}
+#caido h2{margin:0 0 6px;font-size:1.9em;color:#ff6b5e}#cTxt{font-weight:700}#cLev{margin-top:6px;color:#7dff8a;font-weight:800;min-height:1.2em}
+#caido .cbar{width:min(320px,70vw);height:8px;border-radius:5px;background:rgba(255,255,255,.18);margin-top:8px;overflow:hidden}#caido .cbar i{display:block;height:100%;width:0;background:#7dff8a;transition:width .15s}
+@keyframes latido{0%,100%{background-color:rgba(80,0,0,0)}50%{background-color:rgba(80,0,0,.18)}}
+body.cine #caido{display:none!important}
 #muerte h2{margin:0;font-size:clamp(20px,4vw,30px)}#mCuenta{color:#ffc83d}
 #mArmas{max-width:420px;width:100%}
 body.tactil .pc-solo{display:none}
@@ -384,6 +389,7 @@ body.tactil #chatF{bottom:auto;top:30%}
     <div class="lbl" style="margin-top:10px">Para la próxima, ¿qué arma? <span class="pc-solo">(tocala o apretá 1, 2, 3 o 4)</span></div>
     <div class="armas" id="mArmas"></div>
   </div>
+  <div id="caido" class="hidden"><h2>💔 Estás caído</h2><div id="cTxt"></div><div class="cbar"><i></i></div><div id="cLev"></div></div>
   <div id="pausa" class="capa hidden">
     <button class="jugar">▶️ Tocá para jugar</button>
     <div class="card no-lock">
@@ -409,10 +415,10 @@ body.tactil #chatF{bottom:auto;top:30%}
 </div>
 <div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br><span id="rotateTxt">para jugar</span><small id="rotateSub">La partida sigue: ¡apurate!</small></p></div>
 
-<script src="mundo.js?v=28"></script>
-<script src="campana.js?v=28"></script>
-<script src="sala.js?v=28"></script>
-<script src="juego.js?v=28"></script>
+<script src="mundo.js?v=29"></script>
+<script src="campana.js?v=29"></script>
+<script src="sala.js?v=29"></script>
+<script src="juego.js?v=29"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
