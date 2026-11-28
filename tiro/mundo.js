@@ -373,6 +373,7 @@
       const b = B[i];
       if (b[4] > y + 0.01 && b[1] < y + h && x + r > b[0] && x - r < b[3] && z + r > b[2] && z - r < b[5]) return b;
     }
+    if (M.movil) for (const b of M.movil) if (b[4] > y + 0.01 && b[1] < y + h && x + r > b[0] && x - r < b[3] && z + r > b[2] && z - r < b[5]) return b;
     return null;
   }
   // altura del piso debajo (lo más alto que no esté por encima de "tope")
@@ -386,8 +387,25 @@
   }
   // un paso de movimiento. s = {x,y,z,vx,vy,vz,ground,crouch,slideT,slideCd}
   // inp = {mx,mz (dirección en el mundo, largo ≤1), jump, crouch, aim}
+  // la caja del camión blindado según hacia dónde mira (6 m de largo, 2,8 de ancho)
+  function cajaCamion(x, z, ry) {
+    const sn = Math.abs(Math.sin(ry)), cs = Math.abs(Math.cos(ry)), hx = sn * 3 + cs * 1.4, hz = cs * 3 + sn * 1.4;
+    return [x - hx, 0, z - hz, x + hx, 2.9, z + hz];
+  }
+  // si el camión se le vino encima a alguien, lo corre para el costado más cercano
+  function empujar(M, s) {
+    if (!M.movil) return;
+    const r = F.R;
+    for (const b of M.movil) {
+      if (!(b[4] > s.y + 0.01 && b[1] < s.y + 1.6 && s.x + r > b[0] && s.x - r < b[3] && s.z + r > b[2] && s.z - r < b[5])) continue;
+      const op = [[b[0] - r - s.x, 0], [b[3] + r - s.x, 0], [0, b[2] - r - s.z], [0, b[5] + r - s.z]];
+      op.sort((p, q) => Math.abs(p[0] + p[1]) - Math.abs(q[0] + q[1]));
+      for (const [ax, az] of op) { const nx = s.x + ax * 1.02, nz = s.z + az * 1.02; const v = M.movil; M.movil = null; const libre = !choca(M, nx, s.y, nz, 1.6); M.movil = v; if (libre) { s.x = nx; s.z = nz; break; } }
+    }
+  }
   function mover(M, s, inp, dt) {
     if (!(dt > 0)) return;
+    empujar(M, s);
     // agacharse / pararse (solo si hay lugar arriba)
     const quiere = !!inp.crouch;
     if (quiere && !s.crouch) {
@@ -598,10 +616,16 @@
     if (!M.abiertas) M.abiertas = [];
     if (M.abiertas.includes(id)) return false;
     M.abiertas.push(id);
+    const quitadas = M.boxes.filter(b => b[8] === id);
     M.boxes = M.boxes.filter(b => b[8] !== id);
+    for (const b of quitadas) {
+      const cx = (b[0] + b[3]) / 2, cz = (b[2] + b[5]) / 2;
+      const p = (M.props || []).find(p => p.puerta === id && p.abre && Math.abs(p.abre[1]) < 0.5 && Math.abs(p.x - cx) < 4 && Math.abs(p.z - cz) < 4);
+      if (p) M.boxes.push([b[0] + p.abre[0], b[1], b[2] + p.abre[2], b[3] + p.abre[0], b[4], b[5] + p.abre[2], b[6]]);
+    }
     M.nav = navGrid(M);
     return true;
   }
   function reiniciarMapa(id) { delete cacheM[id]; }
-  G.TiroMundo = { armar, abrir, reiniciarMapa, F, PAL, PROPS, ARMAS, ARMA_IDS, MAPAS, MAPA_IDS, mapa, choca, piso, mover, liberar, rayMundo, rayCuerpos, dir, desvio, seVe, rumbo, puntoLibre, cabeza };
+  G.TiroMundo = { armar, abrir, reiniciarMapa, cajaCamion, F, PAL, PROPS, ARMAS, ARMA_IDS, MAPAS, MAPA_IDS, mapa, choca, piso, mover, liberar, rayMundo, rayCuerpos, dir, desvio, seVe, rumbo, puntoLibre, cabeza };
 })(typeof window !== 'undefined' ? window : globalThis);

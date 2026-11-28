@@ -405,7 +405,7 @@
         z.escT -= dt;
         if (z.escT <= 0 && d > 4 && d < 24 && W.seVe(M, boca, [t.x, t.y + 1.2, t.z])) { z.escT = 4 + Math.random() * 2.5; z.escupiendo = 0.6; this.all({ t: 'escupe', id: z.id }); }
       }
-      if (d < (t.esCamion ? 3.2 : t.esPuerta ? 1.8 : 1.35) && Math.abs((t.y || 0) - z.y) < 1.3 && !t.ruido) {
+      if (d < (t.esCamion ? 3.9 : t.esPuerta ? 1.8 : 1.35) && Math.abs((t.y || 0) - z.y) < 1.3 && !t.ruido) {
         z.estado = 1; z.ry = Math.atan2(-dx, -dz);
         z.atkT -= dt;
         if (z.atkT <= 0) { z.atkT = 1.1; this.mordida(t, z, now); }

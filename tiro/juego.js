@@ -1755,6 +1755,8 @@
   }
   // ---------- el camión blindado ----------
   function camionTick(dt) {
+    const MM = mapaId && W.mapa(mapaId);
+    if (MM) MM.movil = campK ? [W.cajaCamion(campK[0], campK[1], campK[2])] : null;
     if (!campK) { if (camion) { scene.remove(camion.g); camion = null; } return; }
     if (!camion) {
       const g = new T.Group(), gl = GLBP.blindado;
@@ -1778,8 +1780,8 @@
     const L = (puertasB[id] || []).concat(puertasP[id] || []); delete puertasB[id]; delete puertasP[id];
     for (const o of L) {
       const a = o.userData.abre || [0, -3.5, 0];
-      if (ya) { o.position.x += a[0]; o.position.y += a[1]; o.position.z += a[2]; if (a[1] < -1) o.visible = false; }
-      else abriendo.push({ o, a, t: 0, desde: o.position.clone() });
+      if (ya) { o.position.x += a[0]; o.position.y += a[1]; o.position.z += a[2]; o.rotation.y += a[3] || 0; if (a[1] < -1) o.visible = false; }
+      else abriendo.push({ o, a, t: 0, desde: o.position.clone(), ry: o.rotation.y });
     }
     if (!ya && L.length) { raspa(0, 2.2, 150, 500, 0.35); metal(0.1, 1.8, 90, 60, 0.25, 3); }
   }
@@ -1787,6 +1789,12 @@
     for (let i = abriendo.length - 1; i >= 0; i--) {
       const b = abriendo[i]; b.t = Math.min(1, b.t + dt / 3.5); const e = b.t * b.t * (3 - 2 * b.t);
       b.o.position.set(b.desde.x + b.a[0] * e, b.desde.y + b.a[1] * e, b.desde.z + b.a[2] * e);
+      // empujado de costado: se sacude, gira un poco y levanta tierra
+      if (Math.abs(b.a[1]) < 0.5) {
+        b.o.rotation.y = b.ry + (b.a[3] || 0) * e;
+        b.o.rotation.z = b.t < 1 ? Math.sin(b.t * 60) * 0.025 * (1 - b.t) : 0;
+        if (b.t < 0.9 && Math.random() < dt * 14) polvoPies(b.o.position.x + (Math.random() - 0.5) * 3, b.o.position.y, b.o.position.z + (Math.random() - 0.5) * 3);
+      }
       if (b.t >= 1) { if (b.a[1] < -1) b.o.visible = false; abriendo.splice(i, 1); }
     }
   }
@@ -1859,7 +1867,7 @@
   const CURA_TXT = { venda: '🩹 Vendándote...', pastilla: '💊 Tomando la pastilla...', inyectable: '💉 Poniéndote el inyectable...' };
   function curaTick(dt) {
     const c = yo.curando; c.t += dt;
-    const el = $('#usar'); el.classList.remove('hidden'); el.querySelector('span').textContent = CURA_TXT[c.tipo]; el.querySelector('i').style.width = Math.min(100, c.t / 2 * 100) + '%';
+    const el = $('#usar'); el.classList.remove('hidden'); el._t = null; el.querySelector('span').textContent = CURA_TXT[c.tipo]; el.querySelector('i').style.width = Math.min(100, c.t / 2 * 100) + '%';
     if (c.t >= 2) { yo.curando = null; C.send({ t: 'curar' }); el.classList.add('hidden'); }
   }
   function curaVM(dt) {
@@ -2048,80 +2056,99 @@
     ren.clear(); ren.render(cine.sc, cam);
   }
   // ---------- al terminar cada nivel: el escuadrón se escapa del lugar ----------
-  // vehículo de cada nivel: [modelo, cómo se va, medidas]
-  const ESCAPE = {
-    1: ['helicoptero', 'sube', { w: 9, h: 3.2, d: 10 }, 'El helicóptero de rescate los saca del Mercado 4...'],
-    2: ['jeep', 'auto', { h: 2.3 }, 'Se escapan por la Costanera en un jeep abandonado...'],
-    3: ['locomotora', 'auto', { w: 10.4, h: 2.7, d: 2.4 }, 'Suben al tren de carga y dejan Areguá entre la neblina...'],
-    4: ['colectivo', 'auto', { w: 2.9, h: 3.1, d: 9.5 }, 'Evacúan a la gente de la Basílica en un colectivo...'],
-    5: ['camion_militar', 'auto', { h: 2.8 }, 'Se llevan las muestras en el camión de la corporación...'],
-    6: ['jeep', 'auto', { h: 2.3 }, 'Salen de la represa a oscuras, en un jeep de mantenimiento...'],
-    7: ['humvee', 'auto', { h: 2 }, 'Encuentran un vehículo enemigo y dejan atrás la selva...'],
-    8: ['humvee', 'auto', { h: 2 }, 'Con los datos, se van de las ruinas rumbo al Chaco...'],
-    9: ['blindado', 'auto', { h: 2.9 }, 'El camión blindado llega a la entrada del búnker...'],
+  // medidas de cada vehículo; frente: hacia dónde mira el modelo (0 = +z)
+  const VEHI = {
+    helicoptero: { w: 9, h: 3.2, d: 10, sube: true, frente: 0, asientos: [[-0.55, 0.45, 0.9, 1], [0.55, 0.45, 0.9, -1], [-0.55, 0.45, -0.3, 1], [0.55, 0.45, -0.3, -1]] },
+    jeep: { h: 2.3, frente: 0, asientos: [[-0.42, 0.62, 0.05], [0.42, 0.62, 0.05], [-0.42, 0.72, -0.95], [0.42, 0.72, -0.95]] },
+    colectivo: { w: 2.9, h: 3.1, d: 9.5, frente: 0 },
+    camion_militar: { h: 2.8, frente: 0 },
+    humvee: { h: 2, frente: Math.PI, asientos: [[-0.48, 0.12, 0.25], [0.48, 0.12, 0.25], [-0.48, 0.12, -0.75], [0.48, 0.12, -0.75]] },
+    blindado: { h: 2.9, frente: Math.PI },
   };
+  // punto y dirección a una distancia d del recorrido
+  function enRuta(R, d) {
+    for (let i = 0; i < R.length - 1; i++) {
+      const [x0, z0] = R[i], [x1, z1] = R[i + 1], L = Math.hypot(x1 - x0, z1 - z0);
+      if (d <= L || i === R.length - 2) { const k = Math.min(1, d / L); return [x0 + (x1 - x0) * k, z0 + (z1 - z0) * k, (x1 - x0) / L, (z1 - z0) / L]; }
+      d -= L;
+    }
+    return [R[0][0], R[0][1], 0, 1];
+  }
+  const largoRuta = R => { let L = 0; for (let i = 0; i < R.length - 1; i++) L += Math.hypot(R[i + 1][0] - R[i][0], R[i + 1][1] - R[i][1]); return L; };
   J.finNivel = n => {
-    const c = CAMP(), N = c.NIVELES[n], S = C.S(), V = ESCAPE[N && N.id];
-    if (!N || !V || !scene || !mapaId) return finNivel(n);
+    const c = CAMP(), N = c.NIVELES[n], S = C.S(), E = N && N.esc, V = E && VEHI[E.v];
+    if (!E || !V || !scene || !mapaId) return finNivel(n);
     if (cine) campLimpiar();
-    const f = N.fases[N.fases.length - 1], ex = (f.zona ? [f.zona[0], f.zona[1]] : f.cp).slice();
-    if (N.id === 9 && campK) { ex[0] = campK[0]; ex[1] = campK[1]; }
-    let dx = ex[0], dz = ex[1]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
-    if (N.id === 3) { dx = 1; dz = 0; } if (N.id === 9) { dx = 0; dz = -1; }
     const grupo = new T.Group(); scene.add(grupo);
-    // el vehículo, mirando hacia donde se va
-    const veh = new T.Group(), gl = GLBP[V[0]];
+    // el vehículo: el modelo queda con lo largo hacia +z y la trompa adelante
+    const veh = new T.Group(), gl = GLBP[E.v];
     if (gl) {
       const m = gl.scene.clone(true), cj = gl.caja, sz = cj.getSize(new T.Vector3()), ce = cj.getCenter(new T.Vector3());
-      const sp = V[2], P = W.PROPS[V[0]], k = sp.h / sz.y;
-      const sx = sp.w ? sp.w / sz.x : k, sz2 = sp.d ? sp.d / sz.z : k;
+      const k = V.h / sz.y, sx = V.w ? V.w / sz.x : k, sz2 = V.d ? V.d / sz.z : k;
       const hold = new T.Group(); hold.add(m); hold.scale.set(sx, k, sz2); hold.position.set(-ce.x * sx, -cj.min.y * k, -ce.z * sz2);
-      const largoX = sz.x * sx > sz.z * sz2;
-      const piv = new T.Group(); piv.add(hold); piv.rotation.y = largoX ? Math.atan2(-dz, dx) : Math.atan2(dx, dz); veh.add(piv);
-    } else { const b = new T.Mesh(cajaGeo(2.6, 2.4, 5), matCaja(13)); b.position.y = 1.2; b.rotation.y = Math.atan2(dx, dz); veh.add(b); }
-    veh.position.set(ex[0], 0, ex[1]); grupo.add(veh);
-    if (N.id === 1) veh.position.y = 0.2;
-    // el escuadrón camina hasta el vehículo y sube
+      const piv = new T.Group(); piv.add(hold); piv.rotation.y = V.frente; veh.add(piv);
+    } else { const b = new T.Mesh(cajaGeo(2.6, 2.4, 5), matCaja(13)); b.position.y = 1.2; veh.add(b); }
+    const p0 = enRuta(E.ruta, 0);
+    veh.position.set(p0[0], V.sube ? 0.2 : 0, p0[1]); veh.rotation.y = Math.atan2(p0[2], p0[3]); grupo.add(veh);
+    if (camion) camion.g.visible = false;   // el camión de la escolta queda escondido (va el de la escena)
+    // el escuadrón sale de donde terminó la misión y camina hasta la puerta del vehículo
+    const M = W.mapa(mapaId), [gx, gz] = E.gente;
+    let ax = p0[0] - gx, az = p0[1] - gz; const aL = Math.hypot(ax, az) || 1; ax /= aL; az /= aL;
+    const puerta = [p0[0] - ax * 2.2, p0[1] - az * 2.2];
     const gente = S.players.filter(p => !p.bot).concat(S.players.filter(p => p.bot)).slice(0, 4), rs = [];
     gente.forEach((p, i) => {
       const g = muneco(p, 'campana'); scene.remove(g); grupo.add(g);
-      const lado = (i - 1.5) * 1.3, px = ex[0] - dx * 9 - dz * lado, pz = ex[1] - dz * 9 + dx * lado;
-      g.position.set(px, W.piso(W.mapa(mapaId), px, pz, 1), pz); g.rotation.y = Math.atan2(-dx, -dz) + Math.PI;
+      const lado = (i - (gente.length - 1) / 2) * (E.sep || 1.3), px = gx - az * lado, pz = gz + ax * lado;
+      g.position.set(px, W.piso(M, px, pz, 1), pz); g.rotation.y = Math.atan2(ax, az);
       if (g.userData.nom) g.userData.nom.visible = false; if (g.userData.haz) g.userData.haz.visible = noche;
-      rs.push({ g, w: 0, alive: true, crouch: false, tiroT: 0, velS: 3, desde: g.position.clone() });
+      rs.push({ g, w: 0, alive: true, crouch: false, tiroT: 0, velS: 3, desde: g.position.clone(), hasta: [puerta[0] - az * lado * 0.4, puerta[1] + ax * lado * 0.4] });
     });
     for (const r of remotos.values()) r.g.visible = false;
-    // cámara: de costado, un poco arriba
-    const cx = ex[0] - dx * 12 + dz * 10, cz = ex[1] - dz * 12 - dx * 10;
-    cine = { escape: true, t: 0, t0: performance.now(), grupo, veh, rs, dir: [dx, dz], tipo: V[1], cam: [cx, 5, cz], N };
+    cine = { escape: true, t: 0, t0: performance.now(), grupo, veh, rs, E, V, L: largoRuta(E.ruta), d: 0, y0: veh.position.y, N };
     document.body.classList.add('cine');
-    const el = $('#cine'); el.innerHTML = '<p class="tit" style="animation-delay:.6s">✅ ¡Nivel ' + N.id + ' completado!</p><p style="animation-delay:2.2s">' + esc(V[3]) + '</p><p style="animation-delay:4.4s">' + esc(N.fin) + '</p>';
+    const el = $('#cine'); el.innerHTML = '<p class="tit" style="animation-delay:.6s">✅ ¡Nivel ' + N.id + ' completado!</p><p style="animation-delay:2.2s">' + esc(E.txt) + '</p><p style="animation-delay:4.4s">' + esc(N.fin) + '</p>';
     el.classList.remove('hidden'); el.style.background = '';
     if (document.pointerLockElement) document.exitPointerLock();
     SFX.fin();
   };
-  function escapeTick(dt0) {
+  function escapeTick() {
     // con el reloj de verdad (en un celular lento la escena no se atrasa)
     const c = cine, nt = (performance.now() - c.t0) / 1000, dt = Math.min(0.2, Math.max(0, nt - c.t)); c.t = nt;
-    const [dx, dz] = c.dir, veh = c.veh;
-    // 0 a 3 s: caminan hasta el vehículo; después suben (desaparecen)
+    const veh = c.veh, E = c.E;
+    // 0 a 2,6 s: caminan hasta la puerta; después suben (desaparecen)
     c.rs.forEach((r, i) => {
+      if (r.sentado) { if (r.g.userData.modelo) animar(r, 0, dt); return; }
       const k = Math.min(1, c.t / 2.6);
-      r.g.position.x = r.desde.x + (veh.position.x - dx * 2.5 - r.desde.x) * k; r.g.position.z = r.desde.z + (veh.position.z - dz * 2.5 - r.desde.z) * k;
+      r.g.position.x = r.desde.x + (r.hasta[0] - r.desde.x) * k; r.g.position.z = r.desde.z + (r.hasta[1] - r.desde.z) * k;
+      // los vehículos abiertos (jeep, humvee, helicóptero): se los ve sentados adentro
+      const as = c.V.asientos && c.V.asientos[i];
+      if (as && c.t >= 2.8 + i * 0.12) {
+        if (!r.sentado) { r.sentado = true; veh.add(r.g); r.g.position.set(as[0], as[1], as[2]); r.g.rotation.set(0, as[3] ? as[3] * Math.PI / 2 : 0, 0); r.crouch = true; }
+        if (r.g.userData.modelo) animar(r, 0, dt);
+        return;
+      }
       r.g.visible = c.t < 2.8 + i * 0.12;
       if (r.g.userData.modelo) animar(r, k < 1 ? 3.5 : 0, dt);
     });
-    // después el vehículo se va
+    // después el vehículo arranca despacio y sigue el recorrido (al final del camino se queda quieto)
     const v = Math.max(0, c.t - 3.2);
-    if (c.tipo === 'sube') {
-      veh.position.y = 0.2 + v * v * 0.9; veh.position.x += dx * v * dt * 3; veh.position.z += dz * v * dt * 3; veh.rotation.x = -Math.min(0.25, v * 0.08);
+    if (c.V.sube) {
+      // el helicóptero sube derecho y después avanza
+      const p = enRuta(E.ruta, Math.min(c.L, v * v * 0.35));
+      veh.position.set(p[0], c.y0 + v * v * 0.9, p[1]); veh.rotation.x = 0; veh.rotation.z = 0;
+      veh.children[0].rotation.x = Math.min(0.22, v * 0.06);
       if (v > 0 && Math.random() < dt * 9) tono(70, 0, 0.08, 'sawtooth', 0.05);
     } else {
-      const vel = Math.min(14, v * 4); veh.position.x += dx * vel * dt; veh.position.z += dz * vel * dt;
+      const vel = Math.min(7, v * 2.2); c.d = Math.min(c.L, c.d + vel * dt);
+      const p = enRuta(E.ruta, c.d), q = enRuta(E.ruta, Math.min(c.L, c.d + 3));
+      veh.position.set(p[0], W.piso(W.mapa(mapaId), p[0], p[1], 1), p[1]);
+      const hx = q[0] - p[0], hz = q[1] - p[1];
+      if (Math.hypot(hx, hz) > 0.3) { let dr = Math.atan2(hx, hz) - veh.rotation.y; while (dr > Math.PI) dr -= 2 * Math.PI; while (dr < -Math.PI) dr += 2 * Math.PI; veh.rotation.y += dr * Math.min(1, dt * 5); }
       if (v > 0 && !c.motor) { c.motor = true; raspa(0, 5, 160, 420, 0.25); }
     }
-    // la cámara sigue al vehículo
-    cam.position.set(c.cam[0], c.cam[1] + Math.min(4, v * 0.4), c.cam[2]);
+    // la cámara mira al vehículo
+    const [cx, cy, cz] = E.cam;
+    cam.position.set(cx, cy + Math.min(3, v * 0.3), cz);
     cam.lookAt(veh.position.x, veh.position.y + 1.5, veh.position.z);
     cam.fov = fovBase; cam.updateProjectionMatrix();
     // al final, la pantalla se pone negra

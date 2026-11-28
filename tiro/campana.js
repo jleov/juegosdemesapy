@@ -251,8 +251,8 @@
     // el puesto de comunicaciones de la corporación
     o('antena', 18, -16, { h: 6 }); o('parabolica', 22, -22, { h: 2.4 }); o('parabolica', 16, -26, { h: 2 });
     o('generador', 26, -14, { w: 2.4, h: 1.5, d: 1.2 }); o('camion_militar', 26, -28, { h: 2.8 });
-    [[-6, -25], [24, 13], [-26, 13]].forEach(([x, z]) => o('terminal', x, z, { w: 1.3, h: 0.7, d: 1.1, y: 0.8 }));
-    [[-6, -25], [24, 13], [-26, 13]].forEach(([x, z]) => b(x, z, 1.6, 1.2, 0.8, 11));
+    [[-6, -25], [26, 13], [-26, 13]].forEach(([x, z]) => o('terminal', x, z, { w: 1.3, h: 0.7, d: 1.1, y: 0.8 }));
+    [[-6, -25], [26, 13], [-26, 13]].forEach(([x, z]) => b(x, z, 1.6, 1.2, 0.8, 11));
     [[-20, -10], [20, 0], [-28, -24], [30, 30], [-30, 30], [9, 28]].forEach(([x, z]) => o('arbol_selva', x, z, { h: 7 }));
     [[14, -8], [-16, -2], [4, 14]].forEach(([x, z]) => o('bolsas', x, z, { w: 3.6, h: 1.1, d: 0.9 }));
   });
@@ -275,8 +275,8 @@
     const rnd = azar(9);
     for (let i = 0; i < 34; i++) { const x = (rnd() < 0.5 ? -1 : 1) * (8 + rnd() * 30), z = -38 + rnd() * 76; if (x > 5 && x < 30 && z > -12 && z < 14) continue; o('palmera', x, z, { h: 6 + rnd() * 3 }); }
     // bloqueos en la ruta (el camión no pasa hasta despejarlos)
-    o('camion_militar', 0, 16, { w: 2.6, h: 2.8, d: 6, q: 1, puerta: 'bloqueo1', abre: [0, -3.2, 0] });
-    o('jeep', 0, -18, { h: 2.2, q: 1, puerta: 'bloqueo2', abre: [0, -3, 0] }); o('bolsas', 0, -16.4, { w: 4, h: 1.1, d: 0.9, puerta: 'bloqueo2', abre: [0, -2, 0] });
+    o('camion_militar', 0, 16, { w: 2.6, h: 2.8, d: 6, q: 1, puerta: 'bloqueo1', abre: [-7, 0, 1.5, 0.35] });
+    o('jeep', 0, -18, { h: 2.2, q: 1, puerta: 'bloqueo2', abre: [6.5, 0, -1, -0.4] }); o('bolsas', 0, -16.4, { w: 4, h: 1.1, d: 0.9, puerta: 'bloqueo2', abre: [-5.5, 0, 0.6, 0.25] });
     // vehículos enemigos con ametralladora
     o('humvee', -8, -24, { h: 2, q: 0 }); o('jeep', 9, 24, { h: 2.2, q: 1 });
     [[-6, 30], [6, -32], [-10, -6]].forEach(([x, z]) => o('auto', x, z, { h: 1.6, q: 1 }));
@@ -366,7 +366,7 @@
     { id: 8, n: 'Ecos de Piedra', lugar: 'Ruinas Jesuíticas de Trinidad · Itapúa', mapa: 'c_trinidad', inicio: [0, 33], enemigos: '🛡️ Mercenarios con escudo + 💥 zombis explosivos',
       historia: 'La corporación instaló un puesto de comunicaciones temporal entre los muros de piedra roja. Hay que hackear las 3 terminales enemigas (como plantar la bomba) mientras resisten los contraataques. Los mercenarios con escudo solo caen por los costados, por atrás o a la cabeza... y los zombis verdes explotan.',
       fases: [
-        { tipo: 'activar', puntos: [[-6, -23.6, 'terminal'], [24, 11.6, 'terminal'], [-26, 11.6, 'terminal']], seg: 9, txt: 'Hackeen las 3 terminales enemigas', m: [['escudo', -3, -14], ['merc', 6, -20], ['escudo', 22, 6], ['merc', 27, 15], ['escudo', -24, 6], ['merc', -29, 16]], ref: { cada: 20, max: 3, desde: [[0, -34], [34, 0], [-34, 0]] }, z: { cada: 2.2, max: 12, explosivo: 0.35 } },
+        { tipo: 'activar', puntos: [[-6, -23.6, 'terminal'], [26, 11.6, 'terminal'], [-26, 11.6, 'terminal']], seg: 9, txt: 'Hackeen las 3 terminales enemigas', m: [['escudo', -3, -14], ['merc', 6, -20], ['escudo', 22, 6], ['merc', 27, 15], ['escudo', -24, 6], ['merc', -29, 16]], ref: { cada: 20, max: 3, desde: [[0, -34], [34, 0], [-34, 0]] }, z: { cada: 2.2, max: 12, explosivo: 0.35 } },
         { tipo: 'aguantar', seg: 45, zona: [0, 0, 12], txt: 'Aguanten mientras se descargan los datos', cp: [0, 2], m: [['escudo', 0, -30], ['merc', -30, -4], ['merc', 30, -4]], z: { cada: 0.9, max: 16, explosivo: 0.3 } },
         { tipo: 'llegar', zona: [30, 32, 6], txt: 'Retirada hacia la ruta', cp: [0, 2], z: { cada: 1.2, max: 14, explosivo: 0.3 } },
       ], fin: 'Los datos revelan la ubicación del búnker: en el corazón del Chaco, sobre una caverna del acuífero.' },
@@ -387,6 +387,18 @@
       ], fin: '' },
   ];
   NIVELES.forEach(n => n.fases.forEach(f => { if (!f.cp) f.cp = n.inicio; }));
+  const ESCAPES = {
+    1: { v: 'helicoptero', ruta: [[23, -27.5], [40, -27.5]], gente: [11, -26], cam: [8, 4, -22], txt: 'El helicóptero de rescate aterriza en la Avenida Pettirossi y los saca del Mercado 4...' },
+    2: { v: 'jeep', ruta: [[27, -8.6], [-31, -8.6]], gente: [34, -6], cam: [20, 4.5, -1], txt: 'Encuentran un jeep abandonado y se escapan por la Costanera...' },
+    3: { v: 'jeep', ruta: [[24, -25], [-18, -25]], gente: [27, -18.5], cam: [12, 4, -18], txt: 'Cruzan las vías y se van de Areguá en un jeep, entre la neblina...' },
+    4: { v: 'colectivo', ruta: [[34.5, -30], [34.5, 24]], gente: [33, -36], cam: [27, 5, -17], txt: 'Suben a la gente a un colectivo y la sacan por atrás de la Basílica...' },
+    5: { v: 'jeep', ruta: [[25, 0], [8, 0], [7.6, -3], [7.6, -34.5]], gente: [37, 0.6], sep: 0.5, cam: [15, 6, 4], txt: 'Cargan las muestras en un jeep y se van del puente, de vuelta a la ciudad...' },
+    6: { v: 'jeep', ruta: [[27, -12.8], [-29, -12.8]], gente: [29.5, -24], cam: [14, 3.5, -17], txt: 'Salen de la represa a oscuras, en un jeep por el túnel de mantenimiento...' },
+    7: { v: 'humvee', ruta: [[-27, -32], [33, -32]], gente: [-31, -26], cam: [-18, 4, -26], txt: 'En el claro encuentran un vehículo enemigo y dejan atrás la selva...' },
+    8: { v: 'humvee', ruta: [[26, 33], [-32, 33]], gente: [27, 27], cam: [16, 3.5, 35], txt: 'Con los datos, se van de las ruinas por la ruta, rumbo al Chaco...' },
+    9: { v: 'blindado', ruta: [[1.5, -4], [1.5, -35.5]], gente: [-3, -1], cam: [9, 4, -24], txt: 'Suben al camión blindado y recorren el último tramo hasta la entrada del búnker...' },
+  };
+  NIVELES.forEach(n => { if (ESCAPES[n.id]) n.esc = ESCAPES[n.id]; });
 
   // ================= MERCENARIOS =================
   const MT = {
@@ -1012,6 +1024,7 @@
           c.puerta ? Math.max(0, Math.round(c.puerta.hp / c.puerta.max * 100)) : -1, c.jefe ? Math.max(0, Math.round(c.jefe.hp / c.jefe.max * 100)) : -1, c.jefe && now < c.jefe.expHasta ? Math.ceil((c.jefe.expHasta - now) / 1000) : 0],
       };
       if (c.items && (c.iEnv !== c.iVer || now - (c.iT || 0) > 2000)) { c.iEnv = c.iVer; c.iT = now; o.I = [...c.items.values()].map(it => [it.id, TIPOS_I.indexOf(it.tipo), r2(it.x), r2(it.y), r2(it.z)]); }
+      this.M.movil = c.camion ? [W.cajaCamion(c.camion.x, c.camion.z, c.camion.ry)] : null;
       if (c.camion) o.K = [r2(c.camion.x), r2(c.camion.z), r2(c.camion.ry), Math.max(0, Math.round(c.camion.hp / c.camion.max * 100)), c.camion.parado ? 1 : 0];
       return o;
     };

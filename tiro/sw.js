@@ -1,5 +1,5 @@
 // Service worker mínimo: permite instalar Tiro Guasu como app.
-const CACHE = 'tiro-v25';
+const CACHE = 'tiro-v26';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './peerjs.min.js', './three.min.js', './mundo.js?v=23', './campana.js?v=23', './sala.js?v=23', './juego.js?v=23'];
 
 self.addEventListener('install', e => {
