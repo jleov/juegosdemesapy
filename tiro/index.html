@@ -27,8 +27,10 @@
 <script>if(!window.Peer) document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
 <script src="three.min.js"></script>
 <!-- para cargar los personajes y armas en 3D (modelos de Quaternius, CC0); si no cargan, se juega con muñecos de cajas -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script src="GLTFLoader.js?v=128"></script>
+<script>if(!THREE.GLTFLoader) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"><\/script>');</script>
+<script src="SkeletonUtils.js?v=128"></script>
+<script>if(!THREE.SkeletonUtils) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"><\/script>');</script>
 <script src="../ice.js"></script>
 <style>
 :root{--rojo:#D52B1E;--azul:#0038A8;--azul2:#3a6df0;--bg:#0f1420;--card:#1a2233;--card2:#222c42;--tx:#eef2fb;--mut:#93a0bd;--ok:#22b35e;--line:#2e3a55;--r:14px}
@@ -403,10 +405,10 @@ body.tactil #chatF{bottom:auto;top:30%}
 </div>
 <div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br><span id="rotateTxt">para jugar</span><small id="rotateSub">La partida sigue: ¡apurate!</small></p></div>
 
-<script src="mundo.js?v=26"></script>
-<script src="campana.js?v=26"></script>
-<script src="sala.js?v=26"></script>
-<script src="juego.js?v=26"></script>
+<script src="mundo.js?v=27"></script>
+<script src="campana.js?v=27"></script>
+<script src="sala.js?v=27"></script>
+<script src="juego.js?v=27"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);
