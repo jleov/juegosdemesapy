@@ -185,6 +185,10 @@ body.tactil .pc-solo{display:none}
 .ajuste{display:grid;grid-template-columns:1fr 2fr 34px;align-items:center;gap:8px;font-size:.88em;margin:6px 0}
 .ajuste input[type=range]{padding:0;accent-color:#ffc83d}
 .ajuste.chk{grid-template-columns:auto 1fr}.ajuste.chk input{width:auto}
+.ajuste select{padding:.35em .5em;grid-column:2/4}
+#fps{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 46px);left:12px;font:700 13px/1 monospace;padding:4px 7px;border-radius:7px;background:rgba(0,0,0,.55);color:#7dff8a;pointer-events:none;z-index:4}
+#fps.med{color:#ffd23d}#fps.mal{color:#ff5a4a}
+.nota{font-size:.78em;opacity:.7;margin:-2px 0 4px;min-height:1em}
 .jugar{font-size:1.25em;padding:.8em 1.4em;background:var(--ok);color:#fff;border-radius:14px;box-shadow:0 0 0 4px rgba(34,179,94,.3)}
 #fin .card{padding:18px;max-width:520px;width:100%}
 #fin h2{margin:0 0 8px}
@@ -344,6 +348,7 @@ body.tactil #chatF{bottom:auto;top:30%}
   </div>
   <form id="chatF"><input id="cin" maxlength="120" placeholder="Escribí y Enter..." autocomplete="off"><button class="btn-p">➤</button></form>
   <div id="marcas"></div>
+  <div id="fps" class="hidden"></div>
   <div id="tctl" class="hidden">
     <div id="palanca"><div id="bolita"></div></div>
     <div class="tb" data-b="fire">🔫</div><div class="tb" data-b="aim">🎯</div><div class="tb" data-b="jump">⬆️</div>
@@ -379,6 +384,10 @@ body.tactil #chatF{bottom:auto;top:30%}
       <div class="ajuste"><span>Mouse</span><input type="range" id="sSens" min="0.2" max="3" step="0.1"><span id="vSens"></span></div>
       <div class="ajuste"><span>Dedo</span><input type="range" id="sTsens" min="0.3" max="3" step="0.1"><span id="vTsens"></span></div>
       <div class="ajuste"><span>Visión</span><input type="range" id="sFov" min="60" max="100" step="1"><span id="vFov"></span></div>
+      <div class="ajuste"><span>Gráficos</span><select id="sGraf"><option value="auto">🤖 Automático (se ajusta solo)</option><option value="bajo">🐢 Bajo (más fluido)</option><option value="medio">⚖️ Medio</option><option value="alto">✨ Alto</option><option value="ultra">💎 Ultra (bordes suaves)</option></select></div>
+      <div class="nota" id="gNota"></div>
+      <div class="ajuste"><span>Límite FPS</span><select id="sFpsLim"><option value="0">Sin límite</option><option value="60">60 FPS</option><option value="30">30 FPS (ahorra batería)</option></select></div>
+      <label class="ajuste chk"><input type="checkbox" id="sFps"> <span>Mostrar los FPS (cuadros por segundo)</span></label>
       <label class="ajuste chk"><input type="checkbox" id="sAimTog"> <span>La mira queda puesta con un clic (no hay que mantener)</span></label>
       <div class="row tactil-solo" style="margin-top:10px"><button class="btn-p" id="ctrlBtn" style="flex:1">🎮 Acomodar controles</button></div>
       <div class="row" style="margin-top:10px"><button class="btn-r" id="leaveBtnP" style="flex:1">🚪 Salir de la partida</button></div>
@@ -392,10 +401,10 @@ body.tactil #chatF{bottom:auto;top:30%}
 </div>
 <div id="rotate"><div class="ph">📱</div><p>Girá el celular de costado<br><span id="rotateTxt">para jugar</span><small id="rotateSub">La partida sigue: ¡apurate!</small></p></div>
 
-<script src="mundo.js?v=23"></script>
-<script src="campana.js?v=23"></script>
-<script src="sala.js?v=23"></script>
-<script src="juego.js?v=23"></script>
+<script src="mundo.js?v=24"></script>
+<script src="campana.js?v=24"></script>
+<script src="sala.js?v=24"></script>
+<script src="juego.js?v=24"></script>
 <script>
 'use strict';
 const $ = s => document.querySelector(s);

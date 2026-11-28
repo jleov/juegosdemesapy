@@ -26,14 +26,67 @@
   const inp = { keys: new Set(), fire: false, aim: false, mx: 0, mz: 0, jumpQ: false, crouchT: false, tabla: false };
   let sens = store.get('tg_sens', 1), tsens = store.get('tg_tsens', 1), fovBase = store.get('tg_fov', 80), aimToggle = store.get('tg_aimtog', false);
   let mira = 0;   // espectador: a quién se mira
+  // ---------- calidad de los gráficos ----------
+  let graf = store.get('tg_graf', 'auto'), fpsLim = +store.get('tg_fpslim', 0) || 0, verFps = store.get('tg_verfps', false);
+  const dpr = () => devicePixelRatio || 1;
+  const GQ = {
+    bajo:  { pr: () => 0.6, dist: 65, efx: 0.35, luces: false },
+    medio: { pr: () => Math.min(dpr(), 0.9), dist: 110, efx: 0.7, luces: true },
+    alto:  { pr: () => Math.min(dpr(), 1.5), dist: 160, efx: 1, luces: true },
+    ultra: { pr: () => Math.min(dpr(), 2), dist: 260, efx: 1, luces: true },
+    auto:  { pr: () => Math.min(dpr(), 1.25), dist: 140, efx: 0.85, luces: true },
+  };
+  const gq = () => GQ[graf] || GQ.auto;
+  const quiereAA = () => graf === 'ultra' || ((graf === 'alto' || graf === 'auto') && !tactil());
+  let escala = 1, fogVisto = 0, fpsN = 0, fpsT = 0, fpsVal = 60, autoSum = 0, autoN = 0, lastDraw = 0;
+  const efx = n => { const k = gq().efx; return k >= 1 ? n : Math.max(1, Math.round(n * k)); };
+  function aplicarGraf() {
+    if (!ren) return;
+    const q = gq(); escala = q.pr(); ren.setPixelRatio(escala); medir();
+    for (const k of ['boom', 'fuego', 'destello']) if (luz[k]) luz[k].visible = q.luces;
+    fogVisto = 0;
+  }
+  // la niebla corta la vista: lo que queda detrás no se dibuja
+  function distTick() {
+    if (!scene || scene.fog === fogVisto) return;
+    const f = scene.fog; fogVisto = f;
+    if (!f) { cam.far = gq().dist + 40; cam.updateProjectionMatrix(); return; }
+    if (f.far0 == null) { f.far0 = f.far; f.near0 = f.near; }
+    f.far = Math.min(f.far0, gq().dist); f.near = Math.min(f.near0, f.far * 0.45);
+    cam.far = f.far + 8; cam.updateProjectionMatrix();
+  }
+  function fpsTick(t) {
+    fpsN++;
+    if (!fpsT) fpsT = t;
+    if (t - fpsT < 500) return;
+    fpsVal = fpsN * 1000 / (t - fpsT); fpsN = 0; fpsT = t;
+    const el = $('#fps');
+    if (verFps) {
+      el.textContent = Math.round(fpsVal) + ' FPS' + (graf === 'auto' ? ' · ' + Math.round(escala / dpr() * 100) + '%' : '');
+      const meta = fpsLim || 60; el.className = fpsVal >= meta * 0.85 ? '' : fpsVal >= meta * 0.5 ? 'med' : 'mal';
+    } else el.classList.add('hidden');
+    // automático: si va lento baja la resolución, si le sobra la sube
+    if (graf === 'auto' && !document.hidden) {
+      autoSum += fpsVal; autoN++;
+      if (autoN >= 4) {
+        const prom = autoSum / autoN, meta = Math.min(60, fpsLim || 60), max = GQ.auto.pr();
+        autoSum = autoN = 0;
+        let n = escala;
+        if (prom < meta * 0.75) n = Math.max(0.45, escala - 0.15);
+        else if (prom > meta * 0.95) n = Math.min(max, escala + 0.1);
+        if (Math.abs(n - escala) > 0.01) { escala = n; ren.setPixelRatio(escala); medir(); }
+      }
+    }
+  }
 
   // ================= arranque =================
   J.conectar = o => { C = o; };
   function crear() {
     if (ren) return;
     const cv = $('#cv3');
-    ren = new T.WebGLRenderer({ canvas: cv, antialias: !tactil(), powerPreference: 'high-performance' });
-    ren.setPixelRatio(Math.min(devicePixelRatio || 1, tactil() ? 1.5 : 2));
+    ren = new T.WebGLRenderer({ canvas: cv, antialias: quiereAA(), powerPreference: 'high-performance' });
+    ren.aa = quiereAA();
+    escala = gq().pr(); ren.setPixelRatio(escala);
     ren.autoClear = false;
     scene = new T.Scene();
     cam = new T.PerspectiveCamera(fovBase, 1, 0.05, 400); cam.rotation.order = 'YXZ';
@@ -52,6 +105,7 @@
     armarVM();
     if (modelosListos) { try { armasVM(); } catch (e) { console.warn('armas 3D', e); } }   // si los modelos cargaron antes que la pantalla 3D
     addEventListener('resize', medir); medir();
+    aplicarGraf();
     controles();
   }
   function medir() {
@@ -799,7 +853,7 @@
   }
   const polvoGeo = new T.BoxGeometry(0.12, 0.12, 0.12);
   function polvo(p, color) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0, n = efx(3); i < n; i++) {
       const m = new T.Mesh(polvoGeo, new T.MeshBasicMaterial({ color, transparent: true }));
       m.position.set(p[0], p[1], p[2]); scene.add(m);
       efectos.push({ o: m, t: 0, max: 0.35, tipo: 'polvo', v: [(Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3] });
@@ -845,6 +899,7 @@
   // deslizarse: nubecitas de polvo en los pies y un roce largo
   let polvoTex = null;
   function polvoPies(x, y, z) {
+    if (Math.random() > gq().efx) return;
     if (!polvoTex) {
       const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
       const gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,.4)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
@@ -1222,6 +1277,12 @@
     $('#vTsens').textContent = tsens.toFixed(1);
     $('#sFov').value = fovBase; $('#sFov').oninput = e => { fovBase = +e.target.value; store.set('tg_fov', fovBase); $('#vFov').textContent = fovBase; };
     $('#vFov').textContent = fovBase;
+    const notaG = () => { $('#gNota').textContent = ({ auto: 'Baja o sube la resolución según cómo ande tu equipo', bajo: 'Menos resolución, menos distancia y menos humo y polvo', medio: 'Resolución y distancia intermedias', alto: 'Buena resolución y distancia', ultra: 'Para equipos potentes' }[graf]) + (ren && quiereAA() && !ren.aa ? ' · Recargá la página para suavizar los bordes' : ''); };
+    $('#sGraf').value = graf; $('#sGraf').onchange = e => { graf = e.target.value; store.set('tg_graf', graf); aplicarGraf(); notaG(); };
+    notaG();
+    $('#sFpsLim').value = String(fpsLim); $('#sFpsLim').onchange = e => { fpsLim = +e.target.value; store.set('tg_fpslim', fpsLim); };
+    $('#sFps').checked = verFps; $('#sFps').onchange = e => { verFps = e.target.checked; store.set('tg_verfps', verFps); $('#fps').classList.toggle('hidden', !verFps); };
+    $('#fps').classList.toggle('hidden', !verFps);
     $('#sAimTog').checked = aimToggle; $('#sAimTog').onchange = e => { aimToggle = e.target.checked; store.set('tg_aimtog', aimToggle); };
     tactilCtl();
   }
@@ -1360,7 +1421,10 @@
   function loop(t) {
     if (!activo) return;
     raf = requestAnimationFrame(loop);
+    if (fpsLim && t - lastDraw < 1000 / fpsLim - 3) return;
+    lastDraw = t;
     const dt = Math.max(0, Math.min(0.05, (t - last) / 1000)); last = Math.max(last, t);
+    fpsTick(t); distTick();
     const now = performance.now(), obs = C.obs();
     if (cine) { cineTick(dt); return; }
     if (!obs && yo.alive) jugar(dt, now);
@@ -1683,6 +1747,7 @@
     if (campK[3] < 45 && (camion.humoT -= dt) <= 0) { camion.humoT = 0.2; humoNegro(g.position.x, 2.6, g.position.z); }
   }
   function humoNegro(x, y, z) {
+    if (Math.random() > gq().efx) return;
     const h = new T.Sprite(new T.SpriteMaterial({ map: brillo('#555555'), transparent: true, depthWrite: false, opacity: 0.6 }));
     h.material.color.set('#222'); h.position.set(x + (Math.random() - 0.5) * 0.6, y, z + (Math.random() - 0.5) * 0.6); scene.add(h);
     humos.push({ o: h, t: 0, max: 2.5, s0: 1, s1: 3, op: 0.55, sube: 1.4 });
